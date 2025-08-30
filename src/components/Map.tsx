@@ -1,3 +1,4 @@
+// src/components/Map.tsx
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 
@@ -247,13 +248,14 @@ export default function Map({
           offset: L.point(90, 20), // กล่องดำไปทางขวา
         })
         .addTo(markersLayer)
-        .on("mouseover", function () {
+        // ✅ ใส่ type ให้ this เป็น L.Marker เพื่อแก้ TS2683
+        .on("mouseover", function (this: L.Marker) {
           this.openPopup();
         })
-        .on("mouseout", function () {
+        .on("mouseout", function (this: L.Marker) {
           this.closePopup();
         })
-        .on("click", function () {
+        .on("click", function (this: L.Marker) {
           this.openPopup();
         });
     });

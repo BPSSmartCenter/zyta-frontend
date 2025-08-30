@@ -1,11 +1,7 @@
 // src/components/StatCard.tsx
-import React, {
-  useMemo,
-  useState,
-  useContext,
-  createContext,
-  PropsWithChildren,
-} from "react";
+import { useMemo, useState, useContext, createContext } from "react";
+import type React from "react";
+import type { PropsWithChildren } from "react";
 import defaultFireImage from "../assets/fire.png";
 
 /* ===================== Group Context ===================== */

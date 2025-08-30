@@ -1,4 +1,3 @@
-import React from "react";
 import brandImage from "../assets/brand.png";
 
 type Props = {};
@@ -16,15 +15,17 @@ export default function Login({}: Props) {
             <div className="flex gap-1 flex-col mt-4 w-full">
               <label>Email</label>
               <input
-                className="border border-gray-500 pl-1 h-[40px] rounded-sm"
+                className="border border-gray-500 pl-1 h-[40px] rounded-sm placeholder:text-transparent"
                 type="email"
+                placeholder="email"
               />
             </div>
-            <div className="flex gap-1 flex-col mt-4 w-full">
+            <div className="flex gap-1 flex-col mt-4 w-full ">
               <label>Password</label>
               <input
-                className="border border-gray-500 pl-1 h-[40px] rounded-sm"
+                className="border border-gray-500 pl-1 h-[40px] rounded-sm placeholder:text-transparent"
                 type="password"
+                placeholder="password"
               />
             </div>
             <div className="flex justify-between items-center w-full mt-4">

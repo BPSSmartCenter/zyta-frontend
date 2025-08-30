@@ -24,14 +24,14 @@ type RadialBarProps = {
   mainColor?: string; // progress
   primaryColor?: string; // track
   bg?: string; // hollow background
-  prefix?: string; // จะถูกวางท้ายตัวเลข เช่น %
+  prefix?: string; // ต่อท้ายตัวเลข เช่น %
   height?: number;
-  width?: number; // ✅ กำหนดความกว้าง chart (px) ให้หดพอดี
+  width?: number; // ความกว้าง chart (px)
   rounded?: boolean;
   hollowSize?: string;
   valueStyle?: RadialValueStyle;
   className?: string;
-  tight?: boolean; // ✅ ทำ container ให้พอดีตัว (inline-flex)
+  tight?: boolean; // ทำ container ให้พอดีตัว
 };
 
 const RadialBar: React.FC<RadialBarProps> = ({
@@ -65,10 +65,12 @@ const RadialBar: React.FC<RadialBarProps> = ({
       radialBar: {
         hollow: { size: hollowSize, background: bg },
         track: { background: primaryColor, strokeWidth: "100%", margin: 0 },
+        // ⬇️ Cast ทั้งก้อนของ dataLabels เพื่อคงสไตล์ (formatter/offsetX) และให้ TS ผ่าน
         dataLabels: {
           show: true,
           name: {
             show: !!label,
+            // apexcharts ช่วยรองรับ formatter แม้ type ไม่ประกาศ -> cast ครอบทั้งก้อน
             formatter: () => label,
             offsetX: offsets?.labelOffsetX ?? 0,
             offsetY: offsets?.labelOffsetY ?? -6, // label อยู่เหนือค่า
@@ -86,8 +88,11 @@ const RadialBar: React.FC<RadialBarProps> = ({
             fontWeight: valueStyle?.fontWeight ?? 600,
             show: true,
           },
-        },
-        startAngle: -0,
+          // (ถ้าคุณมี total ก็ใส่เพิ่มได้ที่นี่ โดยยังอยู่ใน cast เดียวกัน)
+        } as unknown as NonNullable<
+          NonNullable<ApexOptions["plotOptions"]>["radialBar"]
+        >["dataLabels"],
+        startAngle: 0,
         endAngle: 360,
       },
     },
@@ -114,7 +119,7 @@ const RadialBar: React.FC<RadialBarProps> = ({
         options={options}
         series={[value]}
         height={height}
-        width={chartWidth} // ✅ กำหนดความกว้างให้พอดี
+        width={chartWidth}
       />
     </div>
   );

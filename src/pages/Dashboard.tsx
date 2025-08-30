@@ -334,7 +334,6 @@ const Dashboard = () => {
             <Dropdown options={exportFile}>
               {({
                 open,
-                selected,
                 options,
                 getButtonProps,
                 getMenuProps,

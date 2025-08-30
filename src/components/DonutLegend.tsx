@@ -1,15 +1,13 @@
 // src/components/DonutLegend.tsx
-import React from "react";
-
 type Item = { label: string; color: string };
 
 type DonutLegendProps = {
   items: Item[];
 
   // 🔥 เพิ่ม props custom
-  className?: string;        // ใช้กับ <ul>
-  itemClassName?: string;    // ใช้กับ <li>
-  labelClassName?: string;   // ใช้กับ <span> ของข้อความ
+  className?: string; // ใช้กับ <ul>
+  itemClassName?: string; // ใช้กับ <li>
+  labelClassName?: string; // ใช้กับ <span> ของข้อความ
 };
 
 export default function DonutLegend({

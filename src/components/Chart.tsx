@@ -1,7 +1,6 @@
-// src/components/WeeklySnapshotChart.tsx
-import React from "react";
+// src/components/Chart.tsx
 import ReactApexChart from "react-apexcharts";
-import type { ApexOptions, ApexAnnotations } from "apexcharts";
+import type { ApexOptions } from "apexcharts";
 
 /** -----------------------------
  *  Types
@@ -21,48 +20,30 @@ export type HighlightRange =
     }; // ใช้ index ของ category
 
 export interface WeeklySnapshotChartProps {
-  /** REQUIRED: หมวดหมู่แกน X เช่น ["MON","TUE",...,"SUN"] */
   categories: string[];
-  /** REQUIRED: ข้อมูลของซีรีส์ */
   series: WeeklySnapshotSeries[];
 
-  /** สไตล์/คอนฟิกพื้นฐาน */
   height?: number;
-  colors?: string[]; // สีของแต่ละซีรีส์
-  title?: string; // ข้อความหัวข้อหลักเหนือกราฟ
-  subtitle?: string; // ข้อความย่อยเหนือกราฟ
-  /**
-   * ไฮไลต์ช่วงคอลัมน์ เช่นวันพุธ — รองรับระบุด้วยชื่อ category หรือ index
-   * ถ้าไม่ส่ง จะไม่ใส่ annotation
-   */
+  colors?: string[];
+  title?: string;
+  subtitle?: string;
   highlightRange?: HighlightRange;
 
-  /** ปรับคอนฟิกย่อยทั่วไป */
-  legendPosition?: ApexOptions["legend"] extends infer L
-    ? L extends object
-      ? L["position"]
-      : never
-    : never;
-  legendAlign?: ApexOptions["legend"] extends infer L
-    ? L extends object
-      ? L["horizontalAlign"]
-      : never
-    : never;
-  showGridY?: boolean; // โชว์เส้นกริดแนวนอน
-  showGridX?: boolean; // โชว์เส้นกริดแนวตั้ง
-  columnWidthPercent?: number; // ความอ้วนแท่ง (%)
-  borderRadius?: number; // มุมโค้งแท่ง
-  showDataLabels?: boolean; // เปิด/ปิด dataLabels
+  legendPosition?: NonNullable<ApexOptions["legend"]>["position"];
+  legendAlign?: NonNullable<ApexOptions["legend"]>["horizontalAlign"];
+  showGridY?: boolean;
+  showGridX?: boolean;
+  columnWidthPercent?: number;
+  borderRadius?: number;
+  showDataLabels?: boolean;
 
-  /** ส่ง ApexOptions เต็ม ๆ เพื่อ override แบบละเอียด (deep-merge) */
   optionsOverride?: ApexOptions;
 
-  /** ปรับแต่ง tooltip */
   tooltipValueFormatter?: (val: number) => string | number;
 }
 
 /** -----------------------------
- *  Utils: Deep Merge (ง่าย/พอเพียง)
+ *  Utils: Deep Merge (เล็กๆ)
  *  ----------------------------- */
 function isObject(item: unknown): item is Record<string, any> {
   return !!item && typeof item === "object" && !Array.isArray(item);
@@ -84,23 +65,17 @@ function deepMerge<
   return output as T & U;
 }
 
-/** -----------------------------
- *  Component
- *  ----------------------------- */
-const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
+const WeeklySnapshotChart = (props: WeeklySnapshotChartProps) => {
   const {
-    // REQUIRED
     categories,
     series,
 
-    // Basic style (มี default สำหรับ “สไตล์” เท่านั้น)
     height = 760,
     colors = ["#4D80F4", "#39B8EE", "#98D1E4"],
     title,
     subtitle,
     highlightRange,
 
-    // Minor toggles
     legendPosition = "right",
     legendAlign = "center",
     showGridY = true,
@@ -109,21 +84,18 @@ const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
     borderRadius = 10,
     showDataLabels = false,
 
-    // Tooltip
     tooltipValueFormatter,
-
-    // Apex override
     optionsOverride,
   } = props;
 
-  // คำนวณ annotation จาก highlightRange
-  const buildAnnotations = (): ApexAnnotations | undefined => {
+  type Annotations = NonNullable<ApexOptions["annotations"]>;
+
+  const buildAnnotations = (): Annotations | undefined => {
     if (!highlightRange) return undefined;
 
     const fillColor = (highlightRange as any).fillColor ?? "#F5F7FB";
     const opacity = (highlightRange as any).opacity ?? 1;
 
-    // จากชื่อ category
     if ("from" in highlightRange && typeof highlightRange.from === "string") {
       const x1 = highlightRange.from;
       const x2 = highlightRange.to ?? highlightRange.from;
@@ -140,7 +112,6 @@ const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
       };
     }
 
-    // จาก index
     if (
       "fromIndex" in highlightRange &&
       typeof highlightRange.fromIndex === "number"
@@ -174,7 +145,6 @@ const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
     return undefined;
   };
 
-  // base options: “โทน/สไตล์” ดีฟอลต์ (แก้ไขได้ผ่าน props หรือ optionsOverride)
   const baseOptions: ApexOptions = {
     chart: {
       type: "bar",
@@ -218,17 +188,23 @@ const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
       position: legendPosition,
       horizontalAlign: legendAlign,
       fontSize: "12px",
-      markers: { radius: 6, width: 10, height: 10 },
+      // >>> สำคัญ: คงสไตล์เดิมไว้ และ cast type เพื่อให้ TS ผ่าน
+      markers: { radius: 6, width: 10, height: 10 } as unknown as NonNullable<
+        NonNullable<ApexOptions["legend"]>["markers"]
+      >,
       itemMargin: { vertical: 6 },
       offsetY: 20,
     },
     tooltip: {
       theme: "light",
       y: {
-        formatter: (val: number) =>
-          typeof tooltipValueFormatter === "function"
-            ? tooltipValueFormatter(val)
-            : `${val}`,
+        formatter: (val: number) => {
+          const v =
+            typeof tooltipValueFormatter === "function"
+              ? tooltipValueFormatter(val)
+              : val;
+          return String(v); // บังคับเป็น string ให้ตรง type
+        },
       },
     },
     annotations: buildAnnotations(),
