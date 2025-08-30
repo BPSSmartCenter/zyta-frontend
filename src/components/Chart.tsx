@@ -1,0 +1,258 @@
+// src/components/WeeklySnapshotChart.tsx
+import React from "react";
+import ReactApexChart from "react-apexcharts";
+import type { ApexOptions, ApexAnnotations } from "apexcharts";
+
+/** -----------------------------
+ *  Types
+ *  ----------------------------- */
+export type WeeklySnapshotSeries = {
+  name: string;
+  data: number[];
+};
+
+export type HighlightRange =
+  | { from: string; to?: string; fillColor?: string; opacity?: number } // ใช้ label category เช่น "WED"
+  | {
+      fromIndex: number;
+      toIndex?: number;
+      fillColor?: string;
+      opacity?: number;
+    }; // ใช้ index ของ category
+
+export interface WeeklySnapshotChartProps {
+  /** REQUIRED: หมวดหมู่แกน X เช่น ["MON","TUE",...,"SUN"] */
+  categories: string[];
+  /** REQUIRED: ข้อมูลของซีรีส์ */
+  series: WeeklySnapshotSeries[];
+
+  /** สไตล์/คอนฟิกพื้นฐาน */
+  height?: number;
+  colors?: string[]; // สีของแต่ละซีรีส์
+  title?: string; // ข้อความหัวข้อหลักเหนือกราฟ
+  subtitle?: string; // ข้อความย่อยเหนือกราฟ
+  /**
+   * ไฮไลต์ช่วงคอลัมน์ เช่นวันพุธ — รองรับระบุด้วยชื่อ category หรือ index
+   * ถ้าไม่ส่ง จะไม่ใส่ annotation
+   */
+  highlightRange?: HighlightRange;
+
+  /** ปรับคอนฟิกย่อยทั่วไป */
+  legendPosition?: ApexOptions["legend"] extends infer L
+    ? L extends object
+      ? L["position"]
+      : never
+    : never;
+  legendAlign?: ApexOptions["legend"] extends infer L
+    ? L extends object
+      ? L["horizontalAlign"]
+      : never
+    : never;
+  showGridY?: boolean; // โชว์เส้นกริดแนวนอน
+  showGridX?: boolean; // โชว์เส้นกริดแนวตั้ง
+  columnWidthPercent?: number; // ความอ้วนแท่ง (%)
+  borderRadius?: number; // มุมโค้งแท่ง
+  showDataLabels?: boolean; // เปิด/ปิด dataLabels
+
+  /** ส่ง ApexOptions เต็ม ๆ เพื่อ override แบบละเอียด (deep-merge) */
+  optionsOverride?: ApexOptions;
+
+  /** ปรับแต่ง tooltip */
+  tooltipValueFormatter?: (val: number) => string | number;
+}
+
+/** -----------------------------
+ *  Utils: Deep Merge (ง่าย/พอเพียง)
+ *  ----------------------------- */
+function isObject(item: unknown): item is Record<string, any> {
+  return !!item && typeof item === "object" && !Array.isArray(item);
+}
+function deepMerge<
+  T extends Record<string, any>,
+  U extends Record<string, any>
+>(target: T, source?: U): T & U {
+  if (!source) return target as T & U;
+  const output = { ...target } as Record<string, any>;
+  Object.keys(source).forEach((key) => {
+    const sVal = (source as any)[key];
+    if (isObject(sVal)) {
+      output[key] = deepMerge(isObject(output[key]) ? output[key] : {}, sVal);
+    } else {
+      output[key] = sVal;
+    }
+  });
+  return output as T & U;
+}
+
+/** -----------------------------
+ *  Component
+ *  ----------------------------- */
+const WeeklySnapshotChart: React.FC<WeeklySnapshotChartProps> = (props) => {
+  const {
+    // REQUIRED
+    categories,
+    series,
+
+    // Basic style (มี default สำหรับ “สไตล์” เท่านั้น)
+    height = 760,
+    colors = ["#4D80F4", "#39B8EE", "#98D1E4"],
+    title,
+    subtitle,
+    highlightRange,
+
+    // Minor toggles
+    legendPosition = "right",
+    legendAlign = "center",
+    showGridY = true,
+    showGridX = false,
+    columnWidthPercent = 38,
+    borderRadius = 10,
+    showDataLabels = false,
+
+    // Tooltip
+    tooltipValueFormatter,
+
+    // Apex override
+    optionsOverride,
+  } = props;
+
+  // คำนวณ annotation จาก highlightRange
+  const buildAnnotations = (): ApexAnnotations | undefined => {
+    if (!highlightRange) return undefined;
+
+    const fillColor = (highlightRange as any).fillColor ?? "#F5F7FB";
+    const opacity = (highlightRange as any).opacity ?? 1;
+
+    // จากชื่อ category
+    if ("from" in highlightRange && typeof highlightRange.from === "string") {
+      const x1 = highlightRange.from;
+      const x2 = highlightRange.to ?? highlightRange.from;
+      return {
+        xaxis: [
+          {
+            x: x1,
+            x2,
+            fillColor,
+            opacity,
+            borderColor: "transparent",
+          },
+        ],
+      };
+    }
+
+    // จาก index
+    if (
+      "fromIndex" in highlightRange &&
+      typeof highlightRange.fromIndex === "number"
+    ) {
+      const fromIdx = Math.max(
+        0,
+        Math.min(categories.length - 1, highlightRange.fromIndex)
+      );
+      const toIdx = Math.max(
+        fromIdx,
+        Math.min(
+          categories.length - 1,
+          highlightRange.toIndex ?? highlightRange.fromIndex
+        )
+      );
+      const x1 = categories[fromIdx];
+      const x2 = categories[toIdx];
+      return {
+        xaxis: [
+          {
+            x: x1,
+            x2,
+            fillColor,
+            opacity,
+            borderColor: "transparent",
+          },
+        ],
+      };
+    }
+
+    return undefined;
+  };
+
+  // base options: “โทน/สไตล์” ดีฟอลต์ (แก้ไขได้ผ่าน props หรือ optionsOverride)
+  const baseOptions: ApexOptions = {
+    chart: {
+      type: "bar",
+      toolbar: { show: false },
+      fontFamily: "Inter, ui-sans-serif, system-ui",
+    },
+    colors,
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: `${columnWidthPercent}%`,
+        borderRadius,
+        borderRadiusApplication: "end",
+        dataLabels: { position: "top" },
+      },
+    },
+    dataLabels: { enabled: showDataLabels },
+    stroke: { show: false },
+    grid: {
+      borderColor: "#EEF2F7",
+      xaxis: { lines: { show: showGridX } },
+      yaxis: { lines: { show: showGridY } },
+      padding: { left: 8, right: 8 },
+    },
+    xaxis: {
+      categories,
+      axisBorder: { show: false },
+      axisTicks: { show: false },
+      labels: {
+        style: { colors: "#94A3B8", fontSize: "12px", fontWeight: 500 },
+      },
+    },
+    yaxis: {
+      min: 0,
+      tickAmount: 6,
+      labels: {
+        style: { colors: "#94A3B8", fontSize: "12px", fontWeight: 500 },
+      },
+    },
+    legend: {
+      position: legendPosition,
+      horizontalAlign: legendAlign,
+      fontSize: "12px",
+      markers: { radius: 6, width: 10, height: 10 },
+      itemMargin: { vertical: 6 },
+      offsetY: 20,
+    },
+    tooltip: {
+      theme: "light",
+      y: {
+        formatter: (val: number) =>
+          typeof tooltipValueFormatter === "function"
+            ? tooltipValueFormatter(val)
+            : `${val}`,
+      },
+    },
+    annotations: buildAnnotations(),
+  };
+
+  const options = deepMerge(baseOptions, optionsOverride);
+
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm">
+      {subtitle ? (
+        <div className="mb-1 text-xs text-gray-500">{subtitle}</div>
+      ) : null}
+      {title ? (
+        <div className="mb-3 text-lg font-semibold text-gray-900">{title}</div>
+      ) : null}
+
+      <ReactApexChart
+        type="bar"
+        series={series}
+        options={options}
+        height={height}
+      />
+    </div>
+  );
+};
+
+export default WeeklySnapshotChart;

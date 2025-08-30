@@ -1,9 +1,17 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Login from "./pages/Login";
 import "./App.css";
+import Dashboard from "./pages/Dashboard";
 
 function App() {
   return (
     <>
-      <div className="text-2xl">Hello BPS</div>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
+      </BrowserRouter>
     </>
   );
 }
