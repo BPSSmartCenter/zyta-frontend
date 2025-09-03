@@ -80,8 +80,8 @@ const WeeklySnapshotChart = (props: WeeklySnapshotChartProps) => {
     legendAlign = "center",
     showGridY = true,
     showGridX = false,
-    columnWidthPercent = 38,
-    borderRadius = 10,
+    columnWidthPercent = 55,
+    borderRadius = 6,
     showDataLabels = false,
 
     tooltipValueFormatter,

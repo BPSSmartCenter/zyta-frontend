@@ -4,7 +4,7 @@ import fireNoti from "../assets/firenoti.svg";
 import motionNoti from "../assets/motionnoti.svg";
 import deviceNoti from "../assets/devicenoti.svg";
 
-type NotiType = "alert" | "warning" | "device" | "normal";
+type NotiType = "alert" | "warning" | "offline" | "normal";
 
 type NotiCardProps = {
   type: NotiType;
@@ -49,7 +49,7 @@ const palette: Record<
     title: "text-[#181D27]",
     meta: "text-[#B8B8B8]",
   },
-  device: {
+  offline: {
     root: "bg-[#F8FBFE]",
     border: "border-none",
     iconBg: "bg-[#AFEAFF]",
@@ -68,7 +68,7 @@ const palette: Record<
 const DefaultIcon: React.FC<{ type: NotiType }> = ({ type }) => {
   if (type === "alert") return <img src={fireNoti} alt="" />;
   if (type === "warning") return <img src={motionNoti} alt="" />;
-  if (type === "device") return <img src={deviceNoti} alt="" />;
+  if (type === "offline") return <img src={deviceNoti} alt="" />;
   // ❗ normal = แสดง img ไม่มี bg
   return <img src={deviceNoti} alt="" />;
 };

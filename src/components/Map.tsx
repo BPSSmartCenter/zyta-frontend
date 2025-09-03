@@ -1,17 +1,18 @@
 // src/components/Map.tsx
 import { useEffect, useRef } from "react";
 import L from "leaflet";
-
-const TH_BOUNDS: L.LatLngBoundsExpression = [
-  [5.5, 97.0],
-  [21.0, 107.5],
-];
+import {
+  TH_BOUNDS,
+  DEFAULT_SITE_COORDS,
+  SEVERITY_RANK,
+  SEVERITY_COLOR,
+} from "./Dashboard/dashboard.constants";
 
 type Noti = {
-  type: "alert" | "warning" | "normal" | string;
+  type: "alert" | "warning" | "offline" | "normal" | string;
   title: string;
   site: string;
-  date: string; // YYYY-MM-DD หรือ parse ได้
+  date: string;
 };
 
 type SiteCoord = { lat: number; lng: number };
@@ -19,29 +20,9 @@ type SiteCoordMap = Record<string, SiteCoord>;
 
 type Props = {
   notis: Noti[];
-  siteCoords?: SiteCoordMap; // ถ้าไม่ส่ง ใช้ค่า default ด้านล่าง
-  aggregateBySite?: boolean; // true = เลือก “เหตุรุนแรงสุด/ใหม่สุด” ต่อ site
-};
-
-const DEFAULT_SITE_COORDS: SiteCoordMap = {
-  "Site A": { lat: 18.7883, lng: 98.9853 }, // เชียงใหม่
-  "Site B": { lat: 7.8906, lng: 98.3981 }, // ภูเก็ต
-  "Site C": { lat: 15.87, lng: 100.9925 }, // กลางประเทศ
-  "Site D": { lat: 16.4419, lng: 102.835 }, // ขอนแก่น
-  "Site E": { lat: 15.244, lng: 104.8487 }, // อุบลฯ
-  "Site F": { lat: 13.7563, lng: 100.5018 }, // กทม.
-  "Site G": { lat: 9.1382, lng: 99.321 }, // สุราษฎร์ฯ (ตัวอย่าง)
-};
-
-const SEVERITY_RANK: Record<string, number> = {
-  alert: 3,
-  warning: 2,
-  normal: 1,
-};
-const SEVERITY_COLOR: Record<string, string> = {
-  alert: "#ef4444", // แดง
-  warning: "#f59e0b", // ส้ม
-  normal: "#22c55e", // เขียว
+  siteCoords?: SiteCoordMap;
+  aggregateBySite?: boolean;
+  severityFilter?: string;
 };
 
 function makeSvgPin(color: string, size = 32) {
@@ -68,10 +49,35 @@ function makeSvgPin(color: string, size = 32) {
   });
 }
 
+/** แม็พคำที่มาจาก dropdown → คีย์ภายใน notis.type
+ *  - กันเคสภาษา/คำอธิบาย เช่น "Fire detection", "Motion detection", "กล้องออฟไลน์"
+ *  - ถ้าไม่แม็พเจอ => คืน "all" เพื่อไม่กรอง (กันหายหมดจอ)
+ */
+function normalizeSeverity(
+  input?: string
+): "all" | "alert" | "warning" | "offline" | "normal" {
+  const raw = (input || "").trim().toLowerCase();
+  if (!raw || raw === "all" || raw === "any severity") return "all";
+  if (raw.includes("fire")) return "alert";
+  if (raw.includes("motion")) return "warning";
+  if (raw.includes("offline") || raw.includes("ออฟไลน์")) return "offline";
+  // ถ้า dropdown ส่งเป็นคีย์ตรงอยู่แล้ว
+  if (
+    raw === "alert" ||
+    raw === "warning" ||
+    raw === "offline" ||
+    raw === "normal"
+  ) {
+    return raw as any;
+  }
+  return "all";
+}
+
 export default function Map({
   notis,
   siteCoords = DEFAULT_SITE_COORDS,
   aggregateBySite = true,
+  severityFilter,
 }: Props) {
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -169,7 +175,6 @@ export default function Map({
     markersLayerRef.current = L.layerGroup().addTo(map);
 
     return () => {
-      // cleanup ทั้งหมดเมื่อ component unmount
       if (markersLayerRef.current) {
         markersLayerRef.current.remove();
         markersLayerRef.current = null;
@@ -197,7 +202,6 @@ export default function Map({
     const markersLayer = markersLayerRef.current;
     if (!map || !markersLayer) return;
 
-    // เคลียร์รอบเก่า
     markersLayer.clearLayers();
 
     // เลือก 1 noti ต่อ site (รุนแรงสุด แล้วค่อยใหม่สุด)
@@ -222,9 +226,15 @@ export default function Map({
       return Object.values(chosen);
     };
 
-    const list = aggregateBySite ? pickBySite(notis) : notis;
+    // กรองตาม severityFilter (normalize กันหายหมด)
+    const normalized = normalizeSeverity(severityFilter);
+    const filtered =
+      normalized === "all"
+        ? notis
+        : notis.filter((n) => String(n.type).toLowerCase() === normalized);
 
-    // วาดหมุด
+    const list = aggregateBySite ? pickBySite(filtered) : filtered;
+
     list.forEach((n) => {
       const coord = siteCoords[n.site];
       if (!coord) {
@@ -245,10 +255,9 @@ export default function Map({
           className: "bps-popup-wrap",
           closeButton: false,
           autoPan: false,
-          offset: L.point(90, 20), // กล่องดำไปทางขวา
+          offset: L.point(90, 20),
         })
         .addTo(markersLayer)
-        // ✅ ใส่ type ให้ this เป็น L.Marker เพื่อแก้ TS2683
         .on("mouseover", function (this: L.Marker) {
           this.openPopup();
         })
@@ -259,7 +268,7 @@ export default function Map({
           this.openPopup();
         });
     });
-  }, [notis, siteCoords, aggregateBySite]);
+  }, [notis, siteCoords, aggregateBySite, severityFilter]);
 
   return (
     <div

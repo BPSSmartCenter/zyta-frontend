@@ -11,7 +11,7 @@ type Props = {
   selectedEvents: string[];
   buttonLabel: string;
   toggleEvent: (v: string) => void;
-  site: string;
+  site: string; // ใช้เก็บค่าที่เลือกจาก Any Severity
   setSite: (v: string) => void;
   province: string;
   setProvince: (v: string) => void;
@@ -31,6 +31,7 @@ export default function MapPanel({
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
         MAP
       </h1>
+
       <div className="flex items-center flex-wrap gap-5">
         {/* All Event Map */}
         <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
@@ -90,6 +91,7 @@ export default function MapPanel({
             </div>
           )}
         </Dropdown>
+
         {/* Any Severity */}
         <Dropdown options={SEVERITY_OPTIONS} value={site} onChange={setSite}>
           {({
@@ -115,6 +117,7 @@ export default function MapPanel({
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
                 </i>
               </button>
+
               <div
                 {...getMenuProps({
                   className: [
@@ -217,8 +220,10 @@ export default function MapPanel({
           )}
         </Dropdown>
       </div>
+
       <div className="h-[680px] sm:h-[680px] lg:h-[680px] w-full bg-gray-200 rounded-lg flex items-center justify-center">
-        <Map notis={notis} />
+        {/* ส่งค่าที่เลือกจาก Any Severity เป็นตัวกรองให้ Map */}
+        <Map notis={notis} severityFilter={site} />
       </div>
     </form>
   );

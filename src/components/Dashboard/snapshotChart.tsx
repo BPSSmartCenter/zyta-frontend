@@ -4,8 +4,7 @@ import Dropdown from "../../components/Dropdown";
 import WeeklySnapshotChart from "../../components/Chart";
 import {
   EVENT_OPTIONS,
-  chartSeries,
-  avgOfSeriesMax,
+  getSeriesByPeriod,
   niceUp,
 } from "./dashboard.constants";
 
@@ -17,30 +16,25 @@ type Props = {
 
 type AnySeries = { name?: string; data?: any[]; [k: string]: any };
 
-// --- ปรับให้ series ปลอดภัยเสมอ ---
-function sanitizeSeries(
+/** ทำซีรีส์ให้ยาวเท่ากับจำนวน categories เสมอ (pad ด้วย null) */
+function normalizeSeriesToCategories(
   input: AnySeries[] | undefined,
   categories: any[]
 ): AnySeries[] {
   const safe = Array.isArray(input) ? input : [];
-  const filtered = safe
+  return safe
     .filter((s) => Array.isArray(s?.data))
-    .map((s) => ({ ...s, data: [...(s.data as any[])] }));
-
-  if (!filtered.length) return [];
-
-  const minLen = Math.max(
-    0,
-    Math.min(
-      categories?.length ?? 0,
-      ...filtered.map((s) => (Array.isArray(s.data) ? s.data.length : 0))
-    )
-  );
-
-  return filtered.map((s) => ({ ...s, data: s.data.slice(0, minLen) }));
+    .map((s) => {
+      const src = (s.data as any[]) ?? [];
+      const data = Array.from({ length: categories.length }, (_, i) => {
+        const v = src[i];
+        return typeof v === "number" && Number.isFinite(v) ? v : null;
+      });
+      return { ...s, data };
+    });
 }
 
-// breakpoint helper (คง behavior เดิม)
+// breakpoint helper (เดิม)
 function useBreakpoint() {
   const get = () => {
     if (typeof window === "undefined") return "desktop";
@@ -67,48 +61,100 @@ function useBreakpoint() {
   return bp;
 }
 
+// ===== Labels =====
+const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const MONTH_LABELS = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
+
 export default function SnapshotChartSection({
   buttonLabel,
   selectedEvents,
   toggleEvent,
 }: Props) {
   const bp = useBreakpoint();
-
-  // container ใช้สังเกตขนาดเพื่อ reflow กราฟ
   const containerRef = React.useRef<HTMLDivElement | null>(null);
 
   const isDesktop = bp === "desktop";
   const chartHeight = isDesktop ? 600 : bp === "tablet" ? 420 : 280;
-  const columnWidthPercent = isDesktop ? 38 : bp === "tablet" ? 55 : 65;
+
+  // ลด columnWidth เล็กน้อยเพื่อให้แท่งในคลัสเตอร์ห่างกันขึ้น
+  const columnWidthPercent = isDesktop ? 32 : bp === "tablet" ? 50 : 60;
   const useChartLegend = !isDesktop;
 
-  // ===== เตรียมข้อมูลกราฟแบบปลอดภัย =====
-  const baseCategories = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-  const safeSeries = sanitizeSeries(chartSeries as any, baseCategories);
+  // ====== ช่วงเวลา (Default: Weekly) ======
+  const [period, setPeriod] = React.useState<"daily" | "weekly" | "monthly">(
+    "weekly"
+  );
 
-  const minSeriesLen =
-    safeSeries.length > 0
-      ? safeSeries.reduce((min, s: AnySeries) => {
-          const len = Array.isArray(s?.data) ? s.data.length : 0;
-          return Math.min(min, len);
-        }, baseCategories.length)
-      : 0;
+  // categories ของช่วงที่เลือก (Daily/Weekly ใช้ 7 วันเหมือนกัน)
+  const baseCategories = React.useMemo(
+    () => (period === "monthly" ? MONTH_LABELS : DAY_LABELS),
+    [period]
+  );
 
-  const safeCategories = baseCategories.slice(0, minSeriesLen);
+  // ดึงชุดข้อมูลตามช่วง (ถ้ายังไม่ได้กรองตาม event จริง ให้คง logic เดิม)
+  const rawSeries = getSeriesByPeriod(period);
 
-  // เรนเดอร์กราฟต่อเมื่อข้อมูลพร้อมจริง ๆ
-  const hasData =
-    safeSeries.length > 0 &&
-    minSeriesLen > 0 &&
-    safeSeries.every((s) => Array.isArray(s.data) && s.data!.length > 0);
+  // ปรับซีรีส์ให้ยาวเท่ากับจำนวน categories
+  const safeSeries = React.useMemo(
+    () => normalizeSeriesToCategories(rawSeries as any, baseCategories),
+    [rawSeries, baseCategories]
+  );
 
-  // เก็บสถานะไว้ให้ ResizeObserver ใช้
-  const hasDataRef = React.useRef(hasData);
-  React.useEffect(() => {
-    hasDataRef.current = hasData;
-  }, [hasData]);
+  // ใช้ค่าสูงสุดของ “ข้อมูลช่วงนั้น” มาคำนวณ y-axis เพื่อให้แท่งดูเต็ม
+  const currentMax = React.useMemo(
+    () =>
+      safeSeries.reduce((mx, s: any) => {
+        const vals = (s.data ?? []).filter(
+          (v: any) => typeof v === "number"
+        ) as number[];
+        return Math.max(mx, ...(vals.length ? vals : [0]));
+      }, 0),
+    [safeSeries]
+  );
 
-  // ResizeObserver: ข้าม reflow ถ้าไม่มีข้อมูลหรือมี Preline overlay เปิดอยู่
+  // ========== KEY สำหรับรี-mount กราฟเมื่อ event/series/period เปลี่ยน ==========
+  const seriesFingerprint = React.useMemo(
+    () =>
+      safeSeries
+        .map((s) => `${s.name ?? ""}:${(s.data ?? []).join("|")}`)
+        .join(";;"),
+    [safeSeries]
+  );
+
+  const chartKey = React.useMemo(
+    () =>
+      [
+        bp,
+        useChartLegend,
+        columnWidthPercent,
+        period,
+        selectedEvents.join(","), // เลือก event → key เปลี่ยน
+        seriesFingerprint, // ข้อมูลเปลี่ยน → key เปลี่ยน
+      ].join("|"),
+    [
+      bp,
+      useChartLegend,
+      columnWidthPercent,
+      period,
+      selectedEvents,
+      seriesFingerprint,
+    ]
+  );
+
+  // ให้ ResizeObserver ข้ามตอนยังไม่มี container หรือมี overlay ของ Preline
   React.useEffect(() => {
     const el = containerRef.current;
     if (!el || !(window as any).ResizeObserver) return;
@@ -118,8 +164,7 @@ export default function SnapshotChartSection({
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
         const overlayOpen = !!document.querySelector(".hs-overlay.open");
-        if (!document.body.contains(el) || !hasDataRef.current || overlayOpen)
-          return;
+        if (!document.body.contains(el) || overlayOpen) return;
         window.dispatchEvent(new Event("resize"));
       });
     });
@@ -134,12 +179,19 @@ export default function SnapshotChartSection({
     };
   }, []);
 
+  const btnClass = (active: boolean) =>
+    [
+      "py-2 px-3 lg:px-4 inline-flex items-center gap-x-2 -ms-px rounded-2xl first:ms-0 text-sm font-medium focus:z-10",
+      "text-gray-800 hover:bg-[#D1CEE8] hover:cursor-pointer",
+      active
+        ? "text-white bg-[#1E1B39]"
+        : "focus:text-white focus:bg-[#1E1B39]",
+      "disabled:opacity-50 disabled:pointer-events-none",
+    ].join(" ");
+
   return (
     <div className="px-6 flex w-full rounded-md flex-col gap-3 bg-white">
-      <form
-        action=""
-        className="flex flex-col lg:flex-row lg:items-start lg:justify-between p-6 gap-6"
-      >
+      <form className="flex flex-col lg:flex-row lg:items-start lg:justify-between p-6 gap-6">
         {/* =================== Left: header + chart =================== */}
         <div className="flex flex-col flex-1 min-w-0">
           {/* Header + filter */}
@@ -224,19 +276,25 @@ export default function SnapshotChartSection({
                 <div className="p-2 lg:p-4 gap-2 lg:gap-4 inline-flex rounded-lg ">
                   <button
                     type="button"
-                    className="py-2 px-3 lg:px-4 inline-flex items-center gap-x-2 -ms-px rounded-2xl first:ms-0 text-sm font-medium focus:z-10 bg-[#F8F8FF] text-gray-800 hover:bg-[#D1CEE8] hover:cursor-pointer focus:text-white focus:bg-[#1E1B39] disabled:opacity-50 disabled:pointer-events-none"
+                    aria-pressed={period === "daily"}
+                    onClick={() => setPeriod("daily")}
+                    className={btnClass(period === "daily")}
                   >
                     Daily
                   </button>
                   <button
                     type="button"
-                    className="py-2 px-3 lg:px-4 inline-flex items-center gap-x-2 -ms-px rounded-2xl first:ms-0 text-sm font-medium focus:z-10 bg-[#F8F8FF] text-gray-800 hover:bg-[#D1CEE8] hover:cursor-pointer focus:text-white focus:bg-[#1E1B39] disabled:opacity-50 disabled:pointer-events-none"
+                    aria-pressed={period === "weekly"}
+                    onClick={() => setPeriod("weekly")}
+                    className={btnClass(period === "weekly")}
                   >
                     Weekly
                   </button>
                   <button
                     type="button"
-                    className="py-2 px-3 lg:px-4 inline-flex items-center gap-x-2 -ms-px rounded-2xl first:ms-0 text-sm font-medium focus:z-10 bg-[#F8F8FF] text-gray-800 hover:bg-[#D1CEE8] hover:cursor-pointer focus:text-white focus:bg-[#1E1B39] disabled:opacity-50 disabled:pointer-events-none"
+                    aria-pressed={period === "monthly"}
+                    onClick={() => setPeriod("monthly")}
+                    className={btnClass(period === "monthly")}
                   >
                     Monthly
                   </button>
@@ -247,51 +305,42 @@ export default function SnapshotChartSection({
 
           {/* Chart */}
           <div ref={containerRef} className="mt-3">
-            {hasData ? (
-              <WeeklySnapshotChart
-                key={`${bp}-${useChartLegend}-${columnWidthPercent}`}
-                title=""
-                subtitle=""
-                height={chartHeight}
-                categories={safeCategories}
-                series={safeSeries as any}
-                colors={["#4A3AFF", "#39B8EE", "#D3F7FF"]}
-                legendPosition={useChartLegend ? "bottom" : "right"}
-                legendAlign="center"
-                showGridY={true}
-                showGridX={false}
-                columnWidthPercent={columnWidthPercent}
-                showDataLabels={false}
-                tooltipValueFormatter={(v) => `${v} ครั้ง`}
-                optionsOverride={{
-                  chart: { dropShadow: { enabled: false } },
-                  yaxis: {
-                    tickAmount: 5,
-                    max: niceUp(avgOfSeriesMax * 1.1, 10),
-                  },
-                  legend: {
-                    show: useChartLegend,
-                    position: "bottom",
-                    horizontalAlign: "center",
-                    floating: false,
-                    offsetY: 8,
-                  },
-                  stroke: { width: 0 },
-                  tooltip: { enabled: true, shared: false },
-                }}
-              />
-            ) : (
-              // Placeholder คงพื้นที่เดิม (กัน lib ถูกเรียกตอนข้อมูลยังไม่พร้อม)
-              <div
-                style={{ height: chartHeight }}
-                className="rounded-md bg-gray-50 animate-pulse"
-                aria-hidden="true"
-              />
-            )}
+            <WeeklySnapshotChart
+              key={chartKey} // ← รี-mount เมื่อ event/series/period เปลี่ยน
+              title=""
+              subtitle=""
+              height={chartHeight}
+              categories={baseCategories}
+              series={safeSeries as any}
+              colors={["#4A3AFF", "#39B8EE", "#D3F7FF"]}
+              legendPosition={useChartLegend ? "bottom" : "right"}
+              legendAlign="center"
+              showGridY={true}
+              showGridX={false}
+              columnWidthPercent={columnWidthPercent}
+              showDataLabels={false}
+              tooltipValueFormatter={(v) => `${v} ครั้ง`}
+              optionsOverride={{
+                chart: { dropShadow: { enabled: false } },
+                yaxis: {
+                  tickAmount: 5,
+                  max: niceUp(currentMax * 1.1, 10),
+                },
+                legend: {
+                  show: useChartLegend,
+                  position: "bottom",
+                  horizontalAlign: "center",
+                  floating: false,
+                  offsetY: 8,
+                },
+                stroke: { width: 0 },
+                tooltip: { enabled: true, shared: false },
+              }}
+            />
           </div>
         </div>
 
-        {/* =================== Custom legend (Desktop เท่านั้น) =================== */}
+        {/* Custom legend (Desktop เท่านั้น) */}
         <div className="hidden lg:flex flex-col justify-center items-center flex-none w-[220px] h-[600px]">
           <ul className="flex flex-col gap-8">
             <li className="flex gap-2 items-center">
