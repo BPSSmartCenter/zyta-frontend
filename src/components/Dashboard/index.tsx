@@ -49,11 +49,15 @@ export default function ContentLayout(props: Props) {
 
   return (
     <div className="flex flex-col px-6 gap-3">
-      {/* จอเล็ก = เรียงลงมาเป็นแถวเดียว / เดสก์ท็อป = 3 คอลัมน์เดิม */}
-      <div className="flex flex-col lg:flex-row gap-3">
+      {/* 
+        Responsive grid:
+        - mobile: 1 col
+        - tablet: 2 cols
+        - desktop+: 3 cols
+      */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {/* Left column */}
-        <div className="p-6 flex w-full lg:w-[400px] rounded-xl flex-col gap-3 bg-white">
-          {/* SearchInput ภายในฟอร์มจะกินเต็มพื้นที่กล่องเอง */}
+        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <AlertEvents
             search={searchEvent}
             setSearch={setSearchEvent}
@@ -67,7 +71,7 @@ export default function ContentLayout(props: Props) {
         </div>
 
         {/* Middle column */}
-        <div className="p-6 flex w-full lg:w-[700px] rounded-xl flex-col gap-3 bg-white">
+        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <MapPanel
             selectedEvents={selectedEvents}
             buttonLabel={buttonLabel}
@@ -81,7 +85,7 @@ export default function ContentLayout(props: Props) {
         </div>
 
         {/* Right column */}
-        <div className="p-6 flex w-full lg:w-[400px] rounded-xl flex-col gap-3 bg-white">
+        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <DeviceCount />
           <FaceRecognize
             search={searchFR}

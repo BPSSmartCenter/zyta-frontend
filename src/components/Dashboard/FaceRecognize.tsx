@@ -19,7 +19,7 @@ type Props = {
 export default function FaceRecognize({ search, setSearch, items }: Props) {
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[22px] whitespace-nowrap font-inter font-semibold text-[#1E1E1E]">
+      <h1 className="text-[20px]  font-inter font-semibold text-[#1E1E1E]">
         Face Recognize / License Plates
       </h1>
       <SearchInput

@@ -25,6 +25,13 @@ body {
 .arrow-icon {
   font-size: 16px;
 }
+.modalIcon {
+  font-size: 95px;
+}
+
+.checkIcon {
+  font-size: 16px;
+}
 
 .hs-leaflet.leaflet-touch .leaflet-control-layers,
 .hs-leaflet.leaflet-touch .leaflet-bar {

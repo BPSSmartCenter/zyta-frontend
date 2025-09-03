@@ -15,7 +15,32 @@ type Props = {
   toggleEvent: (v: string) => void;
 };
 
-// breakpoint helper
+type AnySeries = { name?: string; data?: any[]; [k: string]: any };
+
+// --- ปรับให้ series ปลอดภัยเสมอ ---
+function sanitizeSeries(
+  input: AnySeries[] | undefined,
+  categories: any[]
+): AnySeries[] {
+  const safe = Array.isArray(input) ? input : [];
+  const filtered = safe
+    .filter((s) => Array.isArray(s?.data))
+    .map((s) => ({ ...s, data: [...(s.data as any[])] }));
+
+  if (!filtered.length) return [];
+
+  const minLen = Math.max(
+    0,
+    Math.min(
+      categories?.length ?? 0,
+      ...filtered.map((s) => (Array.isArray(s.data) ? s.data.length : 0))
+    )
+  );
+
+  return filtered.map((s) => ({ ...s, data: s.data.slice(0, minLen) }));
+}
+
+// breakpoint helper (คง behavior เดิม)
 function useBreakpoint() {
   const get = () => {
     if (typeof window === "undefined") return "desktop";
@@ -49,26 +74,65 @@ export default function SnapshotChartSection({
 }: Props) {
   const bp = useBreakpoint();
 
-  // ✅ ใช้ ref เพื่อตรวจจับการเปลี่ยนขนาดคอนเทนเนอร์ แล้ว trigger resize ให้กราฟ reflow
+  // container ใช้สังเกตขนาดเพื่อ reflow กราฟ
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    if (!containerRef.current) return;
-    if (typeof (window as any).ResizeObserver === "undefined") return;
-    const ro = new (window as any).ResizeObserver(() => {
-      window.dispatchEvent(new Event("resize"));
-    });
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
 
   const isDesktop = bp === "desktop";
   const chartHeight = isDesktop ? 600 : bp === "tablet" ? 420 : 280;
   const columnWidthPercent = isDesktop ? 38 : bp === "tablet" ? 55 : 65;
-
-  // Legend policy:
-  // - Desktop: ปิด legend ของกราฟ → ใช้ Custom Legend (คอลัมน์ขวา)
-  // - Tablet/Mobile: เปิด legend ของกราฟ → ให้ไปอยู่ด้านล่าง-กึ่งกลาง
   const useChartLegend = !isDesktop;
+
+  // ===== เตรียมข้อมูลกราฟแบบปลอดภัย =====
+  const baseCategories = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+  const safeSeries = sanitizeSeries(chartSeries as any, baseCategories);
+
+  const minSeriesLen =
+    safeSeries.length > 0
+      ? safeSeries.reduce((min, s: AnySeries) => {
+          const len = Array.isArray(s?.data) ? s.data.length : 0;
+          return Math.min(min, len);
+        }, baseCategories.length)
+      : 0;
+
+  const safeCategories = baseCategories.slice(0, minSeriesLen);
+
+  // เรนเดอร์กราฟต่อเมื่อข้อมูลพร้อมจริง ๆ
+  const hasData =
+    safeSeries.length > 0 &&
+    minSeriesLen > 0 &&
+    safeSeries.every((s) => Array.isArray(s.data) && s.data!.length > 0);
+
+  // เก็บสถานะไว้ให้ ResizeObserver ใช้
+  const hasDataRef = React.useRef(hasData);
+  React.useEffect(() => {
+    hasDataRef.current = hasData;
+  }, [hasData]);
+
+  // ResizeObserver: ข้าม reflow ถ้าไม่มีข้อมูลหรือมี Preline overlay เปิดอยู่
+  React.useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !(window as any).ResizeObserver) return;
+
+    let raf = 0;
+    const ro = new (window as any).ResizeObserver(() => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const overlayOpen = !!document.querySelector(".hs-overlay.open");
+        if (!document.body.contains(el) || !hasDataRef.current || overlayOpen)
+          return;
+        window.dispatchEvent(new Event("resize"));
+      });
+    });
+
+    ro.observe(el);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      try {
+        ro.unobserve(el);
+      } catch {}
+      ro.disconnect();
+    };
+  }, []);
 
   return (
     <div className="px-6 flex w-full rounded-md flex-col gap-3 bg-white">
@@ -78,15 +142,23 @@ export default function SnapshotChartSection({
       >
         {/* =================== Left: header + chart =================== */}
         <div className="flex flex-col flex-1 min-w-0">
-          {/* Header + filter (คงเดิม) */}
+          {/* Header + filter */}
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-1">
-              <h1 className="text-gray-400 text-[18px] lg:text-[20px]">Statistics</h1>
+              <h1 className="text-gray-400 text-[18px] lg:text-[20px]">
+                Statistics
+              </h1>
               <div className="flex items-center flex-wrap gap-2">
-                <h1 className="text-[20px] lg:text-[25px] font-bold">Total summary of snapshot</h1>
+                <h1 className="text-[20px] lg:text-[25px] font-bold">
+                  Total summary of snapshot
+                </h1>
 
                 {/* Multi-select dropdown */}
-                <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
+                <Dropdown
+                  options={EVENT_OPTIONS}
+                  value="__multi__"
+                  onChange={() => {}}
+                >
                   {({ open, getButtonProps, getMenuProps }) => (
                     <div className="relative inline-block ml-3">
                       <button
@@ -146,7 +218,7 @@ export default function SnapshotChartSection({
               </div>
             </div>
 
-            {/* Daily / Weekly / Monthly (คงเดิม) */}
+            {/* Daily / Weekly / Monthly */}
             <div className="flex justify-center items-center lg:w-[350px] lg:mr-10">
               <div className="bg-[#F8F8FF] rounded-2xl">
                 <div className="p-2 lg:p-4 gap-2 lg:gap-4 inline-flex rounded-lg ">
@@ -175,39 +247,51 @@ export default function SnapshotChartSection({
 
           {/* Chart */}
           <div ref={containerRef} className="mt-3">
-            <WeeklySnapshotChart
-              key={`${bp}-${useChartLegend}-${columnWidthPercent}`} // ✅ re-mount เมื่อ layout/legend เปลี่ยน
-              title=""
-              subtitle=""
-              height={chartHeight}
-              categories={["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]}
-              series={chartSeries}
-              colors={["#4A3AFF", "#39B8EE", "#D3F7FF"]}
-              legendPosition={useChartLegend ? "bottom" : "right"} // มือถือ/แท็บเล็ต → bottom
-              legendAlign="center"                                  // ให้อยู่กึ่งกลางด้านล่าง
-              showGridY={true}
-              showGridX={false}
-              columnWidthPercent={columnWidthPercent}
-              showDataLabels={false}
-              tooltipValueFormatter={(v) => `${v} ครั้ง`}
-              optionsOverride={{
-                chart: { dropShadow: { enabled: false } },
-                yaxis: { tickAmount: 5, max: niceUp(avgOfSeriesMax * 1.1, 10) },
-                legend: {
-                  show: useChartLegend,
-                  position: "bottom",
-                  horizontalAlign: "center",
-                  floating: false,
-                  offsetY: 8,
-                },
-                stroke: { width: 0 },
-                tooltip: { enabled: true, shared: false },
-              }}
-            />
+            {hasData ? (
+              <WeeklySnapshotChart
+                key={`${bp}-${useChartLegend}-${columnWidthPercent}`}
+                title=""
+                subtitle=""
+                height={chartHeight}
+                categories={safeCategories}
+                series={safeSeries as any}
+                colors={["#4A3AFF", "#39B8EE", "#D3F7FF"]}
+                legendPosition={useChartLegend ? "bottom" : "right"}
+                legendAlign="center"
+                showGridY={true}
+                showGridX={false}
+                columnWidthPercent={columnWidthPercent}
+                showDataLabels={false}
+                tooltipValueFormatter={(v) => `${v} ครั้ง`}
+                optionsOverride={{
+                  chart: { dropShadow: { enabled: false } },
+                  yaxis: {
+                    tickAmount: 5,
+                    max: niceUp(avgOfSeriesMax * 1.1, 10),
+                  },
+                  legend: {
+                    show: useChartLegend,
+                    position: "bottom",
+                    horizontalAlign: "center",
+                    floating: false,
+                    offsetY: 8,
+                  },
+                  stroke: { width: 0 },
+                  tooltip: { enabled: true, shared: false },
+                }}
+              />
+            ) : (
+              // Placeholder คงพื้นที่เดิม (กัน lib ถูกเรียกตอนข้อมูลยังไม่พร้อม)
+              <div
+                style={{ height: chartHeight }}
+                className="rounded-md bg-gray-50 animate-pulse"
+                aria-hidden="true"
+              />
+            )}
           </div>
         </div>
 
-        {/* =================== Custom legend (Desktop เท่านั้น — คงตำแหน่งเดิม) =================== */}
+        {/* =================== Custom legend (Desktop เท่านั้น) =================== */}
         <div className="hidden lg:flex flex-col justify-center items-center flex-none w-[220px] h-[600px]">
           <ul className="flex flex-col gap-8">
             <li className="flex gap-2 items-center">

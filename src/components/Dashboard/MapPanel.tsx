@@ -31,7 +31,7 @@ export default function MapPanel({
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
         MAP
       </h1>
-      <div className="flex items-center gap-5">
+      <div className="flex items-center flex-wrap gap-5">
         {/* All Event Map */}
         <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
           {({ open, getButtonProps, getMenuProps }) => (

@@ -122,14 +122,14 @@ export default function DatePicker({
   const yearLabel = cursor.getFullYear();
 
   return (
-    <div ref={wrapRef} className={`relative inline-block ${className}`}>
+    <div ref={wrapRef} className={`relative inline-block`}>
       {/* ปุ่มหลัก */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="h-[40px] w-[240px] rounded-md border border-gray-300 bg-white
+        className={`h-[40px] w-[240px] rounded-md border border-gray-300 bg-white
                    pl-3 pr-10 text-gray-800 flex  items-center justify-center
-                   focus:outline-none focus:bg-gray-50 hover:cursor-pointer"
+                   focus:outline-none focus:bg-gray-50 hover:cursor-pointer ${className}`}
       >
         <span className="truncate">
           {value ? toLabel(value) : placeholder}{" "}

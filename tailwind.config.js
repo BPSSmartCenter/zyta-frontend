@@ -16,6 +16,13 @@ module.exports = {
       },
     },
   },
+  screen: {
+    sm: { min: "375px", max: "819px" },
+
+    md: { min: "820px", max: "1023px" },
+    lg: { min: "1024px", max: "1439px" },
+    wide: "1440px",
+  },
   variants: {
     extend: {},
   },

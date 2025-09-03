@@ -31,23 +31,23 @@ export default function DeviceCount() {
         />
         <div className="flex flex-col gap-3">
           <h1 className="text-[24px] font-semibold">Cameras</h1>
-          <div className="flex gap-2">
-            <div className="flex flex-col w-[85px] h-[60px]] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex flex-col w-[70px] h-[60px]] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
               <DonutLegend
                 items={[{ label: "Offline", color: "#FB3F3F" }]}
-                labelClassName="text-[#39B8EE] text-[15px]"
+                labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[25px] font-semibold">45</h1>
+              <h1 className="text-[18px] font-semibold">45</h1>
             </div>
-            <div className="flex flex-col w-[85px] h-[60px]] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
+            <div className="flex flex-col w-[70px] h-[60px]] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
               <DonutLegend
                 items={[{ label: "Online", color: "#A9DB4E" }]}
-                labelClassName="text-[#39B8EE] text-[15px]"
+                labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[25px] font-semibold">89</h1>
+              <h1 className="text-[18px] font-semibold">89</h1>
             </div>
           </div>
-          <h1 className="mt-2 text-[24px] font-semibold text-[#1E1E1E]">
+          <h1 className="mt-2 text-[24px] whitespace-nowrap font-semibold text-[#1E1E1E]">
             Total <span>134</span>
           </h1>
         </div>
@@ -61,12 +61,12 @@ export default function DeviceCount() {
               จำนวนกล้อง <span className="text-red-500 font-semibold">24</span>
             </span>
           </div>
-          <li className="flex items-center gap-4 ">
+          <div className="flex items-center gap-4 ">
             <img src={intercomeImage} alt="" width={36} />
             <span>
               intercome <span className="text-red-500 font-semibold">45</span>
             </span>
-          </li>
+          </div>
         </li>
         <li className="flex gap-4 justify-around">
           <div className="flex items-center gap-4">
@@ -75,12 +75,12 @@ export default function DeviceCount() {
               มิเตอร์น้ำ <span className="text-red-500 font-semibold">45</span>
             </span>
           </div>
-          <li className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <img src={solarImage} alt="" width={36} />
             <span>
               มิเตอร์ไฟ <span className="text-red-500 font-semibold">34</span>
             </span>
-          </li>
+          </div>
         </li>
         <li className="flex gap-4 justify-around">
           <div className="flex items-center gap-4">
