@@ -3,7 +3,6 @@ import React from "react";
 import fireNoti from "../assets/firenoti.svg";
 import motionNoti from "../assets/motionnoti.svg";
 import deviceNoti from "../assets/devicenoti.svg";
-import { insuranceImage } from "../assets/index";
 
 type NotiType = "alert" | "warning" | "offline" | "normal" | "success";
 
@@ -131,7 +130,11 @@ const NotiCard: React.FC<NotiCardProps> = ({
           type !== "normal" && p.iconBg // normal ไม่ใส่ bg
         )}
       >
-        {img ? <img width={30} src={img} alt="" /> : icon ?? <DefaultIcon type={type} />}
+        {img ? (
+          <img width={30} src={img} alt="" />
+        ) : (
+          icon ?? <DefaultIcon type={type} />
+        )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2">
