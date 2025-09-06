@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /** ── รูปแบบวันที่ที่ส่งออก/รับเข้า (ไม่ใช้ ISO string) ── */
 export type DateValue = { y: number; m: number; d: number }; // m = 1..12
 
 /** utils เล็ก ๆ (ไม่ผูกกับ ISO) */
-const pad = (n: number) => String(n).padStart(2, "0");
-const toLabel = (v?: DateValue) =>
-  v ? `${v.y}-${pad(v.m)}-${pad(v.d)}` : "YYYY-MM-DD"; // แค่ไว้โชว์
 const toDate = (v: DateValue) => new Date(v.y, v.m - 1, v.d);
 const fromDate = (d: Date): DateValue => ({
   y: d.getFullYear(),
@@ -33,8 +31,15 @@ export default function DatePicker({
   min,
   max,
   className = "",
-  placeholder = "YYYY-MM-DD",
+  placeholder,
 }: Props) {
+  const { t, i18n } = useTranslation(["dashboard"]);
+
+  // locale ที่ใช้แสดงผล (ไทยใช้เลขอารบิก)
+  const locale = (i18n.language || "en").startsWith("th")
+    ? "th-TH-u-nu-latn"
+    : "en-GB";
+
   const today = useMemo(() => fromDate(new Date()), []);
   const selected = value;
   const [cursor, setCursor] = useState<Date>(() => toDate(selected ?? today)); // เดือนที่กำลังดู
@@ -118,8 +123,44 @@ export default function DatePicker({
     setCursor(d);
   };
 
-  const monthLabel = cursor.toLocaleString("en-US", { month: "short" });
-  const yearLabel = cursor.getFullYear();
+  // ===== แปลงสตริงแสดงผลตามภาษา =====
+  const formatMonthShort = (d: Date) =>
+    d.toLocaleDateString(locale, { month: "short" });
+  const formatYear = (d: Date) =>
+    new Intl.DateTimeFormat(locale, { year: "numeric" }).format(d);
+
+  const formatDayNum = (d: Date) =>
+    new Intl.NumberFormat(locale, { useGrouping: false }).format(d.getDate());
+
+  const monthLabel = formatMonthShort(cursor);
+  const yearLabel = formatYear(cursor);
+
+  // ป้ายชื่อวัน (Mon..Sun) เรียงเริ่มจันทร์
+  const weekdayLabels = useMemo(() => {
+    // 2024-01-01 เป็นวันจันทร์ (อ้างอิงเพื่อเริ่มที่ Mon)
+    const start = new Date(2024, 0, 1);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      let w = d.toLocaleDateString(locale, { weekday: "short" });
+      if (String(locale).startsWith("th")) w = w.replace(/\./g, ""); // ตัดจุดท้าย
+      return w;
+    });
+  }, [locale]);
+
+  // ปุ่มหลัก: แสดงค่าวันที่ตามภาษา (ถ้าไม่มีค่า ใช้ placeholder จาก i18n/props)
+  const toDisplayLabel = (v?: DateValue) => {
+    if (!v) return "";
+    const d = toDate(v);
+    return d.toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const placeholderText =
+    placeholder ?? t("date.placeholder", { defaultValue: "YYYY-MM-DD" });
 
   return (
     <div ref={wrapRef} className={`relative inline-block`}>
@@ -132,7 +173,7 @@ export default function DatePicker({
                    focus:outline-none focus:bg-gray-50 hover:cursor-pointer ${className}`}
       >
         <span className="truncate">
-          {value ? toLabel(value) : placeholder}{" "}
+          {value ? toDisplayLabel(value) : placeholderText}{" "}
         </span>
         <i className="material-icons absolute right-2  text-gray-300 ">
           calendar_today
@@ -148,7 +189,9 @@ export default function DatePicker({
               type="button"
               onClick={gotoPrev}
               className="size-8 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 hover:cursor-pointer"
-              aria-label="Previous month"
+              aria-label={t("date.prevMonth", {
+                defaultValue: "Previous month",
+              })}
             >
               <svg
                 className="size-4"
@@ -167,7 +210,7 @@ export default function DatePicker({
               type="button"
               onClick={gotoNext}
               className="size-8 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 hover:cursor-pointer"
-              aria-label="Next month"
+              aria-label={t("date.nextMonth", { defaultValue: "Next month" })}
             >
               <svg
                 className="size-4"
@@ -183,8 +226,8 @@ export default function DatePicker({
 
           {/* Labels */}
           <div className="grid grid-cols-7 gap-y-1 pb-1 text-center text-xs text-gray-500 hover:cursor-default">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={d}>{d}</div>
+            {weekdayLabels.map((w) => (
+              <div key={w}>{w}</div>
             ))}
           </div>
 
@@ -212,7 +255,7 @@ export default function DatePicker({
                       : "",
                   ].join(" ")}
                 >
-                  {date.getDate()}
+                  {formatDayNum(date)}
                 </button>
               );
             })}
@@ -228,7 +271,7 @@ export default function DatePicker({
             }}
             className="mt-2 w-full text-center text-sm text-blue-600 hover:text-[#1890FF] hover:cursor-pointer"
           >
-            Today
+            {t("date.today", { defaultValue: "Today" })}
           </button>
         </div>
       )}

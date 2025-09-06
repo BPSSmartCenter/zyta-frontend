@@ -1,7 +1,14 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
+import { useTranslation } from "react-i18next";
 
-type Noti = { type: string; title: string; site: string; date: string };
+type Noti = {
+  type: string;
+  title: string;
+  site: string;
+  date: string;
+  titleKey?: string;
+};
 
 type Props = {
   search: string;
@@ -10,33 +17,57 @@ type Props = {
 };
 
 export default function AlertEvents({ search, setSearch, items }: Props) {
+  const { t, i18n } = useTranslation(["dashboard"]);
+
+  const formatDateForUI = (s: string) => {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const isTH = (i18n.language || "").startsWith("th");
+    const locale = isTH ? "th-TH-u-nu-latn" : "en-GB";
+    // เดิมมี if (isTH) out = out.replace(/\./g, "");
+    return d.toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        ALL-TIME ALERTS
+        {t("alerts.allTimeTitle")}
       </h1>
+
       <SearchInput
         value={search}
-        placeholder="ช่องค้นหาเหตุการณ์"
+        placeholder={t("search.placeholder")}
         onChange={setSearch}
         className="font-poppins"
       />
+
       <div className="h-[590px] overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
             <div className="rounded-md px-3 py-2 text-sm text-gray-500">
-              ไม่พบเหตุการณ์
+              {t("common.noResults")}
             </div>
           ) : (
-            items.map((n, i) => (
-              <NotiCard
-                key={i}
-                type={n.type as any}
-                title={n.title}
-                site={n.site}
-                date={n.date}
-              />
-            ))
+            items.map((n, i) => {
+              const title = n.titleKey
+                ? t(n.titleKey, { defaultValue: n.title })
+                : n.title;
+              const site = t(`sites.${n.site}`, { defaultValue: n.site });
+              const dateText = formatDateForUI(n.date);
+              return (
+                <NotiCard
+                  key={i}
+                  type={n.type as any}
+                  title={title}
+                  site={site}
+                  date={dateText}
+                />
+              );
+            })
           )}
         </div>
       </div>

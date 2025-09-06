@@ -13,10 +13,17 @@ import {
    Notifications
    ============================= */
 export const notis = [
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
   {
     type: "warning",
     img: fireNoti,
+    titleKey: "notis.motionDetected",
     title: "ตรวจพบการเคลื่อนไหว",
     site: "Site B",
     date: "2025-01-06",
@@ -24,6 +31,7 @@ export const notis = [
   {
     type: "warning",
     img: motionNoti,
+    titleKey: "notis.motionDetected",
     title: "ตรวจพบการเคลื่อนไหว",
     site: "Site D",
     date: "2025-01-06",
@@ -31,6 +39,7 @@ export const notis = [
   {
     type: "offline",
     img: deviceNoti,
+    titleKey: "notis.cameraOffline",
     title: "กล้องออฟไลน์",
     site: "Site A",
     date: "2025-01-06",
@@ -38,12 +47,14 @@ export const notis = [
   {
     type: "offline",
     img: deviceNoti,
+    titleKey: "notis.cameraOffline",
     title: "กล้องออฟไลน์",
     site: "Site E",
     date: "2025-01-06",
   },
   {
     type: "offline",
+    titleKey: "notis.cameraOffline",
     title: "กล้องออฟไลน์",
     site: "Site G",
     date: "2025-01-06",
@@ -51,21 +62,53 @@ export const notis = [
   {
     type: "offline",
     img: deviceNoti,
+    titleKey: "notis.cameraOffline",
     title: "กล้องออฟไลน์",
     site: "Site G",
     date: "2025-01-06",
   },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
 ];
 
 export const wellBeingNotis = [
   {
     type: "alert",
     img: sleepingNoti,
+    titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site C",
     date: "2025-01-06",
@@ -73,6 +116,7 @@ export const wellBeingNotis = [
   {
     type: "warning",
     img: fallingNoti,
+    titleKey: "notis.fallDetected",
     title: "ตรวจพบคนล้ม",
     site: "Site B",
     date: "2025-01-06",
@@ -80,6 +124,7 @@ export const wellBeingNotis = [
   {
     type: "alert",
     img: sleepingNoti,
+    titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site D",
     date: "2025-01-06",
@@ -87,6 +132,7 @@ export const wellBeingNotis = [
   {
     type: "warning",
     img: fallingNoti,
+    titleKey: "notis.fallDetected",
     title: "ตรวจพบคนล้ม",
     site: "Site A",
     date: "2025-01-06",
@@ -94,21 +140,53 @@ export const wellBeingNotis = [
   {
     type: "alert",
     img: sleepingNoti,
+    titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site D",
     date: "2025-01-06",
   },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
-  { type: "alert", title: "Fire detected", site: "Site C", date: "2025-01-06" },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "notis.fireDetected",
+    title: "Fire detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
 ];
 
 export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site A",
@@ -117,6 +195,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site C",
@@ -125,6 +204,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site B",
@@ -133,6 +213,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site D",
@@ -141,6 +222,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site E",
@@ -149,6 +231,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: faceImage,
+    titleKey: "notis.faceDetected",
     title: "ตรวจพบใบหน้า",
     detail: "",
     site: "Site G",
@@ -157,6 +240,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "1กข-8412",
     site: "Site B",
@@ -165,6 +249,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "7พร-1023",
     site: "Site C",
@@ -173,6 +258,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "กง-4521",
     site: "Site F",
@@ -181,6 +267,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "4ขฉ-9905",
     site: "Site A",
@@ -189,6 +276,7 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "2ทบ-3714",
     site: "Site D",
@@ -197,12 +285,114 @@ export const recognizeNotis = [
   {
     type: "normal",
     img: plateImage,
+    titleKey: "notis.plateDetected",
     title: "ตรวจพบเลขทะเบียนรถยนต์",
     detail: "7พค-2288",
     site: "Site E",
     date: "2025-02-12",
   },
 ] as const;
+
+export const ZYTA_NOTIS = [
+  {
+    type: "alert",
+    titleKey: "zytaNotis.intrusionDetected",
+    title: "Intrusion detected",
+    site: "Site A",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.systemStabilized",
+    title: "System stabilized",
+    site: "Site A",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "zytaNotis.unauthorizedAccess",
+    title: "Unauthorized access",
+    site: "Site B",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.accessRevoked",
+    title: "Access revoked",
+    site: "Site B",
+    date: "2025-01-06",
+  },
+  {
+    type: "alert",
+    titleKey: "zytaNotis.smokeDetected",
+    title: "Smoke detected",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+  {
+    type: "success",
+    titleKey: "zytaNotis.environmentNormal",
+    title: "Environment normal",
+    site: "Site C",
+    date: "2025-01-06",
+  },
+];
 
 /* =============================
    Site Options

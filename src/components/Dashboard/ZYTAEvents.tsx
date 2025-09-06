@@ -2,22 +2,22 @@ import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 
-type WB = {
+type Noti = {
   type: string;
   title: string;
+  titleKey?: string;
   site: string;
   date: string;
   img?: string;
-  titleKey?: string;
 };
 
 type Props = {
   search: string;
   setSearch: (v: string) => void;
-  items: WB[];
+  items: Noti[];
 };
 
-export default function WellBeingEvents({ search, setSearch, items }: Props) {
+export default function ZYTAEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
   const formatDateForUI = (s: string) => {
@@ -34,19 +34,21 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
 
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        {t("wellbeing.title")}
+      <h1 className="text-[19px] font-inter font-semibold text-[#1E1E1E]">
+        {t("zyta.title")}
       </h1>
+
       <SearchInput
         value={search}
         placeholder={t("search.placeholder")}
         onChange={setSearch}
         className="font-poppins"
       />
-      <div className="h-[420px] overflow-y-auto px-2">
+
+      <div className="lg:h-[1170px] md:h-[1070px] overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
-            <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
               {t("common.noResults")}
             </div>
           ) : (
@@ -56,12 +58,12 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+
               return (
                 <NotiCard
                   key={i}
                   type={n.type as any}
                   title={title}
-                  img={n.img as any}
                   site={site}
                   date={dateText}
                 />

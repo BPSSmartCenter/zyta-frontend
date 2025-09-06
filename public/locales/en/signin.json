@@ -1,0 +1,23 @@
+{
+  "title": "Log in to your account",
+  "subtitle": "Welcome back! Please enter your details.",
+  "fields": {
+    "email": {
+      "label": "Email",
+      "placeholder": "Enter your email",
+      "invalid": "Email is invalid"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password"
+    }
+  },
+  "remember": "Remember for 30 days",
+  "forgot": "Forgot password?",
+  "actions": {
+    "signin": "Sign in",
+    "signin_google": "Sign in with Google",
+    "signup_question": "Don't have an account?",
+    "signup": "Sign up"
+  }
+}

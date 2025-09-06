@@ -2,12 +2,14 @@
 import { useState } from "react";
 import brandImage from "../../assets/brand.png";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface LoginPageProps {
   onSubmit?: (email: string, password: string) => void;
 }
 
 export default function LoginPage({ onSubmit }: LoginPageProps) {
+  const { t } = useTranslation(["signin"]); // ใช้ namespace signin
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState("");
@@ -20,7 +22,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailValid) return; // กัน submit เมื่ออีเมลไม่ถูกต้อง
+    if (!emailValid) return;
     onSubmit?.(email, password);
   };
 
@@ -32,20 +34,20 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
           bg-white
           min-w-[300px] sm:min-w-[360px] md:min-w-[400px] lg:min-w-[450px]
           max-w-[90%] sm:max-w-[400px] md:max-w-[500px]
-          rounded-lg  p-6
+          rounded-lg p-6
         "
       >
         {/* Logo */}
-        <div className="w-[140px] sm:w-[165px] h-[140px] ">
+        <div className="w-[140px] sm:w-[165px] h-[140px]">
           <img className="w-full h-auto" src={brandImage} alt="Brand" />
         </div>
 
         {/* Title */}
         <h1 className="text-[24px] sm:text-[28px] md:text-[32px] font-bold text-center select-none">
-          Log in to your account
+          {t("title")}
         </h1>
         <span className="mt-3 mb-6 text-center text-sm sm:text-base select-none">
-          Welcome back! Please enter your details.
+          {t("subtitle")}
         </span>
 
         {/* Form */}
@@ -57,12 +59,12 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
           {/* Email */}
           <div className="flex gap-1 flex-col mt-4 w-full">
             <label className={emailInvalid ? "text-[#EC0357]" : ""}>
-              Email
+              {t("fields.email.label")}
             </label>
             <input
               className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
               type="email"
-              placeholder="Enter your email"
+              placeholder={t("fields.email.placeholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={() => setEmailTouched(true)}
@@ -79,7 +81,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
                   id="email-error"
                   className="select-none text-[#EC0357] text-[12px]"
                 >
-                  Email is invalid
+                  {t("fields.email.invalid")}
                 </span>
               )}
             </div>
@@ -87,11 +89,11 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
 
           {/* Password */}
           <div className="flex gap-1 flex-col mt-2 w-full">
-            <label>Password</label>
+            <label>{t("fields.password.label")}</label>
             <input
               className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
               type="password"
-              placeholder="password"
+              placeholder={t("fields.password.placeholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -119,14 +121,14 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
                 >
                   <polyline points="5 11 9 15 15 6" />
                 </svg>
-                <span>Remember for 30 days</span>
+                <span>{t("remember")}</span>
               </label>
             </div>
             <a
               href="#"
               className="text-cyan font-bold hover:text-blue select-none"
             >
-              Forgot password?
+              {t("forgot")}
             </a>
           </div>
 
@@ -134,23 +136,23 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
           <div className="w-full flex flex-col gap-3 mt-6">
             <button
               className="bg-cyan w-full font-bold text-white px-4 py-2 rounded-sm hover:bg-blue hover:cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-              disabled={!emailValid} // ❗ ปิดปุ่มถ้า email ยังไม่ถูก format
+              disabled={!emailValid}
             >
-              Sign in
+              {t("actions.signin")}
             </button>
             <button className="w-full font-bold border-2 border-gray-200 px-4 py-2 rounded-sm hover:bg-gray-300 hover:cursor-pointer">
-              Sign in with Google
+              {t("actions.signin_google")}
             </button>
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2 mt-6 text-sm sm:text-base">
-            <span>Don't have an account?</span>
+            <span>{t("actions.signup_question")}</span>
             <Link
               to={"/register"}
               className="text-cyan font-bold hover:cursor-pointer hover:text-blue"
             >
-              Sign up
+              {t("actions.signup")}
             </Link>
           </div>
         </form>

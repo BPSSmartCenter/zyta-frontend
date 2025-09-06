@@ -11,7 +11,7 @@ type Props = {
 export default function SearchInput({
   value,
   onChange,
-  placeholder = "ช่องค้นหา sites",
+  placeholder = "",
   className = "",
   inputClassName = "",
 }: Props) {

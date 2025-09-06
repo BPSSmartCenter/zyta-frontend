@@ -1,0 +1,32 @@
+{
+  "title": "Create your account",
+  "subtitle": "Fill in your details to get started.",
+  "fields": {
+    "email": {
+      "label": "Email",
+      "placeholder": "Enter your email",
+      "invalid": "Email is invalid"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter your password"
+    },
+    "confirm": {
+      "label": "Confirm Password",
+      "placeholder": "Confirm your password",
+      "mismatch": "Passwords do not match"
+    }
+  },
+  "requirements": {
+    "minLen": "At least 10 characters",
+    "complex": "Contains numbers, uppercase, and lowercase letters"
+  },
+  "terms": "I agree to the Terms of Service",
+  "actions": {
+    "signup": "Sign up",
+    "signin": "Sign in"
+  },
+  "footer": {
+    "have_account": "Already have an account?"
+  }
+}

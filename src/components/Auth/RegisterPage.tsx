@@ -2,19 +2,22 @@
 import { useState } from "react";
 import brandImage from "../../assets/brand.png";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface RegisterPageProps {
   onSubmit?: (email: string, password: string, confirmPassword: string) => void;
 }
 
 export default function RegisterPage({ onSubmit }: RegisterPageProps) {
+  const { t } = useTranslation(["signup"]); // ใช้ namespace 'signup'
+
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // --- Validators ---
+  // --- Validators (ยกมาจากของเดิม) ---
   const isEmailValid = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const emailInvalid = emailTouched && !isEmailValid(email);
@@ -50,12 +53,12 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
           <img className="w-full h-auto" src={brandImage} alt="Brand" />
         </div>
 
-        {/* Title (คง UI เดิม) */}
+        {/* Title */}
         <h1 className="text-[24px] sm:text-[28px] md:text-[32px] font-bold text-center select-none">
-          Log in to your account
+          {t("title")}
         </h1>
         <span className="mt-3 mb-6 text-center text-sm sm:text-base select-none">
-          Welcome back! Please enter your details.
+          {t("subtitle")}
         </span>
 
         {/* Form */}
@@ -67,12 +70,12 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
           {/* Email */}
           <div className="flex gap-1 flex-col mt-4 w-full">
             <label className={emailInvalid ? "text-[#EC0357]" : ""}>
-              Email
+              {t("fields.email.label")}
             </label>
             <input
               className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
               type="email"
-              placeholder="Enter your email"
+              placeholder={t("fields.email.placeholder")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={() => setEmailTouched(true)}
@@ -80,14 +83,13 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
                 ? { "aria-invalid": "true", "aria-describedby": "email-error" }
                 : {})}
             />
-            {/* กัน layout ขยับ */}
             <div className="h-[10px] mt-[-4px]" aria-live="polite">
               {emailInvalid && (
                 <span
                   id="email-error"
                   className="select-none text-[#EC0357] text-[12px]"
                 >
-                  Email is invalid
+                  {t("fields.email.invalid")}
                 </span>
               )}
             </div>
@@ -95,28 +97,44 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
 
           {/* Password */}
           <div className="flex gap-1 flex-col mt-4 w-full">
-            <label>Password</label>
+            <label>{t("fields.password.label")}</label>
             <input
               className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
               type="password"
-              placeholder="password"
+              placeholder={t("fields.password.placeholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
 
             {/* Confirm Password */}
             <div className="flex gap-1 flex-col mt-4 w-full">
-              <label>Confirm Password</label>
+              <label>{t("fields.confirm.label")}</label>
               <input
                 className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
                 type="password"
-                placeholder="confirm password"
+                placeholder={t("fields.confirm.placeholder")}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                {...(!confirmOk && confirmPassword.length > 0
+                  ? {
+                      "aria-invalid": "true",
+                      "aria-describedby": "confirm-error",
+                    }
+                  : {})}
               />
+              <div className="h-[10px] mt-[-4px]" aria-live="polite">
+                {!confirmOk && confirmPassword.length > 0 && (
+                  <span
+                    id="confirm-error"
+                    className="select-none text-[#EC0357] text-[12px]"
+                  >
+                    {t("fields.confirm.mismatch")}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* ข้อความเงื่อนไขใต้ Password (2 บรรทัดพร้อมไอคอน) */}
+            {/* Password conditions */}
             <div className="mt-2 space-y-1 text-sm text-gray-700 select-none">
               <div className="flex items-center gap-2">
                 <i
@@ -127,7 +145,7 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
                 >
                   check_circle
                 </i>
-                <span>มีอย่างน้อย 10 ตัวอักษร</span>
+                <span>{t("requirements.minLen")}</span>
               </div>
               <div className="flex items-center gap-2">
                 <i
@@ -138,12 +156,12 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
                 >
                   check_circle
                 </i>
-                <span>ประกอบด้วยตัวเลข ตัวพิมพ์ใหญ่ และตัวพิมพ์เล็ก</span>
+                <span>{t("requirements.complex")}</span>
               </div>
             </div>
           </div>
 
-          {/* Terms (แทน Remember for 30 days) */}
+          {/* Terms */}
           <div className="flex justify-between items-center w-full mt-4 text-sm sm:text-base">
             <div className="flex items-center">
               <label
@@ -167,10 +185,9 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
                 >
                   <polyline points="5 11 9 15 15 6" />
                 </svg>
-                <span>ฉันตกลงและยอมรับเงื่อนไขการใช้งาน</span>
+                <span>{t("terms")}</span>
               </label>
             </div>
-            {/* คงตำแหน่งเดิม */}
             <div />
           </div>
 
@@ -178,20 +195,20 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
           <div className="w-full flex flex-col gap-3 mt-6">
             <button
               className="bg-cyan w-full font-bold text-white px-4 py-2 rounded-sm hover:bg-blue hover:cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-              disabled={!formValid} // ✅ dim & ปิดเมื่อยังไม่ผ่านทุกเงื่อนไข
+              disabled={!formValid}
             >
-              Sign up
+              {t("actions.signup")}
             </button>
           </div>
 
           {/* Footer */}
           <div className="flex items-center justify-center gap-2 mt-6 text-sm sm:text-base">
-            <span>You have an account?</span>
+            <span>{t("footer.have_account")}</span>
             <Link
               to="/"
               className="text-cyan font-bold hover:cursor-pointer hover:text-blue"
             >
-              Sign in
+              {t("actions.signin")}
             </Link>
           </div>
         </form>
@@ -199,3 +216,4 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
     </div>
   );
 }
+  

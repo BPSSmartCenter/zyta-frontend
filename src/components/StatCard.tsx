@@ -3,6 +3,7 @@ import { useMemo, useState, useContext, createContext } from "react";
 import type React from "react";
 import type { PropsWithChildren } from "react";
 import defaultFireImage from "../assets/fire.png";
+import { useTranslation } from "react-i18next";
 
 /* ===================== Group Context ===================== */
 type SelectionMode = "single" | "multiple";
@@ -16,8 +17,8 @@ type GroupCtx = {
 const StatCardGroupContext = createContext<GroupCtx | null>(null);
 
 type StatCardGroupProps = PropsWithChildren<{
-  selectionMode?: SelectionMode; // default: 'multiple'
-  defaultActiveIds?: string[]; // id ที่เริ่มต้น active
+  selectionMode?: SelectionMode;
+  defaultActiveIds?: string[];
   onChange?: (activeIds: string[]) => void;
   className?: string;
 }>;
@@ -30,14 +31,12 @@ export function StatCardGroup({
   children,
 }: StatCardGroupProps) {
   const [activeIds, setActiveIds] = useState<string[]>(defaultActiveIds);
-
   const isActive = (id: string) => activeIds.includes(id);
-
   const toggle = (id: string) => {
     setActiveIds((prev) => {
       let next: string[];
       if (selectionMode === "single") {
-        next = prev.includes(id) ? [] : [id]; // กดซ้ำเพื่อปิดได้
+        next = prev.includes(id) ? [] : [id];
       } else {
         next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
       }
@@ -45,9 +44,7 @@ export function StatCardGroup({
       return next;
     });
   };
-
   const ctx: GroupCtx = { mode: selectionMode, isActive, toggle };
-
   return (
     <div className={className}>
       <StatCardGroupContext.Provider value={ctx}>
@@ -59,28 +56,18 @@ export function StatCardGroup({
 
 /* ===================== StatCard ===================== */
 type Props = {
-  id?: string; // จำเป็นถ้าใช้ใน Group
-
-  // ค่าที่แสดง
+  id?: string;
   counting?: number | string;
   val?: number | string;
   label?: string;
-
-  // รูปภาพ
-  img?: string; // รูปปกติ
-  activeImg?: string; // รูปตอน active
-
-  // สีพื้นหลัง
-  inactiveBg?: string; // default: bg-white
-  activeBg?: string; // default: bg-cyan-500
-
-  // โหมดเดี่ยว (ไม่อยู่ใน Group): เริ่ม active ไหม
+  img?: string;
+  activeImg?: string;
+  inactiveBg?: string;
+  activeBg?: string;
   startActive?: boolean;
-
-  // class/handlers เพิ่มเติม
   className?: string;
   onToggle?: (active: boolean) => void;
-  onClick?: React.MouseEventHandler<HTMLDivElement>; // ใช้กับโหมด Placeholder
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
 };
 
 const StatCard: React.FC<Props> = ({
@@ -98,8 +85,9 @@ const StatCard: React.FC<Props> = ({
   onClick,
 }) => {
   const group = useContext(StatCardGroupContext);
+  const { t } = useTranslation(["dashboard"]);
 
-  // ===== Placeholder mode (+ Add Event) เหมือนไฟล์เก่า =====
+  // ===== Placeholder mode (+ Add Event) =====
   const noContentProps =
     counting === undefined &&
     val === undefined &&
@@ -122,18 +110,30 @@ const StatCard: React.FC<Props> = ({
           className || "",
         ].join(" ")}
       >
-        <span className="text-[14px] font-bold">+ Add Event</span>
+        <span className="text-[14px] font-bold">
+          {t("stats.addEvent", { defaultValue: "+ Add Event" })}
+        </span>
       </div>
     );
   }
 
   // ===== โหมดปกติ =====
-  // ถ้าอยู่ใน Group -> active มาจาก Group, ไม่งั้นใช้ state ภายใน
   const [localActive, setLocalActive] = useState(startActive);
   const active = group ? (id ? group.isActive(id) : false) : localActive;
 
   const displayVal = counting ?? val ?? 12;
-  const displayLabel = label ?? "Fire detected";
+
+  // ลำดับ fallback ของข้อความ:
+  // 1) label จาก props
+  // 2) แปลจาก stats.<id> ถ้ามี id
+  // 3) แปลจาก stats.fire (อยู่ในบล็อกเดียวกัน) หรือ fallback อังกฤษ
+  const intlLabelFromId = id
+    ? t(`stats.${id}`, { defaultValue: undefined })
+    : undefined;
+  const displayLabel =
+    label ??
+    intlLabelFromId ??
+    t("stats.fire", { defaultValue: "Fire detected" });
 
   const currentBg = active ? activeBg : inactiveBg;
   const currentImg = active
@@ -155,7 +155,7 @@ const StatCard: React.FC<Props> = ({
 
   const handleToggle = () => {
     if (group) {
-      if (!id) return; // ป้องกันลืมใส่ id
+      if (!id) return;
       group.toggle(id);
       onToggle?.(!active);
     } else {

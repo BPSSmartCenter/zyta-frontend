@@ -43,7 +43,7 @@ const RadialBar: React.FC<RadialBarProps> = ({
   primaryColor = "#A9DB4E",
   bg = "#FFFFFF",
   prefix = "%",
-  height = 170,
+  height = 20,
   width, // ถ้าไม่ส่งจะเท่ากับ height
   rounded = true,
   hollowSize = "72%",

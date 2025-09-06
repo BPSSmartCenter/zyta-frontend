@@ -7,6 +7,14 @@
 @source "../node_modules/preline/dist/*.js";
 
 @theme {
+  --breakpoint-sm: 375px;
+  --breakpoint-md: 820px;
+  --breakpoint-lg-1024: 1024px;
+  --breakpoint-lg-1291: 1291px;
+  --breakpoint-lg-1399: 1389px;
+  --breakpoint-lg: 1239px;
+  --breakpoint-wide: 1440px;
+
   --font-poppins: "Poppins", sans-serif;
   --font-inter: "Inter", sans-serif;
   --color-blue: #0063bf;

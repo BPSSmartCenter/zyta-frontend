@@ -1,6 +1,8 @@
+// src/pages/Dashboard/Header.tsx
 import React from "react";
 import StatCard, { StatCardGroup } from "../../components/StatCard";
 import CameraTile from "../../components/CameraTile";
+import { useTranslation } from "react-i18next";
 
 type StatItem = {
   key: string;
@@ -18,6 +20,8 @@ type Props = {
 };
 
 export default function Header({ statItems, cameraItems }: Props) {
+  const { t } = useTranslation(["dashboard"]); // ← เพิ่ม i18n
+
   // state สำหรับสไลด์มือถือ/แท็บเล็ต
   const [index, setIndex] = React.useState(0);
   const maxIndex = Math.max(0, cameraItems.length - 1);
@@ -34,42 +38,43 @@ export default function Header({ statItems, cameraItems }: Props) {
       <StatCardGroup
         selectionMode="single"
         // มือถือ/แท็บเล็ต: ใช้ grid 2 คอลัมน์; เดสก์ท็อป: ใช้ flex เดิม
-        className="grid grid-cols-2 gap-2 px-6 lg:flex lg:flex-wrap"
+        className="grid grid-cols-2 gap-2 px-6 lg-1024:flex lg-1024:flex-wrap"
       >
         {statItems.map((it) => (
           <StatCard
             id={it.key}
             key={it.key}
-            label={it.label}
+            // แปลจาก dashboard.stats.<key> ถ้าไม่มีคีย์ จะ fallback เป็น it.label เดิม
+            label={t(`stats.${it.key}`, { defaultValue: it.label })}
             val={it.val}
             img={it.img}
             activeImg={it.activeImg}
             inactiveBg="bg-white"
             activeBg="bg-cyan-500"
             // มือถือให้เต็มแถว (w-full); เดสก์ท็อปคง flex-1
-            className="w-full lg:flex-1"
+            className="w-full lg-1024:flex-1"
           />
         ))}
-        <StatCard className="w-full lg:flex-1" />
+        <StatCard className="w-full lg-1024:flex-1" />
       </StatCardGroup>
 
       {/* --- Camera tiles --- */}
 
       {/* เดสก์ท็อป: คงแบบเดิม (แสดงทั้งหมด) */}
-      <div className="hidden lg:flex justify-between flex-5 gap-5 px-6 mt-4">
+      <div className="hidden lg-1024:flex justify-between flex-5 gap-5 px-6 mt-4">
         {cameraItems.map((c, i) => (
           <CameraTile key={i} ringColor={c.ringColor} imgSrc={c.imgSrc} />
         ))}
       </div>
 
       {/* มือถือ/แท็บเล็ต: แสดงทีละ 1 รูป + ปุ่มเลื่อน + แอนิเมชัน */}
-      <div className="lg:hidden px-6 mt-4">
+      <div className="lg-1024:hidden px-6 mt-4">
         <div className="relative">
           {/* ปุ่มซ้าย */}
           <button
             type="button"
             onClick={gotoPrev}
-            aria-label="previous"
+            aria-label={t("common.prev")} // ← แปลเฉพาะ aria-label
             className={[
               "absolute left-2 top-1/2 -translate-y-1/2 z-10",
               "size-9 flex items-center justify-center rounded-full bg-white/90 border border-gray-200 shadow",
@@ -83,7 +88,7 @@ export default function Header({ statItems, cameraItems }: Props) {
           <button
             type="button"
             onClick={gotoNext}
-            aria-label="next"
+            aria-label={t("common.next")} // ← แปลเฉพาะ aria-label
             className={[
               "absolute right-2 top-1/2 -translate-y-1/2 z-10",
               "size-9 flex items-center justify-center rounded-full bg-white/90 border border-gray-200 shadow",

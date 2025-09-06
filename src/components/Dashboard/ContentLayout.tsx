@@ -4,6 +4,7 @@ import MapPanel from "./MapPanel";
 import UserManagement from "./UserManagement";
 import DeviceCount from "./DeviceCount";
 import FaceRecognize from "./FaceRecognize";
+import ZYTAEvents from "./ZYTAEvents";
 
 type Props = {
   // left column
@@ -25,6 +26,10 @@ type Props = {
   searchFR: string;
   setSearchFR: (v: string) => void;
   filteredRecognize: ReadonlyArray<any>;
+
+  searchZYTA: string;
+  setSearchZYTA: (v: string) => void;
+  filterZYTA: ReadonlyArray<any>;
 };
 
 export default function ContentLayout(props: Props) {
@@ -45,6 +50,9 @@ export default function ContentLayout(props: Props) {
     searchFR,
     setSearchFR,
     filteredRecognize,
+    searchZYTA,
+    setSearchZYTA,
+    filterZYTA,
   } = props;
 
   return (
@@ -55,7 +63,7 @@ export default function ContentLayout(props: Props) {
         - tablet: 2 cols
         - desktop+: 3 cols
       */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Left column */}
         <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <AlertEvents
@@ -70,7 +78,7 @@ export default function ContentLayout(props: Props) {
           />
         </div>
 
-        {/* Middle column */}
+        {/* Second Column */}
         <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <MapPanel
             selectedEvents={selectedEvents}
@@ -84,13 +92,22 @@ export default function ContentLayout(props: Props) {
           <UserManagement />
         </div>
 
-        {/* Right column */}
+        {/* Thrid Column */}
         <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <DeviceCount />
           <FaceRecognize
             search={searchFR}
             setSearch={setSearchFR}
             items={filteredRecognize as any[]}
+          />
+        </div>
+
+        {/* Forth Column */}
+        <div className="p-6 w-full h-full rounded-xl flex flex-col gap-3 bg-white">
+          <ZYTAEvents
+            search={searchZYTA}
+            setSearch={setSearchZYTA}
+            items={filterZYTA as any[]}
           />
         </div>
       </div>

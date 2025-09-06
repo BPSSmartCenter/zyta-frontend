@@ -1,3 +1,4 @@
+// src/components/MapPanel.tsx
 import Dropdown from "../Dropdown";
 import Map from "../Map";
 import {
@@ -6,12 +7,13 @@ import {
   LOCATION_OPTIONS,
 } from "../Dashboard/dashboard.constants";
 import { notis } from "../../data/Dashboard/notis";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   selectedEvents: string[];
   buttonLabel: string;
   toggleEvent: (v: string) => void;
-  site: string; // ใช้เก็บค่าที่เลือกจาก Any Severity
+  site: string; // severity filter value
   setSite: (v: string) => void;
   province: string;
   setProvince: (v: string) => void;
@@ -26,14 +28,25 @@ export default function MapPanel({
   province,
   setProvince,
 }: Props) {
+  const { t } = useTranslation(["dashboard"]);
+
+  // แปลเฉพาะ Event/Severity (จังหวัดไม่แปล)
+  const getEventLabel = (val: string, fallback: string) =>
+    t(`events.${val}`, { defaultValue: fallback });
+
+  const getSeverityLabel = (val: string, fallback: string) => {
+    if (val === "all") return t("map.anySeverity", { defaultValue: fallback });
+    return t(`map.severity.${val}`, { defaultValue: fallback });
+  };
+
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        MAP
+        {t("map.title", { defaultValue: "MAP" })}
       </h1>
 
       <div className="flex items-center flex-wrap gap-5">
-        {/* All Event Map */}
+        {/* All Event Map (หลายตัวเลือก) */}
         <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
           {({ open, getButtonProps, getMenuProps }) => (
             <div className="relative inline-block">
@@ -41,7 +54,7 @@ export default function MapPanel({
                 {...getButtonProps({
                   type: "button",
                   className:
-                    "inline-flex h-8 w-[120px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50",
+                    "inline-flex h-8 min-w-[120px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50",
                 })}
                 onMouseDown={(e) => e.preventDefault()}
               >
@@ -50,10 +63,11 @@ export default function MapPanel({
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
                 </i>
               </button>
+
               <div
                 {...getMenuProps({
                   className: [
-                    "absolute left-0 top-full mt-2 min-w-[220px] rounded-md",
+                    "absolute left-0 top-full mt-2 min-w-[120px] whitespace-nowrap rounded-md",
                     "border border-gray-300 bg-white p-2 shadow-md",
                     "max-h-80 overflow-y-auto z-50",
                     "transition-all duration-150",
@@ -83,7 +97,9 @@ export default function MapPanel({
                         onChange={() => toggleEvent(opt.value)}
                         onMouseDown={(e) => e.preventDefault()}
                       />
-                      <span className="text-gray-800">{opt.label}</span>
+                      <span className="text-gray-800">
+                        {getEventLabel(opt.value, opt.label)}
+                      </span>
                     </label>
                   );
                 })}
@@ -107,11 +123,13 @@ export default function MapPanel({
                 {...getButtonProps({
                   type: "button",
                   className:
-                    "inline-flex h-8 w-[120px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
+                    "inline-flex h-8 w-[140px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
                 })}
               >
                 <span className="truncate">
-                  {selected?.label || "Any Severity"}
+                  {selected
+                    ? getSeverityLabel(selected.value, selected.label)
+                    : t("map.anySeverity", { defaultValue: "Any Severity" })}
                 </span>
                 <i className="material-icons arrow-icon leading-none text-cyan-500">
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
@@ -121,7 +139,7 @@ export default function MapPanel({
               <div
                 {...getMenuProps({
                   className: [
-                    "absolute z-10 mt-9 min-w-[142px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                    "absolute z-10 mt-9 min-w-[160px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
                     "transition-all duration-150",
                     open
                       ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -145,7 +163,7 @@ export default function MapPanel({
                         ].join(" "),
                       })}
                     >
-                      {opt.label}
+                      {getSeverityLabel(opt.value, opt.label)}
                     </button>
                   );
                 })}
@@ -173,20 +191,24 @@ export default function MapPanel({
                 {...getButtonProps({
                   type: "button",
                   className:
-                    "inline-flex h-8 w-[110px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50",
+                    "inline-flex h-8 min-w-[90px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50",
                 })}
               >
                 <span className="truncate text-cyan-500">
-                  {selected?.label || "All Location"}
+                  {selected?.value === "all"
+                    ? t("map.allLocation", { defaultValue: "All Location" })
+                    : selected?.label ??
+                      t("map.allLocation", { defaultValue: "All Location" })}
                 </span>
                 <i className="material-icons arrow-icon leading-none text-cyan-500">
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
                 </i>
               </button>
+
               <div
                 {...getMenuProps({
                   className: [
-                    "absolute left-0 top-full mt-2 min-w-[115px] rounded-xl",
+                    "absolute left-0 top-full mt-2 min-w-[150px] rounded-xl",
                     "border border-gray-300 bg-white p-1 shadow-md",
                     "max-h-80 overflow-y-auto z-50",
                     "transition-all duration-150",
@@ -211,6 +233,7 @@ export default function MapPanel({
                         ].join(" "),
                       })}
                     >
+                      {/* จังหวัดไม่แปลตามที่ขอ */}
                       {opt.label}
                     </button>
                   );
@@ -221,8 +244,7 @@ export default function MapPanel({
         </Dropdown>
       </div>
 
-      <div className="h-[680px] sm:h-[680px] lg:h-[680px] w-full bg-gray-200 rounded-lg flex items-center justify-center">
-        {/* ส่งค่าที่เลือกจาก Any Severity เป็นตัวกรองให้ Map */}
+      <div className="w-full rounded-lg flex items-center justify-center">
         <Map notis={notis} severityFilter={site} />
       </div>
     </form>

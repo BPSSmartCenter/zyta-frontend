@@ -1,0 +1,145 @@
+{
+  "navbar": {
+    "title": "หน้าแดชบอร์ด",
+    "allSites": "ทั้งหมด",
+    "export": "ส่งออก",
+    "openQuickActions": "เปิดแผงใช้งานด่วน",
+    "close": "ปิด",
+    "exportOptions": {
+      "pdf": "ส่งออก PDF",
+      "excel": "ส่งออก Excel",
+      "word": "ส่งออก Word"
+    },
+    "searchPlaceholder": "ช่องค้นหาไซต์"
+  },
+  "date": {
+    "today": "วันนี้",
+    "prevMonth": "เดือนก่อนหน้า",
+    "nextMonth": "เดือนถัดไป",
+    "placeholder": "วันที่ (ปปปป-ดด-วว)"
+  },
+  "stats": {
+    "fire": "ตรวจพบไฟไหม้",
+    "motion": "ตรวจพบการเคลื่อนไหว",
+    "device": "จำนวนกล้องออฟไลน์ / ออนไลน์",
+    "fall": "ตรวจพบการล้ม",
+    "sleeping": "ตรวจพบการนอนหลับ",
+    "addEvent": "+ เพิ่มเหตุการณ์"
+  },
+  "map": {
+    "title": "แผนที่",
+    "anySeverity": "ทุกความรุนแรง",
+    "allLocation": "ทุกพื้นที่",
+    "severity": {
+      "fire": "เพลิงไหม้",
+      "motion": "เคลื่อนไหว",
+      "offline": "ออฟไลน์",
+      "normal": "ปกติ"
+    }
+  },
+  "events": {
+    "all": "เหตุการณ์ทั้งหมด",
+    "fire": "ไฟไหม้",
+    "motion": "การเคลื่อนไหว",
+    "offline": "ออฟไลน์",
+    "fall": "การล้ม",
+    "sleeping": "การนอนหลับ",
+    "face": "ตรวจพบใบหน้า",
+    "plate": "ตรวจพบทะเบียนรถ",
+    "selectCount": "เลือก {{count}}"
+  },
+  "devices": {
+    "title": "อุปกรณ์",
+    "offline": "ออฟไลน์",
+    "online": "ออนไลน์",
+    "cameras": "กล้อง",
+    "total": "รวม",
+    "camerasShort": "จำนวนกล้อง",
+    "intercom": "อินเตอร์คอม",
+    "waterMeter": "มิเตอร์น้ำ",
+    "electricMeter": "มิเตอร์ไฟ",
+    "air": "อากาศ"
+  },
+  "userMgmt": {
+    "title": "การจัดการผู้ใช้",
+    "total": "รวม",
+    "region": {
+      "title": "จำนวนไซต์",
+      "labels": {
+        "0": "ภาคเหนือ",
+        "1": "ภาคตะวันออกเฉียงเหนือ",
+        "2": "ภาคกลาง",
+        "3": "ภาคตะวันตก",
+        "4": "ภาคตะวันออก",
+        "5": "ภาคใต้"
+      }
+    },
+    "role": {
+      "title": "จำนวนผู้ใช้ที่ใช้งาน",
+      "labels": {
+        "0": "Officer",
+        "1": "Admin",
+        "2": "User"
+      }
+    }
+  },
+  "alerts": {
+    "allTimeTitle": "สถิติแจ้งเตือนทั้งหมด"
+  },
+  "wellbeing": {
+    "title": "การแจ้งเตือนด้านความเป็นอยู่"
+  },
+  "zyta": {
+    "title": "การแจ้งเตือนความปลอดภัย ZYTA"
+  },
+  "face": {
+    "title": "จดจำใบหน้า / ทะเบียนรถ",
+    "searchPlaceholder": "ช่องค้นหาเหตุการณ์เเจ้งเตือนใบหน้าและทะเบียนรถ"
+  },
+  "search": {
+    "placeholder": "ช่องค้นหาเหตุการณ์"
+  },
+  "common": {
+    "noResults": "ไม่พบเหตุการณ์",
+    "total": "ทั้งหมด",
+    "prev": "ก่อนหน้า",
+    "next": "ถัดไป"
+  },
+  "sites": {
+    "all": "ทั้งหมด"
+  },
+  "notis": {
+    "fireDetected": "ตรวจพบไฟไหม้",
+    "motionDetected": "ตรวจพบการเคลื่อนไหว",
+    "cameraOffline": "กล้องออฟไลน์",
+    "sleepingLong": "ตรวจพบคนหลับนานกว่าปกติ",
+    "fallDetected": "ตรวจพบคนล้ม",
+    "faceDetected": "ตรวจพบใบหน้า",
+    "plateDetected": "ตรวจพบเลขทะเบียนรถยนต์"
+  },
+  "faceNotis": {
+    "faceDetected": "ตรวจพบใบหน้า",
+    "licenseDetected": "ตรวจพบเลขทะเบียนรถยนต์"
+  },
+  "zytaNotis": {
+    "intrusionDetected": "ตรวจพบการบุกรุก",
+    "systemStabilized": "ระบบกลับมาคงที่",
+    "unauthorizedAccess": "การเข้าถึงที่ไม่ได้รับอนุญาต",
+    "accessRevoked": "ยกเลิกการเข้าถึงแล้ว",
+    "smokeDetected": "ตรวจพบควัน",
+    "environmentNormal": "สภาพแวดล้อมปกติ"
+  },
+  "chart": {
+    "statisticsTitle": "สถิติ",
+    "totalSummary": "สรุปภาพรวมของสแนปช็อต",
+    "daily": "รายวัน",
+    "weekly": "รายสัปดาห์",
+    "monthly": "รายเดือน",
+    "countSuffix": "{{count}} ครั้ง",
+    "legend": {
+      "shift1": "08:00 - 16:00 น.",
+      "shift2": "16:00 - 24:00 น.",
+      "shift3": "24:00 - 08:00 น."
+    }
+  }
+}

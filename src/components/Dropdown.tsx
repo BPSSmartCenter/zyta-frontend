@@ -3,26 +3,22 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 type Option = { label: string; value: string };
 
 type RenderCtx = {
-  /** สถานะเปิด/ปิดเมนู */
   open: boolean;
-  /** toggle เปิด/ปิด */
   toggle: () => void;
-  /** ตั้งค่าสถานะเปิด/ปิด (รองรับ controlled/uncontrolled) */
   setOpen: (next: boolean) => void;
 
-  /** ค่า value ปัจจุบัน (คุมได้ทั้ง controlled/uncontrolled) */
   value: string;
-  /** option ที่ถูกเลือกอยู่ */
   selected?: Option;
-  /** เลือก option */
   pick: (opt: Option) => void;
 
-  /** รายการ options ทั้งหมด (ให้ children map ใช้ได้สะดวก) */
   options: Option[];
 
-  /** prop-getters: ช่วยประกอบ a11y/behavior ได้ง่าย */
-  getButtonProps: (extra?: React.ButtonHTMLAttributes<HTMLButtonElement>) => React.ButtonHTMLAttributes<HTMLButtonElement>;
-  getMenuProps: (extra?: React.HTMLAttributes<HTMLDivElement>) => React.HTMLAttributes<HTMLDivElement>;
+  getButtonProps: (
+    extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
+  ) => React.ButtonHTMLAttributes<HTMLButtonElement>;
+  getMenuProps: (
+    extra?: React.HTMLAttributes<HTMLDivElement>
+  ) => React.HTMLAttributes<HTMLDivElement>;
   getItemProps: (
     opt: Option,
     extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
@@ -34,32 +30,25 @@ type Props = {
   value?: string;
   onChange?: (value: string, option: Option) => void;
 
-  /** ควบคุมสถานะเปิดจากภายนอก (controlled) */
   isOpen?: boolean;
-  /** แจ้งเมื่อสถานะเปิด/ปิดเปลี่ยน */
   onOpenChange?: (open: boolean) => void;
 
-  /** ใช้จับคู่กับ aria-labelledby ของเมนู */
   id?: string;
-
-  /** render props */
   children: (ctx: RenderCtx) => React.ReactNode;
 };
 
-export default function Dropdown({
+function DropdownBase({
   options,
   value,
   onChange,
   isOpen,
   onOpenChange,
-  id = "all-sites-dropdown",
+  id = "dropdown",
   children,
 }: Props) {
-  // รองรับทั้ง controlled และ uncontrolled สำหรับ open
   const [openUncontrolled, setOpenUncontrolled] = useState(false);
   const open = isOpen ?? openUncontrolled;
 
-  // รองรับทั้ง controlled และ uncontrolled สำหรับ value
   const [internal, setInternal] = useState(value ?? "");
   useEffect(() => {
     if (value !== undefined) setInternal(value);
@@ -85,11 +74,18 @@ export default function Dropdown({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open, isOpen]);
 
+  // ใส่/ถอดแฟล็กที่ body เพื่อล็อก breakpoint/resize ชั่วคราวตอนเมนูเปิด
+  useEffect(() => {
+    const cls = "dropdown-inline-open";
+    if (open) document.body.classList.add(cls);
+    else document.body.classList.remove(cls);
+    return () => document.body.classList.remove(cls);
+  }, [open]);
+
   const setOpen = (next: boolean) => {
     if (isOpen === undefined) setOpenUncontrolled(next);
     onOpenChange?.(next);
   };
-
   const toggle = () => setOpen(!open);
 
   const pick = (opt: Option) => {
@@ -98,7 +94,6 @@ export default function Dropdown({
     setOpen(false);
   };
 
-  // prop-getters (ช่วยให้ children ใส่ a11y/behavior ได้ไว)
   const getButtonProps: RenderCtx["getButtonProps"] = (extra) => ({
     id,
     type: "button",
@@ -144,3 +139,7 @@ export default function Dropdown({
     </div>
   );
 }
+
+// dropdown ไม่ต้อง re-render จาก parent ทุกเรื่อง: memo ไว้
+const Dropdown = React.memo(DropdownBase);
+export default Dropdown;

@@ -1,0 +1,145 @@
+{
+  "navbar": {
+    "title": "Welcome My Dashboard",
+    "allSites": "All Sites",
+    "export": "Export",
+    "openQuickActions": "Open quick actions",
+    "close": "Close",
+    "exportOptions": {
+      "pdf": "Export to PDF",
+      "excel": "Export to Excel",
+      "word": "Export to Word"
+    },
+    "searchPlaceholder": "Find sites"
+  },
+  "date": {
+    "today": "Today",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "placeholder": "YYYY-MM-DD"
+  },
+
+  "stats": {
+    "fire": "Fire detected",
+    "motion": "Motion detected",
+    "device": "Offline / Online cameras",
+    "fall": "Fall detected",
+    "sleeping": "Sleep detected",
+    "addEvent": "+ Add Event"
+  },
+
+  "map": {
+    "title": "MAP",
+    "anySeverity": "Any Severity",
+    "allLocation": "All Location",
+    "severity": {
+      "fire": "Fire detected",
+      "motion": "Motion detected",
+      "offline": "Device offline",
+      "normal": "Normal"
+    }
+  },
+  "events": {
+    "all": "All Events",
+    "fire": "Fire",
+    "motion": "Motion",
+    "offline": "Offline",
+    "fall": "Fall",
+    "sleeping": "Sleeping",
+    "face": "Face detected",
+    "plate": "License plate",
+    "selectCount": "เลือก {{count}}"
+  },
+  "devices": {
+    "title": "DEVICES",
+    "offline": "Offline",
+    "online": "Online",
+    "cameras": "Cameras",
+    "total": "Total",
+    "camerasShort": "Cameras",
+    "intercom": "Intercom",
+    "waterMeter": "Water",
+    "electricMeter": "Electric",
+    "air": "Air"
+  },
+  "userMgmt": {
+    "title": "USER MANAGEMENT",
+    "total": "total",
+    "region": {
+      "title": "Total Sites",
+      "labels": {
+        "0": "North",
+        "1": "Northeast",
+        "2": "Central",
+        "3": "West",
+        "4": "East",
+        "5": "South"
+      }
+    },
+    "role": {
+      "title": "Active users",
+      "labels": {
+        "0": "Officer",
+        "1": "Admin",
+        "2": "User"
+      }
+    }
+  },
+  "alerts": {
+    "allTimeTitle": "ALL-TIME ALERTS"
+  },
+  "wellbeing": {
+    "title": "WELL-BEING ALERTS"
+  },
+  "zyta": {
+    "title": "ZYTA SECURITY ALERT"
+  },
+  "face": {
+    "title": "Face Recognize / License Plates",
+    "searchPlaceholder": "Search face & license-plate alerts"
+  },
+
+  "search": {
+    "placeholder": "Search events"
+  },
+  "common": {
+    "noResults": "No events found",
+    "total": "Total",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "notis": {
+    "fireDetected": "Fire detected",
+    "motionDetected": "Motion detected",
+    "cameraOffline": "Camera offline",
+    "sleepingLong": "Sleeping longer than usual",
+    "fallDetected": "Fall detected",
+    "faceDetected": "Face detected",
+    "plateDetected": "License plate detected"
+  },
+  "faceNotis": {
+    "faceDetected": "Face detected",
+    "licenseDetected": "License detected"
+  },
+  "zytaNotis": {
+    "intrusionDetected": "Intrusion detected",
+    "systemStabilized": "System stabilized",
+    "unauthorizedAccess": "Unauthorized access",
+    "accessRevoked": "Access revoked",
+    "smokeDetected": "Smoke detected",
+    "environmentNormal": "Environment normal"
+  },
+  "chart": {
+    "statisticsTitle": "Statistics",
+    "totalSummary": "Total summary of snapshot",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly",
+    "countSuffix": "{{count}} times",
+    "legend": {
+      "shift1": "08:00 - 16:00",
+      "shift2": "16:00 - 24:00",
+      "shift3": "24:00 - 08:00"
+    }
+  }
+}
