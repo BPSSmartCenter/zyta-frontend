@@ -233,8 +233,10 @@ export default function MapPanel({
                         ].join(" "),
                       })}
                     >
-                      {/* จังหวัดไม่แปลตามที่ขอ */}
-                      {opt.label}
+                      {/* จังหวัดไม่แปล ยกเว้นตัวเลือก all ให้แปล */}
+                      {opt.value === "all"
+                        ? t("map.allLocation", { defaultValue: opt.label })
+                        : opt.label}
                     </button>
                   );
                 })}
