@@ -7,6 +7,8 @@ import {
   sleepingNoti,
   faceImage,
   plateImage,
+  alertImage,
+  insuranceImage,
 } from "../../assets/index";
 
 /* =============================
@@ -297,6 +299,7 @@ export const ZYTA_NOTIS = [
   {
     type: "alert",
     titleKey: "zytaNotis.intrusionDetected",
+    img: alertImage,
     title: "Intrusion detected",
     site: "Site A",
     date: "2025-01-06",
@@ -304,6 +307,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.systemStabilized",
+    img: insuranceImage,
     title: "System stabilized",
     site: "Site A",
     date: "2025-01-06",
@@ -311,6 +315,7 @@ export const ZYTA_NOTIS = [
   {
     type: "alert",
     titleKey: "zytaNotis.unauthorizedAccess",
+    img: alertImage,
     title: "Unauthorized access",
     site: "Site B",
     date: "2025-01-06",
@@ -318,6 +323,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.accessRevoked",
+    img: insuranceImage,
     title: "Access revoked",
     site: "Site B",
     date: "2025-01-06",
@@ -325,6 +331,7 @@ export const ZYTA_NOTIS = [
   {
     type: "alert",
     titleKey: "zytaNotis.smokeDetected",
+    img: alertImage,
     title: "Smoke detected",
     site: "Site C",
     date: "2025-01-06",
@@ -332,6 +339,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -339,6 +347,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -346,6 +355,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -353,6 +363,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -360,6 +371,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -367,6 +379,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -374,6 +387,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -381,6 +395,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",
@@ -388,6 +403,7 @@ export const ZYTA_NOTIS = [
   {
     type: "success",
     titleKey: "zytaNotis.environmentNormal",
+    img: insuranceImage,
     title: "Environment normal",
     site: "Site C",
     date: "2025-01-06",

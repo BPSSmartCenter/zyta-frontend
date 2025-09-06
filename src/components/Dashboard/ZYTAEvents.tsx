@@ -63,6 +63,7 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
                 <NotiCard
                   key={i}
                   type={n.type as any}
+                  img={n.img}
                   title={title}
                   site={site}
                   date={dateText}

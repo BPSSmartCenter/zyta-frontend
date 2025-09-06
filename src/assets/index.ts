@@ -32,6 +32,9 @@ import offlineDeviceCamera from "./offlineDeviceCamera.png";
 import fallCamera from "./fallCamera.png";
 import sleepCamera from "./sleepCamera.png";
 
+import alertImage from "./alert.png";
+import insuranceImage from "./insurance.png";
+
 export {
   brandImage,
   exportImage,
@@ -62,4 +65,6 @@ export {
   offlineDeviceCamera,
   fallCamera,
   sleepCamera,
+  alertImage,
+  insuranceImage,
 };
