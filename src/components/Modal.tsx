@@ -3,13 +3,18 @@ import React, { useEffect, useRef } from "react";
 type IconType = "warning" | "mail" | "cancel";
 
 export interface PrelineModalProps {
-  open: boolean; // คุมเปิด/ปิดจาก React
-  id?: string; // id ของ overlay (ต้อง unique)
-  icon?: IconType; // ไอคอน: warning | mail | cancel
+  open: boolean;
+  id?: string;
+  icon?: IconType;
   title: string;
   message?: string | React.ReactNode;
-  closeLabel?: string; // ป้ายปุ่มปิด
-  onClose: () => void; // ให้ React sync state ปิด
+  closeLabel?: string; // ปุ่มเดี่ยว (เดิม)
+  onClose: () => void;
+
+  // ⬇️ NEW: โหมดยืนยัน 2 ปุ่ม
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm?: () => void;
 }
 
 const ICON_MAP: Record<IconType, { name: string; color: string }> = {
@@ -26,47 +31,43 @@ export default function Modal({
   message,
   closeLabel = "ตกลง",
   onClose,
+  confirmLabel,
+  cancelLabel = "ยกเลิก",
+  onConfirm,
 }: PrelineModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const hiddenTriggerRef = useRef<HTMLSpanElement | null>(null);
 
-  // 1) ให้ Preline scan DOM (เผื่อ SPA mount ใหม่)
   useEffect(() => {
     (window as any).HSStaticMethods?.autoInit?.();
   }, []);
 
-  // 2) เปิด/ปิดด้วย Preline API ถ้าพร้อม (HSOverlay)
   useEffect(() => {
-    const overlayEl = overlayRef.current;
+    const el = overlayRef.current;
     const HSO = (window as any).HSOverlay;
-
-    if (!overlayEl) return;
+    if (!el) return;
 
     if (open) {
-      // ถ้า HSOverlay พร้อม → ใช้ API เปิด (แอนิเมชันสมบูรณ์)
       if (HSO?.open) {
         try {
-          HSO.open(overlayEl);
+          HSO.open(el);
           return;
         } catch {}
       }
-      // Fallback: บังคับสถานะให้ variant ทำงาน (กรณี HSO ยังไม่พร้อม)
-      overlayEl.classList.add("open");
-      overlayEl.classList.remove("hidden", "pointer-events-none", "opacity-0");
+      el.classList.add("open");
+      el.classList.remove("hidden", "pointer-events-none", "opacity-0");
     } else {
       if (HSO?.close) {
         try {
-          HSO.close(overlayEl);
+          HSO.close(el);
           return;
         } catch {}
       }
-      // Fallback: เอา .open ออก และซ่อน
-      overlayEl.classList.remove("open");
-      overlayEl.classList.add("hidden", "pointer-events-none");
+      el.classList.remove("open");
+      el.classList.add("hidden", "pointer-events-none");
     }
   }, [open]);
 
-  // 3) ปิดด้วย ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -74,7 +75,6 @@ export default function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // 4) กัน scroll พื้นหลังขณะเปิด
   useEffect(() => {
     const prev = document.body.style.overflow;
     if (open) document.body.style.overflow = "hidden";
@@ -83,7 +83,6 @@ export default function Modal({
     };
   }, [open]);
 
-  // 5) คลิกพื้นหลังเพื่อปิด
   const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === overlayRef.current) onClose();
   };
@@ -92,44 +91,24 @@ export default function Modal({
 
   return (
     <>
-      {/* trigger ซ่อน ไว้ให้ Preline initial instance ได้แน่นอน */}
       <span
         ref={hiddenTriggerRef}
         className="hidden"
         aria-hidden="true"
         data-hs-overlay={`#${id}`}
       />
-
-      {/* ===== Overlay (คง UI/สไตล์เดิม – แค่เพิ่มคลาส Preline) ===== */}
       <div
         id={id}
         ref={overlayRef}
-        className="
-          hs-overlay hidden fixed inset-0 z-[80] size-full
-          overflow-x-hidden overflow-y-auto pointer-events-none
-          bg-black/50 opacity-0 transition-opacity 
-          hs-overlay-open:opacity-100
-          flex items-center justify-center
-        "
+        className="hs-overlay hidden fixed inset-0 z-[80] size-full overflow-x-hidden overflow-y-auto pointer-events-none bg-black/50 opacity-0 transition-opacity hs-overlay-open:opacity-100 flex items-center justify-center"
         role="dialog"
         tabIndex={-1}
         aria-labelledby={`${id}-label`}
         aria-modal="true"
         onMouseDown={handleBackdropMouseDown}
       >
-        {/* กล่องโมดัล: target แอนิเมชันแบบ Preline */}
-        <div
-          className="
-            hs-overlay-animation-target
-            hs-overlay-open:scale-100 hs-overlay-open:opacity-100
-            scale-95 opacity-0 ease-in-out transition-all 
-            w-[90%] max-w-[340px] sm:max-w-[360px] md:max-w-[400px] m-3 sm:mx-auto min-h-[calc(100%-56px)]
-            flex items-center
-          "
-        >
-          {/* เนื้อใน (UI เดิม) */}
+        <div className="hs-overlay-animation-target hs-overlay-open:scale-100 hs-overlay-open:opacity-100 scale-95 opacity-0 ease-in-out transition-all w-[90%] max-w-[340px] sm:max-w-[360px] md:max-w-[400px] m-3 sm:mx-auto min-h-[calc(100%-56px)] flex items-center">
           <div className="w-full flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl pointer-events-auto">
-            {/* Content */}
             <div className="px-6 pb-6 mt-2">
               <div className="w-full flex justify-center">
                 <i
@@ -148,26 +127,49 @@ export default function Modal({
                   {title}
                 </h3>
                 {message ? (
-                  <p className="mt-2 text-gray-700 text-sm leading-6">
+                  <div className="mt-2 text-gray-700 text-sm leading-6">
                     {message}
-                  </p>
+                  </div>
                 ) : null}
               </div>
 
-              <div className="mt-5 flex justify-center">
-                <button
-                  type="button"
-                  className="py-2.5 px-5 w-[200px] inline-flex items-center justify-center text-sm font-semibold rounded-lg
-                             bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer"
-                  data-hs-overlay={`#${id}`} // ปิดด้วย Preline
-                  onClick={onClose}
-                >
-                  {closeLabel}
-                </button>
-              </div>
+              {/* Actions */}
+              {confirmLabel ? (
+                <div className="mt-5 flex justify-center gap-3">
+                  <button
+                    type="button"
+                    className="py-2.5 px-5 w-[140px] inline-flex items-center justify-center text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:cursor-pointer"
+                    data-hs-overlay={`#${id}`}
+                    onClick={onClose}
+                  >
+                    {cancelLabel}
+                  </button>
+                  <button
+                    type="button"
+                    className="py-2.5 px-5 w-[160px] inline-flex items-center justify-center text-sm font-semibold rounded-lg bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer"
+                    data-hs-overlay={`#${id}`}
+                    onClick={() => {
+                      onConfirm?.();
+                      onClose();
+                    }}
+                  >
+                    {confirmLabel}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-5 flex justify-center">
+                  <button
+                    type="button"
+                    className="py-2.5 px-5 w-[200px] inline-flex items-center justify-center text-sm font-semibold rounded-lg bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer"
+                    data-hs-overlay={`#${id}`}
+                    onClick={onClose}
+                  >
+                    {closeLabel}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-          {/* /content */}
         </div>
       </div>
     </>

@@ -1,0 +1,55 @@
+{
+  "title": "ทะเบียนรถ",
+  "import": "นำเข้า",
+  "plate": "ทะเบียน",
+  "province": "จังหวัด",
+  "type": "ประเภทป้าย",
+  "owner": "เจ้าของ",
+  "color": "สี",
+  "camera": "กล้อง",
+  "timestamp": "เวลาที่ถ่าย",
+  "confident": "ความแม่นยำ (%)",
+  "searchPlaceholder": "ค้นหา",
+  "filters": {
+    "plateText": "ข้อความทะเบียนรถ",
+    "province": "จังหวัด",
+    "provinceAll": "ทุกจังหวัด",
+    "date": "วันเริ่มต้น",
+    "name": "ชื่อ",
+    "status": "สถานะ",
+    "statusAll": "ทุกสถานะ"
+  },
+  "nav": {
+    "licensePlates": "ทะเบียนรถ",
+    "faceRecognize": "แสกนใบหน้า"
+  },
+  "stats": {
+    "licensePlates": "ทะเบียนรถ",
+    "faceScan": "สแกนใบหน้า",
+    "picture": "รูปภาพ"
+  },
+  "table": {
+    "no": "ลำดับ",
+    "picture": "รูปภาพ",
+    "platePicture": "รูปภาพทะเบียน",
+    "plateText": "ข้อความทะเบียน",
+    "province": "จังหวัด",
+    "confidence": "ความแม่นยำ",
+    "cameraName": "ชื่อกล้อง",
+    "timestamp": "เวลาบันทึก",
+    "fullName": "ชื่อ-นามสกุล",
+    "gender": "เพศ",
+    "inout": "สถานะการเข้า-ออก",
+    "timeIn": "เวลาขาเข้า",
+    "timeOut": "เวลาขาออก"
+  },
+  "relative": {
+    "justNow": "เมื่อสักครู่",
+    "hoursAgo": "{{count}} ชั่วโมงที่แล้ว"
+  },
+  "pager": {
+    "prev": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "pageOf": "หน้า {{page}} จาก {{pageCount}}"
+  }
+}

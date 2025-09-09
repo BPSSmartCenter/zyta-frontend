@@ -3,6 +3,7 @@ import React from "react";
 import StatCard, { StatCardGroup } from "../../components/StatCard";
 import CameraTile from "../../components/CameraTile";
 import { useTranslation } from "react-i18next";
+import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 
 type StatItem = {
   key: string;
@@ -20,15 +21,14 @@ type Props = {
 };
 
 export default function Header({ statItems, cameraItems }: Props) {
-  const { t } = useTranslation(["dashboard"]); // ← เพิ่ม i18n
+  const { t } = useTranslation(["dashboard"]);
+  const { selected } = useStatSelection();
 
-  // state สำหรับสไลด์มือถือ/แท็บเล็ต
+  // state สไลด์ของ Camera (คงเดิม)
   const [index, setIndex] = React.useState(0);
   const maxIndex = Math.max(0, cameraItems.length - 1);
-
   const canPrev = index > 0;
   const canNext = index < maxIndex;
-
   const gotoPrev = () => canPrev && setIndex((v) => v - 1);
   const gotoNext = () => canNext && setIndex((v) => v + 1);
 
@@ -37,44 +37,39 @@ export default function Header({ statItems, cameraItems }: Props) {
       {/* --- StatCards --- */}
       <StatCardGroup
         selectionMode="single"
-        // มือถือ/แท็บเล็ต: ใช้ grid 2 คอลัมน์; เดสก์ท็อป: ใช้ flex เดิม
+        activeIds={selected ? [selected] : []}
+        onChange={(ids) => setSelectedStat(ids[0] ?? null)}
         className="grid grid-cols-2 gap-2 px-6 lg-1024:flex lg-1024:flex-wrap"
       >
         {statItems.map((it) => (
           <StatCard
             id={it.key}
             key={it.key}
-            // แปลจาก dashboard.stats.<key> ถ้าไม่มีคีย์ จะ fallback เป็น it.label เดิม
             label={t(`stats.${it.key}`, { defaultValue: it.label })}
             val={it.val}
             img={it.img}
             activeImg={it.activeImg}
             inactiveBg="bg-white"
             activeBg="bg-cyan-500"
-            // มือถือให้เต็มแถว (w-full); เดสก์ท็อปคง flex-1
             className="w-full lg-1024:flex-1"
           />
         ))}
         <StatCard className="w-full lg-1024:flex-1" />
       </StatCardGroup>
 
-      {/* --- Camera tiles --- */}
-
-      {/* เดสก์ท็อป: คงแบบเดิม (แสดงทั้งหมด) */}
+      {/* --- Camera tiles (เดิมทั้งหมด) --- */}
       <div className="hidden lg-1024:flex justify-between flex-5 gap-5 px-6 mt-4">
         {cameraItems.map((c, i) => (
           <CameraTile key={i} ringColor={c.ringColor} imgSrc={c.imgSrc} />
         ))}
       </div>
 
-      {/* มือถือ/แท็บเล็ต: แสดงทีละ 1 รูป + ปุ่มเลื่อน + แอนิเมชัน */}
       <div className="lg-1024:hidden px-6 mt-4">
         <div className="relative">
-          {/* ปุ่มซ้าย */}
           <button
             type="button"
             onClick={gotoPrev}
-            aria-label={t("common.prev")} // ← แปลเฉพาะ aria-label
+            aria-label={t("common.prev")}
             className={[
               "absolute left-2 top-1/2 -translate-y-1/2 z-10",
               "size-9 flex items-center justify-center rounded-full bg-white/90 border border-gray-200 shadow",
@@ -84,11 +79,10 @@ export default function Header({ statItems, cameraItems }: Props) {
             <i className="material-icons">arrow_back_ios</i>
           </button>
 
-          {/* ปุ่มขวา */}
           <button
             type="button"
             onClick={gotoNext}
-            aria-label={t("common.next")} // ← แปลเฉพาะ aria-label
+            aria-label={t("common.next")}
             className={[
               "absolute right-2 top-1/2 -translate-y-1/2 z-10",
               "size-9 flex items-center justify-center rounded-full bg-white/90 border border-gray-200 shadow",
@@ -98,9 +92,7 @@ export default function Header({ statItems, cameraItems }: Props) {
             <i className="material-icons">arrow_forward_ios</i>
           </button>
 
-          {/* viewport */}
           <div className="overflow-hidden rounded-xl">
-            {/* track */}
             <div
               className="flex transition-transform duration-300 ease-in-out"
               style={{ transform: `translateX(-${index * 100}%)` }}
@@ -115,7 +107,6 @@ export default function Header({ statItems, cameraItems }: Props) {
             </div>
           </div>
 
-          {/* ตัวบอกตำแหน่ง (dots) */}
           <div className="mt-3 flex items-center justify-center gap-2">
             {cameraItems.map((_, i) => (
               <span

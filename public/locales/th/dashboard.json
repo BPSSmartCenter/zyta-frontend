@@ -3,6 +3,8 @@
     "title": "หน้าแดชบอร์ด",
     "allSites": "ทั้งหมด",
     "export": "ส่งออก",
+    "import": "นำเข้า",
+    "add": "เพิ่ม",
     "openQuickActions": "เปิดแผงใช้งานด่วน",
     "close": "ปิด",
     "exportOptions": {

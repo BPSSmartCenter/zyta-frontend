@@ -1,0 +1,42 @@
+{
+  "totalAlertsToday": "แจ้งเตือนทั้งหมด (วันนี้)",
+  "sitesAlertsTitle": "ตารางการแจ้งเตือนแบบรายไซต์ (Sites Alerts Table)",
+  "filters": {
+    "cameraAll": "กล้องทั้งหมด",
+    "eventAll": "เหตุการณ์ทั้งหมด"
+  },
+  "table": {
+    "headers": {
+      "no": "ลำดับ",
+      "camera": "กล้อง",
+      "event": "เหตุการณ์",
+      "picture": "รูปภาพ",
+      "cameraName": "ชื่อกล้อง",
+      "status": "สถานะ",
+      "timestamp": "เวลา"
+    }
+  },
+  "events": {
+    "fire detected": "ตรวจพบเพลิงไหม้"
+  },
+  "status": {
+    "UNRESOLVED": "ยังไม่ปิด",
+    "RESOLVED": "ปิดแล้ว"
+  },
+  "relative": {
+    "justNow": "เมื่อสักครู่",
+    "hoursAgo": "{{count}} ชั่วโมงที่แล้ว"
+  },
+  "pager": {
+    "prev": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "pageOf": "หน้า {{page}} จาก {{pageCount}}"
+  },
+  "a11y": {
+    "selectRow": "เลือก {{camera}}"
+  },
+  "camera": {
+    "numbered": "กล้องที่ {{number}}"
+  },
+  "searchPlaceholder": "ช่องค้นหาเหตุการณ์"
+}

@@ -16,9 +16,11 @@ type GroupCtx = {
 
 const StatCardGroupContext = createContext<GroupCtx | null>(null);
 
+// src/components/StatCard.tsx  (เฉพาะส่วน Group)
 type StatCardGroupProps = PropsWithChildren<{
   selectionMode?: SelectionMode;
   defaultActiveIds?: string[];
+  activeIds?: string[]; // controlled
   onChange?: (activeIds: string[]) => void;
   className?: string;
 }>;
@@ -26,24 +28,31 @@ type StatCardGroupProps = PropsWithChildren<{
 export function StatCardGroup({
   selectionMode = "multiple",
   defaultActiveIds = [],
+  activeIds,
   onChange,
   className,
   children,
 }: StatCardGroupProps) {
-  const [activeIds, setActiveIds] = useState<string[]>(defaultActiveIds);
-  const isActive = (id: string) => activeIds.includes(id);
+  const [internalActive, setInternalActive] =
+    useState<string[]>(defaultActiveIds);
+
+  const current = activeIds ?? internalActive;
+  const isActive = (id: string) => current.includes(id);
+
   const toggle = (id: string) => {
-    setActiveIds((prev) => {
-      let next: string[];
-      if (selectionMode === "single") {
-        next = prev.includes(id) ? [] : [id];
-      } else {
-        next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      }
-      onChange?.(next);
-      return next;
-    });
+    const base = current;
+    let next: string[];
+    if (selectionMode === "single") {
+      next = base.includes(id) ? [] : [id];
+    } else {
+      next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
+    }
+    if (activeIds === undefined) {
+      setInternalActive(next);
+    }
+    onChange?.(next);
   };
+
   const ctx: GroupCtx = { mode: selectionMode, isActive, toggle };
   return (
     <div className={className}>
@@ -65,6 +74,8 @@ type Props = {
   inactiveBg?: string;
   activeBg?: string;
   startActive?: boolean;
+  /** ถ้า true: อักษรอยู่ซ้าย (บน–ล่าง), รูปอยู่ขวา */
+  reverseLayout?: boolean;
   className?: string;
   onToggle?: (active: boolean) => void;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
@@ -80,6 +91,7 @@ const StatCard: React.FC<Props> = ({
   inactiveBg = "bg-white",
   activeBg = "bg-cyan-500",
   startActive = false,
+  reverseLayout = false,
   className,
   onToggle,
   onClick,
@@ -126,7 +138,7 @@ const StatCard: React.FC<Props> = ({
   // ลำดับ fallback ของข้อความ:
   // 1) label จาก props
   // 2) แปลจาก stats.<id> ถ้ามี id
-  // 3) แปลจาก stats.fire (อยู่ในบล็อกเดียวกัน) หรือ fallback อังกฤษ
+  // 3) แปลจาก stats.fire หรืออังกฤษ
   const intlLabelFromId = id
     ? t(`stats.${id}`, { defaultValue: undefined })
     : undefined;
@@ -165,33 +177,58 @@ const StatCard: React.FC<Props> = ({
     }
   };
 
+  // ===== Layout =====
+  const containerBase =
+    "w-[225px] h-[95px] rounded-md select-none border border-cyan-500 hover:cursor-pointer hover:shadow-xl hover:scale-[1.01]";
+  const containerLayout = reverseLayout
+    ? "flex items-center justify-between px-4"
+    : "flex justify-center items-center gap-6";
+
+  const textColor = isWhiteBg ? "text-gray-700" : "text-white";
+  const textBox = reverseLayout
+    ? "font-inter flex flex-col items-start justify-center"
+    : "font-inter flex flex-col items-center justify-center";
+
   return (
     <div
       onClick={handleToggle}
       className={[
-        "flex justify-center items-center gap-6",
-        "w-[225px] h-[95px] rounded-md select-none",
-        "border border-cyan-500 hover:cursor-pointer hover:shadow-xl hover:scale-[1.01]",
+        containerBase,
+        containerLayout,
         isTailwindBg ? currentBg : "",
         className || "",
       ].join(" ")}
       style={!isTailwindBg ? { backgroundColor: currentBg } : undefined}
     >
-      <div className="">
-        <img src={currentImg} width={36} height={35} alt="" />
-      </div>
-
-      <div
-        className={[
-          isWhiteBg ? "text-gray-700" : "text-white",
-          "font-inter justify-center items-center flex flex-col ",
-        ].join(" ")}
-      >
-        <div className="text-[24px] font-bold">{displayVal}</div>
-        <div className="text-[11px] font-semibold mt-[-7px]">
-          {displayLabel}
-        </div>
-      </div>
+      {reverseLayout ? (
+        <>
+          {/* ข้อความซ้าย (บน–ล่าง) */}
+          <div className={[textColor, textBox].join(" ")}>
+            <div className="text-[11px] font-semibold mt-[-7px]">
+              {displayLabel}
+            </div>
+            <div className="text-[24px] font-bold">{displayVal}</div>
+          </div>
+          {/* รูปขวา */}
+          <div>
+            <img src={currentImg} width={36} height={35} alt="" />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* รูปซ้าย */}
+          <div>
+            <img src={currentImg} width={36} height={35} alt="" />
+          </div>
+          {/* ข้อความขวา (กึ่งกลาง) */}
+          <div className={[textColor, textBox].join(" ")}>
+            <div className="text-[24px] font-bold">{displayVal}</div>
+            <div className="text-[11px] font-semibold mt-[-7px]">
+              {displayLabel}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

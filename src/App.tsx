@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { Dashboard, Register, Login } from "./pages";
+import { Dashboard, Register, Login, TotalAlert, FaceRecognize } from "./pages";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
 
@@ -11,7 +11,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />{" "}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/alert" element={<TotalAlert />} />
+          <Route path="/facerec" element={<FaceRecognize />} />
         </Routes>
       </BrowserRouter>
     </>

@@ -1,0 +1,71 @@
+{
+  "account": { "logout": "Sign out" },
+  "logout": {
+    "title": "Sign out",
+    "message": "Are you sure you want to sign out?"
+  },
+  "actions": { "cancel": "Cancel", "signOut": "Sign out" },
+  "search": {
+    "placeholder": "Search"
+  },
+  "home": {
+    "title": "Home",
+    "links": {
+      "l1": "Link 1",
+      "l2": "Link 2",
+      "l3": "Link 3"
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "devices": "Devices",
+    "map": "Map",
+    "tradeHistory": "Trade history",
+    "mapCountLabel": "{{count}}"
+  },
+  "projects": {
+    "title": "Projects",
+    "links": {
+      "l1": "Link 1",
+      "l2": "Link 2",
+      "l3": "Link 3"
+    }
+  },
+  "tasks": {
+    "title": "Tasks",
+    "links": {
+      "l1": "Link 1",
+      "l2": "Link 2",
+      "l3": "Link 3"
+    }
+  },
+  "reporting": {
+    "title": "Reporting",
+    "links": {
+      "l1": "Link 1",
+      "l2": "Link 2",
+      "l3": "Link 3"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "links": {
+      "l1": "Link 1",
+      "l2": "Link 2",
+      "l3": "Link 3"
+    }
+  },
+  "aria": {
+    "toggleSidebar": "Toggle sidebar",
+    "sidebarLabel": "Sidebar",
+    "brandAlt": "Brand"
+  },
+  "footer": {
+    "support": "Support",
+    "setting": "Settings",
+    "useSpace": "Used space",
+    "desc": "Your team has used {{percent}}% of your available space. Need more?",
+    "dissmiss": "Dissmiss",
+    "upgrade": "Upgrade plan"
+  }
+}

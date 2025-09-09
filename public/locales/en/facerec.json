@@ -1,0 +1,55 @@
+{
+  "title": "License Plates",
+  "import": "Import",
+  "plate": "Plate",
+  "province": "Province",
+  "type": "Plate type",
+  "owner": "Owner",
+  "color": "Color",
+  "camera": "Camera",
+  "timestamp": "Timestamp",
+  "confident": "Confident (%)",
+  "searchPlaceholder": "Search",
+  "filters": {
+    "plateText": "License plates text",
+    "province": "Province",
+    "provinceAll": "All provinces",
+    "date": "Start date",
+    "name": "Name",
+    "status": "Status",
+    "statusAll": "All statuses"
+  },
+  "nav": {
+    "licensePlates": "License Plates",
+    "faceRecognize": "Face Recognize"
+  },
+  "stats": {
+    "licensePlates": "License Plates",
+    "faceScan": "Face Scan",
+    "picture": "Picture"
+  },
+  "table": {
+    "fullName": "FULL NAME",
+    "gender": "GENDER",
+    "inout": "IN/OUT STATUS",
+    "timeIn": "TIME IN",
+    "timeOut": "TIME OUT",
+    "no": "NO",
+    "picture": "PICTURE",
+    "platePicture": "LICENSE PLATES PICTURE",
+    "plateText": "LICENSE PLATES TEXT",
+    "province": "PROVINCE",
+    "confidence": "CONFIDENCE",
+    "cameraName": "CAMERA NAME",
+    "timestamp": "TIMESTAMP"
+  },
+  "relative": {
+    "justNow": "just now",
+    "hoursAgo": "{{count}} hours ago"
+  },
+  "pager": {
+    "prev": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pageCount}}"
+  }
+}

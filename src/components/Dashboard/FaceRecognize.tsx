@@ -47,7 +47,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
         inputClassName="placeholder:text-[13px]!"
       />
 
-      <div className="h-[680px] overflow-y-auto px-2">
+      <div className="h-[500px] overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
             <div className="rounded-md px-3 py-2 text-sm text-gray-500">

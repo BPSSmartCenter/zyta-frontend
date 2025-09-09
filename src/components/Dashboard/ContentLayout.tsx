@@ -34,12 +34,14 @@ type Props = {
 
 export default function ContentLayout(props: Props) {
   const {
+    // left
     searchEvent,
     setSearchEvent,
     filteredNotis,
     searchWB,
     setSearchWB,
     filteredWellBeginNotis,
+    // middle
     selectedEvents,
     buttonLabel,
     toggleEvent,
@@ -47,6 +49,7 @@ export default function ContentLayout(props: Props) {
     setSite,
     province,
     setProvince,
+    // right
     searchFR,
     setSearchFR,
     filteredRecognize,
@@ -60,11 +63,18 @@ export default function ContentLayout(props: Props) {
       {/* 
         Responsive grid:
         - mobile: 1 col
-        - tablet: 2 cols
-        - desktop+: 3 cols
+        - tablet: 2 cols (ซ้าย + กลาง)
+        - desktop+: 3 cols: [ซ้ายแคบ] [กลางกว้าง] [ขวาแคบ]
       */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Left column */}
+      <div
+        className="
+          grid gap-3
+          grid-cols-1
+          md:grid-cols-2
+          lg:[grid-template-columns:370px_minmax(0,1fr)_370px]
+        "
+      >
+        {/* LEFT: All-time Alerts + Well-being (ซ้อนกันในกล่องเดียว) */}
         <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
           <AlertEvents
             search={searchEvent}
@@ -78,37 +88,51 @@ export default function ContentLayout(props: Props) {
           />
         </div>
 
-        {/* Second Column */}
-        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
-          <MapPanel
-            selectedEvents={selectedEvents}
-            buttonLabel={buttonLabel}
-            toggleEvent={toggleEvent}
-            site={site}
-            setSite={setSite}
-            province={province}
-            setProvince={setProvince}
-          />
-          <UserManagement />
+        {/* MIDDLE: Map ด้านบน + แถวล่าง UserManagement & Devices */}
+        <div className="flex flex-col gap-3 md:col-span-1">
+          {/* Map panel */}
+          <div className="p-6 w-full rounded-xl bg-white">
+            <MapPanel
+              selectedEvents={selectedEvents}
+              buttonLabel={buttonLabel}
+              toggleEvent={toggleEvent}
+              site={site}
+              setSite={setSite}
+              province={province}
+              setProvince={setProvince}
+            />
+          </div>
+
+          {/* Bottom row under the map: User Management (ซ้าย) + Devices (ขวา)
+              - บนจอเล็กให้ซ้อนลงมาเป็น 1 คอลัมน์
+              - บนจอใหญ่จัด 2 คอลัมน์เคียงกันให้เหมือนภาพ */}
+          <div className="grid grid-cols-1 lg-1399:grid-cols-2 gap-3">
+            <div className="p-6 w-full rounded-xl bg-white">
+              <UserManagement />
+            </div>
+            <div className="p-6 w-full rounded-xl bg-white">
+              <DeviceCount />
+            </div>
+          </div>
         </div>
 
-        {/* Thrid Column */}
-        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
-          <DeviceCount />
-          <FaceRecognize
-            search={searchFR}
-            setSearch={setSearchFR}
-            items={filteredRecognize as any[]}
-          />
-        </div>
+        {/* RIGHT: ZYTA Security Alert ด้านบน + Face Recognize/License Plates ด้านล่าง */}
+        <div className="flex flex-col gap-3 md:col-span-1">
+          <div className="p-6 w-full rounded-xl bg-white">
+            <ZYTAEvents
+              search={searchZYTA}
+              setSearch={setSearchZYTA}
+              items={filterZYTA as any[]}
+            />
+          </div>
 
-        {/* Forth Column */}
-        <div className="p-6 w-full h-full rounded-xl flex flex-col gap-3 bg-white">
-          <ZYTAEvents
-            search={searchZYTA}
-            setSearch={setSearchZYTA}
-            items={filterZYTA as any[]}
-          />
+          <div className="p-6 w-full rounded-xl bg-white">
+            <FaceRecognize
+              search={searchFR}
+              setSearch={setSearchFR}
+              items={filteredRecognize as any[]}
+            />
+          </div>
         </div>
       </div>
     </div>

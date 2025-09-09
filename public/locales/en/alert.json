@@ -1,0 +1,42 @@
+{
+  "totalAlertsToday": "Total Alerts (Today)",
+  "sitesAlertsTitle": "Sites Alerts Table",
+  "filters": {
+    "cameraAll": "All CAMERA",
+    "eventAll": "All Event"
+  },
+  "table": {
+    "headers": {
+      "no": "NO",
+      "camera": "CAMERA",
+      "event": "EVENT",
+      "picture": "PICTURE",
+      "cameraName": "CAMERA NAME",
+      "status": "STATUS",
+      "timestamp": "TIMESTAMP"
+    }
+  },
+  "events": {
+    "fire detected": "Fire detected"
+  },
+  "status": {
+    "UNRESOLVED": "Unresolved",
+    "RESOLVED": "Resolved"
+  },
+  "relative": {
+    "justNow": "just now",
+    "hoursAgo": "{{count}} hours ago"
+  },
+  "pager": {
+    "prev": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pageCount}}"
+  },
+  "a11y": {
+    "selectRow": "Select {{camera}}"
+  },
+  "camera": {
+    "numbered": "Camera {{number}}"
+  },
+  "searchPlaceholder": "Search events"
+}

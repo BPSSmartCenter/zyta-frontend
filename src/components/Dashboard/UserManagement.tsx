@@ -71,9 +71,12 @@ function DonutBlock({
           </div>
           <div className="grow **:text-[12px]">
             <DonutLegend
-              items={labelsI18n.map((label, i) => ({ label, color: colors[i] }))}
+              items={labelsI18n.map((label, i) => ({
+                label,
+                color: colors[i],
+              }))}
               className=""
-              itemClassName="lg-1399:whitespace-nowrap lg-1389:w-[140px] min-w-[100px]"
+              itemClassName="lg-1445:whitespace-nowrap lg-1445:w-[140px] min-w-[100px]"
               labelClassName=""
             />
           </div>
@@ -107,7 +110,10 @@ function DonutBlock({
           </div>
           <div className="grow **:text-[12px]">
             <DonutLegend
-              items={labelsI18n.map((label, i) => ({ label, color: colors[i] }))}
+              items={labelsI18n.map((label, i) => ({
+                label,
+                color: colors[i],
+              }))}
               className=""
               itemClassName="lg-1399:whitespace-nowrap lg-1389:w-[140px] min-w-[100px]"
               labelClassName=""

@@ -34,6 +34,9 @@ import sleepCamera from "./sleepCamera.png";
 
 import alertImage from "./alert.png";
 import insuranceImage from "./insurance.png";
+import sidebarIcon from "./sidebar.png";
+
+import fireBurning1 from "./fireBurning1.png";
 
 export {
   brandImage,
@@ -67,4 +70,6 @@ export {
   sleepCamera,
   alertImage,
   insuranceImage,
+  sidebarIcon,
+  fireBurning1,
 };

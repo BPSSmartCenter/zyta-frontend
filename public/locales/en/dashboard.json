@@ -3,6 +3,8 @@
     "title": "Welcome My Dashboard",
     "allSites": "All Sites",
     "export": "Export",
+    "import": "Import",
+    "add": "Add",
     "openQuickActions": "Open quick actions",
     "close": "Close",
     "exportOptions": {
