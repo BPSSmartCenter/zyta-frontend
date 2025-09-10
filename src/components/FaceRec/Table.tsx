@@ -39,9 +39,14 @@ export default function Table() {
 
   /* -------- Province options (unique from data) -------- */
   const PROVINCE_OPTIONS: Opt[] = React.useMemo(() => {
-    const uniq = Array.from(new Set(FACE_REC_ROWS.map((r) => r.province))).sort();
+    const uniq = Array.from(
+      new Set(FACE_REC_ROWS.map((r) => r.province))
+    ).sort();
     return [
-      { label: t("filters.provinceAll", { defaultValue: "All provinces" }), value: "all" },
+      {
+        label: t("filters.provinceAll", { defaultValue: "All provinces" }),
+        value: "all",
+      },
       ...uniq.map((p) => ({ label: p, value: p })),
     ];
   }, [t]);
@@ -85,9 +90,15 @@ export default function Table() {
           {/* License plates text */}
           <input
             type="text"
-            placeholder={t("filters.plateText", { defaultValue: "License plates text" })}
-            aria-label={t("filters.plateText", { defaultValue: "License plates text" })}
-            title={t("filters.plateText", { defaultValue: "License plates text" })}
+            placeholder={t("filters.plateText", {
+              defaultValue: "License plates text",
+            })}
+            aria-label={t("filters.plateText", {
+              defaultValue: "License plates text",
+            })}
+            title={t("filters.plateText", {
+              defaultValue: "License plates text",
+            })}
             className="h-[40px] rounded-md border border-gray-300 px-3 text-[14px]"
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -99,7 +110,14 @@ export default function Table() {
             value={province}
             onChange={(val) => setProvince(val)}
           >
-            {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
+            {({
+              open,
+              selected,
+              getButtonProps,
+              getMenuProps,
+              getItemProps,
+              options,
+            }) => (
               <div className="relative">
                 <button
                   {...getButtonProps({
@@ -108,7 +126,8 @@ export default function Table() {
                   })}
                 >
                   <span className="truncate">
-                    {selected?.label ?? t("filters.province", { defaultValue: "Province" })}
+                    {selected?.label ??
+                      t("filters.province", { defaultValue: "Province" })}
                   </span>
                   <i className="material-icons leading-none">
                     {open ? "arrow_drop_up" : "arrow_drop_down"}
@@ -161,8 +180,14 @@ export default function Table() {
           >
             <div>{t("table.no", { defaultValue: "NO" })}</div>
             <div>{t("table.picture", { defaultValue: "PICTURE" })}</div>
-            <div>{t("table.platePicture", { defaultValue: "LICENSE PLATES PICTURE" })}</div>
-            <div>{t("table.plateText", { defaultValue: "LICENSE PLATES TEXT" })}</div>
+            <div>
+              {t("table.platePicture", {
+                defaultValue: "LICENSE PLATES PICTURE",
+              })}
+            </div>
+            <div>
+              {t("table.plateText", { defaultValue: "LICENSE PLATES TEXT" })}
+            </div>
             <div>{t("table.province", { defaultValue: "PROVINCE" })}</div>
             <div>{t("table.confidence", { defaultValue: "CONFIDENCE" })}</div>
             <div>{t("table.cameraName", { defaultValue: "CAMERA NAME" })}</div>
@@ -190,7 +215,9 @@ export default function Table() {
                     id={checkboxId}
                     type="checkbox"
                     checked={isSel}
-                    onChange={(e) => setSelectedId(e.target.checked ? r.id : null)}
+                    onChange={(e) =>
+                      setSelectedId(e.target.checked ? r.id : null)
+                    }
                     className="size-5 rounded-md focus:ring-0 checked:border-cyan checked:bg-cyan hover:cursor-pointer"
                     aria-labelledby={plateCellId}
                   />
@@ -201,12 +228,20 @@ export default function Table() {
 
                 {/* PICTURE */}
                 <div className="h-[60px] w-[80px] overflow-hidden rounded-md">
-                  <img src={r.picture} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={r.picture}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 </div>
 
                 {/* LICENSE PLATES PICTURE */}
                 <div className="h-[50px] w-[120px] overflow-hidden rounded-md">
-                  <img src={r.platePicture} alt="" className="h-full w-full object-contain" />
+                  <img
+                    src={r.platePicture}
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
                 </div>
 
                 {/* LICENSE PLATES TEXT */}
@@ -229,15 +264,6 @@ export default function Table() {
                         ))}
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        {r.confidenceValues.map((val, i) => (
-                          <td key={i} className="border border-black px-2 py-1 font-semibold text-green-600">
-                            {val}
-                          </td>
-                        ))}
-                      </tr>
-                    </tbody>
                   </table>
                 </div>
 
@@ -247,7 +273,9 @@ export default function Table() {
                 {/* TIMESTAMP */}
                 <div className="text-gray-700">
                   <div>{new Date(r.timestamp).toLocaleString()}</div>
-                  <div className="text-[12px] text-gray-500">{relHours(r.timestamp, t)}</div>
+                  <div className="text-[12px] text-gray-500">
+                    {relHours(r.timestamp, t)}
+                  </div>
                 </div>
               </div>
             );
@@ -263,7 +291,9 @@ export default function Table() {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             className={[
               "h-[34px] rounded-md border px-3 text-[14px]",
-              clampedPage <= 1 ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer",
+              clampedPage <= 1
+                ? "text-gray-400 border-gray-200 cursor-not-allowed"
+                : "border-gray-300 cursor-pointer",
             ].join(" ")}
           >
             {t("pager.prev", { defaultValue: "Previous" })}
@@ -273,14 +303,20 @@ export default function Table() {
             onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
             className={[
               "h-[34px] rounded-md border px-3 text-[14px]",
-              clampedPage >= pageCount ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer",
+              clampedPage >= pageCount
+                ? "text-gray-400 border-gray-200 cursor-not-allowed"
+                : "border-gray-300 cursor-pointer",
             ].join(" ")}
           >
             {t("pager.next", { defaultValue: "Next" })}
           </button>
         </div>
         <div className="text-[14px] text-gray-600 select-none">
-          {t("pager.pageOf", { page: clampedPage, pageCount, defaultValue: "Page {{page}} of {{pageCount}}" })}
+          {t("pager.pageOf", {
+            page: clampedPage,
+            pageCount,
+            defaultValue: "Page {{page}} of {{pageCount}}",
+          })}
         </div>
       </div>
     </div>

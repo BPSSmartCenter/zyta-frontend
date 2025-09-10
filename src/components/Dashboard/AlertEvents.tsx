@@ -45,7 +45,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
         className="font-poppins"
       />
 
-      <div className="h-[590px] overflow-y-auto px-2">
+      <div className="lg:h-[590px] h-[350px] overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
             <div className="rounded-md px-3 py-2 text-sm text-gray-500">

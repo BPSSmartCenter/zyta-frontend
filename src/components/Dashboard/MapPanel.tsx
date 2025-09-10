@@ -1,4 +1,3 @@
-// src/components/MapPanel.tsx
 import Dropdown from "../Dropdown";
 import Map from "../Map";
 import {
@@ -7,6 +6,7 @@ import {
   LOCATION_OPTIONS,
 } from "../Dashboard/dashboard.constants";
 import { notis } from "../../data/Dashboard/notis";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -30,7 +30,62 @@ export default function MapPanel({
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
 
-  // แปลเฉพาะ Event/Severity (จังหวัดไม่แปล)
+  // ให้ Map render ใหม่เฉพาะตัว เมื่อความกว้าง container เปลี่ยน
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [mapVersion, setMapVersion] = useState(0);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    let timer: number | null = null;
+    let lastW = el.clientWidth;
+
+    const onSize = (w: number) => {
+      if (timer) (globalThis as any).clearTimeout?.(timer);
+      timer = (globalThis as any).setTimeout?.(() => {
+        if (Math.abs(w - lastW) >= 1) {
+          lastW = w;
+          setMapVersion((v) => v + 1); // remount เฉพาะ <Map>
+        }
+      }, 120) as unknown as number;
+    };
+
+    // ใช้ ResizeObserver ถ้ามี
+    if (typeof (globalThis as any).ResizeObserver !== "undefined") {
+      const ro = new (globalThis as any).ResizeObserver(() =>
+        onSize(el.clientWidth || 0)
+      );
+      ro.observe(el);
+      return () => {
+        if (timer) (globalThis as any).clearTimeout?.(timer);
+        ro.disconnect();
+      };
+    }
+
+    // ไม่มี ResizeObserver → fallback ด้วย window ของจริงแบบ type-safe
+    const wnd: (Window & typeof globalThis) | undefined =
+      typeof globalThis !== "undefined" &&
+      typeof (globalThis as any).addEventListener === "function"
+        ? (globalThis as unknown as Window & typeof globalThis)
+        : undefined;
+
+    const onResize = () => onSize(el.clientWidth || 0);
+
+    if (wnd) {
+      wnd.addEventListener("resize", onResize);
+      wnd.addEventListener("orientationchange", onResize);
+    }
+
+    return () => {
+      if (timer) (globalThis as any).clearTimeout?.(timer);
+      if (wnd) {
+        wnd.removeEventListener("resize", onResize);
+        wnd.removeEventListener("orientationchange", onResize);
+      }
+    };
+  }, []);
+
   const getEventLabel = (val: string, fallback: string) =>
     t(`events.${val}`, { defaultValue: fallback });
 
@@ -233,7 +288,6 @@ export default function MapPanel({
                         ].join(" "),
                       })}
                     >
-                      {/* จังหวัดไม่แปล ยกเว้นตัวเลือก all ให้แปล */}
                       {opt.value === "all"
                         ? t("map.allLocation", { defaultValue: opt.label })
                         : opt.label}
@@ -246,8 +300,14 @@ export default function MapPanel({
         </Dropdown>
       </div>
 
-      <div className="w-full rounded-lg flex items-center justify-center">
-        <Map notis={notis} severityFilter={site} />
+      {/* Wrapper ของ Map: ไม่แตะ class เดิม เพิ่มแค่ ref เพื่อสังเกตความกว้าง */}
+      <div
+        ref={wrapperRef}
+        className="w-full rounded-lg flex items-center justify-center"
+        style={{ minHeight: 680, flexShrink: 0 }}
+      >
+        {/* เปลี่ยน key → remount เฉพาะ Map เมื่อ width เปลี่ยน */}
+        <Map key={`map-${mapVersion}`} notis={notis} severityFilter={site} />
       </div>
     </form>
   );

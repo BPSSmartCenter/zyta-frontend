@@ -1,10 +1,5 @@
 // src/components/FaceRec/LicensePlatePanel.tsx
-import {
-  plateList,
-  plateDetail,
-  confidenceHeader,
-  confidenceValues,
-} from "./faceRec.constant";
+import { plateList, plateDetail, confidenceHeader } from "./faceRec.constant";
 import { useTranslation } from "react-i18next";
 
 const GREEN_BOX_SVG =
@@ -150,18 +145,6 @@ export default function LicensePlatePanel() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  {confidenceValues.map((val, i) => (
-                    <td
-                      key={i}
-                      className="text-[14px] md:text-[20px] border border-black px-2 py-1 text-green-600 font-bold"
-                    >
-                      {val}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
             </table>
           </div>
         </div>

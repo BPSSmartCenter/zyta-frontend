@@ -70,22 +70,26 @@ export default function ContentLayout(props: Props) {
         className="
           grid gap-3
           grid-cols-1
-          md:grid-cols-2
+          md:grid-cols-
           lg:[grid-template-columns:370px_minmax(0,1fr)_370px]
         "
       >
         {/* LEFT: All-time Alerts + Well-being (ซ้อนกันในกล่องเดียว) */}
-        <div className="p-6 w-full rounded-xl flex flex-col gap-3 bg-white">
-          <AlertEvents
-            search={searchEvent}
-            setSearch={setSearchEvent}
-            items={filteredNotis as any[]}
-          />
-          <WellBeingEvents
-            search={searchWB}
-            setSearch={setSearchWB}
-            items={filteredWellBeginNotis as any[]}
-          />
+        <div className="p-6 w-full flex-col lg:flex-col md:flex-row md:grid-cols-2 sm:grid-cols-1 rounded-xl flex  gap-3 bg-white">
+          <div className="w-full rounded-xl bg-white">
+            <AlertEvents
+              search={searchEvent}
+              setSearch={setSearchEvent}
+              items={filteredNotis as any[]}
+            />
+          </div>
+          <div className="w-full rounded-xl bg-white">
+            <WellBeingEvents
+              search={searchWB}
+              setSearch={setSearchWB}
+              items={filteredWellBeginNotis as any[]}
+            />
+          </div>
         </div>
 
         {/* MIDDLE: Map ด้านบน + แถวล่าง UserManagement & Devices */}
@@ -106,7 +110,7 @@ export default function ContentLayout(props: Props) {
           {/* Bottom row under the map: User Management (ซ้าย) + Devices (ขวา)
               - บนจอเล็กให้ซ้อนลงมาเป็น 1 คอลัมน์
               - บนจอใหญ่จัด 2 คอลัมน์เคียงกันให้เหมือนภาพ */}
-          <div className="grid grid-cols-1 lg-1399:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 lg-1399:grid-cols-2 gap-3">
             <div className="p-6 w-full rounded-xl bg-white">
               <UserManagement />
             </div>
@@ -117,7 +121,7 @@ export default function ContentLayout(props: Props) {
         </div>
 
         {/* RIGHT: ZYTA Security Alert ด้านบน + Face Recognize/License Plates ด้านล่าง */}
-        <div className="flex flex-col gap-3 md:col-span-1">
+        <div className="flex flex-col md:flex-row lg:flex-col gap-3 grid-cols-1 md:grid-cols-2 md:col-span-1">
           <div className="p-6 w-full rounded-xl bg-white">
             <ZYTAEvents
               search={searchZYTA}

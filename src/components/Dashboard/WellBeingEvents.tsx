@@ -43,7 +43,7 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
         onChange={setSearch}
         className="font-poppins"
       />
-      <div className="h-[375px] overflow-y-auto px-2">
+      <div className="lg-1399:h-[375px] h-[350px] lg:h-full overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
             <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">

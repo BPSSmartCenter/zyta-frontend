@@ -1,4 +1,3 @@
-// src/components/Map.tsx
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import {
@@ -32,11 +31,8 @@ function makeSvgPin(color: string, size = 32) {
   <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${
     size * 1.25
   }" viewBox="0 0 32 40">
-    <defs>
-      <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="rgba(0,0,0,0.35)"/>
-      </filter>
-    </defs>
+    <defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="rgba(0,0,0,0.35)"/></filter></defs>
     <g filter="url(#shadow)">
       <path d="M16 2 C9.924 2 5 6.924 5 13c0 7.5 8.2 14.5 10.1 16.1a1.5 1.5 0 0 0 1.8 0C19.8 27.5 28 20.5 28 13 28 6.924 23.076 2 17 2h-1z" fill="${color}"/>
       <circle cx="16" cy="13" r="5.2" fill="#ffffff"/>
@@ -59,24 +55,54 @@ function normalizeSeverity(
   if (raw.includes("fire")) return "alert";
   if (raw.includes("motion")) return "warning";
   if (raw.includes("offline") || raw.includes("ออฟไลน์")) return "offline";
-  if (
-    raw === "alert" ||
-    raw === "warning" ||
-    raw === "offline" ||
-    raw === "normal"
-  ) {
+  if (["alert", "warning", "offline", "normal"].includes(raw))
     return raw as any;
-  }
   return "all";
 }
 
-/** ยิ่ง container แคบ → ยิ่งเพิ่ม offset เพื่อ "ซูมออก" ให้เห็นประเทศเล็กลง */
-function computeZoomOutOffset(width: number) {
-  const REF_WIDTH = 1280;
-  const w = Math.max(320, Math.min(width, 2560));
-  const ratio = REF_WIDTH / w; // >1 เมื่อแคบลง
-  const delta = Math.log2(ratio) * 0.9; // ทำให้ลื่นขึ้น
-  return Math.max(0, Math.min(delta, 2.25)); // จำกัด offset สูงสุด
+/** padding อ้างอิงไฟล์เดิม (~4% ของด้านสั้น) */
+function responsivePadding(
+  containerW: number,
+  containerH: number,
+  viewportW?: number
+) {
+  const side = Math.max(1, Math.min(containerW, containerH));
+
+  // ค่าอ้างอิงเดิม ~4% ของด้านสั้น (คงเดิมทุกช่วง)
+  const basePad = Math.max(10, Math.round(side * 0.04));
+
+  // 👇 ใช้ viewport width เป็นเงื่อนไขตามที่ต้องการ
+  const vw = viewportW ?? containerW;
+  const padY =
+    vw >= 375 && vw <= 510
+      ? Math.max(basePad, Math.round(side * 0.38)) // ซูมออกนิดนึงเฉพาะช่วงนี้เท่านั้น
+      : basePad;
+
+  return { x: basePad, y: padY };
+}
+
+/** คำนวณ zoom ให้ "ความสูงของประเทศไทย" = innerHeight (หลังหัก padding) */
+function zoomForExactHeight(
+  map: L.Map,
+  boundsExpr: L.LatLngBoundsExpression,
+  innerHeight: number
+) {
+  const b = L.latLngBounds(boundsExpr as any); // แปลง literal → LatLngBounds
+  const MIN_Z = 2,
+    MAX_Z = 19;
+  let lo = MIN_Z,
+    hi = MAX_Z;
+
+  for (let i = 0; i < 25; i++) {
+    // binary search
+    const mid = (lo + hi) / 2;
+    const pN = map.project(b.getNorthWest(), mid);
+    const pS = map.project(b.getSouthEast(), mid);
+    const spanY = Math.abs(pS.y - pN.y);
+    if (spanY > innerHeight) hi = mid; // ใหญ่เกิน → ลดซูม
+    else lo = mid; // ยังเล็ก → ซูมเข้า
+  }
+  return Math.max(MIN_Z, Math.min(lo, MAX_Z));
 }
 
 export default function Map({
@@ -91,52 +117,77 @@ export default function Map({
   const maskLayerRef = useRef<L.Polygon | null>(null);
   const thLayerRef = useRef<L.GeoJSON<any> | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
-  const roRef = useRef<ResizeObserver | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const dimRendererRef = useRef<L.SVG | null>(null); // 👈 renderer สำหรับ pane เฉพาะ
 
-  // ปรับซูมตามขนาด container: "ยิ่งเล็ก → ยิ่งซูมออก"
-  const updateResponsiveZoom = (animate = false) => {
-    const map = mapRef.current;
-    if (!map) return;
-    const el = map.getContainer();
-    const width = el.clientWidth || 0;
-
-    // ใช้ L.point เพื่อแก้ type error และใช้ซ้ำได้ทั้งสองที่
-    const padding = L.point(20, 20);
-
-    // base zoom ที่เห็นประเทศไทยพอดีกับขอบ (inside=true)
-    const baseZoom = map.getBoundsZoom(TH_BOUNDS, true, padding);
-
-    // เพิ่ม offset แล้ว "ลบ" ออกจาก baseZoom เพื่อซูมออก
-    const offset = computeZoomOutOffset(width);
-    const target = Math.max(
-      map.getMinZoom(),
-      Math.min(map.getMaxZoom(), baseZoom - offset)
-    );
-
-    // fit ก่อน แล้วค่อยตั้งซูมที่เล็กลง
-    map.fitBounds(TH_BOUNDS, { padding, animate: false });
-    map.setZoom(target, { animate });
+  // คุมกล่องด้วย inline style (ไม่แตะ class เดิม)
+  const BASE_HEIGHT_PX = 680;
+  const lockContainerBox = () => {
+    const m = mapRef.current;
+    if (!m) return;
+    const el = m.getContainer() as HTMLDivElement;
+    el.style.height = `${BASE_HEIGHT_PX}px`;
+    el.style.minHeight = `${BASE_HEIGHT_PX}px`;
+    el.style.maxHeight = `${BASE_HEIGHT_PX}px`;
+    el.style.width = "100%";
+    el.style.display = "block";
+    el.style.flexShrink = "0";
   };
 
-  // init map ครั้งเดียว
+  /** ฟิตแนวตั้งให้ชิด padding บน/ล่าง “ไม่เหลื่อม” */
+  const fitVerticalTight = (animate = false) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    lockContainerBox();
+    map.invalidateSize(false);
+
+    const sz = map.getSize();
+    const vw = typeof window !== "undefined" ? window.innerWidth : sz.x;
+    // ใช้ padding ที่พิจารณา viewport width
+    const pad = responsivePadding(sz.x, sz.y, vw);
+    const innerH = Math.max(1, sz.y - pad.y * 2);
+
+    // คำนวณซูมแนวตั้ง + ล็อกห้ามซูม/เลื่อน (โค้ดที่เหลือคงเดิม)
+    const z = zoomForExactHeight(map, TH_BOUNDS, innerH);
+    const center = L.latLngBounds(TH_BOUNDS as any).getCenter();
+
+    map.setView(center, z, { animate: false });
+    map.setMinZoom(z);
+    map.setMaxZoom(z);
+
+    // ชดเชย rounding ให้ top/bottom ชิด padding เป๊ะ
+    const topY = map.latLngToContainerPoint(
+      L.latLngBounds(TH_BOUNDS as any).getNorthWest()
+    ).y;
+    const bottomY = map.latLngToContainerPoint(
+      L.latLngBounds(TH_BOUNDS as any).getSouthEast()
+    ).y;
+    const wantTop = pad.y;
+    const wantBottom = sz.y - pad.y;
+    const deltaY = Math.round((wantTop - topY + (wantBottom - bottomY)) / 2);
+    if (deltaY) map.panBy([0, deltaY], { animate });
+  };
+
   useEffect(() => {
     if (mapRef.current) return;
 
     const map = L.map("th-map", {
       center: [13.736717, 100.523186],
       zoom: 7,
-      minZoom: 4,
-      maxZoom: 16,
+      zoomControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      touchZoom: false,
+      keyboard: false,
       maxBounds: TH_BOUNDS,
-      maxBoundsViscosity: 0.3,
-      inertia: true,
-      inertiaDeceleration: 2500,
+      maxBoundsViscosity: 1.0,
+      inertia: false,
       worldCopyJump: false,
     });
     mapRef.current = map;
 
-    // Base tiles
     tileRef.current = L.tileLayer(
       "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
@@ -146,13 +197,13 @@ export default function Map({
       }
     ).addTo(map);
 
-    // Pane สำหรับ mask
+    // 🔧 pane + renderer เฉพาะ เพื่อกัน error appendChild
     map.createPane("dimPane");
+    dimRendererRef.current = L.svg({ pane: "dimPane" }).addTo(map);
     const dimPane = map.getPane("dimPane")!;
     dimPane.style.zIndex = "430";
     dimPane.style.pointerEvents = "none";
 
-    // วาด mask รอบนอกจาก geojson ประเทศไทย
     const worldRing: L.LatLngExpression[] = [
       [-90, -180],
       [-90, 180],
@@ -163,14 +214,16 @@ export default function Map({
     fetch("/data/thailand.geojson")
       .then((r) => r.json())
       .then((geojson) => {
+        // เส้นขอบไทย (ไม่ interactive)
         thLayerRef.current = L.geoJSON(geojson, {
           style: { color: "#000000", weight: 0.5, fillOpacity: 0 },
+          interactive: false,
         }).addTo(map);
 
-        const thRingsLatLng: L.LatLngExpression[][] = [];
+        // ทำมาสก์รอบนอกลง pane พิเศษ + renderer พิเศษ
+        const rings: L.LatLngExpression[][] = [];
         const pushRing = (ring: number[][]) =>
-          thRingsLatLng.push(ring.map(([lng, lat]) => [lat, lng]));
-
+          rings.push(ring.map(([lng, lat]) => [lat, lng]));
         const feats = Array.isArray(geojson.features)
           ? geojson.features
           : [geojson];
@@ -178,67 +231,36 @@ export default function Map({
           const g = f.geometry;
           if (!g) return;
           if (g.type === "Polygon")
-            g.coordinates.forEach((ring: number[][]) => pushRing(ring));
+            g.coordinates.forEach((r: number[][]) => pushRing(r));
           else if (g.type === "MultiPolygon")
             g.coordinates.forEach((poly: number[][][]) =>
-              poly.forEach((ring: number[][]) => pushRing(ring))
+              poly.forEach((r: number[][]) => pushRing(r))
             );
         });
 
-        if (thRingsLatLng.length > 0) {
-          maskLayerRef.current = L.polygon([worldRing, ...thRingsLatLng], {
+        if (rings.length > 0) {
+          maskLayerRef.current = L.polygon([worldRing, ...rings], {
             pane: "dimPane",
+            renderer: dimRendererRef.current || undefined, // ✅ ป้องกัน appendChild undefined
             stroke: true,
             color: "#000000",
             weight: 2,
             opacity: 0.5,
             fill: true,
             fillColor: "#D3F7FF",
-            fillOpacity: 0.82,
+            fillOpacity: 0.9,
             interactive: false,
             smoothFactor: 2.0,
           }).addTo(map);
         }
 
-        // fit ครั้งแรก + ปรับซูมออกตามขนาด container ตอน mount
-        updateResponsiveZoom(false);
+        fitVerticalTight(false);
       })
       .catch((e) => console.error("Cannot load /data/thailand.geojson", e));
 
-    // layer markers
     markersLayerRef.current = L.layerGroup().addTo(map);
 
-    // ===== Resize handling =====
-    const hasRO = typeof window !== "undefined" && "ResizeObserver" in window;
-
-    if (hasRO) {
-      const el = map.getContainer();
-      const ro = new ResizeObserver(() => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        rafRef.current = requestAnimationFrame(() =>
-          updateResponsiveZoom(true)
-        );
-      });
-      ro.observe(el);
-      roRef.current = ro;
-    } else if (typeof window !== "undefined") {
-      // fallback: ใช้ window resize (แก้ ts: เช็ก window อีกรอบ)
-      const onResize = () => updateResponsiveZoom(true);
-      window.addEventListener("resize", onResize);
-      // เก็บตัว disconnect ไว้ใน roRef เป็น object ที่มีเมธอด disconnect
-      (
-        roRef as unknown as { current: { disconnect: () => void } | null }
-      ).current = {
-        disconnect: () => window.removeEventListener("resize", onResize),
-      };
-    }
-
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // เรียก disconnect() ได้ทั้งกรณี ResizeObserver จริง และกรณี fallback object
-      (roRef.current as any)?.disconnect?.();
-      roRef.current = null;
-
       if (markersLayerRef.current) {
         markersLayerRef.current.remove();
         markersLayerRef.current = null;
@@ -255,12 +277,26 @@ export default function Map({
         map.removeLayer(tileRef.current);
         tileRef.current = null;
       }
+      if (dimRendererRef.current) {
+        map.removeLayer(dimRendererRef.current);
+        dimRendererRef.current = null;
+      }
+
+      const el = map.getContainer() as HTMLDivElement;
+      if (el) {
+        el.style.height = "";
+        el.style.minHeight = "";
+        el.style.maxHeight = "";
+        el.style.width = "";
+        el.style.display = "";
+        el.style.flexShrink = "";
+      }
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // render pins
+  // วาง pins
   useEffect(() => {
     const map = mapRef.current;
     const markersLayer = markersLayerRef.current;
@@ -271,20 +307,19 @@ export default function Map({
     const pickBySite = (list: Noti[]) => {
       const chosen: Record<string, Noti> = {};
       for (const n of list) {
-        const key = n.site;
-        const prev = chosen[key];
+        const prev = chosen[n.site];
         if (!prev) {
-          chosen[key] = n;
+          chosen[n.site] = n;
           continue;
         }
         const r1 = SEVERITY_RANK[String(n.type)] ?? 0;
         const r0 = SEVERITY_RANK[String(prev.type)] ?? 0;
-        if (r1 > r0) chosen[key] = n;
+        if (r1 > r0) chosen[n.site] = n;
         else if (
           r1 === r0 &&
           new Date(n.date).getTime() > new Date(prev.date).getTime()
         )
-          chosen[key] = n;
+          chosen[n.site] = n;
       }
       return Object.values(chosen);
     };
@@ -294,23 +329,17 @@ export default function Map({
       normalized === "all"
         ? notis
         : notis.filter((n) => String(n.type).toLowerCase() === normalized);
-
     const list = aggregateBySite ? pickBySite(filtered) : filtered;
 
     list.forEach((n) => {
       const coord = siteCoords[n.site];
-      if (!coord) {
-        console.warn(`[Map] ไม่มีพิกัดสำหรับ site: ${n.site}`);
-        return;
-      }
+      if (!coord) return;
       const color = SEVERITY_COLOR[String(n.type)] ?? "#3b82f6";
       const icon = makeSvgPin(color, 32);
 
-      // แปล title จากคีย์ ถ้ามี
       const localizedTitle = n.titleKey
         ? t(n.titleKey, { defaultValue: n.title })
         : n.title;
-
       const popupHtml = `
         <div class="bps-popup">
           <div class="bps-popup-title">${n.site}</div>
@@ -336,7 +365,6 @@ export default function Map({
           this.openPopup();
         });
     });
-    // ผูกกับภาษาเพื่อ re-render เมื่อเปลี่ยนภาษา
   }, [notis, siteCoords, aggregateBySite, severityFilter, t, i18n.language]);
 
   return (

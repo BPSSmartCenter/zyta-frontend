@@ -17,7 +17,6 @@ export type FaceRecRow = {
   plateText: string;
   province: string;
   confidenceHeader: string[];
-  confidenceValues: string[];
   cameraName: string;
   timestamp: string; // ISO
 };
@@ -62,7 +61,6 @@ export const plateDetail = {
 };
 
 export const confidenceHeader = ["ก", "ถ", "2", "4", "5", "3"];
-export const confidenceValues = ["99%", "99%", "99%", "99%", "99%", "99%"];
 
 // ✅ ตาราง License Plates (ต้องมีชื่อนี้!)
 export const FACE_REC_ROWS: FaceRecRow[] = [
@@ -73,7 +71,6 @@ export const FACE_REC_ROWS: FaceRecRow[] = [
     plateText: "9รถ2019",
     province: "กรุงเทพมหานคร",
     confidenceHeader,
-    confidenceValues,
     cameraName: "hikvision",
     timestamp: "2025-01-06T17:24:55Z",
   },
@@ -84,7 +81,6 @@ export const FACE_REC_ROWS: FaceRecRow[] = [
     plateText: "9รถ2019",
     province: "กรุงเทพมหานคร",
     confidenceHeader,
-    confidenceValues,
     cameraName: "hikvision",
     timestamp: "2025-01-06T17:24:55Z",
   },
@@ -95,7 +91,6 @@ export const FACE_REC_ROWS: FaceRecRow[] = [
     plateText: "9รถ2019",
     province: "กรุงเทพมหานคร",
     confidenceHeader,
-    confidenceValues,
     cameraName: "hikvision",
     timestamp: "2025-01-06T17:24:55Z",
   },
