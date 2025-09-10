@@ -1,6 +1,7 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 type FR = {
   type: any;
@@ -20,6 +21,7 @@ type Props = {
 
 export default function FaceRecognize({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const navigate = useNavigate();
 
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
@@ -33,9 +35,14 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
     });
   };
 
+  const handleClick = (n: FR) => {
+    // ส่ง state ไปพร้อม /facerec ถ้าต้องการใช้ข้อมูลในหน้านั้น
+    navigate("/facerec", { state: { noti: n } });
+  };
+
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[18px]  font-inter font-semibold text-[#1E1E1E]">
+      <h1 className="text-[18px] font-inter font-semibold text-[#1E1E1E]">
         {t("face.title")}
       </h1>
 
@@ -62,15 +69,25 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
               const dateText = formatDateForUI(n.date);
 
               return (
-                <NotiCard
+                <div
                   key={i}
-                  type={n.type}
-                  img={n.img}
-                  title={title}
-                  detail={n.detail}
-                  site={site}
-                  date={dateText}
-                />
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleClick(n)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handleClick(n);
+                  }}
+                  className="cursor-pointer outline-none select-none"
+                >
+                  <NotiCard
+                    type={n.type}
+                    img={n.img}
+                    title={title}
+                    detail={n.detail}
+                    site={site}
+                    date={dateText}
+                  />
+                </div>
               );
             })
           )}

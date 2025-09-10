@@ -1,6 +1,7 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 type Noti = {
   type: string;
@@ -18,18 +19,23 @@ type Props = {
 
 export default function AlertEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const navigate = useNavigate();
 
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
     const isTH = (i18n.language || "").startsWith("th");
     const locale = isTH ? "th-TH-u-nu-latn" : "en-GB";
-    // เดิมมี if (isTH) out = out.replace(/\./g, "");
     return d.toLocaleDateString(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
+  };
+
+  const handleClick = (n: Noti) => {
+    // ถ้าต้องการส่งข้อมูลการ์ดไปหน้า /alert ด้วย ใช้ state ได้
+    navigate("/alert", { state: { noti: n } });
   };
 
   return (
@@ -58,14 +64,25 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+
               return (
-                <NotiCard
+                <div
                   key={i}
-                  type={n.type as any}
-                  title={title}
-                  site={site}
-                  date={dateText}
-                />
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleClick(n)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") handleClick(n);
+                  }}
+                  className="cursor-pointer outline-none select-none"
+                >
+                  <NotiCard
+                    type={n.type as any}
+                    title={title}
+                    site={site}
+                    date={dateText}
+                  />
+                </div>
               );
             })
           )}

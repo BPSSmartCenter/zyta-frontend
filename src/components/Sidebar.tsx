@@ -3,6 +3,7 @@ import { brandImage, sidebarIcon } from "../assets/index";
 import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
+import { useNavigate } from "react-router-dom";
 
 /** breakpoint hook */
 function useIsDesktop1024() {
@@ -28,6 +29,7 @@ type Props = {
 export default function Sidebar({ children, contentClassName = "" }: Props) {
   const isDesktop = useIsDesktop1024();
   const { t } = useTranslation("sidebar");
+  const navigate = useNavigate();
 
   // mobile toggle
   const [openMobile, setOpenMobile] = useState(false);
@@ -123,7 +125,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
               alt={t("aria.brandAlt")}
               width={70}
               height={70}
-              className="block select-none pointer-events-none"
+              className="block select-none cursor-pointer"
+              onClick={() => navigate("/dashboard")}
             />
           </header>
 

@@ -2,10 +2,12 @@
 import { useCallback, useState } from "react";
 import RegisterPage from "../components/Auth/RegisterPage";
 import Modal from "../components/Modal";
+import { useTranslation } from "react-i18next";
 
 export default function Register() {
   const [open, setOpen] = useState(false);
   const [emailForModal, setEmailForModal] = useState("");
+  const { t } = useTranslation("signup");
 
   const handleSubmit = useCallback(
     (email: string, _password: string, _confirmPassword: string) => {
@@ -24,16 +26,16 @@ export default function Register() {
         onClose={() => setOpen(false)}
         id="hs-scale-animation-modal"
         icon="mail"
-        title="ยืนยันตัวตน"
+        title={t("modal.title")}
         message={
           <>
-            โปรดยืนยันตัวตนผ่านอีเมลล์ <br />
+            {t("modal.top")} <br />
             {emailForModal}
             <br />
-            เพื่อใช้บริการ Dashboard BPS
+            {t("modal.bottom")}
           </>
         }
-        closeLabel="ตกลง"
+        closeLabel={t("modal.close")}
       />
     </>
   );

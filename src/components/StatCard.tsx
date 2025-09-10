@@ -4,6 +4,8 @@ import type React from "react";
 import type { PropsWithChildren } from "react";
 import defaultFireImage from "../assets/fire.png";
 import { useTranslation } from "react-i18next";
+import Switch from "./Switch";
+import type { SwitchProps } from "./Switch";
 
 /* ===================== Group Context ===================== */
 type SelectionMode = "single" | "multiple";
@@ -16,7 +18,7 @@ type GroupCtx = {
 
 const StatCardGroupContext = createContext<GroupCtx | null>(null);
 
-// src/components/StatCard.tsx  (เฉพาะส่วน Group)
+// กลุ่มสำหรับควบคุม single/multiple selection
 type StatCardGroupProps = PropsWithChildren<{
   selectionMode?: SelectionMode;
   defaultActiveIds?: string[];
@@ -47,9 +49,7 @@ export function StatCardGroup({
     } else {
       next = base.includes(id) ? base.filter((x) => x !== id) : [...base, id];
     }
-    if (activeIds === undefined) {
-      setInternalActive(next);
-    }
+    if (activeIds === undefined) setInternalActive(next);
     onChange?.(next);
   };
 
@@ -76,8 +76,15 @@ type Props = {
   startActive?: boolean;
   /** ถ้า true: อักษรอยู่ซ้าย (บน–ล่าง), รูปอยู่ขวา */
   reverseLayout?: boolean;
+
+  /** เลือกแบบการ์ด */
+  variant?: "default" | "boxWithSwitch";
+
+  /** ส่ง props เข้า Switch เมื่อใช้ variant = 'boxWithSwitch' */
+  switchProps?: SwitchProps;
+
   className?: string;
-  onToggle?: (active: boolean) => void;
+  onToggle?: (active: boolean) => void; // สำหรับ default variant
   onClick?: React.MouseEventHandler<HTMLDivElement>;
 };
 
@@ -92,6 +99,8 @@ const StatCard: React.FC<Props> = ({
   activeBg = "bg-cyan-500",
   startActive = false,
   reverseLayout = false,
+  variant = "default",
+  switchProps,
   className,
   onToggle,
   onClick,
@@ -99,7 +108,7 @@ const StatCard: React.FC<Props> = ({
   const group = useContext(StatCardGroupContext);
   const { t } = useTranslation(["dashboard"]);
 
-  // ===== Placeholder mode (+ Add Event) =====
+  // ===== Placeholder (+ Add Event) =====
   const noContentProps =
     counting === undefined &&
     val === undefined &&
@@ -135,10 +144,6 @@ const StatCard: React.FC<Props> = ({
 
   const displayVal = counting ?? val ?? 12;
 
-  // ลำดับ fallback ของข้อความ:
-  // 1) label จาก props
-  // 2) แปลจาก stats.<id> ถ้ามี id
-  // 3) แปลจาก stats.fire หรืออังกฤษ
   const intlLabelFromId = id
     ? t(`stats.${id}`, { defaultValue: undefined })
     : undefined;
@@ -153,7 +158,6 @@ const StatCard: React.FC<Props> = ({
     : img ?? defaultFireImage;
 
   const isTailwindBg = useMemo(() => currentBg.startsWith("bg-"), [currentBg]);
-
   const isWhiteBg = useMemo(() => {
     if (isTailwindBg) return currentBg.includes("bg-white");
     const v = String(currentBg).toLowerCase().replaceAll(" ", "");
@@ -177,24 +181,40 @@ const StatCard: React.FC<Props> = ({
     }
   };
 
-  // ===== Layout =====
-  const containerBase =
-    "w-[225px] h-[95px] rounded-md select-none border border-cyan-500 hover:cursor-pointer hover:shadow-xl hover:scale-[1.01]";
-  const containerLayout = reverseLayout
-    ? "flex items-center justify-between px-4"
-    : "flex justify-center items-center gap-6";
+  /* ========== NEW VARIANT: boxWithSwitch ========== */
+  if (variant === "boxWithSwitch") {
+    const swId = switchProps?.id ?? (id ? `sw-${id}` : undefined); // unique id per card
+    return (
+      <div
+        onClick={handleToggle} // คลิกการ์ด = เลือกการ์ด (bg cyan)
+        className={[
+          "p-6 flex justify-between w-[249px] h-[135px] border border-cyan rounded-lg cursor-pointer",
+          active ? "bg-cyan" : "",
+          className || "",
+        ].join(" ")}
+      >
+        <div className="text-center flex flex-col items-center">
+          <img src={currentImg} alt="" />
+          <h1>{displayLabel}</h1>
+        </div>
 
-  const textColor = isWhiteBg ? "text-gray-700" : "text-white";
-  const textBox = reverseLayout
-    ? "font-inter flex flex-col items-start justify-center"
-    : "font-inter flex flex-col items-center justify-center";
+        {/* คลิกสวิตช์ = toggle สวิตช์อย่างเดียว */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <Switch {...switchProps} id={swId} />
+        </div>
+      </div>
+    );
+  }
 
+  /* ========== Layout เดิม (คงพฤติกรรมเดิม 100%) ========== */
   return (
     <div
       onClick={handleToggle}
       className={[
-        containerBase,
-        containerLayout,
+        "w-[225px] h-[95px] rounded-md select-none border border-cyan-500 hover:cursor-pointer hover:shadow-xl hover:scale-[1.01]",
+        reverseLayout
+          ? "flex items-center justify-between px-4"
+          : "flex justify-center items-center gap-6",
         isTailwindBg ? currentBg : "",
         className || "",
       ].join(" ")}
@@ -202,26 +222,32 @@ const StatCard: React.FC<Props> = ({
     >
       {reverseLayout ? (
         <>
-          {/* ข้อความซ้าย (บน–ล่าง) */}
-          <div className={[textColor, textBox].join(" ")}>
+          <div
+            className={[
+              isWhiteBg ? "text-gray-700" : "text-white",
+              "font-inter flex flex-col items-start justify-center",
+            ].join(" ")}
+          >
             <div className="text-[11px] font-semibold mt-[-7px]">
               {displayLabel}
             </div>
             <div className="text-[24px] font-bold">{displayVal}</div>
           </div>
-          {/* รูปขวา */}
           <div>
             <img src={currentImg} width={36} height={35} alt="" />
           </div>
         </>
       ) : (
         <>
-          {/* รูปซ้าย */}
           <div>
             <img src={currentImg} width={36} height={35} alt="" />
           </div>
-          {/* ข้อความขวา (กึ่งกลาง) */}
-          <div className={[textColor, textBox].join(" ")}>
+          <div
+            className={[
+              isWhiteBg ? "text-gray-700" : "text-white",
+              "font-inter flex flex-col items-center justify-center",
+            ].join(" ")}
+          >
             <div className="text-[24px] font-bold">{displayVal}</div>
             <div className="text-[11px] font-semibold mt-[-7px]">
               {displayLabel}

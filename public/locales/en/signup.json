@@ -26,6 +26,12 @@
     "signup": "Sign up",
     "signin": "Sign in"
   },
+  "modal": {
+    "title": "Identity Verification",
+    "top": "Please verify your identity via email",
+    "bottom": "to use the BPS Dashboard service",
+    "close": "OK"
+  },
   "footer": {
     "have_account": "Already have an account?"
   }

@@ -99,7 +99,7 @@ export default function FaceScanPanel() {
 
         {/* ล่าง: ภาพใบหน้า (crop) + รายละเอียด */}
         <div className="grid md:grid-cols-12 gap-4 p-4">
-          <div className="md:col-span-3 flex justify-center items-start">
+          <div className="md:col-span-3 flex justify-center items-center">
             <img
               src={GREEN_BOX_SVG}
               alt="face-crop"

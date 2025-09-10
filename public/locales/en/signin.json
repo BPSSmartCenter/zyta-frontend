@@ -12,6 +12,13 @@
       "placeholder": "Enter your password"
     }
   },
+  "modal": {
+    "title": "Account Not Found",
+    "top": "This account was not found in the system",
+    "mid": "Please check that your account information is correct",
+    "bottom": "or register a new account",
+    "close": "OK"
+  },
   "remember": "Remember for 30 days",
   "forgot": "Forgot password?",
   "actions": {

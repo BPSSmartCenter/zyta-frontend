@@ -18,10 +18,14 @@ import fallImageSelected from "./fallingSelected.png";
 import sleepImageSelected from "./sleepingSelected.png";
 
 import cctvImage from "./cctv.png";
+import cctvSelected from "./cctvSelected.png";
 import intercomeImage from "./sitemap.png";
+import intercomeSelected from "./sitemapSelected.png";
 import solarImage from "./solar-panel.png";
+import solarSelected from "./solar-panelSelected.png";
 import windImage from "./wind-sign.png";
 import waterTapImage from "./water-tap.png";
+import waterTapSelected from "./water-tapSelected.png";
 
 import faceImage from "./face.png";
 import plateImage from "./plate.png";
@@ -72,4 +76,8 @@ export {
   insuranceImage,
   sidebarIcon,
   fireBurning1,
+  cctvSelected,
+  waterTapSelected,
+  solarSelected,
+  intercomeSelected,
 };
