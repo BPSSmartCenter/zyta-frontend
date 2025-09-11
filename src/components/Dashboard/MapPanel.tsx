@@ -1,5 +1,5 @@
 import Dropdown from "../Dropdown";
-import Map from "../Map";
+import Map from "../Map/Map";
 import {
   EVENT_OPTIONS,
   SEVERITY_OPTIONS,
@@ -62,6 +62,16 @@ export default function MapPanel({
   const getSeverityLabel = (val: string, fallback: string) => {
     if (val === "all") return t("map.anySeverity", { defaultValue: fallback });
     return t(`map.severity.${val}`, { defaultValue: fallback });
+  };
+
+  const getLocationLabel = (value: string, label: string) =>
+    value === "all"
+      ? t("map.allLocation", { defaultValue: "All Location" })
+      : label; // จังหวัดไม่ต้องแปล
+
+  // เมื่อผู้ใช้เลือกจังหวัด/ทุกพื้นที่จากเมนู
+  const onSelectProvince = (val: string) => {
+    setProvince(val); // ถ้า "all" → Map จะซูมออก (ดู Map.tsx)
   };
 
   return (
@@ -200,12 +210,8 @@ export default function MapPanel({
           )}
         </Dropdown>
 
-        {/* All Location */}
-        <Dropdown
-          options={LOCATION_OPTIONS}
-          value={province}
-          onChange={setProvince}
-        >
+        {/* All Location / ทุกพื้นที่ */}
+        <Dropdown options={LOCATION_OPTIONS} value={province} onChange={onSelectProvince}>
           {({
             open,
             selected,
@@ -219,12 +225,12 @@ export default function MapPanel({
                 {...getButtonProps({
                   type: "button",
                   className:
-                    "inline-flex h-8 min-w-[100px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
+                    "inline-flex h-8 min-w-[120px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
                 })}
               >
                 <span className="truncate">
                   {selected
-                    ? selected.label
+                    ? getLocationLabel(selected.value, selected.label)
                     : t("map.allLocation", { defaultValue: "All Location" })}
                 </span>
                 <i className="material-icons arrow-icon leading-none text-cyan-500">
@@ -235,7 +241,8 @@ export default function MapPanel({
               <div
                 {...getMenuProps({
                   className: [
-                    "absolute flex flex-col mt-9 max-h-80 min-w-[100px] overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-md z-50",
+                    "absolute flex flex-col mt-9 max-h-80 min-w-[120px] overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-md z-50",
+                    "transition-all duration-150",
                     open ? "opacity-100" : "opacity-0 pointer-events-none",
                   ].join(" "),
                 })}
@@ -249,7 +256,7 @@ export default function MapPanel({
                         "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
                     })}
                   >
-                    {opt.label}
+                    {getLocationLabel(opt.value, opt.label)}
                   </button>
                 ))}
               </div>
@@ -262,8 +269,10 @@ export default function MapPanel({
       <div className="mt-3" key={mapVersion}>
         <Map
           notis={notis}
+          showPins={true}
           aggregateBySite
           severityFilter={site}
+          // ถ้า province === "all" → ส่ง null เพื่อสั่งซูมออก (Map.tsx จะจับสัญญาณ)
           focusProvince={province && province !== "all" ? province : null}
         />
       </div>
