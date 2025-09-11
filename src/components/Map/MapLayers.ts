@@ -157,7 +157,7 @@ export function loadSubdistrictsForDistrict(
               (map as any)._layers &&
                 Object.values((map as any)._layers).forEach((ly: any) => {
                   if (ly && ly.feature && ly.feature.properties?.amp_code) {
-                    (ly as L.Path).setStyle({ fillOpacity: 0.10 });
+                    (ly as L.Path).setStyle({ fillOpacity: 0.1 });
                   }
                 });
             } catch {}

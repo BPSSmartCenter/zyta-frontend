@@ -1,35 +1,21 @@
 import type L from "leaflet";
-
-export type Noti = {
-  type: "alert" | "warning" | "offline" | "normal" | string;
-  title: string;
-  titleKey?: string;
-  province?: string;
-  site: string;
-  date: string;
-};
+import type { Noti } from "../../data/Dashboard/notis";
 
 export type SiteCoord = { lat: number; lng: number };
 export type SiteCoordMap = Record<string, SiteCoord>;
 
 export type Props = {
   notis: Noti[];
-  siteCoords?: SiteCoordMap;
-  aggregateBySite?: boolean;
-  severityFilter?: string;
-
   showPins?: boolean;
-
-
-  preferNotisMarkers?: boolean;
-
+  aggregateBySite?: boolean;
+  severityFilter?: string; // "all" | "low" | "medium" | "high" | "critical"
   focusProvince?: string | null;
 };
 
 export type ViewState = {
   bounds: L.LatLngBoundsLiteral;
-  padding?: L.PointExpression;
+  padding?: [number, number];
   maxZoom?: number;
-  level: "country" | "province" | "district" | "subdistrict";
+  level: "country" | "province" | "district";
   rings?: L.LatLngExpression[][];
 };

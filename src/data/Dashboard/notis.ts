@@ -11,98 +11,63 @@ import {
   insuranceImage,
 } from "../../assets/index";
 
+export type NotiType = "alert" | "warning" | "info";
+
+export type Noti = {
+  id?: string;
+  type: NotiType;
+  img: string;
+  titleKey: string;
+  title: string;
+  site: string;
+  coords: { lat: number; lng: number };
+  date: string; // ISO (YYYY-MM-DD)
+  severity?: "low" | "medium" | "high" | "critical";
+};
+
 /* =============================
    Notifications
    ============================= */
-export const notis = [
+export const notis: Noti[] = [
   {
     type: "alert",
+    img: fireNoti,
     titleKey: "notis.fireDetected",
     title: "Fire detected",
     site: "Site C",
+    coords: { lat: 18.7883, lng: 98.9853 }, // Chiang Mai
     date: "2025-01-06",
-  },
-  {
-    type: "warning",
-    img: fireNoti,
-    titleKey: "notis.motionDetected",
-    title: "ตรวจพบการเคลื่อนไหว",
-    site: "Site B",
-    date: "2025-01-06",
+    severity: "high",
   },
   {
     type: "warning",
     img: motionNoti,
     titleKey: "notis.motionDetected",
-    title: "ตรวจพบการเคลื่อนไหว",
-    site: "Site D",
-    date: "2025-01-06",
-  },
-  {
-    type: "offline",
-    img: deviceNoti,
-    titleKey: "notis.cameraOffline",
-    title: "กล้องออฟไลน์",
+    title: "Motion detected",
     site: "Site A",
-    date: "2025-01-06",
+    coords: { lat: 13.7563, lng: 100.5018 }, // Bangkok
+    date: "2025-02-11",
+    severity: "medium",
   },
   {
-    type: "offline",
+    type: "info",
     img: deviceNoti,
     titleKey: "notis.cameraOffline",
-    title: "กล้องออฟไลน์",
-    site: "Site E",
-    date: "2025-01-06",
-  },
-  {
-    type: "offline",
-    titleKey: "notis.cameraOffline",
-    title: "กล้องออฟไลน์",
-    site: "Site G",
-    date: "2025-01-06",
-  },
-  {
-    type: "offline",
-    img: deviceNoti,
-    titleKey: "notis.cameraOffline",
-    title: "กล้องออฟไลน์",
-    site: "Site G",
-    date: "2025-01-06",
+    title: "Camera offline",
+    site: "Site B",
+    coords: { lat: 7.8804, lng: 98.3923 }, // Phuket
+    date: "2025-03-18",
+    severity: "low",
   },
   {
     type: "alert",
+    img: fireNoti,
     titleKey: "notis.fireDetected",
     title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
+    site: "Site D",
+    coords: { lat: 16.44, lng: 102.835 }, // Khon Kaen
+    date: "2025-04-22",
+    severity: "critical",
   },
 ];
 

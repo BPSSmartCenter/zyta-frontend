@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import {
-  TH_BOUNDS,
-  DEFAULT_SITE_COORDS,
-} from "../Dashboard/dashboard.constants";
+import { TH_BOUNDS } from "../Dashboard/dashboard.constants";
 import { useTranslation } from "react-i18next";
 
 import type { Props, ViewState } from "./MapTypes";
@@ -26,7 +23,6 @@ import {
 
 export default function Map({
   notis,
-  siteCoords = DEFAULT_SITE_COORDS,
   aggregateBySite = true,
   severityFilter,
   focusProvince,
@@ -307,18 +303,18 @@ export default function Map({
     dimRendererRef.current = L.svg({ pane: "dimPane" }).addTo(map);
 
     // ✅ label pane: สูงกว่า mask เพื่อไม่โดน overlay กลืน
-map.createPane("provinceLabels");
-map.getPane("provinceLabels")!.style.zIndex = "660";
-map.getPane("provinceLabels")!.style.pointerEvents = "none";
+    map.createPane("provinceLabels");
+    map.getPane("provinceLabels")!.style.zIndex = "660";
+    map.getPane("provinceLabels")!.style.pointerEvents = "none";
 
-// ✅ markers pane: ชั้นของตัวหมุด
-map.createPane("markersPane");
-map.getPane("markersPane")!.style.zIndex = "700";
+    // ✅ markers pane: ชั้นของตัวหมุด
+    map.createPane("markersPane");
+    map.getPane("markersPane")!.style.zIndex = "700";
 
-// ✅ markerLabels pane: ชั้นของ "label หมุด" ให้อยู่เหนือ pin
-map.createPane("markerLabels");
-map.getPane("markerLabels")!.style.zIndex = "720";
-map.getPane("markerLabels")!.style.pointerEvents = "none";
+    // ✅ markerLabels pane: ชั้นของ "label หมุด" ให้อยู่เหนือ pin
+    map.createPane("markerLabels");
+    map.getPane("markerLabels")!.style.zIndex = "720";
+    map.getPane("markerLabels")!.style.pointerEvents = "none";
 
     // โหลดขอบประเทศ
     fetch("/data/thailand.geojson")
@@ -484,14 +480,13 @@ map.getPane("markerLabels")!.style.pointerEvents = "none";
           map,
           markersLayerRef.current,
           notis,
-          siteCoords,
           aggregateBySite,
           severityFilter,
           provinceCentersRef.current,
           t
         );
       });
-  }, [notis, siteCoords, aggregateBySite, severityFilter, t, i18n.language]);
+  }, [notis, aggregateBySite, severityFilter, t, i18n.language]);
 
   // โฟกัสเข้าจังหวัดจากภายนอก (เช่น dropdown) + รีเซ็ตเมื่อเลือก "ทุกพื้นที่"
   useEffect(() => {

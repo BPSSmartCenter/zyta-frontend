@@ -15,7 +15,7 @@ import {
   offlineDeviceCamera,
   fallCamera,
 } from "../../assets/index";
-import { TH_PROVINCES } from "../../data/Dashboard/notis";
+import { TH_PROVINCES, notis } from "../../data/Dashboard/notis";
 import type L from "leaflet";
 
 export type DateValue = { y: number; m: number; d: number };
@@ -149,15 +149,8 @@ export const TH_BOUNDS: L.LatLngBoundsExpression = [
   [21.0, 107.5],
 ];
 
-export const DEFAULT_SITE_COORDS = {
-  "Site A": { lat: 18.7883, lng: 98.9853 },
-  "Site B": { lat: 7.8906, lng: 98.3981 },
-  "Site C": { lat: 15.87, lng: 100.9925 },
-  "Site D": { lat: 16.4419, lng: 102.835 },
-  "Site E": { lat: 15.244, lng: 104.8487 },
-  "Site F": { lat: 13.7563, lng: 100.5018 },
-  "Site G": { lat: 9.1382, lng: 99.321 },
-} as const;
+export const DEFAULT_SITE_COORDS: Record<string, { lat: number; lng: number }> =
+  Object.fromEntries(notis.map((n) => [n.site, n.coords]));
 
 export const SEVERITY_RANK: Record<string, number> = {
   alert: 3, // Fire detection
