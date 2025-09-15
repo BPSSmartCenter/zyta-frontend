@@ -81,7 +81,6 @@ const palette: Record<
     title: "text-[#181D27]",
     meta: "text-[#B8B8B8]",
   },
-  // ✅ เพิ่มให้รองรับ info
   info: {
     root: "bg-[#F8FBFE]",
     border: "border-none",
@@ -110,7 +109,6 @@ const NotiCard: React.FC<NotiCardProps> = ({
   onClick,
   className,
 }) => {
-  // ✅ กันพัง: ถ้า type ไม่แมตช์ ให้ใช้ normal เป็นดีฟอลต์
   const p = palette[type as keyof typeof palette] ?? palette.normal;
 
   const metaPieces = [

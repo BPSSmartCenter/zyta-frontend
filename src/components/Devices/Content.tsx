@@ -1,13 +1,22 @@
+// src/components/Devices/Content.tsx
+import { useState } from "react";
 import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
 import StatCard, { StatCardGroup } from "../StatCard";
 import { DEVICE_CARDS } from "./devices.constant";
+import CCTVPanel from "./CCTV/cctvPanel";
+import CCTVTable from "./CCTV/cctvTable";
+import WaterMeterPanel from "./Water Meter/waterMeterPanel";
+import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 
 type Props = {};
 
 export default function Content({}: Props) {
   const { t: tDevices } = useTranslation("devices");
   const { t } = useTranslation("dashboard");
+
+  // ค่าเริ่มต้น = cctv-1 (ต้องมีการ์ดถูกเลือกเสมอ)
+  const [selectedId, setSelectedId] = useState<string>("cctv-1");
 
   return (
     <>
@@ -33,9 +42,18 @@ export default function Content({}: Props) {
         </div>
       </nav>
 
-      {/* กลุ่มการ์ด: เลือกได้ทีละใบ, แต่สวิตช์แต่ละใบอิสระ */}
-      <StatCardGroup selectionMode="single" className="mt-6">
-        <ul className="flex flex-wrap gap-3">
+      {/* กลุ่มการ์ด: เลือกได้ทีละใบ (single) */}
+      <StatCardGroup
+        selectionMode="single"
+        activeIds={[selectedId]}
+        onChange={(ids) => {
+          // ห้ามปิดหมด ต้องเหลือการ์ด 1 ใบเสมอ
+          if (ids.length === 0) return;
+          setSelectedId(ids[0]);
+        }}
+        className="mt-5"
+      >
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
           {DEVICE_CARDS.map((c) => (
             <li key={c.id}>
               <StatCard
@@ -43,13 +61,33 @@ export default function Content({}: Props) {
                 variant="boxWithSwitch"
                 img={c.img}
                 activeImg={c.activeImg}
-                label={c.label}
-                switchProps={{ defaultChecked: false }} // ถ้าอยากเริ่มเปิดไว้
+                label={tDevices(c.label)}
+                switchProps={{ defaultChecked: true }}
               />
             </li>
           ))}
         </ul>
       </StatCardGroup>
+
+      {/* เมื่อเลือก cctv-1 ให้แสดงทั้ง Panel + Table พร้อมกัน */}
+      {selectedId === "cctv-1" || selectedId === "intercom-1" ? (
+        <div className="flex flex-col gap-3">
+          <CCTVPanel />
+          <CCTVTable />
+        </div>
+      ) : selectedId === "water-1" ? (
+        <div className="flex flex-col gap-3">
+          <WaterMeterPanel />
+          <CCTVTable />
+        </div>
+      ) : selectedId === "electric-1" ? (
+        <div className="mt-6">
+          <ElectricMeterPanel />
+          <CCTVTable />
+        </div>
+      ) : (
+        <div className="mt-6"></div>
+      )}
     </>
   );
 }

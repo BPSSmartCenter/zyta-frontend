@@ -35,9 +35,9 @@
     "anySeverity": "Any Severity",
     "allLocation": "All Location",
     "severity": {
-      "fire": "Fire detected",
-      "motion": "Motion detected",
-      "offline": "Device offline",
+      "low": "Low",
+      "medium": "Medium",
+      "critical": "Critical",
       "normal": "Normal"
     }
   },
@@ -46,7 +46,7 @@
     "fire": "Fire",
     "motion": "Motion",
     "offline": "Offline",
-    "fall": "Fall",
+    "fall": "Falling",
     "sleeping": "Sleeping",
     "face": "Face detected",
     "plate": "License plate",

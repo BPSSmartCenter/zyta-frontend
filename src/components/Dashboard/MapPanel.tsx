@@ -5,9 +5,39 @@ import {
   SEVERITY_OPTIONS,
   LOCATION_OPTIONS,
 } from "../Dashboard/dashboard.constants";
-import { notis } from "../../data/Dashboard/notis";
-import { useEffect, useRef, useState } from "react";
+import { notis, wellBeingNotis } from "../../data/Dashboard/notis";
+import type { Noti, Severity } from "../../data/Dashboard/notis";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+
+const toEventKey = (n: Noti): string => {
+  const k = n.titleKey || "";
+  if (k.includes("fireDetected")) return "fire";
+  if (k.includes("motionDetected")) return "motion";
+  if (k.includes("cameraOffline")) return "offline";
+  if (k.includes("fallDetected")) return "fall";
+  if (k.includes("sleepingLong")) return "sleeping";
+  if (k.includes("faceDetected")) return "face";
+  if (k.includes("plateDetected")) return "plate";
+  // fallback เผื่อรายการไหนไม่มี titleKey
+  const t = (n.title || "").toLowerCase();
+  if (t.includes("fire")) return "fire";
+  if (t.includes("motion")) return "motion";
+  if (t.includes("offline")) return "offline";
+  if (t.includes("fall")) return "fall";
+  if (t.includes("sleep")) return "sleeping";
+  if (t.includes("face")) return "face";
+  if (t.includes("plate")) return "plate";
+  return "unknown";
+};
+
+type WithGroup = Noti & { _group: "notis" | "wellbeing" };
+
+const toSeverity = (v: string | undefined | null): Severity | "all" => {
+  return v === "low" || v === "medium" || v === "critical" || v === "all"
+    ? (v as any)
+    : "all";
+};
 
 type Props = {
   selectedEvents: string[];
@@ -33,6 +63,29 @@ export default function MapPanel({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [mapVersion, setMapVersion] = useState(0);
 
+  const allTagged: WithGroup[] = useMemo(() => {
+    const a = notis.map((n) => ({ ...n, _group: "notis" } as WithGroup));
+    const b = wellBeingNotis.map(
+      (n) => ({ ...n, _group: "wellbeing" } as WithGroup)
+    );
+    return [...a, ...b];
+  }, []);
+
+  const eventsSet = useMemo(() => {
+    return new Set(selectedEvents.includes("all") ? ["all"] : selectedEvents);
+  }, [selectedEvents]);
+
+  const byEvents: WithGroup[] = useMemo(() => {
+    if (eventsSet.has("all")) return allTagged;
+    return allTagged.filter((n) => eventsSet.has(toEventKey(n)));
+  }, [allTagged, eventsSet]);
+
+  const notisForMap: Noti[] = useMemo(() => {
+    return byEvents
+      .map((x) => ({ ...x } as Noti)) // extra field _group ไม่กระทบ Map
+      .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
+  }, [byEvents]);
+
   // re-mount map เมื่อ container resize
   useEffect(() => {
     const el = wrapperRef.current;
@@ -55,6 +108,19 @@ export default function MapPanel({
       ro.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    console.log(
+      "[MapPanel] events =",
+      selectedEvents,
+      " severity =",
+      site,
+      " totalAfterEvents =",
+      byEvents.length,
+      " pushToMap =",
+      notisForMap.length
+    );
+  }, [selectedEvents, site, byEvents, notisForMap]);
 
   const getEventLabel = (val: string, fallback: string) =>
     t(`events.${val}`, { defaultValue: fallback });
@@ -161,7 +227,7 @@ export default function MapPanel({
                 {...getButtonProps({
                   type: "button",
                   className:
-                    "inline-flex h-8 w-[140px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
+                    "inline-flex h-8 min-w-[80px] items-center justify-around rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
                 })}
               >
                 <span className="truncate">
@@ -211,7 +277,11 @@ export default function MapPanel({
         </Dropdown>
 
         {/* All Location / ทุกพื้นที่ */}
-        <Dropdown options={LOCATION_OPTIONS} value={province} onChange={onSelectProvince}>
+        <Dropdown
+          options={LOCATION_OPTIONS}
+          value={province}
+          onChange={onSelectProvince}
+        >
           {({
             open,
             selected,
@@ -268,12 +338,17 @@ export default function MapPanel({
       {/* แผนที่ */}
       <div className="mt-3" key={mapVersion}>
         <Map
-          notis={notis}
+          notis={notisForMap}
           showPins={true}
-          aggregateBySite
-          severityFilter={site}
-          // ถ้า province === "all" → ส่ง null เพื่อสั่งซูมออก (Map.tsx จะจับสัญญาณ)
+          aggregateBySite={false}
+          severityFilter={toSeverity(site)}
           focusProvince={province && province !== "all" ? province : null}
+          onProvinceChange={(val) => {
+            setProvince(val);
+            if (val === "all") {
+              setMapVersion((v) => v + 1);
+            }
+          }}
         />
       </div>
     </div>

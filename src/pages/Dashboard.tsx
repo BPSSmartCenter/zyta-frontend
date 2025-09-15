@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx
+// src/pages/Dashboard/Dashboard.tsx
 import React from "react";
 import Navbar from "../components/Dashboard/Navbar";
 import Header from "../components/Dashboard/Header";
@@ -14,7 +14,6 @@ import {
 import {
   today,
   statItems,
-  CAMERA_ITEMS,
   EVENT_OPTIONS,
 } from "../components/Dashboard/dashboard.constants";
 import type { DateValue } from "../components/DateInput";
@@ -42,13 +41,11 @@ export default function Dashboard() {
       const d = new Date(dateStr);
       const locale = i18n.language || "en";
       return [
-        // รูปแบบเดิม (en-GB)
         d.toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "short",
           year: "numeric",
         }),
-        // ตามภาษาปัจจุบัน (ย่อ/เต็ม)
         d.toLocaleDateString(locale, {
           day: "2-digit",
           month: "short",
@@ -59,13 +56,11 @@ export default function Dashboard() {
           month: "long",
           year: "numeric",
         }),
-        // ไทยเต็ม (กันกรณี locale ยังไม่ใช่ th)
         d.toLocaleDateString("th-TH", {
           day: "2-digit",
           month: "long",
           year: "numeric",
         }),
-        // ค่าดิบ
         dateStr,
         d.toISOString().slice(0, 10),
       ];
@@ -80,6 +75,10 @@ export default function Dashboard() {
     type?: string;
     date: string;
     detail?: string;
+    eventKey?: string;
+    subtype?: string;
+    category?: string;
+    key?: string;
   };
 
   const makeHaystack = React.useCallback(
@@ -90,17 +89,12 @@ export default function Dashboard() {
       const localizedSite = t(`sites.${n.site}`, { defaultValue: n.site });
 
       const parts = [
-        // ชื่อเหตุการณ์ (แปล/ดิบ)
         localizedTitle,
         n.title,
-        // สถานที่ (แปล/ดิบ)
         localizedSite,
         n.site,
-        // ประเภท (ดิบไว้ก่อน)
         n.type,
-        // รายละเอียด (สำหรับ Face/Plate)
         ...(opts?.includeDetail ? [n.detail] : []),
-        // วันที่หลายรูปแบบ
         ...formatDateStrings(n.date),
       ];
 
@@ -109,7 +103,7 @@ export default function Dashboard() {
     [t, formatDateStrings]
   );
 
-  // ---------- Filters: ผูกกับภาษาเพื่อ re-run เมื่อเปลี่ยนภาษา ----------
+  // ---------- Filters ----------
   const filteredNotis = React.useMemo(() => {
     const q = searchEvent.trim().toLowerCase();
     if (!q) return notis;
@@ -152,7 +146,6 @@ export default function Dashboard() {
           });
 
     return { buttonLabel, selectedEvents };
-    // ผูกกับภาษาเพื่ออัปเดตปุ่มเมื่อสลับภาษา
   }, [selectedEvents, i18n.language, t]);
 
   // ---------- Handlers ----------
@@ -167,10 +160,6 @@ export default function Dashboard() {
     });
   }, []);
 
-  const handleSearchSite = React.useCallback(
-    (value: string) => setSearchSite(value),
-    []
-  );
   const handleSearchEvent = React.useCallback(
     (value: string) => setSearchEvent(value),
     []
@@ -194,10 +183,6 @@ export default function Dashboard() {
   );
   const handleProvinceChange = React.useCallback(
     (value: string) => setProvince(value),
-    []
-  );
-  const handleDateChange = React.useCallback(
-    (value: DateValue) => setDate(value),
     []
   );
 
@@ -246,18 +231,106 @@ export default function Dashboard() {
     ]
   );
 
+  // ---------- ชุด events สำหรับ Header (notis + wellbeing เรียงใหม่ -> เก่า) ----------
+  const headerEvents = React.useMemo(
+    () =>
+      [...filteredNotis, ...filteredWellBeginNotis].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [filteredNotis, filteredWellBeginNotis]
+  );
+
+  // ---------- All Time Alert ที่ใช้สำหรับ "นับทั้งหมด" ----------
+  // ✅ นับจาก "notis + wellbeingNotis" (เหมือนที่ All Time Alert แสดง), ไม่ใช่ 5 ตัวบน Header
+  const allTimeAlertItems = React.useMemo(
+    () => [...filteredNotis, ...filteredWellBeginNotis],
+    [filteredNotis, filteredWellBeginNotis]
+  );
+
+  // ---------- HELPER: ระบุคีย์เหตุการณ์ของ noti หนึ่งรายการ (motion/fall) ----------
+  const getEventKeyFromNoti = React.useCallback(
+    (n: AnyNoti): "motion" | "fall" | null => {
+      const direct = (n.eventKey ?? n.subtype ?? n.key ?? n.category ?? "")
+        .toString()
+        .toLowerCase();
+
+      const titleKey = (n as any).titleKey
+        ? String((n as any).titleKey).toLowerCase()
+        : "";
+      const title = (n.title ?? "").toLowerCase();
+      const type = (n.type ?? "").toLowerCase();
+
+      if (
+        direct === "motion" ||
+        titleKey.includes("motion") ||
+        title.includes("motion") ||
+        type === "motion"
+      )
+        return "motion";
+
+      if (
+        direct === "fall" ||
+        titleKey.includes("fall") ||
+        title.includes("fall") ||
+        type === "fall"
+      )
+        return "fall";
+
+      // เผื่อชื่อไทย
+      if (
+        title.includes("ตรวจจับการเคลื่อนไหว") ||
+        title.includes("การเคลื่อนไหว")
+      )
+        return "motion";
+      if (title.includes("ล้ม") || title.includes("ตรวจจับการล้ม"))
+        return "fall";
+
+      return null;
+    },
+    []
+  );
+
+  // ---------- นับ "ทั้งหมด" จาก All Time Alert ----------
+  const motionTotal = React.useMemo(
+    () =>
+      allTimeAlertItems.filter(
+        (n) => getEventKeyFromNoti(n as AnyNoti) === "motion"
+      ).length,
+    [allTimeAlertItems, getEventKeyFromNoti]
+  );
+
+  const fallTotal = React.useMemo(
+    () =>
+      allTimeAlertItems.filter(
+        (n) => getEventKeyFromNoti(n as AnyNoti) === "fall"
+      ).length,
+    [allTimeAlertItems, getEventKeyFromNoti]
+  );
+
+  // ---------- อัปเดตค่าใน statItems เฉพาะ motion/fall แล้วค่อยส่งให้ Header ----------
+  const statItemsForHeader = React.useMemo(
+    () =>
+      statItems.map((it) => {
+        if (it.key === "motion") return { ...it, val: motionTotal };
+        if (it.key === "fall") return { ...it, val: fallTotal };
+        return it;
+      }),
+    [motionTotal, fallTotal]
+  );
+
   return (
     <div className="min-h-screen bg-[#F8FBFE] gap-6 flex flex-col">
       <Navbar
         searchSite={searchSite}
-        setSearchSite={handleSearchSite}
+        setSearchSite={setSearchSite}
         site={site}
-        setSite={handleSiteChange}
+        setSite={setSite}
         date={date}
-        setDate={handleDateChange}
+        setDate={setDate}
       />
 
-      <Header statItems={statItems} cameraItems={CAMERA_ITEMS} />
+      {/* ส่ง statItems ที่ override ตัวเลขทั้งหมด + events สำหรับ Header (จำกัด 5 ภายใน Header) */}
+      <Header statItems={statItemsForHeader} events={headerEvents as any} />
 
       <ContentLayout {...contentLayoutProps} />
 

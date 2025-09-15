@@ -9,20 +9,27 @@ import {
   plateImage,
   alertImage,
   insuranceImage,
+  fireCamera,
+  sleepCamera,
+  fallCamera,
+  motionCamera,
+  offlineDeviceCamera,
 } from "../../assets/index";
 
-export type NotiType = "alert" | "warning" | "info";
+export type NotiType = "alert" | "warning" | "info" | "normal";
+
+export type Severity = "low" | "medium" | "critical";
 
 export type Noti = {
-  id?: string;
-  type: NotiType;
-  img: string;
-  titleKey: string;
+  type: NotiType; // ← ห้ามเป็น string กว้างๆ
+  img?: string;
+  titleKey?: string;
   title: string;
   site: string;
-  coords: { lat: number; lng: number };
-  date: string; // ISO (YYYY-MM-DD)
-  severity?: "low" | "medium" | "high" | "critical";
+  coords?: { lat: number; lng: number };
+  date: string; // ISO string หรือ YYYY-MM-DD
+  severity?: Severity; // optional ได้
+  screenshot?: string;
 };
 
 /* =============================
@@ -37,7 +44,8 @@ export const notis: Noti[] = [
     site: "Site C",
     coords: { lat: 18.7883, lng: 98.9853 }, // Chiang Mai
     date: "2025-01-06",
-    severity: "high",
+    severity: "critical",
+    screenshot: fireCamera,
   },
   {
     type: "warning",
@@ -48,6 +56,7 @@ export const notis: Noti[] = [
     coords: { lat: 13.7563, lng: 100.5018 }, // Bangkok
     date: "2025-02-11",
     severity: "medium",
+    screenshot: motionCamera,
   },
   {
     type: "info",
@@ -58,6 +67,7 @@ export const notis: Noti[] = [
     coords: { lat: 7.8804, lng: 98.3923 }, // Phuket
     date: "2025-03-18",
     severity: "low",
+    screenshot: offlineDeviceCamera,
   },
   {
     type: "alert",
@@ -68,41 +78,54 @@ export const notis: Noti[] = [
     coords: { lat: 16.44, lng: 102.835 }, // Khon Kaen
     date: "2025-04-22",
     severity: "critical",
+    screenshot: fireCamera,
   },
 ];
 
-export const wellBeingNotis = [
+export const wellBeingNotis: Noti[] = [
   {
     type: "alert",
     img: sleepingNoti,
     titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site C",
+    coords: { lat: 13.8199206, lng: 100.06216760000007 },
     date: "2025-01-06",
+    severity: "medium",
+    screenshot: sleepCamera,
   },
   {
-    type: "warning",
+    type: "alert",
     img: fallingNoti,
     titleKey: "notis.fallDetected",
     title: "ตรวจพบคนล้ม",
     site: "Site B",
+    coords: { lat: 13.1111601, lng: 99.93913069999996 },
     date: "2025-01-06",
+    severity: "critical",
+    screenshot: fallCamera,
   },
   {
     type: "alert",
     img: sleepingNoti,
     titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
-    site: "Site D",
+    site: "Site C",
+    coords: { lat: 18.7756318, lng: 100.77304170000002 },
     date: "2025-01-06",
+    severity: "medium",
+    screenshot: sleepCamera,
   },
   {
-    type: "warning",
+    type: "alert",
     img: fallingNoti,
     titleKey: "notis.fallDetected",
     title: "ตรวจพบคนล้ม",
     site: "Site A",
     date: "2025-01-06",
+    coords: { lat: 13.7563, lng: 100.5018 },
+    severity: "critical",
+    screenshot: fallCamera,
   },
   {
     type: "alert",
@@ -111,41 +134,20 @@ export const wellBeingNotis = [
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site D",
     date: "2025-01-06",
+    coords: { lat: 16.44, lng: 102.835 },
+    severity: "medium",
+    screenshot: sleepCamera,
   },
   {
     type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
+    img: fallingNoti,
+    titleKey: "notis.fallDetected",
+    title: "ตรวจพบคนล้ม",
+    site: "Site A",
     date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
-  },
-  {
-    type: "alert",
-    titleKey: "notis.fireDetected",
-    title: "Fire detected",
-    site: "Site C",
-    date: "2025-01-06",
+    coords: { lat: 13.7563, lng: 100.5018 },
+    severity: "critical",
+    screenshot: fallCamera,
   },
 ];
 

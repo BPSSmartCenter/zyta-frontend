@@ -2,5 +2,50 @@
   "nav": {
     "title": "Devices",
     "subTitle": "Track, manage and forecast your customers and orders. "
+  },
+  "header": {
+    "cctvCard": "CCTV Cameras",
+    "intercomeCard": "Intercom",
+    "waterCard": "Water Meter",
+    "electricCard": "Electric Meter",
+    "airCard": "Air Sensor"
+  },
+  "table": {
+    "title": "Consolidated Alert Log",
+    "filters": {
+      "site": "All Sites",
+      "event": "All Event"
+    },
+    "searchPlaceholder": "Search event",
+    "columns": {
+      "no": "NO",
+      "site": "SITE",
+      "event": "EVENT",
+      "picture": "PICTURE",
+      "cameraName": "CAMERA NAME",
+      "status": "STATUS",
+      "timestamp": "TIMESTAMP"
+    },
+    "events": {
+      "fire detected": "Fire detected",
+      "face detected": "Face detected",
+      "intrusion detected": "Intrusion detected"
+    },
+    "status": {
+      "UNRESOLVED": "Unresolved",
+      "RESOLVED": "Resolved"
+    },
+    "pager": {
+      "prev": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{pageCount}}"
+    },
+    "a11y": {
+      "selectRow": "Select row"
+    },
+    "relative": {
+      "justNow": "just now",
+      "hoursAgo": "{{count}} hours ago"
+    }
   }
 }

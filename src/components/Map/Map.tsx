@@ -1,8 +1,8 @@
+// src/components/Map/Map.tsx
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { TH_BOUNDS } from "../Dashboard/dashboard.constants";
 import { useTranslation } from "react-i18next";
-
 import type { Props, ViewState } from "./MapTypes";
 import {
   responsivePadding,
@@ -26,6 +26,7 @@ export default function Map({
   aggregateBySite = true,
   severityFilter,
   focusProvince,
+  onProvinceChange,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
@@ -49,9 +50,86 @@ export default function Map({
   const [canZoomOut, setCanZoomOut] = useState(false);
   const zoomOutWrapRef = useRef<HTMLDivElement | null>(null);
 
-  // จำสถานะสไตล์จังหวัดปัจจุบัน (strong | dim)
   const provinceVariantRef = useRef<"strong" | "dim">("strong");
   const prevFocusRef = useRef<string | null>(null);
+
+  // rings ที่ active อยู่ (ใช้กู้คืนตอน zoom out จากหมุด)
+  const activeRingsRef = useRef<L.LatLngExpression[][] | null>(null);
+
+  // จำว่าถอดชั้นไหนออกตอนซูมเข้าหมุด
+  const removedOnPinRef = useRef({
+    provinces: false,
+    districts: false,
+    subdistricts: false,
+  });
+
+  // ===== helpers: แสดง/ซ่อน pane ของ overlay =====
+  const setDimPaneVisible = (visible: boolean) => {
+    const p = mapRef.current?.getPane("dimPane");
+    if (p) p.style.display = visible ? "" : "none";
+  };
+  const setShadePaneVisible = (visible: boolean) => {
+    const p = mapRef.current?.getPane("shadeUnder");
+    if (p) p.style.display = visible ? "" : "none";
+  };
+
+  const detachRegionLayersForPinView = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    removedOnPinRef.current = {
+      provinces: false,
+      districts: false,
+      subdistricts: false,
+    };
+    if (provincesLayerRef.current && map.hasLayer(provincesLayerRef.current)) {
+      provincesLayerRef.current.removeFrom(map);
+      removedOnPinRef.current.provinces = true;
+    }
+    if (districtsLayerRef.current && map.hasLayer(districtsLayerRef.current)) {
+      districtsLayerRef.current.removeFrom(map);
+      removedOnPinRef.current.districts = true;
+    }
+    if (
+      subdistrictsLayerRef.current &&
+      map.hasLayer(subdistrictsLayerRef.current)
+    ) {
+      subdistrictsLayerRef.current.removeFrom(map);
+      removedOnPinRef.current.subdistricts = true;
+    }
+  };
+
+  const reattachRegionLayersAfterPinView = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    const r = removedOnPinRef.current;
+    if (
+      r.provinces &&
+      provincesLayerRef.current &&
+      !map.hasLayer(provincesLayerRef.current)
+    ) {
+      provincesLayerRef.current.addTo(map);
+    }
+    if (
+      r.districts &&
+      districtsLayerRef.current &&
+      !map.hasLayer(districtsLayerRef.current)
+    ) {
+      districtsLayerRef.current.addTo(map);
+    }
+    if (
+      r.subdistricts &&
+      subdistrictsLayerRef.current &&
+      !map.hasLayer(subdistrictsLayerRef.current)
+    ) {
+      subdistrictsLayerRef.current.addTo(map);
+    }
+    removedOnPinRef.current = {
+      provinces: false,
+      districts: false,
+      subdistricts: false,
+    };
+    setProvincesVariant(provinceVariantRef.current);
+  };
 
   const BASE_HEIGHT_PX = 680;
   const lockContainerBox = () => {
@@ -78,26 +156,18 @@ export default function Map({
       .leaflet-pane .leaflet-layer img.grayscale-tiles {
         filter: grayscale(1) contrast(1.05) brightness(1);
       }
-
-      /* ----------- สไตล์ Tooltip ของ "จังหวัด" ----------- */
       .leaflet-tooltip.province-label {
         background: #ffffff;
         border: 1px solid rgba(15,23,42,0.08);
         box-shadow: 0 2px 8px rgba(15,23,42,0.12);
-        color: #0f172a;          /* slate-900 */
+        color: #0f172a;
         font-weight: 600;
         font-size: 12px;
         line-height: 1.2;
         padding: 6px 8px;
         border-radius: 8px;
-
-        /* ไม่ให้ tooltip ขวาง event ของ polygon ด้านล่าง */
         pointer-events: none;
         white-space: nowrap;
-      }
-
-      @media (min-width:1024px){
-        .leaflet-tooltip.province-label { font-size: 12px; }
       }
     `;
     document.head.appendChild(style);
@@ -137,6 +207,10 @@ export default function Map({
   const setMaskByRings = (rings: L.LatLngExpression[][] | null) => {
     const map = mapRef.current;
     if (!map) return;
+
+    activeRingsRef.current =
+      rings && rings.length > 0 ? rings : thRingsRef.current;
+
     if (maskLayerRef.current) {
       map.removeLayer(maskLayerRef.current);
       maskLayerRef.current = null;
@@ -192,7 +266,6 @@ export default function Map({
     return v;
   };
 
-  /** เปลี่ยนความเข้มของ “ชั้นจังหวัด” ทั้งชั้นตามระดับมุมมอง */
   function setProvincesVariant(variant: "strong" | "dim") {
     provinceVariantRef.current = variant;
     const g = provincesLayerRef.current;
@@ -200,14 +273,15 @@ export default function Map({
     g.setStyle((f: any) => provinceDefaultStyleFor(f, variant));
   }
 
-  /** รีเซ็ตเป็นมุมมองประเทศ + ลบอำเภอ/ตำบล + ใส่ shade */
   function resetToCountry(animate = true) {
     const map = mapRef.current;
     if (!map) return;
 
-    // เคลียร์ stack และ layer ย่อย
     viewStackRef.current = [];
     setCanZoomOut(false);
+
+    // ใส่ชั้นพื้นที่กลับมาก่อนเสมอ
+    reattachRegionLayersAfterPinView();
 
     if (districtsLayerRef.current) {
       map.removeLayer(districtsLayerRef.current);
@@ -218,7 +292,10 @@ export default function Map({
       subdistrictsLayerRef.current = null;
     }
 
-    // คืน mask เป็นทั้งประเทศ + ใส่เฉด + จังหวัดเข้ม
+    // แสดง pane overlay กลับมาก่อน แล้วค่อยตั้งค่า
+    setDimPaneVisible(true);
+    setShadePaneVisible(true);
+
     setMaskByRings(thRingsRef.current);
     setInnerShade(true);
     setProvincesVariant("strong");
@@ -228,38 +305,73 @@ export default function Map({
   const zoomOut = () => {
     const map = mapRef.current;
     if (!map) return;
+
     const prev = popView();
+
+    // หมด stack → กลับประเทศ + sync dropdown + ปิด tooltip
     if (!prev) {
       resetToCountry(true);
+      onProvinceChange?.("all");
+      map.closeTooltip?.();
       return;
     }
-    const ringsToUse =
-      prev.rings && prev.rings.length > 0 ? prev.rings : thRingsRef.current;
+
+    // ใส่ชั้นที่เคยถอดตอน zoom-to-pin กลับมาก่อน
+    reattachRegionLayersAfterPinView();
+
+    // ถ้า view ก่อนหน้าเป็น country หรือ province → กลับประเทศทันที (คลิกเดียว)
+    if (prev.level === "country" || prev.level === "province") {
+      resetToCountry(true);
+      onProvinceChange?.("all"); // ให้ MapPanel ตั้ง All Location + remount
+      map.closeTooltip?.(); // ปิด tooltip ที่ค้าง
+      return;
+    }
+
+    // ที่เหลือคือเคสซูมลึกจากหมุด ⇒ กู้ overlay ตาม rings เดิม
+    const ringsToUse: L.LatLngExpression[][] =
+      prev.rings && (prev.rings as L.LatLngExpression[][]).length > 0
+        ? (prev.rings as L.LatLngExpression[][])
+        : thRingsRef.current;
+
+    setDimPaneVisible(true);
+    setShadePaneVisible(true);
     setMaskByRings(ringsToUse);
 
-    if (prev.level === "country") {
-      setProvincesVariant("strong");
-      setInnerShade(true);
-      if (districtsLayerRef.current) {
-        map.removeLayer(districtsLayerRef.current);
-        districtsLayerRef.current = null;
-      }
-      if (subdistrictsLayerRef.current) {
-        map.removeLayer(subdistrictsLayerRef.current);
-        subdistrictsLayerRef.current = null;
-      }
-    } else if (prev.level === "province") {
-      setInnerShade(false);
-      if (subdistrictsLayerRef.current) {
-        map.removeLayer(subdistrictsLayerRef.current);
-        subdistrictsLayerRef.current = null;
-      }
-    }
+    const isCountry = ringsToUse === thRingsRef.current;
+    setInnerShade(isCountry);
+
     map.flyToBounds(L.latLngBounds(prev.bounds), {
       animate: true,
       padding: prev.padding ?? [12, 12],
       maxZoom: prev.maxZoom ?? 19,
     });
+  };
+
+  /** ซูมไปยังพิกัดหมุดให้ชัดที่สุด + เอา overlay ออกชั่วคราว (ซ่อน pane + ถอดชั้นพื้นที่) */
+  const zoomToLatLng = (ll: L.LatLngExpression) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // เก็บสภาพก่อนซูม (รวม rings เดิมเพื่อกู้คืน)
+    pushView({
+      bounds: map.getBounds() as unknown as L.LatLngBoundsLiteral,
+      padding: [12, 12],
+      maxZoom: map.getMaxZoom() ?? 19,
+      level: "district",
+      rings: activeRingsRef.current ?? thRingsRef.current,
+    });
+
+    // ปิด overlay แบบชัวร์
+    setMaskByRings(null);
+    setInnerShade(false);
+    setDimPaneVisible(false);
+    setShadePaneVisible(false);
+
+    // ถอดชั้นพื้นที่ออก (กัน overlay บัง)
+    detachRegionLayersForPinView();
+
+    const targetZoom = Math.min(18, map.getMaxZoom() ?? 19);
+    map.flyTo(ll as any, targetZoom, { animate: true });
   };
 
   /** ---------- init map ---------- */
@@ -294,7 +406,7 @@ export default function Map({
       }
     ).addTo(map);
 
-    // panes & z-index ladder
+    // panes
     map.createPane("shadeUnder");
     map.getPane("shadeUnder")!.style.zIndex = "300";
 
@@ -302,16 +414,13 @@ export default function Map({
     map.getPane("dimPane")!.style.zIndex = "450";
     dimRendererRef.current = L.svg({ pane: "dimPane" }).addTo(map);
 
-    // ✅ label pane: สูงกว่า mask เพื่อไม่โดน overlay กลืน
     map.createPane("provinceLabels");
     map.getPane("provinceLabels")!.style.zIndex = "660";
     map.getPane("provinceLabels")!.style.pointerEvents = "none";
 
-    // ✅ markers pane: ชั้นของตัวหมุด
     map.createPane("markersPane");
     map.getPane("markersPane")!.style.zIndex = "700";
 
-    // ✅ markerLabels pane: ชั้นของ "label หมุด" ให้อยู่เหนือ pin
     map.createPane("markerLabels");
     map.getPane("markerLabels")!.style.zIndex = "720";
     map.getPane("markerLabels")!.style.pointerEvents = "none";
@@ -341,6 +450,7 @@ export default function Map({
 
     markersLayerRef.current = L.layerGroup().addTo(map);
 
+    // ปุ่ม Zoom out
     const ZoomOutControl = L.Control.extend({
       options: { position: "topleft" as L.ControlPosition },
       onAdd: () => {
@@ -363,12 +473,34 @@ export default function Map({
     });
     map.addControl(new ZoomOutControl());
 
+    // คลิกหมุด => ซูม + ซ่อน overlay + ถอดชั้นพื้นที่
+    const onLayerAdd = (ev: any) => {
+      const layer = ev?.layer;
+      if (
+        layer &&
+        (layer instanceof L.Marker || (layer.getLatLng && layer.on))
+      ) {
+        if (!(layer as any).__zoomToPinBound) {
+          (layer as any).__zoomToPinBound = true;
+          layer.on("click", () => {
+            try {
+              const ll = layer.getLatLng();
+              if (ll) zoomToLatLng(ll);
+            } catch {}
+          });
+        }
+      }
+    };
+    map.on("layeradd", onLayerAdd);
+
     return () => {
+      map.off("layeradd", onLayerAdd);
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
+  // แสดง/ซ่อนปุ่ม Zoom out
   useEffect(() => {
     const el = zoomOutWrapRef.current;
     if (!el) return;
@@ -391,7 +523,6 @@ export default function Map({
             const nameTH = feature?.properties?.pro_th as string | undefined;
             const nameEN = feature?.properties?.pro_en as string | undefined;
 
-            // บันทึก center ของจังหวัด (TH/EN)
             if (nameTH) {
               const c = (layer as any).getBounds().getCenter();
               provinceCentersRef.current[nameTH] = { lat: c.lat, lng: c.lng };
@@ -399,7 +530,6 @@ export default function Map({
                 provinceCentersRef.current[nameEN] = { lat: c.lat, lng: c.lng };
             }
 
-            // Tooltip จังหวัด (บังคับภาษาไทย, ลอยเหนือเมาส์)
             (layer as L.Path).bindTooltip(nameTH ?? nameEN ?? "", {
               direction: "top",
               sticky: true,
@@ -408,7 +538,6 @@ export default function Map({
               pane: "provinceLabels",
             });
 
-            // hover: ปรับสไตล์ + เปิด/ปิด tooltip
             layer.on("mouseover", () => {
               (layer as L.Path).setStyle(styleProvinceHover);
               (layer as any).openTooltip?.();
@@ -420,10 +549,11 @@ export default function Map({
               (layer as any).closeTooltip?.();
             });
 
-            // คลิกเข้า "จังหวัด"
+            // คลิกจังหวัด → ซูมเข้า + mask ตามจังหวัด + sync Dropdown
             const handleEnterProvince = () => {
               if (!proCode) return;
-              // จด state ปัจจุบันไว้สำหรับ zoom out
+
+              // เก็บสถานะก่อนเข้า view จังหวัด
               pushView({
                 bounds: TH_BOUNDS as any,
                 padding: [12, 12],
@@ -431,14 +561,21 @@ export default function Map({
                 level: "country",
                 rings: thRingsRef.current,
               });
+
               setInnerShade(false);
               setProvincesVariant("dim");
 
-              // เจาะ mask เฉพาะจังหวัด
               const ringsProv = extractRingsLatLng((feature as any).geometry);
+
+              // เปิด overlay pane และตั้ง mask เป็นรูปจังหวัด
+              setDimPaneVisible(true);
+              setShadePaneVisible(true);
               setMaskByRings(ringsProv);
 
-              // ซูมเข้าจังหวัด
+              // แจ้ง MapPanel ให้ Dropdown เป็นชื่อจังหวัดนี้
+              onProvinceChange?.(nameTH || nameEN || "all");
+
+              // ซูมเข้าไปที่ขอบจังหวัด
               const b = (layer as any).getBounds() as L.LatLngBounds;
               map.flyToBounds(b, {
                 animate: true,
@@ -446,7 +583,7 @@ export default function Map({
                 maxZoom: 10,
               });
 
-              // โหลดอำเภอ/ตำบล
+              // โหลดชั้นอำเภอ/ตำบล
               loadDistrictsForProvince(
                 map,
                 proCode,
@@ -475,7 +612,7 @@ export default function Map({
 
         provincesLayerRef.current = layer;
 
-        // render markers ครั้งแรก (จะไปใช้ pane: "markersPane" ภายใน MapMarkers)
+        // render markers ครั้งแรก
         renderMarkers(
           map,
           markersLayerRef.current,
@@ -485,10 +622,47 @@ export default function Map({
           provinceCentersRef.current,
           t
         );
+
+        // ผูก click กับหมุดที่ถูกสร้างก่อนหน้า (กัน timing)
+        try {
+          markersLayerRef.current?.eachLayer((ly: any) => {
+            if (ly && (ly instanceof L.Marker || (ly.getLatLng && ly.on))) {
+              if (!(ly as any).__zoomToPinBound) {
+                (ly as any).__zoomToPinBound = true;
+                ly.on("click", () => {
+                  try {
+                    const ll = ly.getLatLng();
+                    if (ll) zoomToLatLng(ll);
+                  } catch {}
+                });
+              }
+            }
+          });
+        } catch {}
       });
   }, [notis, aggregateBySite, severityFilter, t, i18n.language]);
 
-  // โฟกัสเข้าจังหวัดจากภายนอก (เช่น dropdown) + รีเซ็ตเมื่อเลือก "ทุกพื้นที่"
+  // อัปเดตหมุดทุกครั้งที่ข้อมูล/ตัวกรองเปลี่ยน
+  useEffect(() => {
+    const map = mapRef.current;
+    const grp = markersLayerRef.current;
+    if (!map || !grp) return;
+
+    try {
+      grp.clearLayers();
+    } catch {}
+    renderMarkers(
+      map,
+      grp,
+      notis,
+      aggregateBySite,
+      severityFilter,
+      provinceCentersRef.current,
+      t
+    );
+  }, [notis, aggregateBySite, severityFilter, t, i18n.language]);
+
+  // โฟกัสจังหวัดจาก dropdown (null = ทุกพื้นที่)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !provincesLayerRef.current) {
@@ -496,7 +670,7 @@ export default function Map({
       return;
     }
 
-    // กรณี "จากมี province → เป็น null" = เลือกทุกพื้นที่
+    // จาก Dropdown: กลับ All → reset อย่างเดียว (ไม่ยิง callback กัน loop)
     if (prevFocusRef.current && !focusProvince) {
       resetToCountry(true);
       prevFocusRef.current = null;

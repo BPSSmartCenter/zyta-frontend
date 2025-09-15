@@ -1,6 +1,51 @@
 {
-    "nav" : {
-        "title" : "อุปกรณ์",
-        "subTitle": "แทรเำดไำดไน"
+  "nav": {
+    "title": "อุปกรณ์",
+    "subTitle": "ติดตาม จัดการ และคาดการณ์ลูกค้าและคำสั่งซื้อของคุณ"
+  },
+  "header": {
+    "cctvCard": "กล้องวงจรปิด",
+    "intercomeCard": "อินเตอร์คอม",
+    "waterCard": "มิเตอร์น้ำ",
+    "electricCard": "มิเตอร์ไฟ",
+    "airCard": "อากาศ"
+  },
+  "table": {
+    "title": "ตารางการแจ้งเตือนแบบรวม",
+    "filters": {
+      "site": "ทุกไซต์",
+      "event": "ทุกเหตุการณ์"
+    },
+    "searchPlaceholder": "ค้นหาเหตุการณ์",
+    "columns": {
+      "no": "ลำดับ",
+      "site": "ไซต์",
+      "event": "เหตุการณ์",
+      "picture": "รูปภาพ",
+      "cameraName": "ชื่อกล้อง",
+      "status": "สถานะ",
+      "timestamp": "เวลา"
+    },
+    "events": {
+      "fire detected": "ตรวจพบเพลิงไหม้",
+      "face detected": "ตรวจพบใบหน้า",
+      "intrusion detected": "ตรวจพบการบุกรุก"
+    },
+    "status": {
+      "UNRESOLVED": "ยังไม่แก้ไข",
+      "RESOLVED": "แก้ไขแล้ว"
+    },
+    "pager": {
+      "prev": "ก่อนหน้า",
+      "next": "ถัดไป",
+      "pageOf": "หน้า {{page}} จาก {{pageCount}}"
+    },
+    "a11y": {
+      "selectRow": "เลือกแถว"
+    },
+    "relative": {
+      "justNow": "เมื่อสักครู่",
+      "hoursAgo": "{{count}} ชั่วโมงที่แล้ว"
     }
+  }
 }

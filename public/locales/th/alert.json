@@ -20,8 +20,8 @@
     "fire detected": "ตรวจพบเพลิงไหม้"
   },
   "status": {
-    "UNRESOLVED": "ยังไม่ปิด",
-    "RESOLVED": "ปิดแล้ว"
+    "UNRESOLVED": "ยังไม่แก้ไข",
+    "RESOLVED": "แก้ไขแล้ว"
   },
   "relative": {
     "justNow": "เมื่อสักครู่",

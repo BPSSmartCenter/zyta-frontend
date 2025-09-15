@@ -115,7 +115,7 @@ function useMonthShortLabels(locale: string) {
   );
 }
 
-/* ============================ Component ============================ */
+/* ============================ DEFAULT (เดิม) — ห้ามแตะ ============================ */
 
 export default function Chart({
   buttonLabel,
@@ -242,16 +242,7 @@ export default function Chart({
         },
       },
     };
-  }, [
-    categories,
-    maxVal,
-    period,
-    scheduleReflow,
-    isLg,
-    borderRadius,
-    t,
-    locale,
-  ]);
+  }, [categories, maxVal, period, scheduleReflow, isLg, borderRadius, t]);
 
   // ResizeObserver เพื่ออัปเดตกราฟเมื่อ container เปลี่ยนขนาด
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -287,8 +278,9 @@ export default function Chart({
       "disabled:opacity-50 disabled:pointer-events-none",
     ].join(" ");
 
+  const { t: tDash } = useTranslation(["dashboard"]);
   const getEventLabel = (val: string, fallback: string) =>
-    t(`events.${val}`, { defaultValue: fallback });
+    tDash(`events.${val}`, { defaultValue: fallback });
 
   return (
     <div className="px-6 flex w-full rounded-md flex-col gap-3 bg-white">
@@ -299,12 +291,12 @@ export default function Chart({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-1">
               <h1 className="text-gray-400 text-[18px] lg:text-[20px]">
-                {t("chart.statisticsTitle", { defaultValue: "Statistics" })}
+                {tDash("chart.statisticsTitle", { defaultValue: "Statistics" })}
               </h1>
 
               <div className="flex items-center flex-wrap gap-2">
                 <h1 className="text-[20px] lg:text-[25px] font-bold">
-                  {t("chart.totalSummary", {
+                  {tDash("chart.totalSummary", {
                     defaultValue: "Total summary of snapshot",
                   })}
                 </h1>
@@ -387,7 +379,7 @@ export default function Chart({
                     onClick={() => setPeriod("daily")}
                     className={btnClass(period === "daily")}
                   >
-                    {t("chart.daily", { defaultValue: "Daily" })}
+                    {tDash("chart.daily", { defaultValue: "Daily" })}
                   </button>
                   <button
                     type="button"
@@ -395,7 +387,7 @@ export default function Chart({
                     onClick={() => setPeriod("weekly")}
                     className={btnClass(period === "weekly")}
                   >
-                    {t("chart.weekly", { defaultValue: "Weekly" })}
+                    {tDash("chart.weekly", { defaultValue: "Weekly" })}
                   </button>
                   <button
                     type="button"
@@ -403,7 +395,7 @@ export default function Chart({
                     onClick={() => setPeriod("monthly")}
                     className={btnClass(period === "monthly")}
                   >
-                    {t("chart.monthly", { defaultValue: "Monthly" })}
+                    {tDash("chart.monthly", { defaultValue: "Monthly" })}
                   </button>
                 </div>
               </div>
@@ -428,7 +420,7 @@ export default function Chart({
             <li className="flex gap-2 items-center">
               <div className="rounded-full bg-[#4A3AFF] w-[20px] h-[20px]" />
               <span className="min-w-[60px]">
-                {t("chart.legend.shift1", {
+                {tDash("chart.legend.shift1", {
                   defaultValue: "08:00 - 16:00",
                 })}
               </span>
@@ -436,7 +428,7 @@ export default function Chart({
             <li className="flex gap-2 items-center">
               <div className="rounded-full bg-[#39B8EE] w-[20px] h-[20px]" />
               <span>
-                {t("chart.legend.shift2", {
+                {tDash("chart.legend.shift2", {
                   defaultValue: "16:00 - 24:00",
                 })}
               </span>
@@ -444,7 +436,7 @@ export default function Chart({
             <li className="flex gap-2 items-center">
               <div className="rounded-full bg-[#D3F7FF] w-[20px] h-[20px]" />
               <span>
-                {t("chart.legend.shift3", {
+                {tDash("chart.legend.shift3", {
                   defaultValue: "24:00 - 08:00",
                 })}
               </span>
@@ -456,10 +448,371 @@ export default function Chart({
   );
 }
 
+/* ============================ NEW (Water) — คอมโพเนนต์เสริม ============================ */
+
+// ── 1) Stacked Columns (เดิม)
+export type WaterStackedProps = {
+  categories?: string[];
+  series?: ApexAxisChartSeries;
+  height?: number | string;
+  title?: string;
+};
+
+export function WaterStackedChart({
+  categories,
+  series,
+  height = 260,
+  title = "ปริมาณน้ำ",
+}: WaterStackedProps) {
+  const cats = categories ?? [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const data: ApexAxisChartSeries = series ?? [
+    {
+      name: "Series 1",
+      data: [340, 400, 280, 300, 360, 390, 350, 360, 340, 380, 420, 320],
+    },
+    {
+      name: "Series 2",
+      data: [260, 320, 240, 210, 220, 280, 300, 310, 330, 340, 360, 300],
+    },
+    {
+      name: "Series 3",
+      data: [290, 360, 260, 230, 190, 360, 330, 320, 350, 360, 380, 290],
+    },
+  ];
+
+  // คำนวณ max รวมแบบ stacked แล้วล็อกฐาน 0
+  const stackedMax = (() => {
+    const sums = Array.from({ length: cats.length }, () => 0);
+    data.forEach((s) =>
+      s.data.forEach((v, i) => (sums[i] += typeof v === "number" ? v : 0))
+    );
+    return Math.max(...sums);
+  })();
+  const stepCandidates = [100, 150, 200, 250, 300];
+  const pickStep = stepCandidates.find((st) => stackedMax / st <= 6) || 300;
+  const maxY = Math.ceil(stackedMax / pickStep) * pickStep;
+  const ticks = Math.min(6, Math.max(3, Math.round(maxY / pickStep)));
+
+  const options: ApexOptions = {
+    chart: {
+      type: "bar",
+      stacked: true,
+      toolbar: { show: false },
+      animations: { enabled: true },
+    },
+    title: {
+      text: title,
+      align: "left",
+      style: { fontSize: "14px", fontWeight: 600, color: "#374151" },
+    },
+    colors: ["#22A9E0", "#6FD7FF", "#CDEFFF"],
+    plotOptions: {
+      bar: { horizontal: false, columnWidth: "45%", borderRadius: 8 },
+    },
+    dataLabels: { enabled: false },
+    stroke: { show: false },
+    xaxis: {
+      categories: cats,
+      axisTicks: { show: false },
+      axisBorder: { show: false },
+      labels: { style: { fontSize: "12px", colors: "#94A3B8" } },
+    },
+    yaxis: {
+      min: 0,
+      max: maxY,
+      tickAmount: ticks,
+      decimalsInFloat: 0,
+      floating: false,
+      forceNiceScale: false,
+      labels: { style: { fontSize: "12px", colors: "#94A3B8" } },
+    },
+    grid: {
+      borderColor: "rgba(0,0,0,0.06)",
+      strokeDashArray: 3,
+      yaxis: { lines: { show: true } },
+      xaxis: { lines: { show: false } },
+      padding: { left: 10, right: 10, bottom: 0, top: 0 },
+    },
+    legend: { show: false },
+    tooltip: { y: { formatter: (val: number) => val.toLocaleString() } },
+    responsive: [
+      {
+        breakpoint: 1024,
+        options: { yaxis: { min: 0, max: maxY, tickAmount: ticks } },
+      },
+      {
+        breakpoint: 640,
+        options: {
+          yaxis: { min: 0, max: maxY, tickAmount: Math.min(ticks, 4) },
+          plotOptions: { bar: { columnWidth: "65%" } },
+        },
+      },
+    ],
+  };
+
+  return (
+    <ReactApexChart
+      type="bar"
+      height={height}
+      options={options}
+      series={data}
+    />
+  );
+}
+
+/* ── 2) NEW: Stacked Area Chart (สำหรับ Water) */
+export type WaterAreaStackedProps = {
+  categories?: string[];
+  series?: ApexAxisChartSeries;
+  height?: number | string;
+  yTitle?: string;
+  xTitle?: string;
+};
+
+export function WaterAreaStackedChart({
+  categories,
+  series,
+  height = 260,
+  yTitle = "ปริมาณน้ำ",
+  xTitle = "Month",
+}: WaterAreaStackedProps) {
+  const cats = categories ?? [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  // mock ใกล้เคียงภาพ: เส้นเข้มล่างสุด ไล่โทนอ่อนไปด้านบน
+  const data: ApexAxisChartSeries = series ?? [
+    {
+      name: "Series 1",
+      data: [60, 90, 120, 140, 250, 300, 260, 340, 360, 320, 380, 460],
+    },
+    {
+      name: "Series 2",
+      data: [360, 380, 420, 430, 450, 470, 440, 500, 520, 510, 530, 560],
+    },
+    {
+      name: "Series 3",
+      data: [540, 560, 590, 600, 650, 700, 660, 740, 780, 760, 800, 840],
+    },
+  ];
+
+  // คิด max แบบ "ไม่ลอย" (ฐาน 0 ตลอด)
+  const stackedMax = (() => {
+    const sums = Array.from({ length: cats.length }, () => 0);
+    data.forEach((s) =>
+      s.data.forEach((v, i) => (sums[i] += typeof v === "number" ? v : 0))
+    );
+    return Math.max(...sums);
+  })();
+  const stepCandidates = [100, 200];
+  const pickStep = stepCandidates.find((st) => stackedMax / st <= 6) || 200;
+  const maxY = Math.ceil(stackedMax / pickStep) * pickStep;
+  const ticks = Math.min(6, Math.max(3, Math.round(maxY / pickStep)));
+
+  const options: ApexOptions = {
+    chart: {
+      type: "area",
+      stacked: true,
+      toolbar: { show: false },
+      animations: { enabled: true },
+      fontFamily: "Inter, ui-sans-serif, system-ui",
+    },
+    colors: ["#22A9E0", "#BFEFFF", "#EAF8FF"], // เส้นเข้ม + แถบอ่อนๆ
+    stroke: {
+      curve: "smooth",
+      width: [3, 2, 2],
+      colors: ["#22A9E0", "#8DDCFF", "#CFEFFF"],
+    },
+    fill: {
+      type: "solid",
+      opacity: [0.25, 0.18, 0.12], // เฉดอ่อนใกล้ภาพ
+    },
+    markers: { size: 0 },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: cats,
+      tickPlacement: "between",
+      axisTicks: { show: false },
+      axisBorder: { show: false },
+      labels: { style: { colors: "#9CA3AF", fontSize: "12px" } },
+      title: {
+        text: xTitle,
+        offsetY: 8,
+        style: { color: "#9CA3AF", fontWeight: 500 },
+      },
+    },
+    yaxis: {
+      min: 0,
+      max: maxY,
+      tickAmount: ticks,
+      decimalsInFloat: 0,
+      labels: { style: { colors: "#9CA3AF", fontSize: "12px" } },
+      title: {
+        text: yTitle,
+        rotate: 0,
+        offsetX: -10,
+        style: { color: "#9CA3AF", fontWeight: 500 },
+      },
+    },
+    grid: {
+      borderColor: "rgba(0,0,0,0.06)",
+      strokeDashArray: 3,
+      padding: { left: 10, right: 10 },
+    },
+    legend: {
+      show: true,
+      position: "top",
+      horizontalAlign: "right",
+      fontSize: "12px",
+      labels: { colors: "#9CA3AF" },
+      offsetY: 0,
+    },
+    tooltip: { shared: true, y: { formatter: (v) => v.toLocaleString() } },
+    responsive: [
+      {
+        breakpoint: 1024,
+        options: {
+          yaxis: { min: 0, max: maxY, tickAmount: ticks },
+          legend: { position: "top", horizontalAlign: "right" },
+        },
+      },
+      {
+        breakpoint: 640,
+        options: {
+          yaxis: { min: 0, max: maxY, tickAmount: Math.min(4, ticks) },
+        },
+      },
+    ],
+  };
+
+  return (
+    <ReactApexChart
+      type="area"
+      height={height}
+      options={options}
+      series={data}
+    />
+  );
+}
+
+/* ============================ NEW (Electric) ============================ */
+/** Basic Line Chart สำหรับ Electric (2 เส้น, โทนฟ้า/เขียว, smooth, grid จาง) */
+export type ElectricLineBasicProps = {
+  categories?: string[];
+  series?: ApexAxisChartSeries;
+  height?: number | string;
+};
+
+export function ElectricLineBasicChart({
+  categories,
+  series,
+  height = 320,
+}: ElectricLineBasicProps) {
+  const cats = categories ?? [
+    "09:22",
+    "10:22",
+    "11:22",
+    "12:22",
+    "13:22",
+    "14:22",
+    "15:22",
+    "16:22",
+    "17:22",
+  ];
+
+  const data: ApexAxisChartSeries = series ?? [
+    {
+      name: "Traffic",
+      data: [120, 60, 140, 80, 180, 40, 170, 90, 160],
+    },
+    {
+      name: "Payment",
+      data: [200, 70, 260, 110, 300, 120, 330, 210, 230],
+    },
+  ];
+
+  // หา max สวยๆ แล้วล็อกฐาน 0 (กันกราฟลอย)
+  const rawMax = Math.max(
+    ...data.flatMap((s) => s.data.map((v) => (typeof v === "number" ? v : 0)))
+  );
+  const maxY = niceUp(rawMax * 1.1, 10);
+
+  const options: ApexOptions = {
+    chart: {
+      type: "line",
+      toolbar: { show: false },
+      animations: { enabled: true },
+      fontFamily: "Inter, ui-sans-serif, system-ui",
+    },
+    colors: ["#2E90FA", "#16A34A"], // ฟ้า / เขียว
+    stroke: { curve: "smooth", width: 3 },
+    markers: { size: 0 },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: cats,
+      axisTicks: { show: false },
+      axisBorder: { show: false },
+      labels: { style: { colors: "#9CA3AF", fontSize: "12px" } },
+    },
+    yaxis: {
+      min: 0,
+      max: maxY,
+      tickAmount: 5,
+      labels: { style: { colors: "#9CA3AF", fontSize: "12px" } },
+    },
+    grid: {
+      borderColor: "rgba(0,0,0,0.06)",
+      strokeDashArray: 3,
+      yaxis: { lines: { show: true } },
+      xaxis: { lines: { show: false } },
+      padding: { left: 10, right: 10 },
+    },
+    legend: {
+      show: true,
+      position: "top",
+      horizontalAlign: "center",
+      fontSize: "12px",
+      labels: { colors: "#9CA3AF" },
+    },
+    tooltip: { shared: true },
+  };
+
+  return (
+    <ReactApexChart
+      type="line"
+      height={height}
+      options={options}
+      series={data}
+    />
+  );
+}
+
 /* ============================ Notes ============================
-- Daily = Weekly (ตาม helper getSeriesByPeriod)
-- ใช้ normalizeSeriesToCategories เพื่อกันกรณี categories/series ยาวไม่เท่ากัน
-- key บน ReactApexChart รวมภาษา เพื่อรีเฟรชกราฟเมื่อเปลี่ยนภาษา
-- Tooltip ใช้คีย์ i18n: chart.countSuffix (e.g., "{{count}} ครั้ง"/"{{count}} times")
-- ป้ายแกน X (วัน/เดือน) ดึงจาก locale ปัจจุบัน: th-TH-u-nu-latn / en-GB
+- DEFAULT export (Chart) ไม่ถูกแก้ไข เพื่อกันกระทบ Snapshot เดิม
+- เพิ่ม named export: WaterStackedChart, WaterAreaStackedChart สำหรับ Water
 ================================================================ */

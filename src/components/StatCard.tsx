@@ -188,19 +188,21 @@ const StatCard: React.FC<Props> = ({
       <div
         onClick={handleToggle} // คลิกการ์ด = เลือกการ์ด (bg cyan)
         className={[
-          "p-6 flex justify-between w-[249px] h-[135px] border border-cyan rounded-lg cursor-pointer",
-          active ? "bg-cyan" : "",
+          "p-6 flex justify-between w-full border border-cyan rounded-lg cursor-pointer",
+          active ? "bg-cyan text-white" : "",
           className || "",
         ].join(" ")}
       >
-        <div className="text-center flex flex-col items-center">
+        <div className="text-center flex flex-col items-center select-none gap-2 whitespace-nowrap">
           <img src={currentImg} alt="" />
           <h1>{displayLabel}</h1>
         </div>
 
         {/* คลิกสวิตช์ = toggle สวิตช์อย่างเดียว */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <Switch {...switchProps} id={swId} />
+        <div>
+          <div onClick={(e) => e.stopPropagation()} className="inline-flex">
+            <Switch {...switchProps} id={swId} />
+          </div>
         </div>
       </div>
     );

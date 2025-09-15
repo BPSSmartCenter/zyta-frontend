@@ -3,14 +3,21 @@ import Dropdown from "../Dropdown";
 import DatePicker, { type DateValue } from "../DateInput";
 import SearchInput from "../SearchInput";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
+
 import {
-  ALERTS_MOCK,
   CAMERA_OPTIONS,
   EVENT_OPTIONS,
   type AlertRow,
 } from "./totalAlert.constant";
 
-/* helpers */
+import type { Noti } from "../../data/Dashboard/notis";
+import {
+  notis as alertNotis,
+  wellBeingNotis,
+} from "../../data/Dashboard/notis";
+
+/* ---------------- helpers ---------------- */
 const sameYMD = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
@@ -41,18 +48,14 @@ const useCameraLabelT = () => {
       : label ?? "";
   };
 };
-// ตรวจว่า option นี้คือ “ทั้งหมด” (กันกรณี value ไม่ใช่ 'all')
+
 const isAllOption = (
   opt: { value?: string; label?: string } | undefined,
   kind: "camera" | "event"
 ) => {
   if (!opt) return false;
-  const v = String(opt.value ?? "")
-    .toLowerCase()
-    .trim();
-  const l = String(opt.label ?? "")
-    .toLowerCase()
-    .trim();
+  const v = String(opt.value ?? "").toLowerCase().trim();
+  const l = String(opt.label ?? "").toLowerCase().trim();
   if (v === "all") return true;
   if (kind === "camera")
     return (
@@ -63,47 +66,131 @@ const isAllOption = (
   );
 };
 
-/** ให้ default วันที่ตรงกับ mock แถวแรก เพื่อมีข้อมูลขึ้นทันที */
-const firstRowDate: DateValue | undefined = (() => {
-  const iso = ALERTS_MOCK[0]?.timestamp;
-  if (!iso) return undefined;
-  const d = new Date(iso);
-  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
-})();
+// แปลง noti → event key ที่ตารางใช้
+const eventKeyFromNoti = (n: Noti): string => {
+  const raw = String(
+    (n as any).event ?? (n as any).titleKey ?? (n as any).title ?? ""
+  ).toLowerCase();
+
+  if (raw.includes("motion")) return "motion";
+  if (raw.includes("fall")) return "fall";
+  if (raw.includes("fire")) return "fire";
+  return "other";
+};
+
+const pictureFromNoti = (n: Noti): string =>
+  ((n as any).screenshot ?? (n as any).img ?? "") as string;
+
+const DEFAULT_CAMERA_LABEL = "Camera 1";
+const DEFAULT_CAMERA_NAME = "Camera 1";
+const DEFAULT_STATUS: AlertRow["status"] = "UNRESOLVED";
+
+// map notis → แถวตาราง
+const mapNotisToRows = (all: Noti[]): AlertRow[] => {
+  return all
+    .filter((n) => !!(n as any).date)
+    .map((n, i) => {
+      const ts = new Date((n as any).date);
+      const id = String(
+        (n as any).id ?? `${eventKeyFromNoti(n)}-${i}-${+ts}`
+      );
+      return {
+        id,
+        cameraLabel: DEFAULT_CAMERA_LABEL,
+        event: eventKeyFromNoti(n),
+        picture: pictureFromNoti(n),
+        cameraName: (n as any).site ?? DEFAULT_CAMERA_NAME,
+        status: DEFAULT_STATUS,
+        timestamp: isNaN(ts.getTime())
+          ? new Date().toISOString()
+          : ts.toISOString(),
+      } as AlertRow;
+    })
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
 
 export default function Table() {
   const { t } = useTranslation("alert");
   const tCamera = useCameraLabelT();
+  const [searchParams] = useSearchParams();
 
-  /* states: ฟิลเตอร์ */
+  // ✅ รวม notis จริงที่ระดับบนสุดของคอมโพเนนต์ (ไม่ใช้ hook ซ้อนใน hook)
+  const allNotis = React.useMemo<Noti[]>(() => {
+    const a = Array.isArray(alertNotis) ? alertNotis : [];
+    const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
+    return [...a, ...b];
+  }, []);
+
+  // แปลงเป็น rows
+  const rowsAll = React.useMemo<AlertRow[]>(
+    () => mapNotisToRows(allNotis),
+    [allNotis]
+  );
+
+  // default วันที่ = แถวล่าสุด (ถ้ามี)
+  const defaultDate: DateValue | undefined = React.useMemo(() => {
+    if (!rowsAll.length) return undefined;
+    const d = new Date(rowsAll[0].timestamp);
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+  }, [rowsAll]);
+
+  /* -------- states: ฟิลเตอร์ -------- */
   const [cameraFilter, setCameraFilter] = React.useState("all");
   const [eventFilter, setEventFilter] = React.useState("all");
-  const [date, setDate] = React.useState<DateValue | undefined>(firstRowDate);
+  const [date, setDate] = React.useState<DateValue | undefined>(defaultDate);
   const [q, setQ] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
-  /* pagination */
+  // อ่าน ?event=... เพื่อ “บังคับกรองชั้นแรก”
+  const queryEventParam = (searchParams.get("event") ?? "").toLowerCase();
+
+  // ถ้า EVENT_OPTIONS มีค่าตรงกับ query → sync dropdown
+  React.useEffect(() => {
+    if (!queryEventParam) return;
+    const match = EVENT_OPTIONS.find(
+      (o) => String(o.value ?? "").toLowerCase() === queryEventParam
+    );
+    if (match && typeof match.value === "string") {
+      setEventFilter(match.value);
+    }
+  }, [queryEventParam]);
+
+  // helper แปลชื่อ event (ประกาศไว้บนสุดของ component; ไม่เรียก hook ซ้ำ)
+  const translateEvent = React.useCallback(
+    (s?: string | null) =>
+      t(`events.${(s ?? "").toLowerCase()}`, { defaultValue: s ?? "" }),
+    [t]
+  );
+
+  /* -------- pagination -------- */
   const [page, setPage] = React.useState(1);
   const pageSize = 5;
 
-  /* filter + search */
+  /* -------- filter + search -------- */
   const rowsFiltered: AlertRow[] = React.useMemo(() => {
-    return ALERTS_MOCK.filter((r) =>
-      cameraFilter === "all" ? true : r.cameraLabel === cameraFilter
-    )
+    return rowsAll
+      // ชั้น 1: กรองตาม query
+      .filter((r) => (queryEventParam ? r.event === queryEventParam : true))
+      // ชั้น 2: dropdown event
       .filter((r) => (eventFilter === "all" ? true : r.event === eventFilter))
+      // ชั้น 3: camera
+      .filter((r) =>
+        cameraFilter === "all" ? true : r.cameraLabel === cameraFilter
+      )
+      // ชั้น 4: date
       .filter((r) => {
-        if (!date) return true; // ยังไม่เลือกวัน → ไม่กรอง
+        if (!date) return true;
         const d = new Date(r.timestamp);
         const sel = new Date(date.y, date.m - 1, date.d);
         return sameYMD(d, sel);
       })
+      // ชั้น 5: search
       .filter((r) => {
         if (!q.trim()) return true;
         const s = `${r.cameraLabel} ${r.event} ${r.cameraName}`.toLowerCase();
         return s.includes(q.toLowerCase());
       });
-  }, [cameraFilter, eventFilter, date, q]);
+  }, [rowsAll, cameraFilter, eventFilter, date, q, queryEventParam]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -114,7 +201,7 @@ export default function Table() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [cameraFilter, eventFilter, date, q]);
+  }, [cameraFilter, eventFilter, date, q, queryEventParam]);
 
   return (
     <div className="p-6">
@@ -122,9 +209,7 @@ export default function Table() {
       <div className="px-1">
         <div className="flex items-start gap-3">
           <h2 className="text-[27px] font-bold">
-            {t("sitesAlertsTitle", {
-              defaultValue: "Sites Alerts Table",
-            })}
+            {t("sitesAlertsTitle", { defaultValue: "Sites Alerts Table" })}
           </h2>
         </div>
       </div>
@@ -213,11 +298,6 @@ export default function Table() {
               getItemProps,
               options,
             }) => {
-              const translateEvent = (s?: string | null) =>
-                t(`events.${(s ?? "").toLowerCase()}`, {
-                  defaultValue: s ?? "",
-                });
-
               const selectedLabel = isAllOption(selected, "event")
                 ? t("filters.eventAll", { defaultValue: "All Event" })
                 : translateEvent(selected?.label);
@@ -285,10 +365,10 @@ export default function Table() {
       </div>
 
       {/* Table */}
-      <div className="mt-4 overflow-x-auto md:overflow-hidden rounded-lg   bg-white">
-        <div className="inline-block w-full min-w-[750px] md:min-w-0 align-middle">
+      <div className="mt-4 overflow-x-auto md:overflow-hidden rounded-lg bg-white">
+        <div className="inline-block w-full min-w=[750px] md:min-w-0 align-middle">
           {/* Header */}
-          <div className="grid  grid-cols-[48px_1.2fr_1fr_120px_1fr_1fr_1.4fr] place-items-center px-4 py-3 text-[12px] font-medium text-gray-500 text-center bg-gray-100">
+          <div className="grid grid-cols-[48px_1.2fr_1fr_120px_1fr_1fr_1.4fr] place-items-center px-4 py-3 text-[12px] font-medium text-gray-500 text-center bg-gray-100">
             <div>{t("table.headers.no", { defaultValue: "NO" })}</div>
             <div>{t("table.headers.camera", { defaultValue: "Camera" })}</div>
             <div>{t("table.headers.event", { defaultValue: "Event" })}</div>
@@ -352,11 +432,15 @@ export default function Table() {
 
                 {/* PICTURE */}
                 <div className="h-[80px] w-[100px] overflow-hidden rounded-md">
-                  <img
-                    src={r.picture}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  {r.picture ? (
+                    <img
+                      src={r.picture}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-gray-200" />
+                  )}
                 </div>
 
                 {/* CAMERA NAME */}

@@ -5,6 +5,7 @@ import UserManagement from "./UserManagement";
 import DeviceCount from "./DeviceCount";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
+import React from "react";
 
 type Props = {
   // left column
@@ -58,6 +59,14 @@ export default function ContentLayout(props: Props) {
     filterZYTA,
   } = props;
 
+  const allItems = React.useMemo(
+    () =>
+      [...filteredNotis, ...filteredWellBeginNotis].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [filteredNotis, filteredWellBeginNotis]
+  );
+
   return (
     <div className="flex flex-col px-6 gap-3">
       {/* 
@@ -80,7 +89,7 @@ export default function ContentLayout(props: Props) {
             <AlertEvents
               search={searchEvent}
               setSearch={setSearchEvent}
-              items={filteredNotis as any[]}
+              items={allItems as any[]}
             />
           </div>
           <div className="w-full rounded-xl bg-white">

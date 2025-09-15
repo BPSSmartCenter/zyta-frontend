@@ -8,10 +8,11 @@
 
 @theme {
   --breakpoint-sm: 375px;
+  --breakpoint-sm-560: 560px;
   --breakpoint-md: 820px;
   --breakpoint-lg-1024: 1024px;
   --breakpoint-lg-1291: 1291px;
-  --breakpoint-lg-1355: 1355px; 
+  --breakpoint-lg-1355: 1355px;
   --breakpoint-lg-1445: 1445px;
   --breakpoint-lg-1399: 1389px;
   --breakpoint-lg: 1239px;
@@ -41,6 +42,10 @@ body {
 
 .checkIcon {
   font-size: 16px;
+}
+
+.addIcon {
+  font-size: 18px;
 }
 
 .hs-leaflet.leaflet-touch .leaflet-control-layers,

@@ -33,9 +33,9 @@
     "anySeverity": "ทุกความรุนแรง",
     "allLocation": "ทุกพื้นที่",
     "severity": {
-      "fire": "เพลิงไหม้",
-      "motion": "เคลื่อนไหว",
-      "offline": "ออฟไลน์",
+      "low": "ระดำต่ำ",
+      "medium": "ระดับปานกลาง",
+      "critical": "ระดับสูง",
       "normal": "ปกติ"
     }
   },

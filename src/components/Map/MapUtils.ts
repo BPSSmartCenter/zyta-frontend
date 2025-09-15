@@ -23,18 +23,21 @@ export function makeSvgPin(color: string, size = 32) {
 
 export function normalizeSeverity(
   input?: string
-): "all" | "alert" | "warning" | "offline" | "normal" {
+): "all" | "critical" | "medium" | "low" | "normal" {
   const raw = (input || "").trim().toLowerCase();
   if (!raw || raw === "all" || raw === "any severity") return "all";
-  if (raw.includes("fire")) return "alert";
-  if (raw.includes("motion")) return "warning";
-  if (raw.includes("offline") || raw.includes("ออฟไลน์")) return "offline";
-  if (["alert", "warning", "offline", "normal"].includes(raw))
-    return raw as any;
+  if (raw.includes("critical")) return "critical";
+  if (raw.includes("motion")) return "medium";
+  if (raw.includes("low") || raw.includes("low")) return "low";
+  if (["critical", "medium", "low", "normal"].includes(raw)) return raw as any;
   return "all";
 }
 
-export function responsivePadding(containerW: number, containerH: number, vw?: number) {
+export function responsivePadding(
+  containerW: number,
+  containerH: number,
+  vw?: number
+) {
   const side = Math.max(1, Math.min(containerW, containerH));
   const basePad = Math.max(10, Math.round(side * 0.04));
   const vww = vw ?? containerW;
@@ -51,8 +54,10 @@ export function zoomForExactHeight(
   innerHeight: number
 ) {
   const b = L.latLngBounds(boundsExpr as any);
-  const MIN_Z = 2, MAX_Z = 19;
-  let lo = MIN_Z, hi = MAX_Z;
+  const MIN_Z = 2,
+    MAX_Z = 19;
+  let lo = MIN_Z,
+    hi = MAX_Z;
   for (let i = 0; i < 25; i++) {
     const mid = (lo + hi) / 2;
     const pN = map.project(b.getNorthWest(), mid);

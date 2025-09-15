@@ -15,7 +15,7 @@ import {
   offlineDeviceCamera,
   fallCamera,
 } from "../../assets/index";
-import { TH_PROVINCES, notis } from "../../data/Dashboard/notis";
+import { TH_PROVINCES } from "../../data/Dashboard/notis";
 import type L from "leaflet";
 
 export type DateValue = { y: number; m: number; d: number };
@@ -35,14 +35,16 @@ export const EVENT_OPTIONS = [
   { label: "All Events", value: "all" },
   { label: "Fire detection", value: "fire" },
   { label: "Motion detection", value: "motion" },
-  { label: "กล้องออฟไลน์", value: "offline" },
+  { label: "Device Offline", value: "offline" },
+  { label: "Sleeping", value: "sleeping" },
+  { label: "Falling", value: "fall" },
 ];
 
 export const SEVERITY_OPTIONS = [
   { label: "Any Severity", value: "all" },
-  { label: "Fire detection", value: "fire" },
-  { label: "Motion detection", value: "motion" },
-  { label: "กล้องออฟไลน์", value: "offline" },
+  { label: "Low", value: "low" },
+  { label: "Medium", value: "medium" },
+  { label: "Critical", value: "critical" },
 ];
 
 export const LOCATION_OPTIONS = [
@@ -149,8 +151,8 @@ export const TH_BOUNDS: L.LatLngBoundsExpression = [
   [21.0, 107.5],
 ];
 
-export const DEFAULT_SITE_COORDS: Record<string, { lat: number; lng: number }> =
-  Object.fromEntries(notis.map((n) => [n.site, n.coords]));
+// export const DEFAULT_SITE_COORDS: Record<string, { lat: number; lng: number }> =
+//   Object.fromEntries(notis.map((n) => [n.site, n.coords]));
 
 export const SEVERITY_RANK: Record<string, number> = {
   alert: 3, // Fire detection

@@ -2,7 +2,7 @@
 import React from "react";
 
 type CameraTileProps = {
-  /** ring color เป็น class Tailwind เช่น "ring-red-500" */
+  /** ring color เป็น class Tailwind เช่น "ring-red-500" หรือ "ring-[#FB3F3F] animate-[...]" */
   ringColor?: string;
   /** src ของรูปจริง (ยังไม่มีก็ปล่อยว่างไว้ได้) */
   imgSrc?: string;
@@ -19,21 +19,21 @@ const CameraTile: React.FC<CameraTileProps> = ({
   alt = "camera-tile",
 }) => {
   return (
+    // ✅ ตัวห่อหลัก: เก็บสัดส่วน/ขนาด เหมือนเดิม เพื่อไม่กระทบ responsive
     <div
       className={[
-        "rounded-2xl ring-7 p-1 bg-white",
-        "overflow-hidden",
-        " min-w-[150px] w-[300px] aspect-square", 
-        ringColor,
+        "relative",
+        "min-w-[150px] w-[300px] aspect-square", // เดิม
         className,
       ].join(" ")}
     >
-      <div className="relative h-full w-full rounded-xl overflow-hidden">
+      {/* ✅ เฟรมเนื้อหา (พื้นขาว + มุมโค้ง) */}
+      <div className="absolute inset-1 rounded-xl overflow-hidden bg-white">
         {imgSrc ? (
           <img
             src={imgSrc}
             alt={alt}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover select-none"
             draggable={false}
           />
         ) : (
@@ -48,6 +48,17 @@ const CameraTile: React.FC<CameraTileProps> = ({
           </div>
         )}
       </div>
+
+      {/* ✅ ขอบกระพริบเฉพาะ border: overlay แยกชั้น ไม่กิน pointer และไม่กระทบเนื้อหา */}
+      <div
+        aria-hidden
+        className={[
+          "pointer-events-none absolute inset-0 rounded-2xl",
+          "ring-7", // คงความหนาขอบแบบเดิม
+          ringColor, // สี + animation จะถูกส่งมาจากภายนอก
+        ].join(" ")}
+      />
+
     </div>
   );
 };

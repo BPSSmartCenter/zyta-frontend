@@ -1,21 +1,24 @@
 import type L from "leaflet";
-import type { Noti } from "../../data/Dashboard/notis";
+import type { Noti, Severity } from "../../data/Dashboard/notis";
 
 export type SiteCoord = { lat: number; lng: number };
 export type SiteCoordMap = Record<string, SiteCoord>;
+
+export type SeverityFilter = Severity | "all" | undefined;
 
 export type Props = {
   notis: Noti[];
   showPins?: boolean;
   aggregateBySite?: boolean;
-  severityFilter?: string; // "all" | "low" | "medium" | "high" | "critical"
+  severityFilter?: SeverityFilter;
   focusProvince?: string | null;
+  onProvinceChange?: (value: string | "all") => void;
 };
 
 export type ViewState = {
   bounds: L.LatLngBoundsLiteral;
   padding?: [number, number];
   maxZoom?: number;
-  level: "country" | "province" | "district";
-  rings?: L.LatLngExpression[][];
+  level: "country" | "province" | "district" | "subdistrict";
+  rings?: L.LatLngExpression[][] | null;
 };

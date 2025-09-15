@@ -24,6 +24,7 @@ import intercomeSelected from "./sitemapSelected.png";
 import solarImage from "./solar-panel.png";
 import solarSelected from "./solar-panelSelected.png";
 import windImage from "./wind-sign.png";
+import windSelected from "./wind-signSelected.png";
 import waterTapImage from "./water-tap.png";
 import waterTapSelected from "./water-tapSelected.png";
 
@@ -41,6 +42,12 @@ import insuranceImage from "./insurance.png";
 import sidebarIcon from "./sidebar.png";
 
 import fireBurning1 from "./fireBurning1.png";
+import wifiImage from "./wifi.png";
+import wifiSelected from "./wifiSelected.png";
+import tvImage from "./television.png";
+import tvSelected from "./televisionSelected.png";
+
+import cloudyDay1 from "./cloudyDay1.svg";
 
 export {
   brandImage,
@@ -80,4 +87,10 @@ export {
   waterTapSelected,
   solarSelected,
   intercomeSelected,
+  windSelected,
+  wifiImage,
+  wifiSelected,
+  tvImage,
+  tvSelected,
+  cloudyDay1,
 };
