@@ -76,7 +76,7 @@ export const statItems = [
     activeImg: motionImageSelected,
   },
   {
-    key: "device",
+    key: "offline",
     label: "จำนวนกล้องออฟไลน์ / ออนไลน์",
     val: "8 / 50",
     img: deviceImage,

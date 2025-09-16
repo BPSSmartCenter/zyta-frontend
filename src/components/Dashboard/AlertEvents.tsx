@@ -10,6 +10,32 @@ type Props = {
   items: Noti[];
 };
 
+/* ---------------- helpers: map noti -> event key ---------------- */
+type EventKey = "fire" | "motion" | "offline" | "fall" | "sleep";
+
+const bag = (n: any) =>
+  [n?.event, n?.titleKey, n?.title]
+    .filter(Boolean)
+    .map((x: any) => String(x).toLowerCase().trim())
+    .join(" | ");
+
+const getEventKey = (n: Noti): EventKey => {
+  const s = bag(n);
+  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
+  if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
+  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
+  if (
+    /notis\.(camera|device)offline/.test(s) ||  // notis.deviceOffline / notis.cameraOffline
+    /(?:camera|device)\s*offline/.test(s) ||    // "Device offline" / "Camera offline"
+    /\boffline\b/.test(s) ||                    // คำว่า offline
+    /ออฟ.?ไลน์/.test(s)                        // ไทย: ออฟไลน์
+  ) return "offline";
+  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ")) return "sleep";
+  // default ให้เข้าเพจ alert ได้แน่ ๆ
+  return "motion";
+};
+/* ---------------------------------------------------------------- */
+
 export default function AlertEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -27,10 +53,11 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
   };
 
   const handleClick = (n: Noti) => {
-    // ถ้าต้องการส่งข้อมูลการ์ดไปหน้า /alert ด้วย ใช้ state ได้
-    navigate("/alert", { state: { noti: n } });
+    const ev = getEventKey(n);
+    navigate(`/alert?event=${ev}`);
   };
 
+  // เรียงใหม่→เก่า (คงพฤติกรรมเดิม)
   const list = [...items].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
