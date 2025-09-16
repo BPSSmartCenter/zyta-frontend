@@ -24,9 +24,9 @@
   "stats": {
     "fire": "Fire detected",
     "motion": "Motion detected",
-    "device": "Offline / Online cameras",
+    "offline": "Offline / Online cameras",
     "fall": "Fall detected",
-    "sleeping": "Sleep detected",
+    "sleep": "Sleep detected",
     "addEvent": "+ Add Event"
   },
 
