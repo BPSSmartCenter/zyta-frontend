@@ -340,7 +340,7 @@ export default function MapPanel({
         <Map
           notis={notisForMap}
           showPins={true}
-          aggregateBySite={false}
+          aggregateBySite={true}
           severityFilter={toSeverity(site)}
           focusProvince={province && province !== "all" ? province : null}
           onProvinceChange={(val) => {

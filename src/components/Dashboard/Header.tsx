@@ -156,6 +156,35 @@ export default function Header({ statItems, cameraItems, events }: Props) {
     navigate(`/alert?event=${id}`);
   };
 
+  // ===== Mobile carousel helpers =====
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [slide, setSlide] = React.useState(0);
+  const slideCount = computedCamera.length;
+
+  const scrollTo = (idx: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const w = el.clientWidth; // ความกว้างของ viewport
+    el.scrollTo({ left: idx * w, behavior: "smooth" });
+  };
+  const go = (dir: 1 | -1) => {
+    if (slideCount === 0) return;
+    const next = (slide + dir + slideCount) % slideCount;
+    setSlide(next);
+    scrollTo(next);
+  };
+  // sync เมื่อสไลด์เปลี่ยนจากการลากนิ้ว
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    if (idx !== slide) setSlide(idx);
+  };
+  React.useEffect(() => {
+    if (slide >= slideCount) setSlide(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slideCount]);
+
   return (
     <div>
       <style>{`@keyframes bps-ring-blink{0%,60%{opacity:1;}80%{opacity:.15;}100%{opacity:1;}}`}</style>
@@ -186,7 +215,79 @@ export default function Header({ statItems, cameraItems, events }: Props) {
         <StatCard className="w-full lg-1024:flex-1" />
       </StatCardGroup>
 
-      {/* camera tiles */}
+      {/* ===== Mobile carousel (<= 1024px) — ปรับให้กว้างสุด 500px ===== */}
+      <div className="lg-1024:hidden relative mt-4">
+        <div
+          ref={scrollRef}
+          onScroll={onScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth p-3"
+          style={{ scrollSnapType: "x mandatory" }}
+        >
+          {computedCamera.map((c, i) => (
+            <div
+              key={i}
+              className="flex-none w-full snap-center px-6"
+              style={{ scrollSnapAlign: "center" }}
+            >
+              {/* จำกัดความกว้างรูปไม่เกิน 500px และจัดกึ่งกลาง */}
+              <div className="w-full max-w-[500px] mx-auto">
+                <CameraTile
+                  ringColor={c.ringColor}
+                  imgSrc={c.imgSrc}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          ))}
+          {computedCamera.length === 0 && (
+            <div className="w-full px-6">
+              <div className="h-[180px] w-full rounded-xl bg-gray-100" />
+            </div>
+          )}
+        </div>
+
+        {computedCamera.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={() => go(-1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
+              aria-label="Previous"
+            >
+              <i className="material-icons">chevron_left</i>
+            </button>
+            <button
+              type="button"
+              onClick={() => go(1)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
+              aria-label="Next"
+            >
+              <i className="material-icons">chevron_right</i>
+            </button>
+          </>
+        )}
+
+        {computedCamera.length > 1 && (
+          <div className="mt-3 flex justify-center gap-2">
+            {computedCamera.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setSlide(i);
+                  scrollTo(i);
+                }}
+                className={`h-2 w-2 rounded-full ${
+                  i === slide ? "bg-cyan-500" : "bg-gray-300"
+                }`}
+                aria-label={`Go to slide ${i + 1}`}
+                type="button"
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* camera tiles (Desktop layout เดิม) */}
       <div className="hidden lg-1024:flex justify-between flex-5 gap-5 px-6 mt-4">
         {computedCamera.map((c, i) => (
           <CameraTile
