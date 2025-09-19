@@ -16,6 +16,8 @@ import {
   offlineDeviceCamera,
 } from "../../assets/index";
 
+export { fallCamera, fallingNoti };
+
 export type NotiType = "alert" | "warning" | "info" | "normal";
 
 export type Severity = "low" | "medium" | "critical";
@@ -82,35 +84,31 @@ export const notis: Noti[] = [
   },
 ];
 
-  // {
-  //   type: "alert",
-  //   img: fallingNoti,
-  //   titleKey: "notis.fallDetected",
-  //   title: "ตรวจพบคนล้ม",
-  //   site: "Site B",
-  //   coords: { lat: 13.7278956, lng: 100.52412349999997 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: fallCamera,
-  // },
+// {
+//   type: "alert",
+//   img: fallingNoti,
+//   titleKey: "notis.fallDetected",
+//   title: "ตรวจพบคนล้ม",
+//   site: "Site B",
+//   coords: { lat: 13.7278956, lng: 100.52412349999997 },
+//   date: "2025-09-19",
+//   severity: "critical",
+//   screenshot: fallCamera,
+// },
 
-
-  // {
-  //   type: "alert",
-  //   img: sleepingNoti,
-  //   titleKey: "notis.sleepingLong",
-  //   title: "ตรวจพบคนหลับนานกว่าปกติ",
-  //   site: "Site C",
-  //   coords: { lat: 13.7278956, lng: 100.52412349999997 },
-  //   date: "2025-09-19",
-  //   severity: "medium",
-  //   screenshot: sleepCamera,
-  // },
-
+// {
+//   type: "alert",
+//   img: sleepingNoti,
+//   titleKey: "notis.sleepingLong",
+//   title: "ตรวจพบคนหลับนานกว่าปกติ",
+//   site: "Site C",
+//   coords: { lat: 13.7278956, lng: 100.52412349999997 },
+//   date: "2025-09-19",
+//   severity: "medium",
+//   screenshot: sleepCamera,
+// },
 
 export const wellBeingNotis: Noti[] = [
-
-
   // {
   //   type: "alert",
   //   img: fallingNoti,
