@@ -88,6 +88,17 @@ export const notis: Noti[] = [
 // },
 
 export const wellBeingNotis: Noti[] = [
+  {
+    type: "alert",
+    img: sleepingNoti,
+    titleKey: "notis.sleepingLong",
+    title: "ตรวจพบคนหลับนานกว่าปกติ",
+    site: "โรงพยาบาลกรุงเทพ",
+    coords: { lat: 13.748953806991215, lng: 100.58319744232878 },
+    date: "2025-09-19",
+    severity: "critical",
+    screenshot: sleepCamera,
+  },
   // {
   //   type: "alert",
   //   img: fallingNoti,
@@ -411,14 +422,14 @@ export const recognizeNotis = [
 ] as const;
 
 export const ZYTA_NOTIS = [
-  {
-    type: "alert",
-    titleKey: "zytaNotis.sos",
-    img: alertImage,
-    title: "SOS",
-    site: "โรงพยาบาลกรุงเทพ",
-    date: "2025-09-19",
-  },
+  // {
+  //   type: "alert",
+  //   titleKey: "zytaNotis.sos",
+  //   img: alertImage,
+  //   title: "SOS",
+  //   site: "โรงพยาบาลกรุงเทพ",
+  //   date: "2025-09-19",
+  // },
   // {
   //   type: "alert",
   //   titleKey: "zytaNotis.sos",
