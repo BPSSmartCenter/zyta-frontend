@@ -130,7 +130,7 @@ export default function DeviceCount() {
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
             <span>
-              {labelAlert} <span className="text-red-500 font-semibold">0</span>
+              {labelAlert} <span className="text-red-500 font-semibold">1</span>
             </span>
           </div>
         </li>
