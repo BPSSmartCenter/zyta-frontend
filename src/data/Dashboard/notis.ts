@@ -120,6 +120,18 @@ export const wellBeingNotis: Noti[] = [
     severity: "medium",
     screenshot: sleepCamera,
   },
+
+  {
+    type: "alert",
+    img: sleepingNoti,
+    titleKey: "notis.sleepingLong",
+    title: "ตรวจพบคนหลับนานกว่าปกติ",
+    site: "Site C",
+    coords: { lat: 13.7278956, lng: 100.52412349999997 },
+    date: "2025-09-19",
+    severity: "medium",
+    screenshot: sleepCamera,
+  },
   // {
   //   type: "alert",
   //   img: fallingNoti,
