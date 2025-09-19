@@ -62,7 +62,8 @@
     "intercom": "Intercom",
     "waterMeter": "Water",
     "electricMeter": "Electric",
-    "air": "Air"
+    "air": "Air",
+    "zyta": "ZYTA Alert"
   },
   "userMgmt": {
     "title": "USER MANAGEMENT",
@@ -124,12 +125,8 @@
     "licenseDetected": "License detected"
   },
   "zytaNotis": {
-    "intrusionDetected": "Intrusion detected",
-    "systemStabilized": "System stabilized",
-    "unauthorizedAccess": "Unauthorized access",
-    "accessRevoked": "Access revoked",
-    "smokeDetected": "Smoke detected",
-    "environmentNormal": "Environment normal"
+    "sos": "SOS",
+    "assistant": "Assistant"
   },
   "chart": {
     "statisticsTitle": "Statistics",

@@ -142,7 +142,7 @@ export default function MapPanel({
 
   return (
     <div
-      className="flex flex-col justify-center py-2 px-3 gap-3"
+      className="flex flex-col justify-center py-2 px-0 md:px-3 gap-3"
       ref={wrapperRef}
     >
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">

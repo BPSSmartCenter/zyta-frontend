@@ -7,6 +7,7 @@ import {
   solarImage,
   windImage,
   waterTapImage,
+  alertCyan,
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +26,7 @@ export default function DeviceCount() {
   const labelWater = t("devices.waterMeter", { defaultValue: "Water meter" });
   const labelElectric = t("devices.electricMeter", { defaultValue: "Electric meter" });
   const labelAir = t("devices.air", { defaultValue: "Air" });
+  const labelAlert = t("devices.zyta", { defaultValue: "ZYTA Alert" });
 
   return (
     <form className="flex flex-col gap-3 hover:cursor-default">
@@ -76,7 +78,7 @@ export default function DeviceCount() {
         </div>
       </div>
 
-      <ul className="flex flex-col gap-7 font-inter text-[16px] text-cyan-500">
+      <ul className="flex flex-col gap-7 font-inter text-[16px]  text-cyan-500">
         <li className="flex gap-4 justify-around">
           <div className="flex items-center gap-4">
             <img src={cctvImage} alt="" width={36} />
@@ -113,7 +115,7 @@ export default function DeviceCount() {
           </div>
         </li>
 
-        <li className="flex gap-4 justify-around">
+         <li className="flex gap-4 justify-around">
           <div className="flex items-center gap-4">
             <img src={windImage} alt="" width={36} />
             <span>
@@ -121,7 +123,14 @@ export default function DeviceCount() {
               <span className="text-red-500 font-semibold">87</span>
             </span>
           </div>
-          <div className="w-[155px]" />
+
+          <div className="flex items-center gap-4">
+            <img src={alertCyan} alt="" width={36} />
+            <span>
+              {labelAlert}{" "}
+              <span className="text-red-500 font-semibold">15</span>
+            </span>
+          </div>
         </li>
       </ul>
     </form>

@@ -47,5 +47,29 @@
       "justNow": "เมื่อสักครู่",
       "hoursAgo": "{{count}} ชั่วโมงที่แล้ว"
     }
+  },
+  "devices": {
+    "waterMeter": {
+      "selectTime": "เลือกเวลา",
+      "to": "ถึง",
+      "ofMl": "ทั้งหมด {{max}} มล.",
+      "domesticWater": "น้ำอุปโภค",
+      "drinkingWater": "น้ำบริโภค",
+      "ph": "ค่า pH",
+      "flowRate": "อัตราการไหลของน้ำ",
+      "flowRateUnit": "(ม³/วินาที)",
+      "tds": "ค่า TDS",
+      "tdsUnit": "(ppm)",
+      "waterToday": "ปริมาณน้ำวันนี้",
+      "monthUsage": "การใช้น้ำเดือนนี้",
+      "literUnit": "ลิตร",
+      "series1": "ซีรีส์ 1",
+      "series2": "ซีรีส์ 2",
+      "series3": "ซีรีส์ 3",
+      "chart": {
+        "title": "ปริมาณน้ำ",
+        "yTitle": "ปริมาณน้ำ"
+      }
+    }
   }
 }

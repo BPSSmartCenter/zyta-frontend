@@ -183,7 +183,7 @@ export default function Map({
     const sz = map.getSize();
     const vw = typeof window !== "undefined" ? window.innerWidth : sz.x;
     const pad = responsivePadding(sz.x, sz.y, vw);
-    const innerH = Math.max(1, sz.y - pad.y * 2);
+    const innerH = Math.max(1, sz.y - pad.y * 2.5);
 
     const z = zoomForExactHeight(map, TH_BOUNDS, innerH);
     const center = L.latLngBounds(TH_BOUNDS as any).getCenter();

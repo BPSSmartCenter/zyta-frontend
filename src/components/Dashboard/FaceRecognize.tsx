@@ -19,6 +19,11 @@ type Props = {
   items: FR[];
 };
 
+const USE_MOCK_REDIRECT = true;
+const OPEN_IN_NEW_TAB = false;
+const MOCK_FACEREC_URL =
+  "https://bpstech.online/d/dbb32996-2e79-4e04-9963-48e62e2c885d/21062885-26cd-5e06-a9b8-67c449dc0cfb?orgId=1&from=1710928419213&to=1774000419213";
+
 export default function FaceRecognize({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -36,10 +41,18 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
   };
 
   const handleClick = (n: FR) => {
-    // ส่ง state ไปพร้อม /facerec ถ้าต้องการใช้ข้อมูลในหน้านั้น
+    if (USE_MOCK_REDIRECT) {
+      if (OPEN_IN_NEW_TAB) {
+        window.open(MOCK_FACEREC_URL, "_blank", "noopener");
+      } else {
+        window.location.href = MOCK_FACEREC_URL;
+      }
+      return;
+    }
+
+    // เส้นทางเดิม — พร้อมสลับกลับเมื่อไหร่ก็แค่ปิด USE_MOCK_REDIRECT
     navigate("/facerec", { state: { noti: n } });
   };
-
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">
       <h1 className="text-[18px] font-inter font-semibold text-[#1E1E1E]">

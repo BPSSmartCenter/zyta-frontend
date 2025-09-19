@@ -1,5 +1,6 @@
 // src/components/Devices/Water/waterMeterTable.tsx
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
 import phWaterDrop from "../../../assets/phWaterDrop.png";
@@ -18,7 +19,7 @@ type CardValueProps = {
   img: string;
   value: number | string;
   valueLabel: string;
-  valueLabel2: string;
+  valueLabel2?: string;
 };
 
 type SideCardValueProps = {
@@ -41,7 +42,7 @@ function CardValue({ img, value, valueLabel, valueLabel2 }: CardValueProps) {
       </div>
       <h1 className="text-[24px] font-bold">{value}</h1>
       <span>
-        {valueLabel} <p>{valueLabel2}</p>
+        {valueLabel} {valueLabel2 ? <p>{valueLabel2}</p> : null}
       </span>
     </div>
   );
@@ -72,6 +73,8 @@ const formatTime = (h: number, m: number) => {
 };
 
 export default function WaterMeterPanel(_: Props) {
+  const { t } = useTranslation("devices"); // ใช้คีย์แบบ devices.waterMeter.*
+
   // options ทุก 30 นาที
   const timeOptions = useMemo(
     () =>
@@ -115,14 +118,14 @@ export default function WaterMeterPanel(_: Props) {
                         "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
                     })}
                   >
-                    {selected?.label ?? "Select time"}
+                    {selected?.label ?? t("devices.waterMeter.selectTime")}
                   </button>
 
                   {open && (
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-10 mt-2 max_h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -143,7 +146,7 @@ export default function WaterMeterPanel(_: Props) {
             </Dropdown>
 
             <span className="text-cyan font-semibold text-sm select-none">
-              TO
+              {t("devices.waterMeter.to")}
             </span>
 
             {/* To */}
@@ -167,14 +170,14 @@ export default function WaterMeterPanel(_: Props) {
                         "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
                     })}
                   >
-                    {selected?.label ?? "Select time"}
+                    {selected?.label ?? t("devices.waterMeter.selectTime")}
                   </button>
 
                   {open && (
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-10 mt-2 max_h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -201,8 +204,8 @@ export default function WaterMeterPanel(_: Props) {
               <Thermostat
                 initialValue={2000}
                 max={3000}
-                maxLabel={"of 3000 ml"}
-                valueLabel={"น้ำอุปโภค"}
+                maxLabel={t("devices.waterMeter.ofMl", { max: 3000 })}
+                valueLabel={t("devices.waterMeter.domesticWater")}
               />
 
               <div className="flex gap-5">
@@ -210,14 +213,13 @@ export default function WaterMeterPanel(_: Props) {
                   {
                     img: phWaterDrop,
                     value: 10,
-                    valueLabel: "ค่า pH",
-                    valueLabel2: "",
+                    valueLabel: t("devices.waterMeter.ph"),
                   },
                   {
                     img: waterIcon,
                     value: 200,
-                    valueLabel: "อัตราการไหลของน้ำ",
-                    valueLabel2: "(m³/s)",
+                    valueLabel: t("devices.waterMeter.flowRate"),
+                    valueLabel2: t("devices.waterMeter.flowRateUnit"),
                   },
                 ].map((kpi, idx) => (
                   <CardValue
@@ -235,8 +237,8 @@ export default function WaterMeterPanel(_: Props) {
               <Thermostat
                 initialValue={2000}
                 max={3000}
-                maxLabel={"of 3000 ml"}
-                valueLabel={"น้ำอุปโภค"}
+                maxLabel={t("devices.waterMeter.ofMl", { max: 3000 })}
+                valueLabel={t("devices.waterMeter.drinkingWatern pm")}
               />
 
               <div className="flex gap-5">
@@ -244,14 +246,13 @@ export default function WaterMeterPanel(_: Props) {
                   {
                     img: phWaterDrop,
                     value: 10,
-                    valueLabel: "ค่า pH",
-                    valueLabel2: "",
+                    valueLabel: t("devices.waterMeter.ph"),
                   },
                   {
                     img: TDSIcon,
                     value: 80,
-                    valueLabel: "ค่า TDS",
-                    valueLabel2: "(ppm)",
+                    valueLabel: t("devices.waterMeter.tds"),
+                    valueLabel2: t("devices.waterMeter.tdsUnit"),
                   },
                 ].map((kpi, idx) => (
                   <CardValue
@@ -272,38 +273,38 @@ export default function WaterMeterPanel(_: Props) {
             {
               img: waterDrop,
               value: 1500,
-              valueLabel: "การน้ำวันนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.waterToday"),
+              unit: t("devices.waterMeter.literUnit"),
             },
             {
               img: waterDrop,
               value: 1500,
-              valueLabel: "การน้ำวันนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.waterToday"),
+              unit: t("devices.waterMeter.literUnit"),
             },
             {
               img: waterECIcon,
               value: 150000,
-              valueLabel: "การใช้น้ำเดือนนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.monthUsage"),
+              unit: t("devices.waterMeter.literUnit"),
             },
             {
               img: waterDrop,
               value: 1500,
-              valueLabel: "การน้ำวันนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.waterToday"),
+              unit: t("devices.waterMeter.literUnit"),
             },
             {
               img: waterDrop,
               value: 1500,
-              valueLabel: "การน้ำวันนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.waterToday"),
+              unit: t("devices.waterMeter.literUnit"),
             },
             {
               img: waterDrop,
               value: 1500,
-              valueLabel: "การน้ำวันนี้",
-              unit: "ลิตร",
+              valueLabel: t("devices.waterMeter.waterToday"),
+              unit: t("devices.waterMeter.literUnit"),
             },
           ].map((kpi, idx) => (
             <SideCardValue
@@ -316,22 +317,30 @@ export default function WaterMeterPanel(_: Props) {
           ))}
         </div>
       </div>
+
       <div className="mt-6 grid grid-cols-6">
         <div className="col-span-6 sm-560:col-span-4">
-          <WaterStackedChart height={460} />
+          <WaterStackedChart
+            height={460}
+            title={t("devices.waterMeter.chart.title")}
+          />
         </div>
         <div className="flex col-span-6 sm-560:col-span-2 justify-center items-center">
           <WaterMultiRadial
             height={240}
             total={1000}
             values={[88, 62, 38]}
-            labels={["Series 1", "Series 2", "Series 3"]}
+            labels={["series1", "series2", "series3"]}
             className="p-0 m-0"
           />
         </div>
       </div>
+
       <div className="mt-6">
-        <WaterAreaStackedChart height={340} />
+        <WaterAreaStackedChart
+          yTitle={t("devices.waterMeter.chart.yTitle")}
+          height={340}
+        />
       </div>
     </>
   );

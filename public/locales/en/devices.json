@@ -47,5 +47,26 @@
       "justNow": "just now",
       "hoursAgo": "{{count}} hours ago"
     }
+  },
+  "devices": {
+    "waterMeter": {
+      "selectTime": "Select time",
+      "to": "TO",
+      "ofMl": "of {{max}} ml",
+      "domesticWater": "Domestic water",
+      "drinkingWater": "Drinking water",
+      "ph": "pH",
+      "flowRate": "Water flow rate",
+      "flowRateUnit": "(m³/s)",
+      "tds": "TDS",
+      "tdsUnit": "(ppm)",
+      "waterToday": "Today's water",
+      "monthUsage": "Water usage this month",
+      "literUnit": "L",
+      "chart": {
+        "title": "Water vol.",
+        "yTitle": "Water vol."
+      }
+    }
   }
 }
