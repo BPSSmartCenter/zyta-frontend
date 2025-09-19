@@ -21,10 +21,14 @@ export default function DeviceCount() {
   const titleCameras = t("devices.cameras", { defaultValue: "Cameras" });
   const titleTotal = t("devices.total", { defaultValue: "Total" });
 
-  const labelCameraCount = t("devices.camerasShort", { defaultValue: "Cameras" });
+  const labelCameraCount = t("devices.camerasShort", {
+    defaultValue: "Cameras",
+  });
   const labelIntercom = t("devices.intercom", { defaultValue: "Intercom" });
   const labelWater = t("devices.waterMeter", { defaultValue: "Water meter" });
-  const labelElectric = t("devices.electricMeter", { defaultValue: "Electric meter" });
+  const labelElectric = t("devices.electricMeter", {
+    defaultValue: "Electric meter",
+  });
   const labelAir = t("devices.air", { defaultValue: "Air" });
   const labelAlert = t("devices.zyta", { defaultValue: "ZYTA Alert" });
 
@@ -36,7 +40,7 @@ export default function DeviceCount() {
 
       <div className="flex">
         <RadialBar
-          key={`radial-offline-${langKey}`}       // ← บังคับ remount เมื่อภาษาเปลี่ยน
+          key={`radial-offline-${langKey}`} // ← บังคับ remount เมื่อภาษาเปลี่ยน
           value={(45 / (45 + 89)) * 100}
           label={labelOffline}
           mainColor="#FB3F3F"
@@ -115,20 +119,18 @@ export default function DeviceCount() {
           </div>
         </li>
 
-         <li className="flex gap-4 justify-around">
+        <li className="flex gap-4 justify-around">
           <div className="flex items-center gap-4">
             <img src={windImage} alt="" width={36} />
             <span>
-              {labelAir}{" "}
-              <span className="text-red-500 font-semibold">87</span>
+              {labelAir} <span className="text-red-500 font-semibold">87</span>
             </span>
           </div>
 
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
             <span>
-              {labelAlert}{" "}
-              <span className="text-red-500 font-semibold">15</span>
+              {labelAlert} <span className="text-red-500 font-semibold">0</span>
             </span>
           </div>
         </li>
