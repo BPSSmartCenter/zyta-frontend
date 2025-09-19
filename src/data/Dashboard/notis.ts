@@ -111,13 +111,24 @@ export const notis: Noti[] = [
 export const wellBeingNotis: Noti[] = [
   {
     type: "alert",
+    img: fallingNoti,
+    titleKey: "notis.fallDetected",
+    title: "ตรวจพบคนล้ม",
+    site: "Site C",
+    coords: { lat: 13.7278956, lng: 100.52412349999997 },
+    date: "2025-09-19",
+    severity: "critical",
+    screenshot: fallCamera,
+  },
+  {
+    type: "alert",
     img: sleepingNoti,
     titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
     site: "Site C",
     coords: { lat: 13.7278956, lng: 100.52412349999997 },
     date: "2025-09-19",
-    severity: "medium",
+    severity: "critical",
     screenshot: sleepCamera,
   },
   {
@@ -139,7 +150,7 @@ export const wellBeingNotis: Noti[] = [
     site: "Site C",
     coords: { lat: 13.7278956, lng: 100.52412349999997 },
     date: "2025-09-19",
-    severity: "medium",
+    severity: "critical",
     screenshot: sleepCamera,
   },
 
