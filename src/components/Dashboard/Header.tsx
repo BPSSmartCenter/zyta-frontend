@@ -5,7 +5,10 @@ import CameraTile from "../../components/CameraTile";
 import { useTranslation } from "react-i18next";
 import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
-import { notis as alertNotis, wellBeingNotis } from "../../data/Dashboard/notis";
+import {
+  notis as alertNotis,
+  wellBeingNotis,
+} from "../../data/Dashboard/notis";
 
 /* ---------- types ---------- */
 type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
@@ -41,8 +44,10 @@ const getPic = (n: any) =>
 
 const ringClass = (n: Noti) => {
   const t = (n.type || "").toLowerCase();
-  if (t === "alert") return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
-  if (t === "warning") return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
+  if (t === "alert")
+    return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
+  if (t === "warning")
+    return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
   return "ring-[#AFEAFF]";
 };
 
@@ -62,11 +67,13 @@ const normalizeEventKey = (n: any): EventKey => {
   // ✅ OFFLINE (ครบทุกสำนวน)
   if (
     /notis\.(camera|device)offline/.test(s) || // notis.cameraOffline / notis.deviceOffline
-    /(?:camera|device)\s*offline/.test(s) ||   // "camera offline" / "device offline"
-    /\boffline\b/.test(s) ||                   // offline เฉย ๆ
-    /ออฟ.?ไลน์/.test(s)                       // ไทย: ออฟไลน์
-  ) return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ")) return "sleep";
+    /(?:camera|device)\s*offline/.test(s) || // "camera offline" / "device offline"
+    /\boffline\b/.test(s) || // offline เฉย ๆ
+    /ออฟ.?ไลน์/.test(s) // ไทย: ออฟไลน์
+  )
+    return "offline";
+  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
+    return "sleep";
   return "other";
 };
 
@@ -82,7 +89,8 @@ const normalizeStatKey = (k: string): EventKey => {
     /ออฟ.?ไลน์/.test(raw) ||
     collapsed.includes("จำนวนกล้องออฟไลน์ออนไลน์") ||
     collapsed.includes("กล้องออฟไลน์")
-  ) return "offline";
+  )
+    return "offline";
   if (raw.includes("sleep") || raw.includes("หลับ")) return "sleep";
   return "other";
 };
@@ -102,7 +110,14 @@ export default function Header({ statItems, cameraItems, events }: Props) {
 
   // นับยอดตามคีย์กลาง
   const counts = React.useMemo<Record<EventKey, number>>(() => {
-    const c: Record<EventKey, number> = { motion: 0, fall: 0, fire: 0, offline: 0, sleep: 0, other: 0 };
+    const c: Record<EventKey, number> = {
+      motion: 0,
+      fall: 0,
+      fire: 0,
+      offline: 0,
+      sleep: 0,
+      other: 0,
+    };
     for (const n of source) c[normalizeEventKey(n)]++;
     return c;
   }, [source]);
@@ -121,10 +136,16 @@ export default function Header({ statItems, cameraItems, events }: Props) {
   const computedCamera = React.useMemo<CameraItem[]>(() => {
     const tiles = source
       .filter((n) => !!getPic(n))
-      .sort((a, b) => new Date((b as any).date).getTime() - new Date((a as any).date).getTime())
+      .sort(
+        (a, b) =>
+          new Date((b as any).date).getTime() -
+          new Date((a as any).date).getTime()
+      )
       .slice(0, MAX_HEADER_IMAGES)
       .map((n) => ({ imgSrc: getPic(n)!, ringColor: ringClass(n) }));
-    return tiles.length ? tiles : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
+    return tiles.length
+      ? tiles
+      : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
   }, [source, cameraItems]);
 
   // กดการ์ด -> ไป /alert?event=<keyชัดเจน>
@@ -168,7 +189,12 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       {/* camera tiles */}
       <div className="hidden lg-1024:flex justify-between flex-5 gap-5 px-6 mt-4">
         {computedCamera.map((c, i) => (
-          <CameraTile key={i} ringColor={c.ringColor} imgSrc={c.imgSrc} className="p-1!" />
+          <CameraTile
+            key={i}
+            ringColor={c.ringColor}
+            imgSrc={c.imgSrc}
+            className="p-1!"
+          />
         ))}
       </div>
     </div>

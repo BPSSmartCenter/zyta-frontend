@@ -90,6 +90,17 @@ export const notis: Noti[] = [
 export const wellBeingNotis: Noti[] = [
   {
     type: "alert",
+    img: fallingNoti,
+    titleKey: "notis.fallDetected",
+    title: "ตรวจพบคนล้ม",
+    site: "โรงพยาบาลกรุงเทพ",
+    coords: { lat: 13.748953806991215, lng: 100.58319744232878 },
+    date: "2025-09-19",
+    severity: "critical",
+    screenshot: fallCamera,
+  },
+  {
+    type: "alert",
     img: sleepingNoti,
     titleKey: "notis.sleepingLong",
     title: "ตรวจพบคนหลับนานกว่าปกติ",
@@ -99,17 +110,6 @@ export const wellBeingNotis: Noti[] = [
     severity: "critical",
     screenshot: sleepCamera,
   },
-  // {
-  //   type: "alert",
-  //   img: fallingNoti,
-  //   titleKey: "notis.fallDetected",
-  //   title: "ตรวจพบคนล้ม",
-  //   site: "โรงพยาบาลกรุงเทพ",
-  //   coords: { lat: 13.748953806991215, lng: 100.58319744232878 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: fallCamera,
-  // },
   {
     type: "alert",
     img: sleepingNoti,
