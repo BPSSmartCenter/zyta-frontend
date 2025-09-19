@@ -438,14 +438,14 @@ export const ZYTA_NOTIS = [
   //   site: "Site A",
   //   date: "2025-01-06",
   // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site A",
-  //   date: "2025-01-06",
-  // },
+  {
+    type: "success",
+    titleKey: "zytaNotis.assistant",
+    img: insuranceImage,
+    title: "Assistant",
+    site: "โรงพยาบาลกรุงเทพ",
+    date: "2025-09-19",
+  },
   // {
   //   type: "alert",
   //   titleKey: "zytaNotis.sos",
