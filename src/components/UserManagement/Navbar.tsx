@@ -29,7 +29,7 @@ export default function Navbar({ title }: Props) {
             <circle cx="9" cy="7" r="4" />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
+        <h1 className="text-[19px] md:text-2xl font-semibold">{title}</h1>
       </div>
 
       <div className="gap-6 flex items-center">

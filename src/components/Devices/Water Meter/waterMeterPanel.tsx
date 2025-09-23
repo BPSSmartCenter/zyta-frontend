@@ -238,7 +238,7 @@ export default function WaterMeterPanel(_: Props) {
                 initialValue={2000}
                 max={3000}
                 maxLabel={t("devices.waterMeter.ofMl", { max: 3000 })}
-                valueLabel={t("devices.waterMeter.drinkingWatern pm")}
+                valueLabel={t("devices.waterMeter.drinkingWater")}
               />
 
               <div className="flex gap-5">

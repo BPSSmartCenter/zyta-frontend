@@ -45,7 +45,7 @@ export default function Content({
   setRows,
   onEdit,
   onCreateClick,
-  onReset
+  onReset,
 }: Props) {
   // const { t } = useTranslation("dashboard");
 
@@ -92,13 +92,15 @@ export default function Content({
       <div className="mt-6 p-6 bg-white rounded-lg">
         {/* header */}
         <div className="flex justify-between pb-4 border-b">
-          <h1 className="font-bold text-[24px]">Admin Management</h1>
+          <h1 className="font-bold text-[22px] md:text-[24px]">
+            Admin Management
+          </h1>
           <button
             onClick={onCreateClick} // ← ผูกปุ่ม
             className="flex items-center gap-2 bg-cyan text-white p-2 px-3 rounded-lg cursor-pointer hover:bg-cyan-400"
           >
             <i className="material-icons-outlined">add_circle</i>
-            <span className="hidden sm:block">Create admin</span>
+            <span className="hidden md:block">Create admin</span>
           </button>
         </div>
 
@@ -131,7 +133,7 @@ export default function Content({
                     <button
                       {...getButtonProps({
                         className:
-                          "h-[40px] min-w-[180px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                          "h-[40px] min-w-[110px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
                       })}
                     >
                       <span className="truncate">
@@ -190,7 +192,7 @@ export default function Content({
                     <button
                       {...getButtonProps({
                         className:
-                          "h-[40px] min-w-[180px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                          "h-[40px] min-w-[110px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
                       })}
                     >
                       <span className="truncate">
