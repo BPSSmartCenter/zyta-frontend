@@ -67,6 +67,30 @@
         "title": "Water vol.",
         "yTitle": "Water vol."
       }
+    },
+    "electric": {
+      "selectTime": "Select time",
+      "to": "TO",
+      "cards": {
+        "voltage": "Voltage",
+        "consumption": "Power consumption",
+        "accumulated": "Accumulated power",
+        "current": "Current",
+        "frequency": "Frequency",
+        "humidity": "Humidity"
+      },
+      "units": {
+        "volt": "(V)",
+        "kwh": "(kWh)",
+        "amp": "(A)",
+        "hz": "(Hz)",
+        "gm3": "(g/m³)"
+      },
+      "side": {
+        "today": "Today's consumption",
+        "month": "This month's consumption",
+        "unitKwh": "kWh"
+      }
     }
   }
 }

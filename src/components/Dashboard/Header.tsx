@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // ⬅️ เพิ่ม useLocation
 import StatCard, { StatCardGroup } from "../../components/StatCard";
 import CameraTile from "../../components/CameraTile";
 import { useTranslation } from "react-i18next";
@@ -99,6 +99,14 @@ export default function Header({ statItems, cameraItems, events }: Props) {
   const { t } = useTranslation(["dashboard", "common"]);
   const { selected } = useStatSelection();
   const navigate = useNavigate();
+  const location = useLocation(); // ⬅️ ใช้เพื่อตรวจเส้นทางปัจจุบัน
+
+  // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logic ตามที่ขอ)
+  React.useEffect(() => {
+    if (location.pathname === "/dashboard") {
+      setSelectedStat(null);
+    }
+  }, [location.pathname]);
 
   // รวม notis จริง
   const source = React.useMemo<Noti[]>(() => {
@@ -215,7 +223,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
         <StatCard className="w-full lg-1024:flex-1" />
       </StatCardGroup>
 
-      {/* ===== Mobile carousel (<= 1024px) — ปรับให้กว้างสุด 500px ===== */}
+      {/* ===== Mobile carousel (<= 1024px) — จำกัดความกว้างรูปไม่เกิน 500px ตามเดิม ===== */}
       <div className="lg-1024:hidden relative mt-4">
         <div
           ref={scrollRef}
@@ -229,7 +237,6 @@ export default function Header({ statItems, cameraItems, events }: Props) {
               className="flex-none w-full snap-center px-6"
               style={{ scrollSnapAlign: "center" }}
             >
-              {/* จำกัดความกว้างรูปไม่เกิน 500px และจัดกึ่งกลาง */}
               <div className="w-full max-w-[500px] mx-auto">
                 <CameraTile
                   ringColor={c.ringColor}
@@ -288,7 +295,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       </div>
 
       {/* camera tiles (Desktop layout เดิม) */}
-      <div className="hidden lg-1024:flex justify-between flex-5 gap-5 px-6 mt-4">
+      <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
         {computedCamera.map((c, i) => (
           <CameraTile
             key={i}

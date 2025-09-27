@@ -1,4 +1,4 @@
-// src/components/Devices/Water/waterMeterTable.tsx
+// src/components/Devices/Water/waterMeterPanel.tsx
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
@@ -20,6 +20,7 @@ type CardValueProps = {
   value: number | string;
   valueLabel: string;
   valueLabel2?: string;
+  onClick?: () => void; // ← เพิ่มเพื่อคลิกแล้วอัปเดต Thermostat
 };
 
 type SideCardValueProps = {
@@ -34,9 +35,18 @@ function formatWithComma(v: number | string) {
   return Number.isFinite(n) ? n.toLocaleString("en-US") : v;
 }
 
-function CardValue({ img, value, valueLabel, valueLabel2 }: CardValueProps) {
+function CardValue({
+  img,
+  value,
+  valueLabel,
+  valueLabel2,
+  onClick,
+}: CardValueProps) {
   return (
-    <div className="bg-cyan rounded-lg w-[180px] h-[190px] p-5 flex flex-col text-white gap-2">
+    <div
+      className="bg-cyan rounded-lg w-[180px] h-[190px] p-5 flex flex-col text-white gap-2 cursor-pointer hover:brightness-90 transition"
+      onClick={onClick}
+    >
       <div className="bg-white w-[50px] rounded-full ">
         <img src={img} className="p-3 w-full" alt="" />
       </div>
@@ -91,6 +101,32 @@ export default function WaterMeterPanel(_: Props) {
   const [fromTime, setFromTime] = useState<string>("09:30 PM");
   const [toTime, setToTime] = useState<string>("01:30 AM");
 
+  // ✅ state สำหรับ Thermostat ซ้าย/ขวา (อันละชุด)
+  const [thermoLeft, setThermoLeft] = useState<{
+    initialValue: number;
+    valueLabel: string;
+    maxLabel: string;
+  }>({
+    initialValue: 2000,
+    valueLabel: t("devices.waterMeter.domesticWater"),
+    maxLabel: t("devices.waterMeter.ofMl", { max: 3000 }) as string,
+  });
+
+  const [thermoRight, setThermoRight] = useState<{
+    initialValue: number;
+    valueLabel: string;
+    maxLabel: string;
+  }>({
+    initialValue: 2000,
+    valueLabel: t("devices.waterMeter.drinkingWater"),
+    maxLabel: t("devices.waterMeter.ofMl", { max: 3000 }) as string,
+  });
+
+  const toNumber = (v: number | string) => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   return (
     <>
       <div className="grid grid-cols-1 lg-1355:grid-cols-5 gap-3 mt-6">
@@ -125,7 +161,7 @@ export default function WaterMeterPanel(_: Props) {
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max_h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -177,7 +213,7 @@ export default function WaterMeterPanel(_: Props) {
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max_h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -200,12 +236,14 @@ export default function WaterMeterPanel(_: Props) {
           {/* ──────────────────────────────────── */}
 
           <div className="flex flex-col md:flex-row w-full justify-around gap-10 lg:gap-0">
+            {/* ซ้าย */}
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={2000}
+                key={`${thermoLeft.initialValue}-${thermoLeft.valueLabel}-${thermoLeft.maxLabel}`}
+                initialValue={thermoLeft.initialValue}
                 max={3000}
-                maxLabel={t("devices.waterMeter.ofMl", { max: 3000 })}
-                valueLabel={t("devices.waterMeter.domesticWater")}
+                maxLabel={thermoLeft.maxLabel}
+                valueLabel={thermoLeft.valueLabel}
               />
 
               <div className="flex gap-5">
@@ -228,17 +266,26 @@ export default function WaterMeterPanel(_: Props) {
                     value={kpi.value}
                     valueLabel={kpi.valueLabel}
                     valueLabel2={kpi.valueLabel2}
+                    onClick={() =>
+                      setThermoLeft({
+                        initialValue: toNumber(kpi.value),
+                        valueLabel: kpi.valueLabel,
+                        maxLabel: kpi.valueLabel2 ?? "",
+                      })
+                    }
                   />
                 ))}
               </div>
             </div>
 
+            {/* ขวา */}
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={2000}
+                key={`${thermoRight.initialValue}-${thermoRight.valueLabel}-${thermoRight.maxLabel}`}
+                initialValue={thermoRight.initialValue}
                 max={3000}
-                maxLabel={t("devices.waterMeter.ofMl", { max: 3000 })}
-                valueLabel={t("devices.waterMeter.drinkingWater")}
+                maxLabel={thermoRight.maxLabel}
+                valueLabel={thermoRight.valueLabel}
               />
 
               <div className="flex gap-5">
@@ -261,6 +308,13 @@ export default function WaterMeterPanel(_: Props) {
                     value={kpi.value}
                     valueLabel={kpi.valueLabel}
                     valueLabel2={kpi.valueLabel2}
+                    onClick={() =>
+                      setThermoRight({
+                        initialValue: toNumber(kpi.value),
+                        valueLabel: kpi.valueLabel,
+                        maxLabel: kpi.valueLabel2 ?? "",
+                      })
+                    }
                   />
                 ))}
               </div>

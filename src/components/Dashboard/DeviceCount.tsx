@@ -1,4 +1,3 @@
-// src/components/Dashboard/DeviceCount.tsx
 import RadialBar from "../RadialBar";
 import DonutLegend from "../DonutLegend";
 import {
@@ -10,10 +9,12 @@ import {
   alertCyan,
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
 export default function DeviceCount() {
   const { t, i18n } = useTranslation(["dashboard"]);
   const langKey = i18n.language || "en";
+  const navigate = useNavigate();
 
   const titleDevices = t("devices.title", { defaultValue: "DEVICES" });
   const labelOffline = t("devices.offline", { defaultValue: "Offline" });
@@ -31,6 +32,8 @@ export default function DeviceCount() {
   });
   const labelAir = t("devices.air", { defaultValue: "Air" });
   const labelAlert = t("devices.zyta", { defaultValue: "ZYTA Alert" });
+
+  const goDevices = (type: string) => navigate(`/devices?type=${type}`);
 
   return (
     <form className="flex flex-col gap-3 hover:cursor-default">
@@ -84,7 +87,11 @@ export default function DeviceCount() {
 
       <ul className="flex flex-col gap-7 font-inter text-[16px]  text-cyan-500">
         <li className="flex gap-4 justify-around">
-          <div className="flex items-center gap-4">
+          {/* Cameras → /devices?type=cctv */}
+          <div
+            className="flex items-center gap-4 hover:cursor-pointer"
+            onClick={() => goDevices("cctv")}
+          >
             <img src={cctvImage} alt="" width={36} />
             <span>
               {labelCameraCount}{" "}
@@ -92,7 +99,11 @@ export default function DeviceCount() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4 ">
+          {/* Intercom → /devices?type=intercom */}
+          <div
+            className="flex items-center gap-4 hover:cursor-pointer"
+            onClick={() => goDevices("intercom")}
+          >
             <img src={intercomeImage} alt="" width={36} />
             <span>
               {labelIntercom}{" "}
@@ -102,7 +113,11 @@ export default function DeviceCount() {
         </li>
 
         <li className="flex gap-4 justify-around">
-          <div className="flex items-center gap-4">
+          {/* Water Meter → /devices?type=watermeter */}
+          <div
+            className="flex items-center gap-4 hover:cursor-pointer"
+            onClick={() => goDevices("watermeter")}
+          >
             <img src={waterTapImage} alt="" width={36} />
             <span>
               {labelWater}{" "}
@@ -110,7 +125,11 @@ export default function DeviceCount() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Electric Meter → /devices?type=electricmeter */}
+          <div
+            className="flex items-center gap-4 hover:cursor-pointer"
+            onClick={() => goDevices("electricmeter")}
+          >
             <img src={solarImage} alt="" width={36} />
             <span>
               {labelElectric}{" "}
@@ -120,13 +139,18 @@ export default function DeviceCount() {
         </li>
 
         <li className="flex gap-4 justify-around">
-          <div className="flex items-center gap-4">
+          {/* Air Sensor → /devices?type=airsensor */}
+          <div
+            className="flex items-center gap-4 hover:cursor-pointer"
+            onClick={() => goDevices("airsensor")}
+          >
             <img src={windImage} alt="" width={36} />
             <span>
               {labelAir} <span className="text-red-500 font-semibold">87</span>
             </span>
           </div>
 
+          {/* ZYTA → no action */}
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
             <span>

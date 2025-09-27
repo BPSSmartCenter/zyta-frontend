@@ -6,13 +6,22 @@ import CameraTile from "../CameraTile";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import type { Noti } from "../../data/Dashboard/notis";
-import { notis as alertNotis, wellBeingNotis } from "../../data/Dashboard/notis";
+import {
+  notis as alertNotis,
+  wellBeingNotis,
+} from "../../data/Dashboard/notis";
 
 /* ---------- types ---------- */
 type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
-type StatItem = { key: string; label: string; val: number | string; img: string; activeImg: string; };
+type StatItem = {
+  key: string;
+  label: string;
+  val: number | string;
+  img: string;
+  activeImg: string;
+};
 type CameraItem = { ringColor: string; imgSrc: string; alt?: string };
-type Props = { statItems?: StatItem[]; cameraItems?: CameraItem[]; };
+type Props = { statItems?: StatItem[]; cameraItems?: CameraItem[] };
 
 /* ---------- helpers ---------- */
 const getPic = (n: any) =>
@@ -27,8 +36,10 @@ const getPic = (n: any) =>
 
 const ringClass = (n: Noti) => {
   const t = (n.type || "").toLowerCase();
-  if (t === "alert") return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
-  if (t === "warning") return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
+  if (t === "alert")
+    return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
+  if (t === "warning")
+    return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
   return "ring-[#AFEAFF]";
 };
 
@@ -48,8 +59,10 @@ const normalizeEventKey = (n: any): EventKey => {
     /(?:camera|device)\s*offline/.test(s) ||
     /\boffline\b/.test(s) ||
     /ออฟ.?ไลน์/.test(s)
-  ) return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ")) return "sleep";
+  )
+    return "offline";
+  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
+    return "sleep";
   return "other";
 };
 
@@ -64,17 +77,22 @@ const normalizeStatKey = (k: string): EventKey => {
     /ออฟ.?ไลน์/.test(raw) ||
     collapsed.includes("จำนวนกล้องออฟไลน์ออนไลน์") ||
     collapsed.includes("กล้องออฟไลน์")
-  ) return "offline";
+  )
+    return "offline";
   if (raw.includes("sleep") || raw.includes("หลับ")) return "sleep";
   return "other";
 };
 
 const parseEventFromUrl = (s?: string | null): EventKey => {
   const v = String(s ?? "motion").toLowerCase();
-  return (["motion", "fall", "fire", "offline", "sleep"] as const).includes(v as any) ? (v as EventKey) : "motion";
+  return (["motion", "fall", "fire", "offline", "sleep"] as const).includes(
+    v as any
+  )
+    ? (v as EventKey)
+    : "motion";
 };
 
-export default function Content({ statItems, cameraItems }: Props) {
+export default function Content({ statItems }: Props) {
   const { t: tAlert } = useTranslation("alert");
   const { t } = useTranslation("dashboard");
   const { selected } = useStatSelection();
@@ -90,7 +108,14 @@ export default function Content({ statItems, cameraItems }: Props) {
 
   // นับยอดการ์ดจาก notis จริง (คีย์กลาง)
   const counts = React.useMemo<Record<EventKey, number>>(() => {
-    const c: Record<EventKey, number> = { motion:0, fall:0, fire:0, offline:0, sleep:0, other:0 };
+    const c: Record<EventKey, number> = {
+      motion: 0,
+      fall: 0,
+      fire: 0,
+      offline: 0,
+      sleep: 0,
+      other: 0,
+    };
     for (const n of allEvents) c[normalizeEventKey(n)]++;
     return c;
   }, [allEvents]);
@@ -107,35 +132,46 @@ export default function Content({ statItems, cameraItems }: Props) {
 
   // event ปัจจุบันจาก URL + ให้ URL เป็น fallback สำหรับ activeIds
   const eventKey = parseEventFromUrl(searchParams.get("event"));
-  const activeId = React.useMemo(() => (selected ?? eventKey), [selected, eventKey]);
+  const activeId = React.useMemo(
+    () => selected ?? eventKey,
+    [selected, eventKey]
+  );
 
   // sync global selection กับ URL
-  React.useEffect(() => { setSelectedStat(eventKey); }, [eventKey]);
+  React.useEffect(() => {
+    setSelectedStat(eventKey);
+  }, [eventKey]);
 
   // notis ของหมวดที่เลือก (เรียงใหม่->เก่า)
   const listForEvent = React.useMemo(() => {
     return allEvents
       .filter((n) => normalizeEventKey(n) === eventKey)
-      .sort((a, b) => new Date((b as any).date).getTime() - new Date((a as any).date).getTime());
+      .sort(
+        (a, b) =>
+          new Date((b as any).date).getTime() -
+          new Date((a as any).date).getTime()
+      );
   }, [allEvents, eventKey]);
 
   // 3 รูปล่าสุด (ถ้ามี)
   const tiles = React.useMemo<CameraItem[]>(() => {
-    const pics = listForEvent
+    return listForEvent
       .map((n) => {
         const pic = getPic(n);
         return pic ? { ringColor: ringClass(n), imgSrc: pic } : null;
       })
       .filter(Boolean)
       .slice(0, 3) as CameraItem[];
-    if (pics.length === 0 && cameraItems?.length) return cameraItems.slice(0, 3);
-    return pics;
-  }, [listForEvent, cameraItems]);
+  }, [listForEvent]);
 
   // เปลี่ยนหมวด / ยกเลิกเลือก
   const onStatChange = (ids: string[]) => {
     const next = (ids[0] ?? "") as EventKey;
-    if (!next) { setSelectedStat(null); navigate("/"); return; }
+    if (!next) {
+      setSelectedStat(null);
+      navigate("/dashboard");
+      return;
+    }
     setSelectedStat(next);
     navigate(`/alert?event=${next}`);
   };
@@ -167,14 +203,14 @@ export default function Content({ statItems, cameraItems }: Props) {
       <div className="mt-6">
         <StatCardGroup
           selectionMode="single"
-          activeIds={[activeId]}  // <<< ใช้ URL เป็น fallback ป้องกันหลุด selection
+          activeIds={[activeId]} // <<< ใช้ URL เป็น fallback ป้องกันหลุด selection
           onChange={onStatChange}
           className="grid grid-cols-2 gap-2 px-6 lg-1024:flex lg-1024:flex-wrap"
         >
           {items.map((it) => (
             <StatCard
               key={it.key}
-              id={it.key}  // id เป็นคีย์กลาง (motion/fall/fire/offline/sleep)
+              id={it.key} // id เป็นคีย์กลาง (motion/fall/fire/offline/sleep)
               label={t(`stats.${it.key}`, { defaultValue: it.label })}
               val={it.val}
               img={it.img}
@@ -190,7 +226,13 @@ export default function Content({ statItems, cameraItems }: Props) {
         {tiles.length > 0 && (
           <div className="flex flex-3 justify-around flex-col items-center mt-6 md:flex-row gap-14 px-6">
             {tiles.map((c, i) => (
-              <CameraTile key={i} ringColor={c.ringColor} imgSrc={c.imgSrc} alt={`event-${i + 1}`} className="flex-1 max-w-[346px]" />
+              <CameraTile
+                key={i}
+                ringColor={c.ringColor}
+                imgSrc={c.imgSrc}
+                alt={`event-${i + 1}`}
+                className="flex-1 max-w-[346px]"
+              />
             ))}
           </div>
         )}

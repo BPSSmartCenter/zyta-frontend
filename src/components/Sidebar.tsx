@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { brandImage, sidebarIcon } from "../assets/index";
 import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 /** breakpoint hook */
 function useIsDesktop1024() {
@@ -30,25 +30,20 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const isDesktop = useIsDesktop1024();
   const { t } = useTranslation("sidebar");
   const navigate = useNavigate();
+  const location = useLocation();
 
   // mobile toggle
   const [openMobile, setOpenMobile] = useState(false);
 
-  // used-space dismiss -> shift support/settings down after dismiss
+  // used-space dismiss (footer package)
   const [showUsedSpace, setShowUsedSpace] = useState(true);
-  const usedRef = useRef<HTMLDivElement>(null);
-  const [usedHeight, setUsedHeight] = useState(0);
-  const handleDismissUsed = () => {
-    const h = usedRef.current?.offsetHeight ?? 0;
-    setUsedHeight(h);
-    setShowUsedSpace(false);
-  };
+  const handleDismissUsed = () => setShowUsedSpace(false); // ยุบจริง ไม่เหลือช่องว่าง
 
   // logout modal
   const [logoutOpen, setLogoutOpen] = useState(false);
   const handleConfirmLogout = () => {
-    // TODO: put real signout logic here
-    console.log("SIGNED OUT");
+    setLogoutOpen(false);
+    navigate("/", { replace: true });
   };
 
   // preline init
@@ -75,6 +70,41 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     }
   }, [isDesktop]);
 
+  // Route-aware: กลับ /dashboard ให้พับ dropdown ทั้งหมด
+  useEffect(() => {
+    if (location.pathname === "/dashboard") {
+      document.querySelectorAll<HTMLElement>(".hs-accordion").forEach((acc) => {
+        acc.classList.remove("active");
+        const content = acc.querySelector<HTMLElement>(".hs-accordion-content");
+        if (content) {
+          content.style.height = "0px";
+          content.classList.add("hidden");
+        }
+      });
+    }
+  }, [location.pathname]);
+
+  // เปิด dropdown อัตโนมัติสำหรับ Alert และ Devices
+  useEffect(() => {
+    const openAccordion = (id: string) => {
+      const acc = document.getElementById(id);
+      if (!acc) return;
+      acc.classList.add("active");
+      const content = acc.querySelector<HTMLElement>(".hs-accordion-content");
+      if (content) {
+        content.classList.remove("hidden");
+        content.style.height = content.scrollHeight + "px";
+        setTimeout(() => {
+          content.style.height = "auto";
+        }, 300);
+      }
+    };
+    if (location.pathname.startsWith("/alert"))
+      openAccordion("alert-accordion");
+    if (location.pathname.startsWith("/devices"))
+      openAccordion("devices-accordion");
+  }, [location.pathname]);
+
   const sidebarClass = useMemo(() => {
     const base =
       "w-64 h-full fixed top-0 left-0 z-60 bg-white border-e border-gray-200 transition-transform duration-300";
@@ -86,6 +116,30 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     () => ({ transform: openMobile ? "translateX(16rem)" : "translateX(0)" }),
     [openMobile]
   );
+
+  // helper: navigate + close on mobile
+  const go = (path: string) => {
+    navigate(path);
+    if (!isDesktop) setOpenMobile(false);
+  };
+
+  // ===== active helpers for highlight =====
+  const cx = (...classes: (string | false | null | undefined)[]) =>
+    classes.filter(Boolean).join(" ");
+
+  const url = new URLSearchParams(location.search);
+  const active = {
+    home: location.pathname === "/dashboard",
+    alert: location.pathname.startsWith("/alert"),
+    alertEvent: (k: string) =>
+      location.pathname.startsWith("/alert") && url.get("event") === k,
+    facerec: location.pathname.startsWith("/facerec"),
+    devices: location.pathname.startsWith("/devices"),
+    devicesType: (k: string) =>
+      location.pathname.startsWith("/devices") && url.get("type") === k,
+    usermanage: location.pathname.startsWith("/usermanage"),
+  };
+  // =======================================
 
   return (
     <div className="relative">
@@ -119,14 +173,19 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       <div className={sidebarClass} aria-label={t("aria.sidebarLabel")}>
         <div className="relative flex flex-col h-full max-h-full">
           {/* Header */}
-          <header className="p-4 flex items-center gap-x-2">
+          <header className="p-4 flex flex-col items-center gap-x-2">
             <img
               src={brandImage}
               alt={t("aria.brandAlt")}
               width={70}
               height={70}
               className="block select-none cursor-pointer"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => go("/dashboard")}
+            />
+
+            <SearchInput
+              placeholder={t("search.placeholder")}
+              className="mb-4"
             />
           </header>
 
@@ -145,18 +204,17 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                 data-hs-accordion-always-open
               >
                 <ul className="space-y-1">
-                  <li className="mx-2 my-2">
-                    <SearchInput
-                      placeholder={t("search.placeholder")}
-                      className="mb-4"
-                    />
-                  </li>
-
-                  {/* Home */}
-                  <li className="hs-accordion" id="home-accordion">
+                  {/* ===== หน้าแรก / Home ===== */}
+                  <li>
                     <button
                       type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
+                      onClick={() => go("/dashboard")}
+                      className={cx(
+                        "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                        active.home
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-800 hover:bg-gray-100"
+                      )}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -173,53 +231,22 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
                         <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                       </svg>
-                      {t("home.title")}
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
+                      <span>{t("menu.home", { defaultValue: "หน้าแรก" })}</span>
                     </button>
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
-                      <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("home.links.l1")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("home.links.l2")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("home.links.l3")}
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
                   </li>
 
-                  {/* Dashboard */}
-                  <li className="hs-accordion" id="dashboard-accordion">
+                  {/* ===== การแจ้งเตือน / Notification (Dropdown) ===== */}
+                  <li className="hs-accordion" id="alert-accordion">
                     <button
                       type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
+                      className={cx(
+                        "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                        active.alert
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-800 hover:bg-gray-100"
+                      )}
                     >
+                      {/* bell icon */}
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="19"
@@ -230,13 +257,18 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="lucide lucide-chart-no-axes-column"
+                        className="lucide lucide-bell-icon lucide-bell"
+                        aria-hidden="true"
                       >
-                        <path d="M5 21v-6" />
-                        <path d="M12 21V3" />
-                        <path d="M19 21V9" />
+                        <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+                        <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
                       </svg>
-                      {t("dashboard.title")}
+                      <span>
+                        {t("menu.notification", {
+                          defaultValue: "การแจ้งเตือน",
+                        })}
+                      </span>
+
                       <svg
                         className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
                         viewBox="0 0 24 24"
@@ -256,36 +288,101 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="m6 9 6 6 6-6" />
                       </svg>
                     </button>
+
                     <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
                       <ul className="pt-1 ps-7 space-y-1">
                         <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("dashboard.devices")}
+                          <a
+                            onClick={() => go("/alert?event=fire")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.alertEvent("fire")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.alerts_fire", {
+                              defaultValue: "ตรวจพบไฟไหม้",
+                            })}
                           </a>
                         </li>
                         <li>
-                          <a className="w-full flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer">
-                            {t("dashboard.map")}
-                            <span className="ms-auto py-0.5 px-1.5 inline-flex items-center gap-x-1.5 text-xs bg-gray-200 text-gray-800 rounded-full">
-                              {t("dashboard.mapCountLabel", { count: 10 })}
-                            </span>
+                          <a
+                            onClick={() => go("/alert?event=motion")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.alertEvent("motion")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.alerts_motion", {
+                              defaultValue: "ตรวจพบการเคลื่อนไหว",
+                            })}
                           </a>
                         </li>
                         <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("dashboard.tradeHistory")}
+                          <a
+                            onClick={() => go("/alert?event=offline")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.alertEvent("offline")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.alerts_offline", {
+                              defaultValue: "จำนวนกล้อง",
+                            })}
+                          </a>
+                        </li>
+                        <li>
+                          <a
+                            onClick={() => go("/alert?event=fall")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.alertEvent("fall")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.alerts_fall", {
+                              defaultValue: "ตรวจพบการล้ม",
+                            })}
+                          </a>
+                        </li>
+                        <li>
+                          <a
+                            onClick={() => go("/alert?event=sleep")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.alertEvent("sleep")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.alerts_sleep", {
+                              defaultValue: "ตรวจพบนอนหลับ",
+                            })}
                           </a>
                         </li>
                       </ul>
                     </div>
                   </li>
 
-                  {/* Projects */}
-                  <li className="hs-accordion" id="project-accordion">
+                  {/* ===== การจดจำใบหน้า / Face Regconize (ลิงก์เดี่ยว → /facerec) ===== */}
+                  <li>
                     <button
                       type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
+                      onClick={() => go("/facerec")}
+                      className={cx(
+                        "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                        active.facerec
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-800 hover:bg-gray-100"
+                      )}
                     >
+                      {/* user icon */}
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="19"
@@ -296,59 +393,29 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="lucide lucide-layers"
+                        className="lucide lucide-user-icon lucide-user"
                       >
-                        <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
-                        <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
-                        <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
                       </svg>
-                      {t("projects.title")}
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
+                      <span>
+                        {t("menu.facerec", { defaultValue: "การจดจำใบหน้า" })}
+                      </span>
                     </button>
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
-                      <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("projects.links.l1")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("projects.links.l2")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("projects.links.l3")}
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
                   </li>
 
-                  {/* Tasks */}
-                  <li className="hs-accordion" id="task-accordion">
+                  {/* ===== อุปกรณ์ / Devices (Dropdown) ===== */}
+                  <li className="hs-accordion" id="devices-accordion">
                     <button
                       type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
+                      className={cx(
+                        "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                        active.devices
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-800 hover:bg-gray-100"
+                      )}
                     >
+                      {/* CCTV-ish icon */}
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="19"
@@ -359,12 +426,18 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="lucide lucide-square-check-big"
+                        className="lucide lucide-cctv-icon lucide-cctv"
                       >
-                        <path d="M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344" />
-                        <path d="m9 11 3 3L22 4" />
+                        <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97" />
+                        <path d="M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.92-1.3z" />
+                        <path d="M2 19h3.76a2 2 0 0 0 1.8-1.1L9 15" />
+                        <path d="M2 21v-4" />
+                        <path d="M7 9h.01" />
                       </svg>
-                      {t("tasks.title")}
+                      <span>
+                        {t("menu.devices", { defaultValue: "อุปกรณ์" })}
+                      </span>
+
                       <svg
                         className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
                         viewBox="0 0 24 24"
@@ -384,93 +457,97 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="m6 9 6 6 6-6" />
                       </svg>
                     </button>
+
                     <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
                       <ul className="pt-1 ps-7 space-y-1">
                         <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("tasks.links.l1")}
+                          <a
+                            onClick={() => go("/devices?type=cctv")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.devicesType("cctv")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.devices_cctv", { defaultValue: "CCTV" })}
                           </a>
                         </li>
                         <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("tasks.links.l2")}
+                          <a
+                            onClick={() => go("/devices?type=intercom")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.devicesType("intercom")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.devices_intercom", {
+                              defaultValue: "Intercom",
+                            })}
                           </a>
                         </li>
                         <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("tasks.links.l3")}
+                          <a
+                            onClick={() => go("/devices?type=watermeter")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.devicesType("watermeter")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.devices_watermeter", {
+                              defaultValue: "Water Meter",
+                            })}
+                          </a>
+                        </li>
+                        <li>
+                          <a
+                            onClick={() => go("/devices?type=electricmeter")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.devicesType("electricmeter")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.devices_electricmeter", {
+                              defaultValue: "Electric Meter",
+                            })}
+                          </a>
+                        </li>
+                        <li>
+                          <a
+                            onClick={() => go("/devices?type=airsensor")}
+                            className={cx(
+                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                              active.devicesType("airsensor")
+                                ? "bg-gray-100 text-gray-900"
+                                : "hover:bg-gray-100"
+                            )}
+                          >
+                            {t("menu.devices_airsensor", {
+                              defaultValue: "Air Sensor",
+                            })}
                           </a>
                         </li>
                       </ul>
                     </div>
                   </li>
 
-                  {/* Reporting */}
-                  <li className="hs-accordion" id="report-accordion">
+                  {/* ===== การจัดการผู้ใช้ / User Management ===== */}
+                  <li>
                     <button
                       type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-flag"
-                      >
-                        <path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528" />
-                      </svg>
-                      {t("reporting.title")}
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
-                      <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("reporting.links.l1")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("reporting.links.l2")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("reporting.links.l3")}
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-
-                  {/* Users */}
-                  <li className="hs-accordion" id="users-accordion">
-                    <button
-                      type="button"
-                      className="hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-hidden cursor-pointer"
+                      onClick={() => go("/usermanage")}
+                      className={cx(
+                        "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                        active.usermanage
+                          ? "bg-gray-100 text-gray-900"
+                          : "text-gray-800 hover:bg-gray-100"
+                      )}
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -489,45 +566,12 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                         <circle cx="9" cy="7" r="4" />
                       </svg>
-                      {t("users.title")}
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
+                      <span>
+                        {t("menu.user_management", {
+                          defaultValue: "การจัดการผู้ใช้",
+                        })}
+                      </span>
                     </button>
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
-                      <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("users.links.l1")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("users.links.l2")}
-                          </a>
-                        </li>
-                        <li>
-                          <a className="block py-2 px-2.5 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">
-                            {t("users.links.l3")}
-                          </a>
-                        </li>
-                      </ul>
-                    </div>
                   </li>
                 </ul>
               </div>
@@ -535,11 +579,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
 
             {/* ===== Footer inside sidebar ===== */}
             <footer className="mt-auto bg-white border-t border-gray-200 pt-2">
-              {/* Support + Settings — shift down AFTER dismiss */}
-              <div
-                className="px-2 pb-2 space-y-1 transition-all duration-300"
-                style={{ marginTop: showUsedSpace ? 0 : usedHeight }}
-              >
+              <div className="px-2 pb-2 space-y-1">
                 <a className="flex items-center gap-x-3 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 cursor-pointer">
                   <svg
                     className="size-4"
@@ -558,27 +598,26 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                 </a>
                 <a className="flex items-center gap-x-3 py-2 px-2.5 text-sm text-gray-800 rounded-lg hover:bg-gray-100 cursor-pointer">
                   <svg
-                    className="size-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="19"
+                    height="19"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    className="lucide lucide-settings-icon lucide-settings"
                   >
-                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9A1.65 1.65 0 0 0 10 3V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 .33 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .65.39 1.24 1 1.51H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                    <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
                   <span>{t("footer.setting")}</span>
                 </a>
               </div>
 
-              {/* Used space (dismissible) */}
               {showUsedSpace && (
-                <div
-                  ref={usedRef}
-                  className="mx-2 mb-2 rounded-lg border border-gray-200 p-3"
-                >
+                <div className="mx-2 mb-2 rounded-lg border border-gray-200 p-3">
                   <p className="text-xs font-medium text-gray-800">
                     {t("footer.useSpace")}
                   </p>
@@ -602,7 +641,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                 </div>
               )}
 
-              {/* Account → sign out button */}
+              {/* Account → sign out */}
               <div className="px-2 pb-2">
                 <button
                   type="button"
@@ -644,9 +683,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
           </nav>
         </div>
       </div>
-      {/* ===== end Sidebar container ===== */}
 
-      {/* Logout confirm modal (OUTSIDE sidebar) */}
+      {/* Logout confirm modal */}
       <Modal
         open={logoutOpen}
         id="logout-confirm"
@@ -661,7 +699,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
         onConfirm={handleConfirmLogout}
       />
 
-      {/* Main content (pushed on desktop) */}
+      {/* Main content */}
       <div
         className={[
           "min-h-160 bg-white transition-all duration-300",

@@ -3,7 +3,16 @@ import { useTranslation } from "react-i18next";
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
-  const setLng = (lng: "th" | "en") => i18n.changeLanguage(lng);
+
+  // เปลี่ยนภาษาแล้วรีโหลดหน้า 1 ครั้ง
+  const setLng = (lng: "th" | "en") => {
+    if (i18n.language === lng) return; // กดภาษาที่ใช้อยู่แล้ว ไม่ต้องทำอะไร
+    void i18n.changeLanguage(lng).then(() => {
+      // ให้ i18n อัปเดตก่อนแล้วค่อยรีโหลด
+      window.location.reload();
+    });
+  };
+
   const isActive = (lng: "th" | "en") => i18n.language === lng;
 
   // ซ่อนปุ่มเมื่อมีการ scroll ลง (ไม่อยู่บนสุด) และแสดงเมื่อกลับไปบนสุดของหน้า
@@ -15,8 +24,7 @@ export default function LanguageSwitcher() {
       const atTop = (window.scrollY || window.pageYOffset) <= 2;
       setShow(atTop);
     };
-    // เรียกหนึ่งครั้งตอน mount เพื่อเช็คตำแหน่งเริ่มต้น
-    onScroll();
+    onScroll(); // เช็คครั้งแรกตอน mount
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -27,49 +35,53 @@ export default function LanguageSwitcher() {
        isActive(lng) ? "bg-gray-900 text-white" : "bg-white text-gray-700"
      }`;
 
-  return (
-    <div
-      className={[
-        // ขยับตำแหน่งนิดหน่อย (mobile ใกล้มุมขึ้นเล็กน้อย)
-        "fixed right-3 top-3 sm:right-4 sm:top-4 z-50",
-        // แอนิเมชันซ่อน/แสดง
-        "transition-all duration-200",
-        show
-          ? "opacity-100 translate-y-0 pointer-events-auto"
-          : "opacity-0 -translate-y-2 pointer-events-none",
-      ].join(" ")}
-      aria-hidden={!show as any}
-    >
-      <fieldset
-        aria-label="Language switcher"
-        className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
-      >
-        {/* TH */}
-        <input
-          id="lng-th"
-          type="radio"
-          name="lng"
-          className="sr-only"
-          checked={isActive("th")}
-          onChange={() => setLng("th")}
-        />
-        <label htmlFor="lng-th" className={btnClass("th")}>
-          ไทย
-        </label>
+  // แยก class เดิมออกเป็นส่วน ๆ เพื่อประกอบเหมือนเดิม
+  const base =
+    "fixed right-3 top-3 sm:right-4 sm:top-4 z-50 transition-all duration-200";
+  const visible = "opacity-100 translate-y-0 pointer-events-auto";
+  const hidden = "opacity-0 -translate-y-2 pointer-events-none";
 
-        {/* EN */}
-        <input
-          id="lng-en"
-          type="radio"
-          name="lng"
-          className="sr-only"
-          checked={isActive("en")}
-          onChange={() => setLng("en")}
-        />
-        <label htmlFor="lng-en" className={btnClass("en")}>
-          EN
-        </label>
-      </fieldset>
+  const content = (
+    <fieldset
+      aria-label="Language switcher"
+      className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
+    >
+      {/* TH */}
+      <input
+        id="lng-th"
+        type="radio"
+        name="lng"
+        className="sr-only"
+        checked={isActive("th")}
+        onChange={() => setLng("th")}
+      />
+      <label htmlFor="lng-th" className={btnClass("th")}>
+        ไทย
+      </label>
+
+      {/* EN */}
+      <input
+        id="lng-en"
+        type="radio"
+        name="lng"
+        className="sr-only"
+        checked={isActive("en")}
+        onChange={() => setLng("en")}
+      />
+      <label htmlFor="lng-en" className={btnClass("en")}>
+        EN
+      </label>
+    </fieldset>
+  );
+
+  // เรนเดอร์ 2 กรณี เพื่อให้ aria-hidden เป็น string literal
+  return show ? (
+    <div className={`${base} ${visible}`} aria-hidden="false">
+      {content}
+    </div>
+  ) : (
+    <div className={`${base} ${hidden}`} aria-hidden="true">
+      {content}
     </div>
   );
 }

@@ -1,67 +1,38 @@
 {
-  "search": {
-    "placeholder": "ค้นหา"
-  },
-  "account": { "logout": "ออกจากระบบ" },
-  "logout": { "title": "ออกจากระบบ", "message": "คุณต้องการออกจากระบบใช่ไหม?" },
-  "actions": { "cancel": "ยกเลิก", "signOut": "ออกจากระบบ" },
-  "home": {
-    "title": "หน้าแรก",
-    "links": {
-      "l1": "ลิงก์ 1",
-      "l2": "ลิงก์ 2",
-      "l3": "ลิงก์ 3"
-    }
-  },
-  "dashboard": {
-    "title": "แดชบอร์ด",
-    "devices": "อุปกรณ์",
-    "map": "แผนที่",
-    "tradeHistory": "ประวัติการทำรายการ",
-    "mapCountLabel": "{{count}}"
-  },
-  "projects": {
-    "title": "โปรเจกต์",
-    "links": {
-      "l1": "ลิงก์ 1",
-      "l2": "ลิงก์ 2",
-      "l3": "ลิงก์ 3"
-    }
-  },
-  "tasks": {
-    "title": "งาน",
-    "links": {
-      "l1": "ลิงก์ 1",
-      "l2": "ลิงก์ 2",
-      "l3": "ลิงก์ 3"
-    }
-  },
-  "reporting": {
-    "title": "รายงาน",
-    "links": {
-      "l1": "ลิงก์ 1",
-      "l2": "ลิงก์ 2",
-      "l3": "ลิงก์ 3"
-    }
-  },
-  "users": {
-    "title": "ผู้ใช้งาน",
-    "links": {
-      "l1": "ลิงก์ 1",
-      "l2": "ลิงก์ 2",
-      "l3": "ลิงก์ 3"
-    }
-  },
+  "search": { "placeholder": "ค้นหา" },
   "aria": {
     "toggleSidebar": "สลับแถบข้าง",
     "sidebarLabel": "แถบข้าง",
     "brandAlt": "แบรนด์"
   },
+  "menu": {
+    "home": "หน้าแรก",
+    "notification": "การแจ้งเตือน",
+    "facerec": "การจดจำใบหน้า",
+    "devices": "อุปกรณ์",
+    "devices_cctv": "กล้องวงจรปิด",
+    "devices_intercom": "อินเตอร์คอม",
+    "devices_watermeter": "มิเตอร์น้ำ",
+    "devices_electricmeter": "มิเตอร์ไฟ",
+    "devices_airsensor": "อากาศ",
+    "alerts_fire": "ตรวจพบไฟไหม้",
+    "alerts_motion": "ตรวจพบการเคลื่อนไหว",
+    "alerts_offline": "จำนวนกล้อง",
+    "alerts_fall": "ตรวจพบการล้ม",
+    "alerts_sleep": "ตรวจพบนอนหลับ",
+    "user_management": "การจัดการผู้ใช้"
+  },
+  "account": { "logout": "ออกจากระบบ" },
+  "logout": {
+    "title": "ออกจากระบบ",
+    "message": "คุณต้องการออกจากระบบใช่ไหม?"
+  },
+  "actions": { "cancel": "ยกเลิก", "signOut": "ออกจากระบบ" },
   "footer": {
     "support": "ช่วยเหลือ",
     "setting": "การตั้งค่า",
     "useSpace": "พื้นที่ที่ใช้ไป",
-    "desc": "ทีมของคุณใช้พื้นที่ไปเเล้ว {{percent}}% จากพื้นที่ที่มีอยู่ ต้องการเพิ่มไหม?",
+    "desc": "ทีมของคุณใช้พื้นที่ไปแล้ว {{percent}}% จากพื้นที่ที่มีอยู่ ต้องการเพิ่มไหม?",
     "dissmiss": "ปิดข้อความ",
     "upgrade": "อัปเกรดแพ็กเกจ"
   }

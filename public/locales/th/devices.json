@@ -70,6 +70,30 @@
         "title": "ปริมาณน้ำ",
         "yTitle": "ปริมาณน้ำ"
       }
+    },
+    "electric": {
+      "selectTime": "เลือกเวลา",
+      "to": "ถึง",
+      "cards": {
+        "voltage": "แรงดันไฟฟ้า",
+        "consumption": "การใช้ไฟฟ้า",
+        "accumulated": "กำลังไฟสะสม",
+        "current": "กระแสไฟฟ้า",
+        "frequency": "ความถี่",
+        "humidity": "ความชื้น"
+      },
+      "units": {
+        "volt": "(V)",
+        "kwh": "(kWh)",
+        "amp": "(A)",
+        "hz": "(Hz)",
+        "gm3": "(g/m³)"
+      },
+      "side": {
+        "today": "การใช้ไฟฟ้าวันนี้",
+        "month": "การใช้ไฟฟ้าเดือนนี้",
+        "unitKwh": "kWh"
+      }
     }
   }
 }

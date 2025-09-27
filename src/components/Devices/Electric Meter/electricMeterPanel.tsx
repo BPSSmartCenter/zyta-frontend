@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
 import boltWhiteIcon from "../../../assets/bolt.png";
@@ -27,6 +28,7 @@ type CardValueProps = {
   value: number | string;
   valueLabel: string;
   valueLabel2: string;
+  onClick?: () => void; // ← เพิ่มสำหรับคลิก
 };
 
 type SideCardValueProps = {
@@ -41,9 +43,18 @@ function formatWithComma(v: number | string) {
   return Number.isFinite(n) ? n.toLocaleString("en-US") : v;
 }
 
-function CardValue({ img, value, valueLabel, valueLabel2 }: CardValueProps) {
+function CardValue({
+  img,
+  value,
+  valueLabel,
+  valueLabel2,
+  onClick,
+}: CardValueProps) {
   return (
-    <div className="bg-cyan rounded-lg w-[139px] md:w-[145px] h-[190px] p-5 flex flex-col text-white gap-2 select-none">
+    <div
+      className="bg-cyan rounded-lg w-[139px] md:w-[145px] h-[190px] p-5 flex flex-col text-white gap-2 select-none cursor-pointer hover:brightness-90 transition"
+      onClick={onClick}
+    >
       <div className="bg-white w-[48px] rounded-full ">
         <img src={img} className="p-3 w-full" alt="" />
       </div>
@@ -80,6 +91,8 @@ const formatTime = (h: number, m: number) => {
 };
 
 export default function ElectricMeterPanel(_: Props) {
+  const { t } = useTranslation("devices");
+
   // options ทุก 30 นาที
   const timeOptions = useMemo(
     () =>
@@ -92,10 +105,26 @@ export default function ElectricMeterPanel(_: Props) {
     []
   );
 
-  // ค่าเริ่มต้นให้เหมือนภาพ
+  // ค่าเริ่มต้นให้เหมือนเดิม
   const [fromTime, setFromTime] = useState<string>("09:30 PM");
   const [toTime, setToTime] = useState<string>("01:30 AM");
-  const [selected, setSelected] = React.useState<ElectricDay>("Sun");
+  const [selected, setSelected] = useState<ElectricDay>("Sun");
+
+  // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
+  const [thermoOne, setThermoOne] = useState<{
+    initialValue: number;
+    valueLabel: string;
+    maxLabel: string;
+  }>({
+    initialValue: 0.5,
+    valueLabel: "kWh",
+    maxLabel: "",
+  });
+
+  const toNumber = (v: number | string) => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
 
   return (
     <>
@@ -124,7 +153,7 @@ export default function ElectricMeterPanel(_: Props) {
                         "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
                     })}
                   >
-                    {selected?.label ?? "Select time"}
+                    {selected?.label ?? t("devices.electric.selectTime")}
                   </button>
 
                   {open && (
@@ -152,7 +181,7 @@ export default function ElectricMeterPanel(_: Props) {
             </Dropdown>
 
             <span className="text-cyan font-semibold text-sm select-none">
-              TO
+              {t("devices.electric.to")}
             </span>
 
             {/* To */}
@@ -176,7 +205,7 @@ export default function ElectricMeterPanel(_: Props) {
                         "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
                     })}
                   >
-                    {selected?.label ?? "Select time"}
+                    {selected?.label ?? t("devices.electric.selectTime")}
                   </button>
 
                   {open && (
@@ -207,11 +236,13 @@ export default function ElectricMeterPanel(_: Props) {
 
           <div className="flex flex-col md:flex-row w-full justify-around gap-10 lg:gap-0">
             <div className="flex flex-col items-center gap-20">
+              {/* ✅ รี-mount เมื่อค่าเปลี่ยน */}
               <Thermostat
-                initialValue={0.5}
-                max={10}
-                maxLabel={""}
-                valueLabel={"kWh"}
+                key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}`}
+                initialValue={thermoOne.initialValue}
+                max={220}
+                maxLabel={thermoOne.maxLabel}
+                valueLabel={thermoOne.valueLabel}
               />
             </div>
 
@@ -225,43 +256,45 @@ export default function ElectricMeterPanel(_: Props) {
               />
             </div>
           </div>
+
+          {/* value cards */}
           <div className="flex flex-wrap gap-4">
             {[
               {
                 img: voltageIcon,
                 value: 220,
-                valueLabel: "แรงดันไฟฟ้า",
-                valueLabel2: "(โวลท์)",
+                valueLabel: t("devices.electric.cards.voltage"),
+                valueLabel2: t("devices.electric.units.volt"),
               },
               {
                 img: plugIcon,
                 value: 0.5,
-                valueLabel: "การใช้ไฟไฟ้า",
-                valueLabel2: "(kWh)",
+                valueLabel: t("devices.electric.cards.consumption"),
+                valueLabel2: t("devices.electric.units.kwh"),
               },
               {
                 img: transformIcon,
                 value: 0.6,
-                valueLabel: "กำลังไฟสะสม",
-                valueLabel2: "(kWh)",
+                valueLabel: t("devices.electric.cards.accumulated"),
+                valueLabel2: t("devices.electric.units.kwh"),
               },
               {
                 img: IletterIcon,
                 value: 220,
-                valueLabel: "กระแสไฟฟ้า",
-                valueLabel2: "(แอมแปร์)",
+                valueLabel: t("devices.electric.cards.current"),
+                valueLabel2: t("devices.electric.units.amp"),
               },
               {
                 img: wavesineIcon,
                 value: 10,
-                valueLabel: "ความถี่",
-                valueLabel2: "(Hz)",
+                valueLabel: t("devices.electric.cards.frequency"),
+                valueLabel2: t("devices.electric.units.hz"),
               },
               {
                 img: waterSupplieIcon,
                 value: 7.1,
-                valueLabel: "ความชื้น",
-                valueLabel2: "(g/m³)",
+                valueLabel: t("devices.electric.cards.humidity"),
+                valueLabel2: t("devices.electric.units.gm3"),
               },
             ].map((kpi, idx) => (
               <CardValue
@@ -270,6 +303,13 @@ export default function ElectricMeterPanel(_: Props) {
                 value={kpi.value}
                 valueLabel={kpi.valueLabel}
                 valueLabel2={kpi.valueLabel2}
+                onClick={() =>
+                  setThermoOne({
+                    initialValue: toNumber(kpi.value),
+                    valueLabel: kpi.valueLabel,
+                    maxLabel: kpi.valueLabel2,
+                  })
+                }
               />
             ))}
           </div>
@@ -280,14 +320,14 @@ export default function ElectricMeterPanel(_: Props) {
             {
               img: plugWhiteIcon,
               value: 0.45,
-              valueLabel: "การใช้ไฟฟ้าวันนี้",
-              unit: "kWh",
+              valueLabel: t("devices.electric.side.today"),
+              unit: t("devices.electric.side.unitKwh"),
             },
             {
               img: boltWhiteIcon,
               value: 930773,
-              valueLabel: "การใช้ไฟฟ้าเดือนนี้",
-              unit: "kWh",
+              valueLabel: t("devices.electric.side.month"),
+              unit: t("devices.electric.side.unitKwh"),
             },
           ].map((kpi, idx) => (
             <SideCardValue
@@ -300,6 +340,7 @@ export default function ElectricMeterPanel(_: Props) {
           ))}
         </div>
       </div>
+
       <div className="bg-white rounded-xl p-6">
         {/* แถบรายวัน + วง Radial */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">

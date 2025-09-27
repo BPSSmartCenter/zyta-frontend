@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import {
   Dashboard,
   Register,
-  // Login,
+  Login,
   TotalAlert,
   FaceRecognize,
   Devices,
@@ -19,9 +19,9 @@ function App() {
         <ScrollUnlocker />
         <LanguageSwitcher />
         <Routes>
-          {/* <Route path="/" element={<Login />} /> */}
+          <Route path="/" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/alert" element={<TotalAlert />} />
           <Route path="/facerec" element={<FaceRecognize />} />
           <Route path="/devices" element={<Devices />} />
