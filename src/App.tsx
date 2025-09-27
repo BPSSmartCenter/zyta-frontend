@@ -11,11 +11,13 @@ import {
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
 import ScrollUnlocker from "./hook/ScrollUnlocker";
+import ScrollToTop from "./hook/useScrollToTop";
 
 function App() {
   return (
     <>
       <BrowserRouter>
+        <ScrollToTop smooth={true} />
         <ScrollUnlocker />
         <LanguageSwitcher />
         <Routes>
