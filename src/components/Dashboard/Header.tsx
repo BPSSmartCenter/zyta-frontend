@@ -21,7 +21,12 @@ type StatItem = {
   activeImg: string;
 };
 
-type CameraItem = { ringColor: string; imgSrc: string };
+type CameraItem = {
+  ringColor: string;
+  imgSrc?: string;
+  embedUrl?: string;
+  embedTitle?: string;
+};
 
 type Props = {
   statItems: StatItem[];
@@ -153,10 +158,24 @@ export default function Header({ statItems, cameraItems, events }: Props) {
           new Date((a as any).date).getTime()
       )
       .slice(0, MAX_HEADER_IMAGES)
-      .map((n) => ({ imgSrc: getPic(n)!, ringColor: ringClass(n) }));
-    return tiles.length
+      .map<CameraItem>((n) => ({
+        imgSrc: getPic(n) || undefined,
+        ringColor: ringClass(n),
+      }));
+
+    const fallback = tiles.length
       ? tiles
       : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
+
+    const base: CameraItem[] = fallback.length
+      ? fallback
+      : [{ ringColor: "ring-[#AFEAFF]" }];
+
+    return base.map((tile) => ({
+      ...tile,
+      embedUrl: tile.embedUrl ?? MONITOR_URL,
+      embedTitle: tile.embedTitle ?? "Camera monitor",
+    }));
   }, [source, cameraItems]);
 
   // กดการ์ด -> ไป /alert?event=<keyชัดเจน>
@@ -241,18 +260,14 @@ export default function Header({ statItems, cameraItems, events }: Props) {
               style={{ scrollSnapAlign: "center" }}
             >
               <div className="w-full max-w-[500px] mx-auto">
-                {/* ⬇️ ทำให้คลิกแล้วเปิดแท็บใหม่ไปยัง MONITOR_URL */}
-                <a
-                  href={MONITOR_URL}
-                  rel="noopener noreferrer"
-                  aria-label="Open monitor"
-                >
-                  <CameraTile
-                    ringColor={c.ringColor}
-                    imgSrc={c.imgSrc}
-                    className="w-full"
-                  />
-                </a>
+                {/* ⬇️ ฝังหน้ากล้องจาก MONITOR_URL แบบชั่วคราวผ่าน iframe */}
+                <CameraTile
+                  ringColor={c.ringColor}
+                  imgSrc={c.imgSrc}
+                  embedUrl={c.embedUrl}
+                  embedTitle={c.embedTitle}
+                  className="w-full"
+                />
               </div>
             </div>
           ))}
@@ -307,19 +322,14 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       {/* camera tiles (Desktop layout เดิม) */}
       <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
         {computedCamera.map((c, i) => (
-          <a
+          <CameraTile
             key={i}
-            href={MONITOR_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Open monitor"
-          >
-            <CameraTile
-              ringColor={c.ringColor}
-              imgSrc={c.imgSrc}
-              className="p-1!"
-            />
-          </a>
+            ringColor={c.ringColor}
+            imgSrc={c.imgSrc}
+            embedUrl={c.embedUrl}
+            embedTitle={c.embedTitle}
+            className="p-1!"
+          />
         ))}
       </div>
     </div>
