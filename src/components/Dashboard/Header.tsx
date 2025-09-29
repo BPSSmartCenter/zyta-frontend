@@ -31,6 +31,9 @@ type Props = {
 
 const MAX_HEADER_IMAGES = 5;
 
+/* ---------- TEMP monitor URL ---------- */
+const MONITOR_URL = "http://203.114.71.19";
+
 /* ---------- helpers ---------- */
 const getPic = (n: any) =>
   n?.screenshot ??
@@ -238,11 +241,18 @@ export default function Header({ statItems, cameraItems, events }: Props) {
               style={{ scrollSnapAlign: "center" }}
             >
               <div className="w-full max-w-[500px] mx-auto">
-                <CameraTile
-                  ringColor={c.ringColor}
-                  imgSrc={c.imgSrc}
-                  className="w-full"
-                />
+                {/* ⬇️ ทำให้คลิกแล้วเปิดแท็บใหม่ไปยัง MONITOR_URL */}
+                <a
+                  href={MONITOR_URL}
+                  rel="noopener noreferrer"
+                  aria-label="Open monitor"
+                >
+                  <CameraTile
+                    ringColor={c.ringColor}
+                    imgSrc={c.imgSrc}
+                    className="w-full"
+                  />
+                </a>
               </div>
             </div>
           ))}
@@ -297,12 +307,19 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       {/* camera tiles (Desktop layout เดิม) */}
       <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
         {computedCamera.map((c, i) => (
-          <CameraTile
+          <a
             key={i}
-            ringColor={c.ringColor}
-            imgSrc={c.imgSrc}
-            className="p-1!"
-          />
+            href={MONITOR_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open monitor"
+          >
+            <CameraTile
+              ringColor={c.ringColor}
+              imgSrc={c.imgSrc}
+              className="p-1!"
+            />
+          </a>
         ))}
       </div>
     </div>

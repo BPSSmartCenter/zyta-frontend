@@ -9,6 +9,7 @@ import { notis, wellBeingNotis } from "../../data/Dashboard/notis";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { me } from "../../data/Dashboard/auth"; // ★ NEW
 
 const toEventKey = (n: Noti): string => {
   const k = n.titleKey || "";
@@ -19,7 +20,6 @@ const toEventKey = (n: Noti): string => {
   if (k.includes("sleepingLong")) return "sleeping";
   if (k.includes("faceDetected")) return "face";
   if (k.includes("plateDetected")) return "plate";
-  // fallback เผื่อรายการไหนไม่มี titleKey
   const t = (n.title || "").toLowerCase();
   if (t.includes("fire")) return "fire";
   if (t.includes("motion")) return "motion";
@@ -47,6 +47,7 @@ type Props = {
   setSite: (v: string) => void;
   province: string;
   setProvince: (v: string) => void;
+  overrideNotis?: Noti[];
 };
 
 export default function MapPanel({
@@ -57,19 +58,49 @@ export default function MapPanel({
   setSite,
   province,
   setProvince,
+  overrideNotis,
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
+  const userRole: "admin" | "officer" | "user" = (me()?.role as any) || "admin";
+
+  type AclSite = { id?: string; code?: string; name?: string };
+  const aclSites: AclSite[] = (me()?.sites as AclSite[]) || [];
+
+  // ทำ key หลายแบบไว้เผื่อ noti ใช้ชื่อ field ต่างกัน (id / code / name / site / siteId / siteCode / siteName)
+  const allowedSiteKeys = useMemo(() => {
+    const keys = new Set<string>();
+    aclSites.forEach((s) => {
+      [s.id, s.code, s.name]
+        .filter(Boolean)
+        .map(String)
+        .forEach((k) => keys.add(k));
+    });
+    return keys;
+  }, [JSON.stringify(aclSites)]);
+
+  const siteKeysFromNoti = (n: Noti) => {
+    const raw = [
+      (n as any).siteId,
+      (n as any).siteCode,
+      (n as any).siteName,
+      (n as any).site, // บาง mock ใช้สั้นๆ
+    ].filter(Boolean);
+    return raw.map(String);
+  };
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [mapVersion, setMapVersion] = useState(0);
 
   const allTagged: WithGroup[] = useMemo(() => {
+    if (overrideNotis && overrideNotis.length > 0) {
+      return overrideNotis.map((n) => ({ ...(n as Noti), _group: "notis" }));
+    }
     const a = notis.map((n) => ({ ...n, _group: "notis" } as WithGroup));
     const b = wellBeingNotis.map(
       (n) => ({ ...n, _group: "wellbeing" } as WithGroup)
     );
     return [...a, ...b];
-  }, []);
+  }, [overrideNotis]);
 
   const eventsSet = useMemo(() => {
     return new Set(selectedEvents.includes("all") ? ["all"] : selectedEvents);
@@ -81,10 +112,19 @@ export default function MapPanel({
   }, [allTagged, eventsSet]);
 
   const notisForMap: Noti[] = useMemo(() => {
-    return byEvents
-      .map((x) => ({ ...x } as Noti)) // extra field _group ไม่กระทบ Map
+    let list = byEvents
+      .map((x) => ({ ...x } as Noti))
       .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
-  }, [byEvents]);
+
+    if (userRole !== "admin") {
+      list = list.filter((n) => {
+        const keys = siteKeysFromNoti(n);
+        // ผ่านถ้า noti ใดมี key ตรงกับสิทธิ์อย่างน้อยหนึ่งตัว
+        return keys.some((k) => allowedSiteKeys.has(k));
+      });
+    }
+    return list;
+  }, [byEvents, userRole, allowedSiteKeys]);
 
   // re-mount map เมื่อ container resize
   useEffect(() => {
@@ -130,14 +170,8 @@ export default function MapPanel({
     return t(`map.severity.${val}`, { defaultValue: fallback });
   };
 
-  const getLocationLabel = (value: string, label: string) =>
-    value === "all"
-      ? t("map.allLocation", { defaultValue: "All Location" })
-      : label; // จังหวัดไม่ต้องแปล
-
-  // เมื่อผู้ใช้เลือกจังหวัด/ทุกพื้นที่จากเมนู
   const onSelectProvince = (val: string) => {
-    setProvince(val); // ถ้า "all" → Map จะซูมออก (ดู Map.tsx)
+    setProvince(val);
   };
 
   return (
@@ -276,63 +310,69 @@ export default function MapPanel({
           )}
         </Dropdown>
 
-        {/* All Location / ทุกพื้นที่ */}
-        <Dropdown
-          options={LOCATION_OPTIONS}
-          value={province}
-          onChange={onSelectProvince}
-        >
-          {({
-            open,
-            selected,
-            options,
-            getButtonProps,
-            getMenuProps,
-            getItemProps,
-          }) => (
-            <>
-              <button
-                {...getButtonProps({
-                  type: "button",
-                  className:
-                    "inline-flex h-8 min-w-[120px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
-                })}
-              >
-                <span className="truncate">
-                  {selected
-                    ? getLocationLabel(selected.value, selected.label)
-                    : t("map.allLocation", { defaultValue: "All Location" })}
-                </span>
-                <i className="material-icons arrow-icon leading-none text-cyan-500">
-                  {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
-                </i>
-              </button>
+        {/* Location Dropdown → แสดงเฉพาะ admin */}
+        {userRole === "admin" && (
+          <Dropdown
+            options={LOCATION_OPTIONS}
+            value={province}
+            onChange={onSelectProvince}
+          >
+            {({
+              open,
+              selected,
+              options,
+              getButtonProps,
+              getMenuProps,
+              getItemProps,
+            }) => (
+              <>
+                <button
+                  {...getButtonProps({
+                    type: "button",
+                    className:
+                      "inline-flex h-8 min-w-[120px] items-center justify-between rounded-md border border-cyan-500 px-2 text-sm hover:cursor-pointer focus:bg-gray-50 text-cyan-500",
+                  })}
+                >
+                  <span className="truncate">
+                    {selected
+                      ? selected.value === "all"
+                        ? t("map.allLocation", { defaultValue: "All Location" })
+                        : selected.label
+                      : t("map.allLocation", { defaultValue: "All Location" })}
+                  </span>
+                  <i className="material-icons arrow-icon leading-none text-cyan-500">
+                    {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
+                  </i>
+                </button>
 
-              <div
-                {...getMenuProps({
-                  className: [
-                    "absolute flex flex-col mt-9 max-h-80 min-w-[120px] overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-md z-50",
-                    "transition-all duration-150",
-                    open ? "opacity-100" : "opacity-0 pointer-events-none",
-                  ].join(" "),
-                })}
-              >
-                {options.map((opt) => (
-                  <button
-                    key={opt.value}
-                    {...getItemProps(opt, {
-                      type: "button",
-                      className:
-                        "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                    })}
-                  >
-                    {getLocationLabel(opt.value, opt.label)}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </Dropdown>
+                <div
+                  {...getMenuProps({
+                    className: [
+                      "absolute flex flex-col mt-9 max-h-80 min-w-[120px] overflow-y-auto rounded-md border border-gray-300 bg-white p-2 shadow-md z-50",
+                      "transition-all duration-150",
+                      open ? "opacity-100" : "opacity-0 pointer-events-none",
+                    ].join(" "),
+                  })}
+                >
+                  {options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      {...getItemProps(opt, {
+                        type: "button",
+                        className:
+                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
+                      })}
+                    >
+                      {opt.value === "all"
+                        ? t("map.allLocation", { defaultValue: "All Location" })
+                        : opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </Dropdown>
+        )}
       </div>
 
       {/* แผนที่ */}
@@ -342,7 +382,9 @@ export default function MapPanel({
           showPins={true}
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
-          focusProvince={province && province !== "all" ? province : null}
+          focusProvince={
+            userRole === "admin" && province !== "all" ? province : null
+          }
           onProvinceChange={(val) => {
             setProvince(val);
             if (val === "all") {

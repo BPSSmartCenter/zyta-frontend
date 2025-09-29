@@ -4,6 +4,7 @@ import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
 import { useNavigate, useLocation } from "react-router-dom";
+import { me } from "../data/Dashboard/auth";
 
 /** breakpoint hook */
 function useIsDesktop1024() {
@@ -31,6 +32,21 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const { t } = useTranslation("sidebar");
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [account, setAccount] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
+  useEffect(() => {
+    const u = me();
+    if (u) {
+      // เดิม ERD ไม่มี full name ใน payload me() → ใช้ email เป็นชื่อชั่วคราว
+      // ถ้าอยากโชว์ firstName/lastName ให้ปรับ me() คืนค่าเพิ่มได้ภายหลัง
+      setAccount({ name: u.email.split("@")[0], email: u.email });
+    } else {
+      setAccount(null);
+    }
+  }, []);
 
   // mobile toggle
   const [openMobile, setOpenMobile] = useState(false);
@@ -656,10 +672,10 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                   />
                   <div className="flex-1 text-left">
                     <p className="text-sm text-gray-800 font-medium leading-none">
-                      Olivia Rhye
+                      {account?.name ?? "—"}
                     </p>
                     <p className="text-xs text-gray-500">
-                      olivia@untitledui.com
+                      {account?.email ?? ""}
                     </p>
                   </div>
                   <svg
