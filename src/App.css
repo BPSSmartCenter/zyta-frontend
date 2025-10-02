@@ -171,3 +171,7 @@ body {
 .leaflet-popup.bps-popup-wrap .leaflet-popup-tip-container {
   display: none;
 }
+
+.mask-area {
+  cursor: default !important;
+}

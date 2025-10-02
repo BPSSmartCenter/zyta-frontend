@@ -3,6 +3,7 @@ import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
+import React from "react";
 
 type Props = {
   search: string;
@@ -25,12 +26,14 @@ const getEventKey = (n: Noti): EventKey => {
   if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
   if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
   if (
-    /notis\.(camera|device)offline/.test(s) ||  // notis.deviceOffline / notis.cameraOffline
-    /(?:camera|device)\s*offline/.test(s) ||    // "Device offline" / "Camera offline"
-    /\boffline\b/.test(s) ||                    // คำว่า offline
-    /ออฟ.?ไลน์/.test(s)                        // ไทย: ออฟไลน์
-  ) return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ")) return "sleep";
+    /notis\.(camera|device)offline/.test(s) || // notis.deviceOffline / notis.cameraOffline
+    /(?:camera|device)\s*offline/.test(s) || // "Device offline" / "Camera offline"
+    /\boffline\b/.test(s) || // คำว่า offline
+    /ออฟ.?ไลน์/.test(s) // ไทย: ออฟไลน์
+  )
+    return "offline";
+  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
+    return "sleep";
   // default ให้เข้าเพจ alert ได้แน่ ๆ
   return "motion";
 };
@@ -58,9 +61,32 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
   };
 
   // เรียงใหม่→เก่า (คงพฤติกรรมเดิม)
-  const list = [...items].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const list = React.useMemo(() => {
+    const q = (search || "").toLowerCase().trim();
+
+    // เรียงใหม่→เก่าเหมือนเดิม
+    const sorted = [...items].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    if (!q) return sorted;
+
+    // ใช้ bag() + site + date ให้ค้นหาทั้ง alert + wellbeing ได้
+    return sorted.filter((n: any) => {
+      const hay = [
+        bag(n), // event/titleKey/title (รองรับ i18n key เดิม)
+        n?.site, // ชื่อไซต์
+        n?.title, // ชื่อเรื่อง plain
+        n?.type, // ประเภท เช่น motion/offline/...
+        n?.date, // string วันที่
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return hay.includes(q);
+    });
+  }, [items, search, i18n.language]);
 
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">

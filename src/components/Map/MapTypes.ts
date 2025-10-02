@@ -11,8 +11,26 @@ export type Props = {
   showPins?: boolean;
   aggregateBySite?: boolean;
   severityFilter?: SeverityFilter;
+
+  /** จังหวัดที่จะโฟกัส (ชื่อไทยให้ตรง geojson เช่น "กรุงเทพมหานคร") */
   focusProvince?: string | null;
+
+  /** center ของ Site ที่เลือกไว้ (ถ้ามี) จะ flyTo ให้แบบ auto-focus */
+  focusSiteCenter?: { lat: number; lng: number } | null;
+
   onProvinceChange?: (value: string | "all") => void;
+
+  /** สิทธิ์ผู้ใช้ — ใช้กำหนดพฤติกรรมโต้ตอบ (เช่น lock interaction สำหรับ user) */
+  role?: "admin" | "officer" | "user";
+
+  /** อนุญาตให้มุมมอง country หรือไม่ (บาง role อาจไม่ให้ออกนอกจังหวัด) */
+  allowCountryView?: boolean;
+
+  /** ล็อกปุ่ม Zoom out และกันซูมออก */
+  lockZoomOut?: boolean;
+
+  /** รายชื่อ site ที่อนุญาต (ไว้ใช้กับการ aggregate marker ถ้าต้อง) */
+  allowedSiteNames?: string[];
 };
 
 export type ViewState = {

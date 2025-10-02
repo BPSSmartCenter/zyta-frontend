@@ -25,6 +25,7 @@ type Props = {
   setSite: (v: string) => void;
   province: string;
   setProvince: (v: string) => void;
+  mapNotis?: any[];
   // right
   searchFR: string;
   setSearchFR: (v: string) => void;
@@ -33,6 +34,15 @@ type Props = {
   searchZYTA: string;
   setSearchZYTA: (v: string) => void;
   filterZYTA: ReadonlyArray<any>;
+  selectedSiteCode?: string;
+  accessibleSites?: Array<{
+    id?: string;
+    code?: string;
+    name?: string;
+    province_code?: string;
+    lat?: number;
+    lng?: number;
+  }>;
 };
 
 export default function ContentLayout(props: Props) {
@@ -117,6 +127,9 @@ export default function ContentLayout(props: Props) {
               setSite={setSite}
               province={province}
               setProvince={setProvince}
+              selectedSiteCode={props.selectedSiteCode}
+              accessibleSites={props.accessibleSites}
+              overrideNotis={props.mapNotis}
             />
           </div>
 

@@ -38,12 +38,23 @@ const CameraTile: React.FC<CameraTileProps> = ({
       {/* Inner frame with rounded corners and white background */}
       <div className="absolute inset-1 rounded-xl overflow-hidden bg-white">
         {embedUrl ? (
-          <iframe
-            src={embedUrl}
-            title={title}
-            className="h-full w-full border-0"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
+          <div className="h-full w-full overflow-hidden">
+            <iframe
+              src={embedUrl}
+              title={title}
+              className="h-full w-full border-0 object-cover"
+              style={{ objectFit: "cover" }} // ให้ scale เหมือนรูป
+              allow="autoplay; fullscreen; picture-in-picture"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
+        ) : imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={alt}
+            className="h-full w-full object-cover select-none"
+            draggable={false}
             loading="lazy"
           />
         ) : imgSrc ? (

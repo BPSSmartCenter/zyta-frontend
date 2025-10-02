@@ -36,8 +36,12 @@ type Props = {
 
 const MAX_HEADER_IMAGES = 5;
 
-/* ---------- TEMP monitor URL ---------- */
-const MONITOR_URL = "http://203.114.71.19";
+/* ---------- TEMP monitor URL (mock) ---------- */
+const MONITOR_URL =
+  "https://lh3.googleusercontent.com/d/1SyjAavZ0IP_VQU81tAmBmQE-AjFEhn6m=w600-h600-iv1";
+
+/* ---------- toggle: เปิด/ปิดการใช้รูป mock ---------- */
+const USE_MOCK_CAMERA = false;
 
 /* ---------- helpers ---------- */
 const getPic = (n: any) =>
@@ -148,9 +152,39 @@ export default function Header({ statItems, cameraItems, events }: Props) {
     [statItems, counts]
   );
 
+  const isImageUrl = (url?: string) => {
+    if (!url) return false;
+    const u = url.toLowerCase();
+    return (
+      /\.(png|jpe?g|gif|webp|bmp|avif)(\?.*)?$/.test(u) ||
+      u.includes("googleusercontent.com") ||
+      u.includes("=iv1")
+    );
+  };
+
+  // helper: ถ้าเป็น googleusercontent และยังไม่มีพารามิเตอร์ ให้ต่อ "=w600-h600-iv1"
+  // หรือถ้ามีแล้วแต่ไม่มี -iv1 ให้เติม -iv1 เข้าไป
+  const normalizeGoogleImg = (u?: string) => {
+    if (!u) return u;
+    if (!u.includes("googleusercontent.com/d/")) return u;
+    if (!u.includes("=")) return `${u}=w600-h600-iv1`;
+    return /[-_]iv1\b/.test(u) ? u : `${u}-iv1`;
+  };
+
   // รูปแกลลอรี่ด้านบน
-  const computedCamera = React.useMemo<CameraItem[]>(() => {
-    const tiles = source
+  const computedCamera: CameraItem[] = React.useMemo(() => {
+    if (USE_MOCK_CAMERA) {
+      const mock: CameraItem = {
+        ringColor: "ring-[#AFEAFF]",
+        imgSrc: normalizeGoogleImg(MONITOR_URL),
+        embedUrl: undefined,
+        embedTitle: "Mock Camera",
+      };
+      return Array.from({ length: MAX_HEADER_IMAGES }, () => mock);
+    }
+
+    // ===== โหมดจริง =====
+    const tiles: CameraItem[] = source
       .filter((n) => !!getPic(n))
       .sort(
         (a, b) =>
@@ -163,7 +197,8 @@ export default function Header({ statItems, cameraItems, events }: Props) {
         ringColor: ringClass(n),
       }));
 
-    const fallback = tiles.length
+    // ให้ TypeScript รู้แน่ ๆ ว่าเป็น CameraItem[]
+    const fallback: CameraItem[] = tiles.length
       ? tiles
       : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
 
@@ -171,11 +206,18 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       ? fallback
       : [{ ringColor: "ring-[#AFEAFF]" }];
 
-    return base.map((tile) => ({
-      ...tile,
-      embedUrl: tile.embedUrl ?? MONITOR_URL,
-      embedTitle: tile.embedTitle ?? "Camera monitor",
-    }));
+    return base.map<CameraItem>((tile) => {
+      const candidate = normalizeGoogleImg(
+        tile.imgSrc ?? tile.embedUrl ?? MONITOR_URL
+      );
+      const showAsImg = isImageUrl(candidate);
+      return {
+        ...tile,
+        imgSrc: showAsImg ? candidate : tile.imgSrc,
+        embedUrl: showAsImg ? undefined : tile.embedUrl ?? candidate,
+        embedTitle: tile.embedTitle ?? "Camera monitor",
+      };
+    });
   }, [source, cameraItems]);
 
   // กดการ์ด -> ไป /alert?event=<keyชัดเจน>

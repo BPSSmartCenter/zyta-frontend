@@ -1,5 +1,5 @@
 import Dropdown from "../Dropdown";
-import Map from "../Map/Map";
+import MapView from "../Map/Map";
 import {
   EVENT_OPTIONS,
   SEVERITY_OPTIONS,
@@ -9,25 +9,25 @@ import { notis, wellBeingNotis } from "../../data/Dashboard/notis";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { me } from "../../data/Dashboard/auth"; // ★ NEW
+import { me } from "../../data/Dashboard/auth";
+import { PROVINCE_CODE_TO_TH } from "../../data/Dashboard/data";
 
+/* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {
   const k = n.titleKey || "";
   if (k.includes("fireDetected")) return "fire";
   if (k.includes("motionDetected")) return "motion";
-  if (k.includes("cameraOffline")) return "offline";
+  if (k.includes("cameraOffline") || k.includes("deviceOffline"))
+    return "offline";
   if (k.includes("fallDetected")) return "fall";
-  if (k.includes("sleepingLong")) return "sleeping";
-  if (k.includes("faceDetected")) return "face";
-  if (k.includes("plateDetected")) return "plate";
+  if (k.includes("sleepDetected") || k.includes("sleepingLong"))
+    return "sleeping";
   const t = (n.title || "").toLowerCase();
   if (t.includes("fire")) return "fire";
   if (t.includes("motion")) return "motion";
   if (t.includes("offline")) return "offline";
   if (t.includes("fall")) return "fall";
   if (t.includes("sleep")) return "sleeping";
-  if (t.includes("face")) return "face";
-  if (t.includes("plate")) return "plate";
   return "unknown";
 };
 
@@ -39,15 +39,40 @@ const toSeverity = (v: string | undefined | null): Severity | "all" => {
     : "all";
 };
 
+// map noti -> severity ("low" | "medium" | "critical")
+const normalizeSeverity = (n: any): Severity => {
+  const s = (n?.severity ?? "").toString().toLowerCase();
+  if (s === "low" || s === "medium" || s === "critical") return s as Severity;
+  const t = (n?.type ?? "").toString().toLowerCase();
+  if (t === "alert" || t === "critical" || t === "danger") return "critical";
+  if (t === "warning" || t === "medium") return "medium";
+  return "low";
+};
+
+/* ---------- props ---------- */
 type Props = {
   selectedEvents: string[];
   buttonLabel: string;
   toggleEvent: (v: string) => void;
+
+  // หมายเหตุ: prop ชื่อ site ใช้เก็บ "severity" ตามโค้ดเดิม
   site: string;
   setSite: (v: string) => void;
+
+  // province: "all" | ชื่อจังหวัด (ไทย)
   province: string;
   setProvince: (v: string) => void;
+
   overrideNotis?: Noti[];
+  selectedSiteCode?: string;
+  accessibleSites?: Array<{
+    id?: string;
+    code?: string;
+    name?: string;
+    province_code?: string;
+    lat?: number;
+    lng?: number;
+  }>;
 };
 
 export default function MapPanel({
@@ -59,17 +84,47 @@ export default function MapPanel({
   province,
   setProvince,
   overrideNotis,
+  selectedSiteCode,
+  accessibleSites,
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
   const userRole: "admin" | "officer" | "user" = (me()?.role as any) || "admin";
 
-  type AclSite = { id?: string; code?: string; name?: string };
-  const aclSites: AclSite[] = (me()?.sites as AclSite[]) || [];
+  /* ---------- ACL sites (ใช้ object เต็มจาก accessSites) ---------- */
+  type AclSite = {
+    id?: string;
+    code?: string;
+    name?: string;
+    province_code?: string;
+    lat?: number;
+    lng?: number;
+  };
+  const aclSites: AclSite[] = (accessibleSites ?? []) as AclSite[];
 
-  // ทำ key หลายแบบไว้เผื่อ noti ใช้ชื่อ field ต่างกัน (id / code / name / site / siteId / siteCode / siteName)
+  useEffect(() => {
+    if (!selectedSiteCode) return;
+
+    if (selectedSiteCode === "all") {
+      // กลับโหมดเห็นทุกพื้นที่
+      setProvince("all");
+      return;
+    }
+
+    // หา site จากรายการที่ส่งมาจาก Navbar
+    const s = accessibleSites?.find((x) => x.code === selectedSiteCode);
+    if (!s) return;
+
+    const pCode = s.province_code;
+    const pName = pCode ? PROVINCE_CODE_TO_TH[pCode] : undefined;
+    if (pName) {
+      setProvince(pName); // ★ สั่งให้ Map โฟกัส "จังหวัด" เท่านั้น
+    }
+  }, [selectedSiteCode, accessibleSites, setProvince]);
+
+  // รองรับหลายฟิลด์ของ noti (id/code/name/site/siteId/siteCode/siteName)
   const allowedSiteKeys = useMemo(() => {
     const keys = new Set<string>();
-    aclSites.forEach((s) => {
+    (aclSites || []).forEach((s) => {
       [s.id, s.code, s.name]
         .filter(Boolean)
         .map(String)
@@ -79,54 +134,38 @@ export default function MapPanel({
   }, [JSON.stringify(aclSites)]);
 
   const siteKeysFromNoti = (n: Noti) => {
+    // รวบรวม key ทุกรูปแบบที่พบนิยม
     const raw = [
       (n as any).siteId,
+      (n as any).site_id,
       (n as any).siteCode,
+      (n as any).site_code,
       (n as any).siteName,
-      (n as any).site, // บาง mock ใช้สั้นๆ
+      (n as any).site_name,
+      (n as any).site, // บางที่อาจเป็น code หรือ name
+      (n as any)?.site?.id,
+      (n as any)?.site?.code,
+      (n as any)?.site?.name,
     ].filter(Boolean);
-    return raw.map(String);
+
+    // map “ชื่อไซต์” -> “code” เพื่อให้เทียบ selectedSiteCode ได้เสมอ
+    const nameToCode = new Map(
+      (accessibleSites ?? []).map((s) => [String(s.name), String(s.code)])
+    );
+    const withCodes = raw.flatMap((val) => {
+      const s = String(val);
+      const code = nameToCode.get(s);
+      return code ? [s, code] : [s];
+    });
+
+    // คืนค่ารูปแบบ string ทั้งหมด (unique)
+    return Array.from(new Set(withCodes));
   };
 
+  /* ---------- container + remount on resize (ของเดิม) ---------- */
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [mapVersion, setMapVersion] = useState(0);
 
-  const allTagged: WithGroup[] = useMemo(() => {
-    if (overrideNotis && overrideNotis.length > 0) {
-      return overrideNotis.map((n) => ({ ...(n as Noti), _group: "notis" }));
-    }
-    const a = notis.map((n) => ({ ...n, _group: "notis" } as WithGroup));
-    const b = wellBeingNotis.map(
-      (n) => ({ ...n, _group: "wellbeing" } as WithGroup)
-    );
-    return [...a, ...b];
-  }, [overrideNotis]);
-
-  const eventsSet = useMemo(() => {
-    return new Set(selectedEvents.includes("all") ? ["all"] : selectedEvents);
-  }, [selectedEvents]);
-
-  const byEvents: WithGroup[] = useMemo(() => {
-    if (eventsSet.has("all")) return allTagged;
-    return allTagged.filter((n) => eventsSet.has(toEventKey(n)));
-  }, [allTagged, eventsSet]);
-
-  const notisForMap: Noti[] = useMemo(() => {
-    let list = byEvents
-      .map((x) => ({ ...x } as Noti))
-      .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
-
-    if (userRole !== "admin") {
-      list = list.filter((n) => {
-        const keys = siteKeysFromNoti(n);
-        // ผ่านถ้า noti ใดมี key ตรงกับสิทธิ์อย่างน้อยหนึ่งตัว
-        return keys.some((k) => allowedSiteKeys.has(k));
-      });
-    }
-    return list;
-  }, [byEvents, userRole, allowedSiteKeys]);
-
-  // re-mount map เมื่อ container resize
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
@@ -141,27 +180,100 @@ export default function MapPanel({
         }
       }, 120);
     };
-    const ro = new ResizeObserver(() => onSize(el.clientWidth || 0));
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) onSize(entry.contentRect.width);
+    });
     ro.observe(el);
     return () => {
-      if (timer) clearTimeout(timer);
+      if (timer) clearTimeout(timer!);
       ro.disconnect();
     };
   }, []);
 
-  useEffect(() => {
-    console.log(
-      "[MapPanel] events =",
-      selectedEvents,
-      " severity =",
-      site,
-      " totalAfterEvents =",
-      byEvents.length,
-      " pushToMap =",
-      notisForMap.length
-    );
-  }, [selectedEvents, site, byEvents, notisForMap]);
+  /* ---------- merge notis + filter by selected events ---------- */
+  const allTagged: WithGroup[] = useMemo(() => {
+    if (Array.isArray(overrideNotis)) {
+      // ใช้ชุดที่มาจาก Dashboard โดยตรง (กรองตาม Site/ACL แล้ว)
+      return overrideNotis.map((n) => ({ ...n, _group: "notis" as const }));
+    }
+    const a = notis.map((n) => ({ ...n, _group: "notis" as const }));
+    const b = wellBeingNotis.map((n) => ({
+      ...n,
+      _group: "wellbeing" as const,
+    }));
+    return [...a, ...b];
+  }, [overrideNotis]);
 
+  const eventsSet = useMemo(
+    () => new Set(selectedEvents.includes("all") ? ["all"] : selectedEvents),
+    [selectedEvents]
+  );
+
+  const byEvents: WithGroup[] = useMemo(() => {
+    if (eventsSet.has("all")) return allTagged;
+    return allTagged.filter((n) => eventsSet.has(toEventKey(n)));
+  }, [allTagged, eventsSet]);
+
+  const notisForMap: Noti[] = useMemo(() => {
+    const usingOverride = Array.isArray(overrideNotis);
+    let list = byEvents
+      .map((x) => ({ ...x } as Noti))
+      .sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime());
+
+    if (!usingOverride && selectedSiteCode && selectedSiteCode !== "all") {
+      list = list.filter((n) =>
+        siteKeysFromNoti(n).includes(String(selectedSiteCode))
+      );
+    }
+
+    // ⬇️ กรองตามสิทธิ์เข้าถึง Site
+    if (userRole !== "admin") {
+      list = list.filter((n) => {
+        const keys = siteKeysFromNoti(n);
+        return keys.some((k) => allowedSiteKeys.has(k));
+      });
+    }
+
+    // ⬇️ กรองตาม Severity (ให้ทำงานแน่ๆ จากฝั่ง Panel)
+    const want = toSeverity(site);
+    if (want !== "all") {
+      list = list.filter((n: any) => normalizeSeverity(n) === want);
+    }
+
+    return list;
+  }, [
+    byEvents,
+    userRole,
+    allowedSiteKeys,
+    site,
+    selectedSiteCode,
+    overrideNotis,
+  ]);
+
+  /* ---------- auto set province for non-admin (ไม่แตะ UI) ---------- */
+  const firstAccessibleSite = useMemo(() => {
+    return Array.isArray(aclSites) && aclSites.length > 0 ? aclSites[0] : null;
+  }, [aclSites]);
+
+  const resolvedProvinceForRole = useMemo(() => {
+    if (userRole === "admin") return province;
+    if (province && province !== "all") return province;
+    const code = firstAccessibleSite?.province_code as string | undefined;
+    const nameTh = code ? PROVINCE_CODE_TO_TH[code] : undefined;
+    return nameTh || "all";
+  }, [userRole, province, firstAccessibleSite]);
+
+  useEffect(() => {
+    if (
+      userRole !== "admin" &&
+      province === "all" &&
+      resolvedProvinceForRole !== "all"
+    ) {
+      setProvince(resolvedProvinceForRole as any);
+    }
+  }, [userRole, province, resolvedProvinceForRole, setProvince]);
+
+  /* ---------- i18n helpers ---------- */
   const getEventLabel = (val: string, fallback: string) =>
     t(`events.${val}`, { defaultValue: fallback });
 
@@ -170,17 +282,16 @@ export default function MapPanel({
     return t(`map.severity.${val}`, { defaultValue: fallback });
   };
 
-  const onSelectProvince = (val: string) => {
-    setProvince(val);
-  };
+  const onSelectProvince = (val: string) => setProvince(val);
 
+  /* ---------- render (UI เดิม) ---------- */
   return (
     <div
       className="flex flex-col justify-center py-2 px-0 md:px-3 gap-3"
       ref={wrapperRef}
     >
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        {t("map.title", { defaultValue: "MAP" })}
+        {t("map.title", { defaultValue: "แผนที่" })}
       </h1>
 
       <div className="flex items-center flex-wrap gap-5">
@@ -267,7 +378,7 @@ export default function MapPanel({
                 <span className="truncate">
                   {selected
                     ? getSeverityLabel(selected.value, selected.label)
-                    : t("map.anySeverity", { defaultValue: "Any Severity" })}
+                    : t("map.anySeverity", { defaultValue: "ทุกความรุนแรง" })}
                 </span>
                 <i className="material-icons arrow-icon leading-none text-cyan-500">
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
@@ -311,7 +422,7 @@ export default function MapPanel({
         </Dropdown>
 
         {/* Location Dropdown → แสดงเฉพาะ admin */}
-        {userRole === "admin" && (
+        {userRole === "admin" && selectedSiteCode === "all" && (
           <Dropdown
             options={LOCATION_OPTIONS}
             value={province}
@@ -336,9 +447,9 @@ export default function MapPanel({
                   <span className="truncate">
                     {selected
                       ? selected.value === "all"
-                        ? t("map.allLocation", { defaultValue: "All Location" })
+                        ? t("map.allLocation", { defaultValue: "ทุกพื้นที่" })
                         : selected.label
-                      : t("map.allLocation", { defaultValue: "All Location" })}
+                      : t("map.allLocation", { defaultValue: "ทุกพื้นที่" })}
                   </span>
                   <i className="material-icons arrow-icon leading-none text-cyan-500">
                     {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
@@ -364,7 +475,7 @@ export default function MapPanel({
                       })}
                     >
                       {opt.value === "all"
-                        ? t("map.allLocation", { defaultValue: "All Location" })
+                        ? t("map.allLocation", { defaultValue: "ทุกพื้นที่" })
                         : opt.label}
                     </button>
                   ))}
@@ -377,14 +488,18 @@ export default function MapPanel({
 
       {/* แผนที่ */}
       <div className="mt-3" key={mapVersion}>
-        <Map
+        <MapView
           notis={notisForMap}
           showPins={true}
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
+          // โฟกัสจังหวัด (มาจาก useEffect ในข้อ 2)
           focusProvince={
-            userRole === "admin" && province !== "all" ? province : null
+            resolvedProvinceForRole !== "all"
+              ? (resolvedProvinceForRole as string)
+              : null
           }
+          lockZoomOut={selectedSiteCode !== "all"}
           onProvinceChange={(val) => {
             setProvince(val);
             if (val === "all") {

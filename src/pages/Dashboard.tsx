@@ -1,4 +1,4 @@
-// src/pages/Dashboard/Dashboard.tsx
+﻿// src/pages/Dashboard/Dashboard.tsx
 import React from "react";
 import Navbar from "../components/Dashboard/Navbar";
 import Header from "../components/Dashboard/Header";
@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 
 import { me, accessSites } from "../data/Dashboard/auth";
 import { PROVINCE_CODE_TO_TH } from "../data/Dashboard/data";
+import type { Site } from "../data/Dashboard/data";
 
 const NON_ALL_COUNT = EVENT_OPTIONS.length - 1;
 
@@ -30,7 +31,8 @@ export default function Dashboard() {
   const { t, i18n } = useTranslation(["dashboard"]);
 
   const [date, setDate] = React.useState<DateValue>(today);
-  const [site, setSite] = React.useState("all");
+  const [selectedSiteCode, setSelectedSiteCode] = React.useState("all");
+  const [mapSeverity, setMapSeverity] = React.useState("all");
   const [province, setProvince] = React.useState("all");
   const [selectedEvents, setSelectedEvents] = React.useState<string[]>(["all"]);
 
@@ -42,49 +44,60 @@ export default function Dashboard() {
 
   // ===== mock auth + access sites =====
   const [role, setRole] = React.useState<"admin" | "officer" | "user">("admin");
-  const [accessibleSiteIds, setAccessibleSiteIds] = React.useState<
-    string[] | null
-  >(null);
+  const [accessibleSites, setAccessibleSites] = React.useState<Site[] | null>(
+    null
+  );
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
 
   React.useEffect(() => {
-    const u = me();
+    const currentUser = me();
+    if (currentUser) {
+      setRole(currentUser.role as any);
+    } else {
+      setRole("admin");
+    }
+
     const resp = accessSites({ includeCountryBBox: true });
 
-    // role
-    if (u) setRole(u.role as any);
-
-    // สร้าง options ของ dropdown ให้ตรงสิทธิ์
     if (resp) {
-      const ids = resp.items.map((s) => s.id);
-      setAccessibleSiteIds(ids);
+      const normalizedSites = resp.items.map((s) => ({ ...s } as Site));
+      setAccessibleSites(normalizedSites);
 
-      const opts: SiteOption[] = [
-        {
-          label: t("navbar.allSites"),
-          value: "all",
-          i18nKey: "navbar.allSites",
-        },
-        ...resp.items.map((s) => ({
-          label: s.name,
-          value: s.code, // NOTE: ฝั่ง Navbar map ด้วย i18n key "sites.<value>" ได้
-        })),
-      ];
+      const includeAllOption = (currentUser?.role ?? "admin") === "admin";
+      const baseOptions: SiteOption[] = normalizedSites.map((s) => ({
+        label: s.name,
+        value: s.code,
+      }));
+
+      const opts: SiteOption[] = includeAllOption
+        ? [
+            {
+              label: t("navbar.allSites"),
+              value: "all",
+              i18nKey: "navbar.allSites",
+            },
+            ...baseOptions,
+          ]
+        : baseOptions;
+
       setSiteOptions(opts);
 
-      // ถ้า role=user และมีแค่ไซต์เดียว → ตั้ง province ให้โฟกัสจังหวัดนั้น
-      if (u?.role === "user" && resp.items.length === 1) {
-        const only = resp.items[0];
-        const provinceNameTH = PROVINCE_CODE_TO_TH[only.province_code];
-        if (provinceNameTH) {
-          setProvince(provinceNameTH); // MapPanel จะรับ province นี้ไป focus
+      setSelectedSiteCode((prev) => {
+        if (includeAllOption) {
+          if (prev === "all" || baseOptions.some((opt) => opt.value === prev)) {
+            return prev;
+          }
+          return "all";
         }
-      }
+        if (baseOptions.some((opt) => opt.value === prev)) {
+          return prev;
+        }
+        return baseOptions[0]?.value ?? "";
+      });
     } else {
-      // ไม่มี token → ให้ dropdown เป็น all อย่างเดียว
-      setAccessibleSiteIds([]);
+      setAccessibleSites([]);
       setSiteOptions([
         {
           label: t("navbar.allSites"),
@@ -92,10 +105,89 @@ export default function Dashboard() {
           i18nKey: "navbar.allSites",
         },
       ]);
+      setSelectedSiteCode("all");
     }
   }, [t, i18n.language]);
 
-  // ---------- Helpers: ค้นหา (ตามไฟล์เดิม) ----------
+  React.useEffect(() => {
+    if (!accessibleSites || accessibleSites.length === 0) {
+      if (role !== "admin" && province !== "all") {
+        setProvince("all");
+      }
+      return;
+    }
+
+    if (role === "admin") {
+      if (
+        selectedSiteCode !== "all" &&
+        !accessibleSites.some((site) => site.code === selectedSiteCode)
+      ) {
+        setSelectedSiteCode("all");
+      }
+      return;
+    }
+
+    const siteForRole =
+      accessibleSites.find((site) => site.code === selectedSiteCode) ??
+      accessibleSites[0];
+
+    if (!siteForRole) return;
+
+    if (selectedSiteCode !== siteForRole.code) {
+      setSelectedSiteCode(siteForRole.code);
+      return;
+    }
+
+    const provinceName =
+      PROVINCE_CODE_TO_TH[siteForRole.province_code] ?? "all";
+
+    if (provinceName !== "all" && province !== provinceName) {
+      setProvince(provinceName);
+    }
+    if (provinceName === "all" && province !== "all") {
+      setProvince("all");
+    }
+  }, [accessibleSites, selectedSiteCode, role, province]);
+
+  // เลือก site เริ่มต้น + เซ็ต province ทันทีหลังรู้ accessibleSites
+  React.useEffect(() => {
+    if (!accessibleSites || accessibleSites.length === 0) return;
+    if (role === "admin") {
+      // admin เห็นทุกจังหวัด → all
+      if (selectedSiteCode !== "all") setSelectedSiteCode("all");
+      setProvince("all");
+      return;
+    }
+    // officer/user → ใช้ site ตัวแรกตามสิทธิ์
+    const first = accessibleSites[0];
+    if (!first) return;
+    if (String(selectedSiteCode) !== String(first.code)) {
+      setSelectedSiteCode(String(first.code));
+    }
+    if (first.province_code) {
+      const nameTh = PROVINCE_CODE_TO_TH[first.province_code];
+      if (nameTh) setProvince(nameTh);
+    }
+  }, [role, JSON.stringify(accessibleSites)]);
+
+  // เมื่อผู้ใช้เปลี่ยน site (จาก Navbar) → sync province ตาม province_code ของ site นั้น
+  React.useEffect(() => {
+    if (!accessibleSites || accessibleSites.length === 0) return;
+    if (!selectedSiteCode || selectedSiteCode === "all") {
+      // admin เลือก all → แผนที่กลับประเทศ
+      if (role === "admin") setProvince("all");
+      return;
+    }
+    const s = (accessibleSites ?? []).find(
+      (x) => String(x.code) === String(selectedSiteCode)
+    );
+    if (s?.province_code) {
+      const nameTh = PROVINCE_CODE_TO_TH[s.province_code];
+      if (nameTh) setProvince(nameTh);
+    }
+  }, [selectedSiteCode, JSON.stringify(accessibleSites)]);
+
+  // ---------- Helpers: เธเนเธเธซเธฒ (เธ•เธฒเธกเนเธเธฅเนเน€เธ”เธดเธก) ----------
   const formatDateStrings = React.useCallback(
     (dateStr: string) => {
       const d = new Date(dateStr);
@@ -131,7 +223,7 @@ export default function Dashboard() {
   type AnyNoti = {
     title: string;
     titleKey?: string;
-    site: string; // << สำคัญ: notis มี site name/code ตรงนี้
+    site: string; // << เธชเธณเธเธฑเธ: notis เธกเธต site name/code เธ•เธฃเธเธเธตเน
     type?: string;
     date: string;
     detail?: string;
@@ -161,22 +253,33 @@ export default function Dashboard() {
     [t, formatDateStrings]
   );
 
-  // ---- Filter notis ด้วยสิทธิ์ (accessibleSiteIds) ----
+  // ---- Filter notis เธ”เนเธงเธขเธชเธดเธ—เธเธดเน (accessibleSites) ----
   const filterByAcl = React.useCallback(
     (arr: ReadonlyArray<any>) => {
-      if (!accessibleSiteIds) return arr; // ยังโหลดไม่เสร็จ → แสดงทั้งหมดชั่วคราว
-      if (role === "admin") return arr; // admin เห็นหมด
-      // officer/user: noti.site ต้องอยู่ในรายการ site ที่เห็นได้
-      // หมายเหตุ: ใน mock notis ใช้ค่า "site" เป็นชื่อ Site ("Site A"|"Site B"|...) ให้ map เป็น id จาก access sites ที่สร้าง option ไว้
-      const allowedNames = new Set(
-        siteOptions.filter((o) => o.value !== "all").map((o) => o.label)
-      );
-      return arr.filter((n) => allowedNames.has(n.site));
+      if (!accessibleSites) return arr;
+      let list = arr;
+
+      if (role !== "admin") {
+        const allowedNames = new Set(accessibleSites.map((s) => s.name));
+        list = list.filter((n) => allowedNames.has(n.site));
+      }
+
+      if (selectedSiteCode !== "all") {
+        const selectedSite = accessibleSites.find(
+          (s) => s.code === selectedSiteCode
+        );
+        if (!selectedSite) {
+          return [];
+        }
+        list = list.filter((n) => n.site === selectedSite.name);
+      }
+
+      return list;
     },
-    [accessibleSiteIds, role, siteOptions]
+    [accessibleSites, role, selectedSiteCode]
   );
 
-  // ---------- Filters (คง logic เดิม) ----------
+  // ---------- Filters (เธเธ logic เน€เธ”เธดเธก) ----------
   const filteredNotis = React.useMemo(() => {
     const source = filterByAcl(notis);
     const q = searchEvent.trim().toLowerCase();
@@ -207,7 +310,7 @@ export default function Dashboard() {
     return source.filter((n: any) => makeHaystack(n).includes(q));
   }, [searchZYTA, i18n.language, makeHaystack, filterByAcl]);
 
-  // ---------- Chart props (เดิม) ----------
+  // ---------- Chart props (เน€เธ”เธดเธก) ----------
   const chartProps = React.useMemo(() => {
     const nonAllSelected = selectedEvents.filter((v) => v !== "all");
     const selectedCount = selectedEvents.includes("all")
@@ -237,8 +340,12 @@ export default function Dashboard() {
     });
   }, []);
 
-  const handleSiteChange = React.useCallback(
-    (value: string) => setSite(value),
+  const handleMapSeverityChange = React.useCallback(
+    (value: string) => setMapSeverity(value),
+    []
+  );
+  const handleSelectedSiteChange = React.useCallback(
+    (value: string) => setSelectedSiteCode(value),
     []
   );
   const handleProvinceChange = React.useCallback(
@@ -277,10 +384,14 @@ export default function Dashboard() {
       selectedEvents,
       buttonLabel: chartProps.buttonLabel,
       toggleEvent,
-      site,
-      setSite: handleSiteChange,
+      site: mapSeverity,
+      setSite: handleMapSeverityChange,
       province,
       setProvince: handleProvinceChange,
+      selectedSiteCode,
+      accessibleSites: accessibleSites ?? [],
+      role,
+      mapNotis: [...filteredNotis, ...filteredWellBeginNotis],
       searchFR,
       setSearchFR: handleSearchFR,
       filteredRecognize: [...filteredRecognize],
@@ -295,10 +406,13 @@ export default function Dashboard() {
       selectedEvents,
       chartProps.buttonLabel,
       toggleEvent,
-      site,
-      handleSiteChange,
+      mapSeverity,
+      handleMapSeverityChange,
       province,
       handleProvinceChange,
+      selectedSiteCode,
+      accessibleSites,
+      role,
       searchFR,
       handleSearchFR,
       filteredRecognize,
@@ -307,7 +421,7 @@ export default function Dashboard() {
     ]
   );
 
-  // ---------- Header events / totals (เดิม) ----------
+  // ---------- Header events / totals (เน€เธ”เธดเธก) ----------
   const headerEvents = React.useMemo(
     () =>
       [...filteredNotis, ...filteredWellBeginNotis].sort(
@@ -322,8 +436,10 @@ export default function Dashboard() {
   );
 
   const getEventKeyFromNoti = React.useCallback(
-    (n: AnyNoti): "motion" | "fall" | null => {
-      const direct = (n.eventKey ?? n.subtype ?? n.key ?? n.category ?? "")
+    (
+      n: AnyNoti
+    ): "motion" | "fall" | "fire" | "offline" | "sleeping" | null => {
+      const base = (n.eventKey ?? n.subtype ?? n.key ?? n.category ?? "")
         .toString()
         .toLowerCase();
       const titleKey = (n as any).titleKey
@@ -331,66 +447,82 @@ export default function Dashboard() {
         : "";
       const title = (n.title ?? "").toLowerCase();
       const type = (n.type ?? "").toLowerCase();
+      const detail = (n.detail ?? "").toLowerCase();
+
+      const text = [base, titleKey, title, type, detail].join(" ");
 
       if (
-        direct === "motion" ||
-        titleKey.includes("motion") ||
-        title.includes("motion") ||
-        type === "motion"
+        text.includes("fire") ||
+        text.includes("ไฟไหม้") ||
+        text.includes("เพลิงไหม้")
+      )
+        return "fire";
+      if (
+        text.includes("offline") ||
+        text.includes("cameraoffline") ||
+        text.includes("deviceoffline") ||
+        text.includes("ออฟไลน์") ||
+        text.includes("หลุดการเชื่อมต่อ")
+      )
+        return "offline";
+      if (
+        text.includes("sleep") ||
+        text.includes("sleeping") ||
+        text.includes("หลับนาน")
+      )
+        return "sleeping";
+      if (
+        text.includes("motion") ||
+        text.includes("ตรวจจับการเคลื่อนไหว") ||
+        text.includes("การเคลื่อนไหว")
       )
         return "motion";
       if (
-        direct === "fall" ||
-        titleKey.includes("fall") ||
-        title.includes("fall") ||
-        type === "fall"
+        text.includes("fall") ||
+        text.includes("ล้ม") ||
+        text.includes("หกล้ม")
       )
-        return "fall";
-      if (
-        title.includes("ตรวจจับการเคลื่อนไหว") ||
-        title.includes("การเคลื่อนไหว")
-      )
-        return "motion";
-      if (title.includes("ล้ม") || title.includes("ตรวจจับการล้ม"))
         return "fall";
       return null;
     },
     []
   );
 
-  const motionTotal = React.useMemo(
-    () =>
-      allTimeAlertItems.filter(
-        (n) => getEventKeyFromNoti(n as AnyNoti) === "motion"
-      ).length,
-    [allTimeAlertItems, getEventKeyFromNoti]
-  );
+  const eventCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {
+      fire: 0,
+      motion: 0,
+      offline: 0,
+      sleeping: 0,
+      fall: 0,
+    };
 
-  const fallTotal = React.useMemo(
-    () =>
-      allTimeAlertItems.filter(
-        (n) => getEventKeyFromNoti(n as AnyNoti) === "fall"
-      ).length,
-    [allTimeAlertItems, getEventKeyFromNoti]
-  );
+    allTimeAlertItems.forEach((item) => {
+      const key = getEventKeyFromNoti(item as AnyNoti);
+      if (key) counts[key] = (counts[key] ?? 0) + 1;
+    });
+
+    return counts;
+  }, [allTimeAlertItems, getEventKeyFromNoti]);
 
   const statItemsForHeader = React.useMemo(
     () =>
       statItems.map((it) => {
-        if (it.key === "motion") return { ...it, val: motionTotal };
-        if (it.key === "fall") return { ...it, val: fallTotal };
+        if (typeof eventCounts[it.key] === "number") {
+          return { ...it, val: eventCounts[it.key] };
+        }
         return it;
       }),
-    [motionTotal, fallTotal]
+    [eventCounts]
   );
-
   return (
     <div className="min-h-screen bg-[#F8FBFE] gap-6 flex flex-col">
       <Navbar
         searchSite={searchSite}
         setSearchSite={setSearchSite}
-        site={site}
-        setSite={setSite}
+        siteOptions={siteOptions}
+        selectedSite={selectedSiteCode}
+        setSelectedSite={handleSelectedSiteChange}
         date={date}
         setDate={setDate}
       />

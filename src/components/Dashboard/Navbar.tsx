@@ -1,19 +1,19 @@
-import React from "react";
+﻿import React from "react";
 import { brandImage, exportImage } from "../../assets/index";
 import SearchInput from "../../components/SearchInput";
 import Dropdown from "../../components/Dropdown";
 import DatePicker from "../../components/DateInput";
 import type { DateValue } from "../../components/DateInput";
 import { exportFile } from "./dashboard.constants";
-import { allSites } from "../../data/Dashboard/notis";
 import searchIcon from "../../assets/search.png";
 import { useTranslation } from "react-i18next";
 
 type Props = {
   searchSite: string;
   setSearchSite: (v: string) => void;
-  site: string;
-  setSite: (v: string) => void;
+  siteOptions: SiteOption[];
+  selectedSite: string;
+  setSelectedSite: (v: string) => void;
   date: DateValue;
   setDate: (v: DateValue) => void;
 };
@@ -21,34 +21,35 @@ type Props = {
 type SiteOption = {
   label: string;
   value: string;
-  i18nKey?: string; // ← ถ้ามี key ก็จะใช้แปลโดยตรง
+  i18nKey?: string; // โ เธ–เนเธฒเธกเธต key เธเนเธเธฐเนเธเนเนเธเธฅเนเธ”เธขเธ•เธฃเธ
 };
 
 export default function Navbar({
   searchSite,
   setSearchSite,
-  site,
-  setSite,
+  siteOptions,
+  selectedSite,
+  setSelectedSite,
   date,
   setDate,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const [mobilePanelOpen, setMobilePanelOpen] = React.useState(false);
 
-  // รวม logic แปล label ของ "ไซต์" ไว้ที่เดียว (ไม่ทำลาย workflow ของ Dropdown)
+  // เธฃเธงเธก logic เนเธเธฅ label เธเธญเธ "เนเธเธ•เน" เนเธงเนเธ—เธตเนเน€เธ”เธตเธขเธง (เนเธกเนเธ—เธณเธฅเธฒเธข workflow เธเธญเธ Dropdown)
   const getSiteLabel = React.useCallback(
     (opt?: Partial<SiteOption> | null) => {
       if (!opt) return "";
       const val = String(opt.value ?? "").trim();
-      // 1) ให้สิทธิ์ i18nKey มาก่อน ถ้าฝั่ง data ตั้งมา
+      // 1) เนเธซเนเธชเธดเธ—เธเธดเน i18nKey เธกเธฒเธเนเธญเธ เธ–เนเธฒเธเธฑเนเธ data เธ•เธฑเนเธเธกเธฒ
       if (opt.i18nKey) {
         return t(opt.i18nKey, { defaultValue: opt.label as string });
       }
-      // 2) ค่า 'all' ให้แมปเป็นคีย์ navbar.allSites
+      // 2) เธเนเธฒ 'all' เนเธซเนเนเธกเธเน€เธเนเธเธเธตเธขเน navbar.allSites
       if (val.toLowerCase() === "all") {
         return t("navbar.allSites");
       }
-      // 3) พยายามหาใน dashboard.json ที่ 'sites.<value>' แล้ว fallback เป็น label เดิม
+      // 3) เธเธขเธฒเธขเธฒเธกเธซเธฒเนเธ dashboard.json เธ—เธตเน 'sites.<value>' เนเธฅเนเธง fallback เน€เธเนเธ label เน€เธ”เธดเธก
       return t(`sites.${val}`, { defaultValue: opt.label as string });
     },
     [t, i18n.language]
@@ -79,7 +80,7 @@ export default function Navbar({
             className="min-w-[140px]"
           />
 
-          <Dropdown options={allSites as any} value={site} onChange={setSite}>
+          <Dropdown options={siteOptions as any} value={selectedSite} onChange={setSelectedSite}>
             {({
               open,
               selected,
@@ -88,9 +89,15 @@ export default function Navbar({
               getMenuProps,
               getItemProps,
             }) => {
-              // ป้ายบนปุ่ม: แปลจาก selected (หรือใช้ All Sites ถ้าไม่มี)
-              const selectedLabel =
-                (selected && getSiteLabel(selected)) || t("navbar.allSites");
+              // เธเนเธฒเธขเธเธเธเธธเนเธก: เนเธเธฅเธเธฒเธ selected (เธซเธฃเธทเธญเนเธเน All Sites เธ–เนเธฒเนเธกเนเธกเธต)
+              const siteOptionList = options as SiteOption[];
+              const fallbackOption =
+                selected ??
+                siteOptionList.find((opt) => opt.value === selectedSite) ??
+                siteOptionList[0];
+              const selectedLabel = fallbackOption
+                ? getSiteLabel(fallbackOption)
+                : t("navbar.allSites");
 
               return (
                 <>
@@ -118,8 +125,8 @@ export default function Navbar({
                       ].join(" "),
                     })}
                   >
-                    {(options as SiteOption[]).map((opt) => {
-                      const active = opt.value === selected?.value;
+                    {siteOptionList.map((opt) => {
+                      const active = opt.value === (selected?.value ?? selectedSite);
                       return (
                         <button
                           key={opt.value}
@@ -218,7 +225,7 @@ export default function Navbar({
                 <div className="col-span-1">
                   <SearchInput
                     value={searchSite}
-                    placeholder="ช่องค้นหา Sites"
+                    placeholder="เธเนเธญเธเธเนเธเธซเธฒ Sites"
                     onChange={setSearchSite}
                   />
                 </div>
@@ -226,9 +233,9 @@ export default function Navbar({
                 {/* Site dropdown */}
                 <div className="col-span-1">
                   <Dropdown
-                    options={allSites as any}
-                    value={site}
-                    onChange={setSite}
+                    options={siteOptions as any}
+                    value={selectedSite}
+                    onChange={setSelectedSite}
                   >
                     {({
                       open,
@@ -238,9 +245,16 @@ export default function Navbar({
                       getMenuProps,
                       getItemProps,
                     }) => {
-                      const selectedLabel =
-                        (selected && getSiteLabel(selected)) ||
-                        t("navbar.allSites");
+                      const siteOptionList = options as SiteOption[];
+                      const fallbackOption =
+                        selected ??
+                        siteOptionList.find(
+                          (opt) => opt.value === selectedSite
+                        ) ??
+                        siteOptionList[0];
+                      const selectedLabel = fallbackOption
+                        ? getSiteLabel(fallbackOption)
+                        : t("navbar.allSites");
                       return (
                         <div className="relative inline-block w-full">
                           <button
@@ -267,8 +281,10 @@ export default function Navbar({
                               ].join(" "),
                             })}
                           >
-                            {(options as SiteOption[]).map((opt) => {
-                              const active = opt.value === selected?.value;
+                            {siteOptionList.map((opt) => {
+                              const active =
+                                opt.value ===
+                                (selected?.value ?? selectedSite);
                               return (
                                 <button
                                   key={opt.value}
@@ -367,3 +383,12 @@ export default function Navbar({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
