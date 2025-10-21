@@ -2,6 +2,7 @@ import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useUserPath } from "../../routes/useUserPath";
 
 /* ----- types ----- */
 type WB = {
@@ -49,6 +50,7 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -63,7 +65,7 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
 
   const handleClick = (n: WB) => {
     const ev = getEventKey(n);
-    navigate(`/alert?event=${ev}`);
+    navigate(abs(`/alert?event=${ev}`));
   };
 
   return (

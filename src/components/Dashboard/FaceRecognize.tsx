@@ -2,6 +2,7 @@ import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useUserPath } from "../../routes/useUserPath";
 
 type FR = {
   type: any;
@@ -28,6 +29,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -51,7 +53,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
     }
 
     // เส้นทางเดิม — พร้อมสลับกลับเมื่อไหร่ก็แค่ปิด USE_MOCK_REDIRECT
-    navigate("/facerec", { state: { noti: n } });
+    navigate(abs("/facerec"), { state: { noti: n } });
   };
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">

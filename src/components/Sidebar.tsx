@@ -4,7 +4,11 @@ import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
 import { useNavigate, useLocation } from "react-router-dom";
-import { me } from "../data/Dashboard/auth";
+import { me as mockMe } from "../data/Dashboard/auth";
+import { logout as mockLogout } from "../data/Dashboard/auth";
+import { useUserPath } from "../routes/useUserPath";
+import { logout as apiLogout } from "../api/auth";
+import { me as apiMe } from "../api/user";
 
 /** breakpoint hook */
 function useIsDesktop1024() {
@@ -32,20 +36,41 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const { t } = useTranslation("sidebar");
   const navigate = useNavigate();
   const location = useLocation();
+  const { abs, base } = useUserPath();
 
   const [account, setAccount] = useState<{
     name: string;
     email: string;
   } | null>(null);
   useEffect(() => {
-    const u = me();
-    if (u) {
-      // เดิม ERD ไม่มี full name ใน payload me() → ใช้ email เป็นชื่อชั่วคราว
-      // ถ้าอยากโชว์ firstName/lastName ให้ปรับ me() คืนค่าเพิ่มได้ภายหลัง
-      setAccount({ name: u.email.split("@")[0], email: u.email });
-    } else {
-      setAccount(null);
-    }
+    let mounted = true;
+    (async () => {
+      try {
+        const u = await apiMe();
+        if (!mounted || !u) return;
+        const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
+        const fallback = u.email.split("@")[0];
+        setAccount({ name: fullName || fallback, email: u.email });
+        return;
+      } catch {
+        const u = mockMe();
+        if (!mounted || !u) {
+          setAccount(null);
+          return;
+        }
+        const fullName = [
+          (u as any).firstName as string | undefined,
+          (u as any).lastName as string | undefined,
+        ]
+          .filter((v) => typeof v === "string" && String(v).trim().length > 0)
+          .join(" ");
+        const fallback = u.email.split("@")[0];
+        setAccount({ name: fullName || fallback, email: u.email });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // mobile toggle
@@ -57,7 +82,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
 
   // logout modal
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const handleConfirmLogout = () => {
+  const handleConfirmLogout = async () => {
+    try { await apiLogout(); } catch (e) { /* ignore */ }
+    try { mockLogout(); } catch (e) { /* ignore */ }
     setLogoutOpen(false);
     navigate("/", { replace: true });
   };
@@ -88,7 +115,10 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
 
   // Route-aware: กลับ /dashboard ให้พับ dropdown ทั้งหมด
   useEffect(() => {
-    if (location.pathname === "/dashboard") {
+    const pathNoBase = location.pathname.startsWith(base)
+      ? location.pathname.slice(base.length) || "/"
+      : location.pathname;
+    if (pathNoBase === "/dashboard") {
       document.querySelectorAll<HTMLElement>(".hs-accordion").forEach((acc) => {
         acc.classList.remove("active");
         const content = acc.querySelector<HTMLElement>(".hs-accordion-content");
@@ -98,7 +128,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
         }
       });
     }
-  }, [location.pathname]);
+  }, [location.pathname, base]);
 
   // เปิด dropdown อัตโนมัติสำหรับ Alert และ Devices
   useEffect(() => {
@@ -115,11 +145,14 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
         }, 300);
       }
     };
-    if (location.pathname.startsWith("/alert"))
+    const pathNoBase = location.pathname.startsWith(base)
+      ? location.pathname.slice(base.length) || "/"
+      : location.pathname;
+    if (pathNoBase.startsWith("/alert"))
       openAccordion("alert-accordion");
-    if (location.pathname.startsWith("/devices"))
+    if (pathNoBase.startsWith("/devices"))
       openAccordion("devices-accordion");
-  }, [location.pathname]);
+  }, [location.pathname, base]);
 
   const sidebarClass = useMemo(() => {
     const base =
@@ -135,7 +168,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
 
   // helper: navigate + close on mobile
   const go = (path: string) => {
-    navigate(path);
+    navigate(abs(path));
     if (!isDesktop) setOpenMobile(false);
   };
 
@@ -144,16 +177,19 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     classes.filter(Boolean).join(" ");
 
   const url = new URLSearchParams(location.search);
+  const pathNoBase = location.pathname.startsWith(base)
+    ? location.pathname.slice(base.length) || "/"
+    : location.pathname;
   const active = {
-    home: location.pathname === "/dashboard",
-    alert: location.pathname.startsWith("/alert"),
+    home: pathNoBase === "/dashboard",
+    alert: pathNoBase.startsWith("/alert"),
     alertEvent: (k: string) =>
-      location.pathname.startsWith("/alert") && url.get("event") === k,
-    facerec: location.pathname.startsWith("/facerec"),
-    devices: location.pathname.startsWith("/devices"),
+      pathNoBase.startsWith("/alert") && url.get("event") === k,
+    facerec: pathNoBase.startsWith("/facerec"),
+    devices: pathNoBase.startsWith("/devices"),
     devicesType: (k: string) =>
-      location.pathname.startsWith("/devices") && url.get("type") === k,
-    usermanage: location.pathname.startsWith("/usermanage"),
+      pathNoBase.startsWith("/devices") && url.get("type") === k,
+    usermanage: pathNoBase.startsWith("/usermanage"),
   };
   // =======================================
 

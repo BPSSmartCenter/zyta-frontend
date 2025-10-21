@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
 import React from "react";
+import { useUserPath } from "../../routes/useUserPath";
 
 type Props = {
   search: string;
@@ -61,6 +62,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -75,7 +77,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
 
   const handleClick = (n: Noti) => {
     const ev = getEventKey(n);
-    navigate(`/alert?event=${ev}`);
+    navigate(abs(`/alert?event=${ev}`));
   };
 
   // เรียงใหม่→เก่า (คงพฤติกรรมเดิม)

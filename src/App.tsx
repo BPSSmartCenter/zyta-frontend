@@ -28,7 +28,7 @@ function App() {
       <LanguageSwitcher />
       <Routes>
         {/* public */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<RootLoginOrDashboard />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot" element={<Forgot />} />
@@ -73,4 +73,25 @@ function LegacyDashboardRedirect() {
   return <Navigate to={to} replace />;
 }
 
+/**
+ * If already authenticated, redirect root "/" to "/u/:uid/dashboard".
+ * Otherwise render the normal Login page.
+ */
+function RootLoginOrDashboard() {
+  const [to, setTo] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const user = await apiMe();
+        if (user?.id) setTo(`/u/${user.id}/dashboard`);
+        else setTo("/");
+      } catch {
+        setTo("/");
+      }
+    })();
+  }, []);
+  if (!to) return null;
+  if (to === "/") return <Login />;
+  return <Navigate to={to} replace />;
+}
 export default App;

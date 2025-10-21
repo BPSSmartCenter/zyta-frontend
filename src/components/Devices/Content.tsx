@@ -10,6 +10,7 @@ import WaterMeterPanel from "./Water Meter/waterMeterPanel";
 import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 import AirPanel from "./Air Sensor/AirPanel";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useUserPath } from "../../routes/useUserPath";
 
 type Props = {};
 
@@ -35,6 +36,7 @@ export default function Content({}: Props) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();
@@ -52,10 +54,7 @@ export default function Content({}: Props) {
     // ใช้ search แทนการประกอบสตริงเอง เผื่ออนาคตมีพารามอื่น
     const params = new URLSearchParams(location.search);
     params.set("type", nextType);
-    navigate(
-      { pathname: "/devices", search: `?${params.toString()}` },
-      { replace: false }
-    );
+    navigate({ pathname: abs("/devices"), search: `?${params.toString()}` }, { replace: false });
   };
 
   return (

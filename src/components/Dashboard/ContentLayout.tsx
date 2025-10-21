@@ -8,6 +8,7 @@ import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useUserPath } from "../../routes/useUserPath";
 
 type Props = {
   // left column
@@ -73,6 +74,7 @@ export default function ContentLayout(props: Props) {
 
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   const allItems = React.useMemo(
     () =>
       [...filteredNotis, ...filteredWellBeginNotis].sort(
@@ -152,7 +154,7 @@ export default function ContentLayout(props: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 lg-1399:grid-cols-2 gap-3">
             <div
               className="p-6 w-full rounded-xl bg-white hover:cursor-pointer"
-              onClick={() => navigate("/usermanage")}
+              onClick={() => navigate(abs("/usermanage"))}
             >
               <UserManagement />
             </div>

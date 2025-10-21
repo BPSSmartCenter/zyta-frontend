@@ -10,12 +10,14 @@ import {
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useUserPath } from "../../routes/useUserPath";
 
 export default function DeviceCount() {
   const { t, i18n } = useTranslation(["dashboard"]);
   const langKey = i18n.language || "en";
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   const titleDevices = t("devices.title", { defaultValue: "DEVICES" });
   const labelOffline = t("devices.offline", { defaultValue: "Offline" });
   const labelOnline = t("devices.online", { defaultValue: "Online" });
@@ -33,7 +35,7 @@ export default function DeviceCount() {
   const labelAir = t("devices.air", { defaultValue: "Air" });
   const labelAlert = t("devices.zyta", { defaultValue: "ZYTA Alert" });
 
-  const goDevices = (type: string) => navigate(`/devices?type=${type}`);
+  const goDevices = (type: string) => navigate(abs(`/devices?type=${type}`));
 
   return (
     <form className="flex flex-col gap-3 hover:cursor-default">

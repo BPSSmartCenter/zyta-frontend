@@ -6,6 +6,7 @@ import CameraTile from "../CameraTile";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import type { Noti } from "../../data/Dashboard/notis";
+import { useUserPath } from "../../routes/useUserPath";
 import {
   notis as alertNotis,
   wellBeingNotis,
@@ -99,6 +100,7 @@ export default function Content({ statItems }: Props) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const { abs } = useUserPath();
   // รวม notis ทั้งหมด
   const allEvents = React.useMemo<Noti[]>(() => {
     const a = Array.isArray(alertNotis) ? alertNotis : [];
@@ -169,11 +171,11 @@ export default function Content({ statItems }: Props) {
     const next = (ids[0] ?? "") as EventKey;
     if (!next) {
       setSelectedStat(null);
-      navigate("/dashboard");
+      navigate(abs("/dashboard"));
       return;
     }
     setSelectedStat(next);
-    navigate(`/alert?event=${next}`);
+    navigate(abs(`/alert?event=${next}`));
   };
 
   return (

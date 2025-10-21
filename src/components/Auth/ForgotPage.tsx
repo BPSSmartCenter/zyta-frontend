@@ -2,6 +2,7 @@
 import { useState } from "react";
 import brandImage from "../../assets/brand.png";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 interface Props {
   onSubmit?: (email: string) => void;
@@ -75,7 +76,7 @@ export default function ForgotPage({
             </div>
           </div>
 
-          <div className="w-full flex flex-col gap-3 mt-6">
+          <div className="w-full flex flex-col gap-3 mt-6 items-end">
             <button
               type="submit"
               className="bg-cyan w-full font-bold text-white px-4 py-2 rounded-sm hover:bg-blue hover:cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
@@ -86,6 +87,12 @@ export default function ForgotPage({
                 {submitting ? t("forgot.actions.checking") : ""}
               </span>
             </button>
+            <Link
+              to="/"
+              className="text-cyan font-bold hover:text-blue select-none"
+            >
+              {t("reset.login_link")}
+            </Link>
           </div>
         </form>
       </div>

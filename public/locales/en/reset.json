@@ -17,6 +17,7 @@
     "title": "Set a new password",
     "subtitle": "Create a new password that meets the requirements below",
     "actions": { "submit": "Change password" },
+    "login_link": "Back to sign in",
     "modal": {
       "title": "Success",
       "success": "Your password has been changed successfully",

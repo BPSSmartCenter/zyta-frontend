@@ -67,6 +67,8 @@ export function me(): {
   id: string;
   email: string;
   role: string;
+  firstName?: string;
+  lastName?: string;
   sites: string[];
 } | null {
   const token = getToken();
@@ -81,6 +83,8 @@ export function me(): {
     id: u.id,
     email: u.email,
     role: u.role,
+    firstName: u.firstName,
+    lastName: u.lastName,
     sites: payload.site_ids || [],
   };
 }

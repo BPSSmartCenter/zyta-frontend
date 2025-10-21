@@ -21,8 +21,14 @@ api.interceptors.response.use(
         url.includes("/auth/register") ||
         url.includes("/auth/logout");
 
-      if (status === 401 && !isAuthEndpoint) {
-        // for protected APIs เท่านั้น
+            if (status === 401 && !isAuthEndpoint) {
+        const publicPaths = ["/", "/register", "/verify-email", "/forgot", "/reset"];
+        const atPublic = typeof window !== 'undefined' && publicPaths.includes(window.location?.pathname || "");
+        if (atPublic) {
+          // Avoid redirect loops on public routes (e.g., root login)
+          return Promise.reject(err);
+        }
+        // for protected APIs only: bounce to login
         window.location.href = "/";
         return;
       }

@@ -5,6 +5,7 @@ import CameraTile from "../../components/CameraTile";
 import { useTranslation } from "react-i18next";
 import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
+import { useUserPath } from "../../routes/useUserPath";
 import {
   notis as alertNotis,
   wellBeingNotis,
@@ -134,13 +135,17 @@ export default function Header({ statItems, cameraItems, events }: Props) {
   const { selected } = useStatSelection();
   const navigate = useNavigate();
   const location = useLocation(); // ⬅️ ใช้เพื่อตรวจเส้นทางปัจจุบัน
+  const { abs, base } = useUserPath();
 
-  // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logic ตามที่ขอ)
+  // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logicตาม base /u/:uid)
   React.useEffect(() => {
-    if (location.pathname === "/dashboard") {
+    const pathNoBase = location.pathname.startsWith(base)
+      ? location.pathname.slice(base.length) || "/"
+      : location.pathname;
+    if (pathNoBase === "/dashboard") {
       setSelectedStat(null);
     }
-  }, [location.pathname]);
+  }, [location.pathname, base]);
 
   // รวม notis จริง
   const source = React.useMemo<Noti[]>(() => {
@@ -247,7 +252,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
     const id = (ids[0] ?? "") as EventKey;
     setSelectedStat(id || null);
     if (!id) return;
-    navigate(`/alert?event=${id}`);
+    navigate(abs(`/alert?event=${id}`));
   };
 
   // ===== Mobile carousel helpers =====

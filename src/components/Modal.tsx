@@ -37,7 +37,6 @@ export default function Modal({
   onConfirm,
 }: PrelineModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
-  const hiddenTriggerRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     (window as any).HSStaticMethods?.autoInit?.();
@@ -71,7 +70,16 @@ export default function Modal({
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        try {
+          const el = overlayRef.current;
+          const HSO = (window as any).HSOverlay;
+          if (el && HSO?.close) HSO.close(el);
+        } catch {}
+        onClose();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
@@ -84,20 +92,30 @@ export default function Modal({
     };
   }, [open]);
 
-  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === overlayRef.current) onClose();
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === overlayRef.current) {
+      try {
+        const el = overlayRef.current;
+        const HSO = (window as any).HSOverlay;
+        if (el && HSO?.close) HSO.close(el);
+      } catch {}
+      // Fallback: remove any stray backdrops if present
+      try {
+        document
+          .querySelectorAll<HTMLElement>(
+            ".hs-overlay-backdrop, .preline-backdrop"
+          )
+          .forEach((b) => b.remove());
+      } catch {}
+      onClose();
+    }
   };
 
   const iconCfg = ICON_MAP[icon];
 
   return (
     <>
-      <span
-        ref={hiddenTriggerRef}
-        className="hidden"
-        aria-hidden="true"
-        data-hs-overlay={`#${id}`}
-      />
+      {/* Removed Preline trigger: control via React state only */}
       <div
         id={id}
         ref={overlayRef}
@@ -106,7 +124,7 @@ export default function Modal({
         tabIndex={-1}
         aria-labelledby={`${id}-label`}
         aria-modal="true"
-        onMouseDown={handleBackdropMouseDown}
+        onClick={handleBackdropClick}
       >
         <div className="hs-overlay-animation-target hs-overlay-open:scale-100 hs-overlay-open:opacity-100 scale-95 opacity-0 ease-in-out transition-all w-[90%] max-w-[340px] sm:max-w-[360px] md:max-w-[400px] m-3 sm:mx-auto min-h-[calc(100%-56px)] flex items-center">
           <div className="w-full flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl pointer-events-auto">
@@ -140,17 +158,41 @@ export default function Modal({
                   <button
                     type="button"
                     className="py-2.5 px-5 w-[140px] inline-flex items-center justify-center text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:cursor-pointer"
-                    data-hs-overlay={`#${id}`}
-                    onClick={onClose}
+                    onClick={() => {
+                      try {
+                        const el = overlayRef.current;
+                        const HSO = (window as any).HSOverlay;
+                        if (el && HSO?.close) HSO.close(el);
+                      } catch {}
+                      try {
+                        document
+                          .querySelectorAll<HTMLElement>(
+                            ".hs-overlay-backdrop, .preline-backdrop"
+                          )
+                          .forEach((b) => b.remove());
+                      } catch {}
+                      onClose();
+                    }}
                   >
                     {cancelLabel}
                   </button>
                   <button
                     type="button"
                     className="py-2.5 px-5 w-[160px] inline-flex items-center justify-center text-sm font-semibold rounded-lg bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer"
-                    data-hs-overlay={`#${id}`}
                     onClick={() => {
                       onConfirm?.();
+                      try {
+                        const el = overlayRef.current;
+                        const HSO = (window as any).HSOverlay;
+                        if (el && HSO?.close) HSO.close(el);
+                      } catch {}
+                      try {
+                        document
+                          .querySelectorAll<HTMLElement>(
+                            ".hs-overlay-backdrop, .preline-backdrop"
+                          )
+                          .forEach((b) => b.remove());
+                      } catch {}
                       onClose();
                     }}
                   >
@@ -162,8 +204,21 @@ export default function Modal({
                   <button
                     type="button"
                     className="py-2.5 px-5 w-[200px] inline-flex items-center justify-center text-sm font-semibold rounded-lg bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer"
-                    data-hs-overlay={`#${id}`}
-                    onClick={onClose}
+                    onClick={() => {
+                      try {
+                        const el = overlayRef.current;
+                        const HSO = (window as any).HSOverlay;
+                        if (el && HSO?.close) HSO.close(el);
+                      } catch {}
+                      try {
+                        document
+                          .querySelectorAll<HTMLElement>(
+                            ".hs-overlay-backdrop, .preline-backdrop"
+                          )
+                          .forEach((b) => b.remove());
+                      } catch {}
+                      onClose();
+                    }}
                   >
                     {closeLabel}
                   </button>
