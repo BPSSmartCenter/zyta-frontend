@@ -81,6 +81,19 @@ export default function ContentLayout(props: Props) {
     [filteredNotis, filteredWellBeginNotis]
   );
 
+  const bag = (n: any) =>
+    [n?.event, n?.titleKey, n?.title, n?.site, n?.type, n?.date]
+      .filter(Boolean)
+      .map((x: any) => String(x).toLowerCase().trim())
+      .join(" ");
+
+  // ลิสต์ “ผลลัพธ์จาก search ของ AlertEvents”
+  const filteredAllForSearch = React.useMemo(() => {
+    const q = (searchEvent || "").toLowerCase().trim();
+    if (!q) return allItems;
+    return allItems.filter((n: any) => bag(n).includes(q));
+  }, [allItems, searchEvent]);
+
   return (
     <div className="flex flex-col px-6 gap-3">
       {/* 
@@ -129,7 +142,7 @@ export default function ContentLayout(props: Props) {
               setProvince={setProvince}
               selectedSiteCode={props.selectedSiteCode}
               accessibleSites={props.accessibleSites}
-              overrideNotis={props.mapNotis}
+              overrideNotis={filteredAllForSearch as any[]}
             />
           </div>
 

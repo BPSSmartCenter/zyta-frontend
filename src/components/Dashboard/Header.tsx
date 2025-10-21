@@ -71,21 +71,43 @@ const bag = (n: any) =>
     .join(" | ");
 
 // noti -> คีย์กลาง (รองรับ EN/TH + titleKey พิเศษ)
+// noti -> คีย์กลาง (รองรับ EN/TH + titleKey พิเศษ)
 const normalizeEventKey = (n: any): EventKey => {
   const s = bag(n);
+
+  // 1) fire
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
-  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
-  // ✅ OFFLINE (ครบทุกสำนวน)
+
+  // 2) offline (ครบ ๆ)
   if (
-    /notis\.(camera|device)offline/.test(s) || // notis.cameraOffline / notis.deviceOffline
-    /(?:camera|device)\s*offline/.test(s) || // "camera offline" / "device offline"
-    /\boffline\b/.test(s) || // offline เฉย ๆ
-    /ออฟ.?ไลน์/.test(s) // ไทย: ออฟไลน์
+    /notis\.(camera|device)offline/.test(s) ||
+    /(?:camera|device)\s*offline/.test(s) ||
+    /\boffline\b/.test(s) ||
+    /ออฟ.?ไลน์/.test(s)
   )
     return "offline";
+
+  // 3) fall (ให้มาก่อน motion)
+  if (
+    /\bfall\b/.test(s) ||
+    s.includes("ตรวจพบคนล้ม") ||
+    s.includes("ตรวจพบการล้ม") ||
+    s.includes("fall detected")
+  )
+    return "fall";
+
+  // 4) sleep
   if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
     return "sleep";
+
+  // 5) motion (สุดท้าย)
+  if (
+    /\bmotion\b/.test(s) ||
+    s.includes("motion detected") ||
+    s.includes("ตรวจจับการเคลื่อนไหว")
+  )
+    return "motion";
+
   return "other";
 };
 
@@ -174,6 +196,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
   // รูปแกลลอรี่ด้านบน
   const computedCamera: CameraItem[] = React.useMemo(() => {
     if (USE_MOCK_CAMERA) {
+      // mock-only กดสวิตช์เอง (ปัจจุบัน false)
       const mock: CameraItem = {
         ringColor: "ring-[#AFEAFF]",
         imgSrc: normalizeGoogleImg(MONITOR_URL),
@@ -183,7 +206,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       return Array.from({ length: MAX_HEADER_IMAGES }, () => mock);
     }
 
-    // ===== โหมดจริง =====
+    // โหมดจริง: คัดเฉพาะ noti ที่มีรูป
     const tiles: CameraItem[] = source
       .filter((n) => !!getPic(n))
       .sort(
@@ -197,24 +220,23 @@ export default function Header({ statItems, cameraItems, events }: Props) {
         ringColor: ringClass(n),
       }));
 
-    // ให้ TypeScript รู้แน่ ๆ ว่าเป็น CameraItem[]
+    // ถ้าไม่เจอรูปจาก notis และไม่มี cameraItems ให้ "ไม่แสดงอะไรเลย"
+    if (tiles.length === 0 && !(cameraItems && cameraItems.length)) {
+      return [];
+    }
+
     const fallback: CameraItem[] = tiles.length
       ? tiles
       : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
 
-    const base: CameraItem[] = fallback.length
-      ? fallback
-      : [{ ringColor: "ring-[#AFEAFF]" }];
-
-    return base.map<CameraItem>((tile) => {
-      const candidate = normalizeGoogleImg(
-        tile.imgSrc ?? tile.embedUrl ?? MONITOR_URL
-      );
-      const showAsImg = isImageUrl(candidate);
+    // **สำคัญ**: ไม่เติม MONITOR_URL โดยอัตโนมัติ
+    return fallback.map<CameraItem>((tile) => {
+      const candidateImg = normalizeGoogleImg(tile.imgSrc);
+      const showAsImg = isImageUrl(candidateImg);
       return {
         ...tile,
-        imgSrc: showAsImg ? candidate : tile.imgSrc,
-        embedUrl: showAsImg ? undefined : tile.embedUrl ?? candidate,
+        imgSrc: showAsImg ? candidateImg : undefined,
+        embedUrl: showAsImg ? undefined : tile.embedUrl, // ใช้เฉพาะที่มีมาจริง
         embedTitle: tile.embedTitle ?? "Camera monitor",
       };
     });
@@ -314,7 +336,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
             </div>
           ))}
           {computedCamera.length === 0 && (
-            <div className="w-full px-6">
+            <div className="lg-1024:hidden relative mt-4">
               <div className="h-[180px] w-full rounded-xl bg-gray-100" />
             </div>
           )}
@@ -362,18 +384,20 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       </div>
 
       {/* camera tiles (Desktop layout เดิม) */}
-      <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
-        {computedCamera.map((c, i) => (
-          <CameraTile
-            key={i}
-            ringColor={c.ringColor}
-            imgSrc={c.imgSrc}
-            embedUrl={c.embedUrl}
-            embedTitle={c.embedTitle}
-            className="p-1!"
-          />
-        ))}
-      </div>
+      {computedCamera.length > 0 && (
+        <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
+          {computedCamera.map((c, i) => (
+            <CameraTile
+              key={i}
+              ringColor={c.ringColor}
+              imgSrc={c.imgSrc}
+              embedUrl={c.embedUrl}
+              embedTitle={c.embedTitle}
+              className="p-1!"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

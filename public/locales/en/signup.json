@@ -5,9 +5,20 @@
     "email": {
       "label": "Email",
       "placeholder": "Enter your email",
-      "invalid": "Email is invalid"
+      "invalid": "Email is invalid",
+      "error": "this email is already taken"
     },
-    "password": {
+    "firstName": {
+      "label": "First Name",
+      "placeholder": "Enter your first name",
+      "required": "Please enter your first name"
+    },
+    "lastName": {
+      "label": "Last Name",
+      "placeholder": "Enter your last name",
+      "required": "Please enter your last name"
+    },
+    "password": { 
       "label": "Password",
       "placeholder": "Enter your password"
     },
@@ -24,13 +35,19 @@
   "terms": "I agree to the Terms of Service",
   "actions": {
     "signup": "Sign up",
-    "signin": "Sign in"
+    "signin": "Sign in",
+    "loading": "Verifying"
   },
   "modal": {
     "title": "Identity Verification",
     "top": "Please verify your identity via email",
     "bottom": "to use the BPS Dashboard service",
-    "close": "OK"
+    "close": "OK",
+    "no_email": "Didn't receive the email?",
+    "resend": "Resend",
+    "resent": "Sent",
+    "sending": "Sending...",
+    "no_success": "Failed to send, try again"
   },
   "footer": {
     "have_account": "Already have an account?"

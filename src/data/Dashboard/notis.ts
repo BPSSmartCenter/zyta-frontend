@@ -54,7 +54,7 @@ export const notis: Noti[] = [
     type: "warning",
     img: motionNoti,
     titleKey: "notis.motionDetected",
-    title: "Motion detected",
+    title: "ตรวจพบการเคลื่อนไหว",
     site: "Site A",
     coords: { lat: 13.7563, lng: 100.5018 }, // Bangkok
     date: "2025-02-11",

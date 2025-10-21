@@ -4,6 +4,7 @@ import Navbar from "../components/Dashboard/Navbar";
 import Header from "../components/Dashboard/Header";
 import ContentLayout from "../components/Dashboard/ContentLayout";
 import SnapshotChartSection from "../components/Chart";
+import { useParams, useNavigate } from "react-router-dom";
 
 import {
   notis,
@@ -18,10 +19,10 @@ import {
 } from "../components/Dashboard/dashboard.constants";
 import type { DateValue } from "../components/DateInput";
 import { useTranslation } from "react-i18next";
-
-import { me, accessSites } from "../data/Dashboard/auth";
 import { PROVINCE_CODE_TO_TH } from "../data/Dashboard/data";
 import type { Site } from "../data/Dashboard/data";
+import { me as apiMe } from "../api/user";
+import { listSites } from "../api/sites";
 
 const NON_ALL_COUNT = EVENT_OPTIONS.length - 1;
 
@@ -29,6 +30,8 @@ type SiteOption = { label: string; value: string; i18nKey?: string };
 
 export default function Dashboard() {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const params = useParams();
+  const navigate = useNavigate();
 
   const [date, setDate] = React.useState<DateValue>(today);
   const [selectedSiteCode, setSelectedSiteCode] = React.useState("all");
@@ -43,7 +46,9 @@ export default function Dashboard() {
   const [searchZYTA, setSearchZYTA] = React.useState("");
 
   // ===== mock auth + access sites =====
-  const [role, setRole] = React.useState<"admin" | "officer" | "user">("admin");
+  const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(
+    null
+  );
   const [accessibleSites, setAccessibleSites] = React.useState<Site[] | null>(
     null
   );
@@ -52,61 +57,107 @@ export default function Dashboard() {
   ]);
 
   React.useEffect(() => {
-    const currentUser = me();
-    if (currentUser) {
-      setRole(currentUser.role as any);
-    } else {
-      setRole("admin");
-    }
+    (async () => {
+      try {
+        const currentUser = await apiMe();
+        const myUid = currentUser?.id;
+        const urlUid = params.uid;
+        if (myUid && urlUid && myUid !== urlUid) {
+          navigate(`/u/${myUid}/dashboard`, { replace: true });
+        }
+      } catch {
+        // ถ้าเรียกไม่ได้ เดี๋ยว RequireAuth พาออกไปหน้า Login อยู่แล้ว
+      }
+    })();
+  }, [params.uid, navigate]);
 
-    const resp = accessSites({ includeCountryBBox: true });
+  React.useEffect(() => {
+    (async () => {
+      // 1) โหลด me() ให้รู้บทบาท
+      let currentUser: any = null;
+      try {
+        currentUser = await apiMe();
+        const normalizedRole = String(currentUser?.role || "").toLowerCase() as
+          | "admin"
+          | "officer"
+          | "user";
+        setRole(normalizedRole || "user"); // ถ้าไม่เจอ ให้เป็น "user" ปลอดภัยกว่า
+      } catch (e) {
+        console.error("me() failed", e);
+        setRole("user"); // บังคับโหมดต่ำสุด
+        // ปล่อยให้ RequireAuth จัดการรีไดเรกต์ในกรณีไม่มีเซสชัน
+      }
 
-    if (resp) {
-      const normalizedSites = resp.items.map((s) => ({ ...s } as Site));
-      setAccessibleSites(normalizedSites);
+      // 2) โหลด sites ตามสิทธิ์ (อย่าแตะ role ใน catch อีก)
+      try {
+        const resp = await listSites();
 
-      const includeAllOption = (currentUser?.role ?? "admin") === "admin";
-      const baseOptions: SiteOption[] = normalizedSites.map((s) => ({
-        label: s.name,
-        value: s.code,
-      }));
+        // รองรับทั้ง resp.items[] และ resp[] (array ตรง ๆ)
+        const items = Array.isArray(resp?.items)
+          ? resp.items
+          : Array.isArray(resp)
+          ? resp
+          : [];
 
-      const opts: SiteOption[] = includeAllOption
-        ? [
-            {
-              label: t("navbar.allSites"),
-              value: "all",
-              i18nKey: "navbar.allSites",
-            },
-            ...baseOptions,
-          ]
-        : baseOptions;
+        const normalizedSites: Site[] = (items as Site[]).map((s) => ({
+          ...s,
+        }));
+        setAccessibleSites(normalizedSites);
 
-      setSiteOptions(opts);
+        // ใช้ค่า role จาก state (ที่ normalize แล้ว) เท่านั้น
+        const isAdmin = (r: any) => String(r).toLowerCase() === "admin";
+        const includeAllOption = isAdmin(currentUser?.role);
 
-      setSelectedSiteCode((prev) => {
-        if (includeAllOption) {
-          if (prev === "all" || baseOptions.some((opt) => opt.value === prev)) {
-            return prev;
+        const baseOptions: SiteOption[] = normalizedSites.map((s) => ({
+          label: s.name,
+          value: s.code,
+        }));
+
+        const opts: SiteOption[] = includeAllOption
+          ? [
+              {
+                label: t("navbar.allSites"),
+                value: "all",
+                i18nKey: "navbar.allSites",
+              },
+              ...baseOptions,
+            ]
+          : baseOptions;
+
+        setSiteOptions(opts);
+
+        // ตั้ง selectedSiteCode เริ่มต้น
+        setSelectedSiteCode((prev) => {
+          if (includeAllOption) {
+            if (prev === "all" || baseOptions.some((o) => o.value === prev))
+              return prev;
+            return "all";
           }
-          return "all";
-        }
-        if (baseOptions.some((opt) => opt.value === prev)) {
-          return prev;
-        }
-        return baseOptions[0]?.value ?? "";
-      });
-    } else {
-      setAccessibleSites([]);
-      setSiteOptions([
-        {
-          label: t("navbar.allSites"),
-          value: "all",
-          i18nKey: "navbar.allSites",
-        },
-      ]);
-      setSelectedSiteCode("all");
-    }
+          if (baseOptions.some((o) => o.value === prev)) return prev;
+          return baseOptions[0]?.value ?? "";
+        });
+      } catch (e) {
+        console.error("listSites() failed", e);
+        setAccessibleSites([]);
+        // ตั้ง options แบบไม่รวม all (ยกเว้นยืนยันว่าเป็น admin จาก me())
+        const isAdmin =
+          String(currentUser?.role || "").toLowerCase() === "admin";
+        setSiteOptions(
+          isAdmin
+            ? [
+                {
+                  label: t("navbar.allSites"),
+                  value: "all",
+                  i18nKey: "navbar.allSites",
+                },
+              ]
+            : []
+        );
+        setSelectedSiteCode(isAdmin ? "all" : "");
+        // ❌ อย่าแตะ setRole ที่นี่อีกแล้ว
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t, i18n.language]);
 
   React.useEffect(() => {
@@ -280,6 +331,18 @@ export default function Dashboard() {
   );
 
   // ---------- Filters (เธเธ logic เน€เธ”เธดเธก) ----------
+
+  // รวม Alert + Well-being แล้วกรองด้วย searchEvent ทีเดียว
+  const filteredAllAlerts = React.useMemo(() => {
+    const source = filterByAcl([...notis, ...wellBeingNotis]);
+    const q = searchEvent.trim().toLowerCase();
+    if (!q) return source as any;
+    // ใช้ makeHaystack เดิมเพื่อค้นหากว้าง ทั้ง title/site/date/detail
+    return source.filter((n: any) =>
+      makeHaystack(n as AnyNoti, { includeDetail: true }).includes(q)
+    );
+  }, [searchEvent, i18n.language, makeHaystack, filterByAcl]);
+
   const filteredNotis = React.useMemo(() => {
     const source = filterByAcl(notis);
     const q = searchEvent.trim().toLowerCase();
@@ -391,7 +454,7 @@ export default function Dashboard() {
       selectedSiteCode,
       accessibleSites: accessibleSites ?? [],
       role,
-      mapNotis: [...filteredNotis, ...filteredWellBeginNotis],
+      mapNotis: filteredAllAlerts,
       searchFR,
       setSearchFR: handleSearchFR,
       filteredRecognize: [...filteredRecognize],
@@ -418,21 +481,22 @@ export default function Dashboard() {
       filteredRecognize,
       searchZYTA,
       filterZYTA,
+      filteredAllAlerts,
     ]
   );
 
   // ---------- Header events / totals (เน€เธ”เธดเธก) ----------
   const headerEvents = React.useMemo(
     () =>
-      [...filteredNotis, ...filteredWellBeginNotis].sort(
+      [...filteredAllAlerts].sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       ),
-    [filteredNotis, filteredWellBeginNotis]
+    [filteredAllAlerts]
   );
 
   const allTimeAlertItems = React.useMemo(
-    () => [...filteredNotis, ...filteredWellBeginNotis],
-    [filteredNotis, filteredWellBeginNotis]
+    () => [...filteredAllAlerts],
+    [filteredAllAlerts]
   );
 
   const getEventKeyFromNoti = React.useCallback(

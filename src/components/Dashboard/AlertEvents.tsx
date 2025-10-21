@@ -15,26 +15,44 @@ type Props = {
 type EventKey = "fire" | "motion" | "offline" | "fall" | "sleep";
 
 const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title]
+  [n?.event, n?.titleKey, n?.title, n?.type, n?.subtype, n?.category, n?.key]
     .filter(Boolean)
     .map((x: any) => String(x).toLowerCase().trim())
     .join(" | ");
 
 const getEventKey = (n: Noti): EventKey => {
   const s = bag(n);
+
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
-  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
+
   if (
-    /notis\.(camera|device)offline/.test(s) || // notis.deviceOffline / notis.cameraOffline
-    /(?:camera|device)\s*offline/.test(s) || // "Device offline" / "Camera offline"
-    /\boffline\b/.test(s) || // คำว่า offline
-    /ออฟ.?ไลน์/.test(s) // ไทย: ออฟไลน์
+    /notis\.(camera|device)offline/.test(s) ||
+    /(?:camera|device)\s*offline/.test(s) ||
+    /\boffline\b/.test(s) ||
+    /ออฟ.?ไลน์/.test(s)
   )
     return "offline";
+
+  // ✅ ให้ fall มาก่อน motion
+  if (
+    /\bfall\b/.test(s) ||
+    s.includes("ตรวจพบคนล้ม") ||
+    s.includes("ตรวจพบการล้ม") ||
+    s.includes("fall detected")
+  )
+    return "fall";
+
   if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
     return "sleep";
-  // default ให้เข้าเพจ alert ได้แน่ ๆ
+
+  if (
+    /\bmotion\b/.test(s) ||
+    s.includes("motion detected") ||
+    s.includes("ตรวจจับการเคลื่อนไหว")
+  )
+    return "motion";
+
+  // default เพื่อให้เข้าเพจ alert ได้แน่ ๆ
   return "motion";
 };
 /* ---------------------------------------------------------------- */

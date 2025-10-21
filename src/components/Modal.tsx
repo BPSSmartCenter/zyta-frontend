@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 
-type IconType = "warning" | "mail" | "cancel";
+type IconType = "warning" | "mail" | "cancel" | "check";
 
 export interface PrelineModalProps {
   open: boolean;
@@ -21,6 +21,7 @@ const ICON_MAP: Record<IconType, { name: string; color: string }> = {
   warning: { name: "warning_amber", color: "text-[#EC0357]" },
   cancel: { name: "cancel", color: "text-[#EC0357]" },
   mail: { name: "mail", color: "text-blue-600" },
+  check: { name: "check_circle", color: "text-green-600" },
 };
 
 export default function Modal({

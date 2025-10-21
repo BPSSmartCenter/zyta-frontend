@@ -5,7 +5,11 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 interface LoginPageProps {
-  onSubmit?: (email: string, password: string) => void;
+  onSubmit?: (
+    email: string,
+    password: string,
+    opts?: { remember: boolean }
+  ) => void;
 }
 
 export default function LoginPage({ onSubmit }: LoginPageProps) {
@@ -13,6 +17,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
 
   const isEmailValid = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -23,7 +28,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailValid) return;
-    onSubmit?.(email, password);
+    onSubmit?.(email, password, { remember });
   };
 
   return (
@@ -111,6 +116,8 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
                   type="checkbox"
                   name="remember"
                   className="peer appearance-none w-[16px] h-4 border rounded-sm bg-white checked:bg-cyan-500 checked:border-cyan-500 focus:outline-none focus:ring-0"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
                 />
                 <svg
                   className="absolute left-[0px] top-[3px] w-[16px] h-4 opacity-0 peer-checked:opacity-100"
@@ -124,12 +131,12 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
                 <span>{t("remember")}</span>
               </label>
             </div>
-            <a
-              href="#"
+            <Link
+              to="/forgot"
               className="text-cyan font-bold hover:text-blue select-none"
             >
               {t("forgot")}
-            </a>
+            </Link>
           </div>
 
           {/* Buttons */}

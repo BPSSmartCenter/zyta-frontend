@@ -5,22 +5,47 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 interface RegisterPageProps {
-  onSubmit?: (email: string, password: string, confirmPassword: string) => void;
+  onSubmit?: (
+    email: string,
+    password: string,
+    confirmPassword: string,
+    extras?: { firstName: string; lastName: string }
+  ) => void;
+  serverEmailError?: string;
+  onChangeEmail?: () => void;
+  submitLabel?: string;
+  submitting?: boolean;
 }
 
-export default function RegisterPage({ onSubmit }: RegisterPageProps) {
+export default function RegisterPage({
+  onSubmit,
+  serverEmailError,
+  onChangeEmail,
+  submitLabel,
+}: RegisterPageProps) {
   const { t } = useTranslation(["signup"]); // ใช้ namespace 'signup'
 
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [firstTouched, setFirstTouched] = useState(false);
+  const [lastName, setLastName] = useState("");
+  const [lastTouched, setLastTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
-  // --- Validators (ยกมาจากของเดิม) ---
+  // --- Validators ของ Email ---
   const isEmailValid = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   const emailInvalid = emailTouched && !isEmailValid(email);
+
+  // --- Validators ของชื่อและนามสกุล ---
+  const firstOk = firstName.trim().length > 0;
+  const lastOk = lastName.trim().length > 0;
+
+  const firstInvalid = firstTouched && !firstOk;
+  const lastInvalid = lastTouched && !lastOk;
 
   const passMin = password.length >= 10;
   const passComplex =
@@ -29,12 +54,21 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
   const confirmOk = confirmPassword === password && password.length > 0;
 
   const formValid =
-    isEmailValid(email) && passMin && passComplex && confirmOk && termsAccepted;
+    isEmailValid(email) &&
+    firstOk &&
+    lastOk &&
+    passMin &&
+    passComplex &&
+    confirmOk &&
+    termsAccepted;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formValid) return;
-    onSubmit?.(email, password, confirmPassword);
+    onSubmit?.(email, password, confirmPassword, {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+    });
   };
 
   return (
@@ -77,7 +111,10 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
               type="email"
               placeholder={t("fields.email.placeholder")}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                onChangeEmail?.();
+              }}
               onBlur={() => setEmailTouched(true)}
               {...(emailInvalid
                 ? { "aria-invalid": "true", "aria-describedby": "email-error" }
@@ -92,6 +129,72 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
                   {t("fields.email.invalid")}
                 </span>
               )}
+              {!emailInvalid && serverEmailError && (
+                <span
+                  id="email-error"
+                  className="select-none text-[#EC0357] text-[12px]"
+                >
+                  {serverEmailError}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* FirstName - LastName */}
+          <div className="flex gap-1 flex-col mt-4 w-full">
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="flex flex-col">
+                <label>{t("fields.firstName.label")}</label>
+                <input
+                  className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
+                  type="text"
+                  placeholder={t("fields.firstName.placeholder")}
+                  value={firstName}
+                  onBlur={() => setFirstTouched(true)}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  {...(firstInvalid
+                    ? {
+                        "aria-invalid": "true",
+                        "aria-describedby": "first-error",
+                      }
+                    : {})}
+                />
+                <div
+                  className="h-[10px] mt-[4px] text-[12px] text-[#EC0357]"
+                  aria-live="polite"
+                >
+                  {firstInvalid && (
+                    <span id="first-error">
+                      {t("fields.firstName.required")}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label>{t("fields.lastName.label")}</label>
+                <input
+                  className="border border-gray-500 pl-3 h-[40px] rounded-lg text-sm sm:text-base"
+                  type="text"
+                  placeholder={t("fields.lastName.placeholder")}
+                  value={lastName}
+                  onBlur={() => setLastTouched(true)}
+                  onChange={(e) => setLastName(e.target.value)}
+                  {...(lastInvalid
+                    ? {
+                        "aria-invalid": "true",
+                        "aria-describedby": "last-error",
+                      }
+                    : {})}
+                />
+                <div
+                  className="h-[10px] mt-[4px] text-[12px] text-[#EC0357]"
+                  aria-live="polite"
+                >
+                  {lastInvalid && (
+                    <span id="last-error">{t("fields.lastName.required")}</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -197,7 +300,7 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
               className="bg-cyan w-full font-bold text-white px-4 py-2 rounded-sm hover:bg-blue hover:cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
               disabled={!formValid}
             >
-              {t("actions.signup")}
+              {submitLabel ?? t("actions.signup")}
             </button>
           </div>
 
@@ -216,4 +319,3 @@ export default function RegisterPage({ onSubmit }: RegisterPageProps) {
     </div>
   );
 }
-  

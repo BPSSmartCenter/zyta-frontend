@@ -1,0 +1,46 @@
+{
+  "forgot": {
+    "title": "Forgot password",
+    "subtitle": "Enter your email to receive a password reset link",
+    "actions": { "send_link": "Send reset link", "checking": "Checking" },
+    "modal": {
+      "title": "Link sent",
+      "sent_to": "We've sent the link to",
+      "close": "OK"
+    },
+    "errors": {
+      "not_found": "We couldn't find an account with this email",
+      "server": "Unable to verify email, please try again"
+    }
+  },
+  "reset": {
+    "title": "Set a new password",
+    "subtitle": "Create a new password that meets the requirements below",
+    "actions": { "submit": "Change password" },
+    "modal": {
+      "title": "Success",
+      "success": "Your password has been changed successfully",
+      "close": "Go to sign in"
+    }
+  },
+  "fields": {
+    "email": {
+      "label": "Email",
+      "placeholder": "Enter your email",
+      "invalid": "Invalid email"
+    },
+    "password": {
+      "label": "New password",
+      "placeholder": "Create a new password"
+    },
+    "confirm": {
+      "label": "Confirm password",
+      "placeholder": "Re-enter your password",
+      "mismatch": "Passwords do not match"
+    }
+  },
+  "requirements": {
+    "minLen": "At least 10 characters",
+    "complex": "Contains numbers, uppercase, and lowercase letters"
+  }
+}

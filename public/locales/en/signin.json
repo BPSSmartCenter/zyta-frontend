@@ -19,6 +19,18 @@
     "bottom": "or register a new account",
     "close": "OK"
   },
+  "modalNotVerified": {
+    "title": "Email not verified",
+    "top": "This account has not been verified yet",
+    "bottom": "We have sent a verification link to <bold>{{lastEmail}}</bold>",
+    "close": "OK",
+    "no_email": "Didn't receive the email",
+    "resend": "Resend",
+    "resent": "Resent",
+    "sending": "Sending...",
+    "no_success": "Failed to send, please try again",
+    "check_spam": "Please also check your Spam/Promotions folder"
+  },
   "remember": "Remember for 30 days",
   "forgot": "Forgot password?",
   "actions": {

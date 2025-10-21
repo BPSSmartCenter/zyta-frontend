@@ -1,0 +1,7 @@
+{
+  "verifying": "Verifying your email link...",
+  "success": "Verification successful! You can close this page now.",
+  "login": "go to Sign In",
+  "denied": "The verification link is invalid or has expired.",
+  "go_signin": "Please request a new verification email from the sign-in page."
+}
