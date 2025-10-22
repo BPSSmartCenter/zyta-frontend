@@ -21,6 +21,7 @@ import RequireAuth from "./routes/RequireAuth";
 import { me as apiMe } from "./api/user";
 
 function App() {
+  console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
   return (
     <BrowserRouter>
       <ScrollToTop smooth={true} />
