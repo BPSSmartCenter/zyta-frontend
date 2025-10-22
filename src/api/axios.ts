@@ -3,7 +3,7 @@ import axios from "axios";
 import { isAxiosError } from "axios";
 
 export const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_BASE_URL}/api`,
+  baseURL: `${import.meta.env.VITE_API_BASE_URL}`,
   withCredentials: true, // ให้ส่ง/รับ cookie (token) ไปกับ request
   headers: { "Content-Type": "application/json" },
 });
