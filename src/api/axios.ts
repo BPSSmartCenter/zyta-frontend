@@ -3,7 +3,7 @@ import axios from "axios";
 import { isAxiosError } from "axios";
 
 export const api = axios.create({
-  baseURL: "http://localhost:3001/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL + "/api",
   withCredentials: true, // ให้ส่ง/รับ cookie (token) ไปกับ request
   headers: { "Content-Type": "application/json" },
 });
@@ -21,9 +21,17 @@ api.interceptors.response.use(
         url.includes("/auth/register") ||
         url.includes("/auth/logout");
 
-            if (status === 401 && !isAuthEndpoint) {
-        const publicPaths = ["/", "/register", "/verify-email", "/forgot", "/reset"];
-        const atPublic = typeof window !== 'undefined' && publicPaths.includes(window.location?.pathname || "");
+      if (status === 401 && !isAuthEndpoint) {
+        const publicPaths = [
+          "/",
+          "/register",
+          "/verify-email",
+          "/forgot",
+          "/reset",
+        ];
+        const atPublic =
+          typeof window !== "undefined" &&
+          publicPaths.includes(window.location?.pathname || "");
         if (atPublic) {
           // Avoid redirect loops on public routes (e.g., root login)
           return Promise.reject(err);
