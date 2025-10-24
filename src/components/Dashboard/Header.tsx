@@ -33,6 +33,7 @@ type Props = {
   statItems: StatItem[];
   cameraItems?: CameraItem[];
   events?: Noti[];
+  selectedSiteCode?: string;
 };
 
 const MAX_HEADER_IMAGES = 5;
@@ -105,7 +106,8 @@ const normalizeEventKey = (n: any): EventKey => {
   if (
     /\bmotion\b/.test(s) ||
     s.includes("motion detected") ||
-    s.includes("ตรวจจับการเคลื่อนไหว")
+    s.includes("ตรวจจับการเคลื่อนไหว") ||
+    s.includes("ตรวจพบการเคลื่อนไหว")
   )
     return "motion";
 
@@ -130,12 +132,12 @@ const normalizeStatKey = (k: string): EventKey => {
   return "other";
 };
 
-export default function Header({ statItems, cameraItems, events }: Props) {
+export default function Header({ statItems, cameraItems, events, selectedSiteCode }: Props) {
   const { t } = useTranslation(["dashboard", "common"]);
   const { selected } = useStatSelection();
   const navigate = useNavigate();
   const location = useLocation(); // ⬅️ ใช้เพื่อตรวจเส้นทางปัจจุบัน
-  const { abs, base } = useUserPath();
+  const { absSite, base } = useUserPath();
 
   // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logicตาม base /u/:uid)
   React.useEffect(() => {
@@ -148,8 +150,9 @@ export default function Header({ statItems, cameraItems, events }: Props) {
   }, [location.pathname, base]);
 
   // รวม notis จริง
+  // ใช้ events ที่ถูกส่งเข้ามา "แม้จะเป็น []" (เพื่อให้แสดง 0 ได้จริง)
   const source = React.useMemo<Noti[]>(() => {
-    if (events?.length) return events;
+    if (Array.isArray(events)) return events;
     const a = Array.isArray(alertNotis) ? alertNotis : [];
     const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
     return [...a, ...b];
@@ -178,6 +181,8 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       }),
     [statItems, counts]
   );
+
+  // ไปหน้า Alert (รักษา site context ถ้ามี)
 
   const isImageUrl = (url?: string) => {
     if (!url) return false;
@@ -247,12 +252,13 @@ export default function Header({ statItems, cameraItems, events }: Props) {
     });
   }, [source, cameraItems]);
 
-  // กดการ์ด -> ไป /alert?event=<keyชัดเจน>
-  const onChange = (ids: string[]) => {
+  // กดการ์ด -> ไป /alert?event=<keyชัดเจน> (รักษา site context)
+  const handleStatChange = (ids: string[]) => {
     const id = (ids[0] ?? "") as EventKey;
     setSelectedStat(id || null);
     if (!id) return;
-    navigate(abs(`/alert?event=${id}`));
+    const sc = selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+    navigate(absSite(`/alert?event=${id}`, sc));
   };
 
   // ===== Mobile carousel helpers =====
@@ -291,7 +297,7 @@ export default function Header({ statItems, cameraItems, events }: Props) {
       <StatCardGroup
         selectionMode="single"
         activeIds={selected ? [selected] : []}
-        onChange={onChange}
+        onChange={handleStatChange}
         className="grid grid-cols-2 gap-2 px-6 lg-1024:flex lg-1024:flex-wrap"
       >
         {synced.map((it) => {

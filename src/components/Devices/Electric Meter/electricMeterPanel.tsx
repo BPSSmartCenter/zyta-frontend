@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
@@ -20,6 +20,7 @@ import {
 } from "../devices.constant";
 
 type Props = {
+  siteCode?: string;
   timeRange?: { from: string; to: string };
 };
 
@@ -40,7 +41,9 @@ type SideCardValueProps = {
 
 function formatWithComma(v: number | string) {
   const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n.toLocaleString("en-US") : v;
+  return Number.isFinite(n)
+    ? n.toLocaleString("en-US", { maximumFractionDigits: 0 })
+    : v;
 }
 
 function CardValue({
@@ -50,6 +53,9 @@ function CardValue({
   valueLabel2,
   onClick,
 }: CardValueProps) {
+  const toNum = (x: number | string) =>
+    Number.isFinite(Number(x)) ? Number(x) : 0;
+  const shown = formatWithComma(Math.round(toNum(value)));
   return (
     <div
       className="bg-cyan rounded-lg w-[139px] md:w-[145px] h-[190px] p-5 flex flex-col text-white gap-2 select-none cursor-pointer hover:brightness-90 transition"
@@ -58,7 +64,7 @@ function CardValue({
       <div className="bg-white w-[48px] rounded-full ">
         <img src={img} className="p-3 w-full" alt="" />
       </div>
-      <h1 className="text-[24px] font-bold">{value}</h1>
+      <h1 className="text-[24px] font-bold">{shown}</h1>
       <span>
         {valueLabel} <p>{valueLabel2}</p>
       </span>
@@ -90,7 +96,13 @@ const formatTime = (h: number, m: number) => {
   return `${hh}:${mm} ${ampm}`;
 };
 
-export default function ElectricMeterPanel(_: Props) {
+import {
+  getElectricDevices,
+  getElectricOverview,
+  getElectricSeries,
+} from "../../../api/electric";
+
+export default function ElectricMeterPanel({ siteCode }: Props) {
   const { t } = useTranslation("devices");
 
   // options ทุก 30 นาที
@@ -110,14 +122,33 @@ export default function ElectricMeterPanel(_: Props) {
   const [toTime, setToTime] = useState<string>("01:30 AM");
   const [selected, setSelected] = useState<ElectricDay>("Sun");
 
+  // fetched data
+  const [, setDevices] = useState<any[] | null>(null);
+  const [overview, setOverview] = useState<{
+    now?: {
+      unit?: string;
+      pv_kw?: number;
+      load_kw?: number;
+      grid_kw?: number;
+      storage_kw?: number;
+    };
+    today_kwh?: number;
+    month_kwh?: number;
+    lifetime_kwh?: number;
+  } | null>(null);
+  const [seriesCats, setSeriesCats] = useState<string[] | undefined>(undefined);
+  const [seriesData, setSeriesData] = useState<any | undefined>(undefined);
+  const [, setLoading] = useState(false);
+  const [, setError] = useState<string | null>(null);
+
   // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
   const [thermoOne, setThermoOne] = useState<{
     initialValue: number;
     valueLabel: string;
     maxLabel: string;
   }>({
-    initialValue: 0.5,
-    valueLabel: "kWh",
+    initialValue: 0,
+    valueLabel: t("devices.electric.side.unitKwh"),
     maxLabel: "",
   });
 
@@ -125,6 +156,110 @@ export default function ElectricMeterPanel(_: Props) {
     const n = typeof v === "number" ? v : Number(v);
     return Number.isFinite(n) ? n : 0;
   };
+
+  // Update left gauge from overview today_kwh when available
+  React.useEffect(() => {
+    const today =
+      typeof overview?.today_kwh === "number" ? overview!.today_kwh : 0;
+    setThermoOne((prev) => ({
+      ...prev,
+      initialValue: Math.round(toNumber(today)),
+    }));
+  }, [overview]);
+
+  // Derive today's kWh from series (fallback if overview missing)
+  const todayKwhFromSeries = React.useMemo(() => {
+    if (!Array.isArray(seriesData)) return 0;
+    const s = seriesData.find(
+      (x: any) => String(x?.name).toUpperCase() === "CONSUMPTION"
+    );
+    if (!s || !Array.isArray(s.data)) return 0;
+    const sum = s.data.reduce(
+      (acc: number, v: any) =>
+        acc + (Number.isFinite(Number(v)) ? Number(v) : 0),
+      0
+    );
+    return sum;
+  }, [seriesData]);
+
+  // Compute ISO date range from selected day/time (simple: use today's date)
+  const computeRange = React.useCallback(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const to24 = (s: string) => {
+      const m = /^(\d{2}):(\d{2})\s*(AM|PM)$/i.exec(s.trim());
+      if (!m) return "00:00";
+      let h = parseInt(m[1], 10);
+      const min = m[2];
+      const ap = m[3].toUpperCase();
+      if (ap === "PM" && h !== 12) h += 12;
+      if (ap === "AM" && h === 12) h = 0;
+      return `${String(h).padStart(2, "0")}:${min}`;
+    };
+    const from = `${yyyy}-${mm}-${dd} ${to24(fromTime)}:00`;
+    const to = `${yyyy}-${mm}-${dd} ${to24(toTime)}:00`;
+    return { from, to };
+  }, [fromTime, toTime]);
+
+  // Fetch electric devices for this site (date range could be used later for series)
+  React.useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (!siteCode) {
+          setDevices([]);
+          return;
+        }
+        const range = computeRange();
+        const resp = await getElectricDevices(siteCode, range);
+        const items = Array.isArray(resp?.items) ? resp.items : [];
+        setDevices(items);
+      } catch (e: any) {
+        console.error("load electric devices failed", e);
+        setDevices([]);
+        setError("failed");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [siteCode, computeRange]);
+
+  // Fetch overview + series for the same range
+  React.useEffect(() => {
+    (async () => {
+      try {
+        if (!siteCode) {
+          setOverview(null);
+          setSeriesCats(undefined);
+          setSeriesData(undefined);
+          return;
+        }
+        const range = computeRange();
+        const [ov, se] = await Promise.all([
+          getElectricOverview(siteCode).catch(() => ({ data: null })),
+          getElectricSeries(siteCode, {
+            ...range,
+            timeUnit: "HOUR",
+            meters: "PRODUCTION,CONSUMPTION",
+          }).catch(() => ({ data: null })),
+        ]);
+        const dataOv = (ov?.data ?? null) as any;
+        setOverview(dataOv);
+        const dse = (se?.data ?? null) as any;
+        setSeriesCats(
+          Array.isArray(dse?.categories) ? dse.categories : undefined
+        );
+        setSeriesData(Array.isArray(dse?.series) ? dse.series : undefined);
+      } catch (e) {
+        setOverview(null);
+        setSeriesCats(undefined);
+        setSeriesData(undefined);
+      }
+    })();
+  }, [siteCode, computeRange]);
 
   return (
     <>
@@ -240,7 +375,7 @@ export default function ElectricMeterPanel(_: Props) {
               <Thermostat
                 key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}`}
                 initialValue={thermoOne.initialValue}
-                max={220}
+                max={200000}
                 maxLabel={thermoOne.maxLabel}
                 valueLabel={thermoOne.valueLabel}
               />
@@ -248,7 +383,7 @@ export default function ElectricMeterPanel(_: Props) {
 
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={24}
+                initialValue={0}
                 max={50}
                 maxLabel={""}
                 valueLabel={`🌢 26%`}
@@ -262,37 +397,37 @@ export default function ElectricMeterPanel(_: Props) {
             {[
               {
                 img: voltageIcon,
-                value: 220,
+                value: 0,
                 valueLabel: t("devices.electric.cards.voltage"),
                 valueLabel2: t("devices.electric.units.volt"),
               },
               {
                 img: plugIcon,
-                value: 0.5,
+                value: overview?.today_kwh ?? todayKwhFromSeries ?? 0,
                 valueLabel: t("devices.electric.cards.consumption"),
                 valueLabel2: t("devices.electric.units.kwh"),
               },
               {
                 img: transformIcon,
-                value: 0.6,
+                value: overview?.month_kwh ?? 0,
                 valueLabel: t("devices.electric.cards.accumulated"),
                 valueLabel2: t("devices.electric.units.kwh"),
               },
               {
                 img: IletterIcon,
-                value: 220,
+                value: 0,
                 valueLabel: t("devices.electric.cards.current"),
                 valueLabel2: t("devices.electric.units.amp"),
               },
               {
                 img: wavesineIcon,
-                value: 10,
+                value: 0,
                 valueLabel: t("devices.electric.cards.frequency"),
                 valueLabel2: t("devices.electric.units.hz"),
               },
               {
                 img: waterSupplieIcon,
-                value: 7.1,
+                value: 0,
                 valueLabel: t("devices.electric.cards.humidity"),
                 valueLabel2: t("devices.electric.units.gm3"),
               },
@@ -319,13 +454,13 @@ export default function ElectricMeterPanel(_: Props) {
           {[
             {
               img: plugWhiteIcon,
-              value: 0.45,
+              value: overview?.today_kwh ?? todayKwhFromSeries ?? 0,
               valueLabel: t("devices.electric.side.today"),
               unit: t("devices.electric.side.unitKwh"),
             },
             {
               img: boltWhiteIcon,
-              value: 930773,
+              value: overview?.month_kwh ?? 0,
               valueLabel: t("devices.electric.side.month"),
               unit: t("devices.electric.side.unitKwh"),
             },
@@ -376,7 +511,10 @@ export default function ElectricMeterPanel(_: Props) {
         {/* กราฟเส้นเปลี่ยนตามวัน */}
         <ElectricLineBasicChart
           key={selected}
-          series={ELECTRIC_DAY_SERIES[selected]}
+          categories={seriesCats?.map((d) =>
+            typeof d === "string" ? d.slice(11, 16) : ""
+          )}
+          series={seriesData ?? ELECTRIC_DAY_SERIES[selected]}
         />
       </div>
     </>

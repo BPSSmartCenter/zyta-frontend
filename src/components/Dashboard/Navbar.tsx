@@ -80,7 +80,11 @@ export default function Navbar({
             className="min-w-[140px]"
           />
 
-          <Dropdown options={siteOptions as any} value={selectedSite} onChange={setSelectedSite}>
+          <Dropdown
+            options={siteOptions as any}
+            value={selectedSite}
+            onChange={setSelectedSite}
+          >
             {({
               open,
               selected,
@@ -89,7 +93,6 @@ export default function Navbar({
               getMenuProps,
               getItemProps,
             }) => {
-              // เธเนเธฒเธขเธเธเธเธธเนเธก: เนเธเธฅเธเธฒเธ selected (เธซเธฃเธทเธญเนเธเน All Sites เธ–เนเธฒเนเธกเนเธกเธต)
               const siteOptionList = options as SiteOption[];
               const fallbackOption =
                 selected ??
@@ -104,7 +107,7 @@ export default function Navbar({
                   <button
                     {...getButtonProps({
                       className:
-                        "inline-flex h-10 w-[105px] items-center justify-around rounded-md border border-gray-300 px-1 text-sm hover:cursor-pointer focus:bg-gray-50",
+                        "inline-flex h-10 min-w-[105px] items-center justify-around rounded-md border border-gray-300 px-1 text-sm hover:cursor-pointer focus:bg-gray-50",
                     })}
                   >
                     <span className="truncate">{selectedLabel}</span>
@@ -116,7 +119,7 @@ export default function Navbar({
                   <div
                     {...getMenuProps({
                       className: [
-                        "absolute z-10 mt-12 min-w-[110px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                        "absolute z-10 mt-12 min-w-[180px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
                         "transition-all duration-150",
                         open
                           ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -126,7 +129,8 @@ export default function Navbar({
                     })}
                   >
                     {siteOptionList.map((opt) => {
-                      const active = opt.value === (selected?.value ?? selectedSite);
+                      const active =
+                        opt.value === (selected?.value ?? selectedSite);
                       return (
                         <button
                           key={opt.value}
@@ -283,8 +287,7 @@ export default function Navbar({
                           >
                             {siteOptionList.map((opt) => {
                               const active =
-                                opt.value ===
-                                (selected?.value ?? selectedSite);
+                                opt.value === (selected?.value ?? selectedSite);
                               return (
                                 <button
                                   key={opt.value}
@@ -383,12 +386,3 @@ export default function Navbar({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

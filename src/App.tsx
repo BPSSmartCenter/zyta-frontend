@@ -46,6 +46,12 @@ function App() {
             <Route path="facerec" element={<FaceRecognize />} />
             <Route path="devices" element={<Devices />} />
             <Route path="usermanage" element={<UserManagement />} />
+            {/* site-scoped routes */}
+            <Route path="site/:siteCode">
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="alert" element={<TotalAlert />} />
+              <Route path="devices" element={<Devices />} />
+            </Route>
           </Route>
         </Route>
 

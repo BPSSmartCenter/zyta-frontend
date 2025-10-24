@@ -11,16 +11,26 @@ import { useParams } from "react-router-dom";
 export function useUserPath() {
   const params = useParams();
   const uid = params.uid as string | undefined;
+  const siteCodeFromParams = params.siteCode as string | undefined;
   const base = uid ? `/u/${uid}` : "";
 
   const abs = (path: string) => {
     if (!uid) return path; // fallback when not under /u/:uid scope
     if (!path) return base;
-    // handle full URLSearch style like "?a=b"
     if (path.startsWith("?")) return `${base}${path}`;
-    // normalize to single slash
     return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
   };
 
-  return { uid, base, abs };
+  // Build under /u/:uid/site/:siteCode
+  const absSite = (path: string, siteCode?: string) => {
+    if (!uid) return path;
+    const sc = siteCode || siteCodeFromParams;
+    if (!sc) return abs(path);
+    const siteBase = `${base}/site/${sc}`;
+    if (!path) return siteBase;
+    if (path.startsWith("?")) return `${siteBase}${path}`;
+    return path.startsWith("/") ? `${siteBase}${path}` : `${siteBase}/${path}`;
+  };
+
+  return { uid, base, abs, absSite };
 }

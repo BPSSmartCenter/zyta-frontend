@@ -9,15 +9,15 @@ import CCTVTable from "./CCTV/cctvTable";
 import WaterMeterPanel from "./Water Meter/waterMeterPanel";
 import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 import AirPanel from "./Air Sensor/AirPanel";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 
 type Props = {};
 
 const TYPE_TO_ID: Record<string, string> = {
   cctv: "cctv-1",
-  intercom: "intercom-1",
   watermeter: "water-1",
+  redbox: "intercom-1",
   electricmeter: "electric-1",
   airsensor: "air-1",
 };
@@ -36,7 +36,8 @@ export default function Content({}: Props) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { abs } = useUserPath();
+  const { abs, absSite } = useUserPath();
+  const { siteCode } = useParams();
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();
@@ -54,7 +55,17 @@ export default function Content({}: Props) {
     // ใช้ search แทนการประกอบสตริงเอง เผื่ออนาคตมีพารามอื่น
     const params = new URLSearchParams(location.search);
     params.set("type", nextType);
-    navigate({ pathname: abs("/devices"), search: `?${params.toString()}` }, { replace: false });
+    if (siteCode) {
+      navigate(
+        { pathname: absSite("/devices", siteCode), search: `?${params.toString()}` },
+        { replace: false }
+      );
+    } else {
+      navigate(
+        { pathname: abs("/devices"), search: `?${params.toString()}` },
+        { replace: false }
+      );
+    }
   };
 
   return (
@@ -105,7 +116,12 @@ export default function Content({}: Props) {
       </StatCardGroup>
 
       {/* Panel/Table ตาม selectedId (คอมโพเนนต์คงตัว ไม่รี-mount จาก key/state) */}
-      {selectedId === "cctv-1" || selectedId === "intercom-1" ? (
+      {selectedId === "cctv-1" ? (
+        <div className="flex flex-col gap-3">
+          <CCTVPanel />
+          <CCTVTable />
+        </div>
+      ) : selectedId === "intercom-1" ? (
         <div className="flex flex-col gap-3">
           <CCTVPanel />
           <CCTVTable />
@@ -117,7 +133,7 @@ export default function Content({}: Props) {
         </div>
       ) : selectedId === "electric-1" ? (
         <div className="mt-6">
-          <ElectricMeterPanel />
+          <ElectricMeterPanel siteCode={siteCode} />
           <CCTVTable />
         </div>
       ) : selectedId === "air-1" ? (

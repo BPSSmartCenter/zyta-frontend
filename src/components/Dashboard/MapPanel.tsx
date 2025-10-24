@@ -10,7 +10,6 @@ import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { me } from "../../data/Dashboard/auth";
-import { PROVINCE_CODE_TO_TH } from "../../data/Dashboard/data";
 
 /* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {
@@ -101,25 +100,19 @@ export default function MapPanel({
   };
   const aclSites: AclSite[] = (accessibleSites ?? []) as AclSite[];
 
+  // เดิม: โฟกัสตามจังหวัดของ site → เปลี่ยนเป็นโฟกัสตรงพิกัด lat/lng ของ site
   useEffect(() => {
     if (!selectedSiteCode) return;
-
     if (selectedSiteCode === "all") {
-      // กลับโหมดเห็นทุกพื้นที่
       setProvince("all");
+      // บังคับ remount map หนึ่งครั้ง เมื่อละทิ้งโหมด Site → ป้องกัน layer ค้าง
+      // (Map.tsx จะ init overlays ใหม่ในสถานะประเทศ)
+      setMapVersion((v) => v + 1);
       return;
     }
-
-    // หา site จากรายการที่ส่งมาจาก Navbar
-    const s = accessibleSites?.find((x) => x.code === selectedSiteCode);
-    if (!s) return;
-
-    const pCode = s.province_code;
-    const pName = pCode ? PROVINCE_CODE_TO_TH[pCode] : undefined;
-    if (pName) {
-      setProvince(pName); // ★ สั่งให้ Map โฟกัส "จังหวัด" เท่านั้น
-    }
-  }, [selectedSiteCode, accessibleSites, setProvince]);
+    // ยกเลิก province zoom เสมอเมื่อเลือก site เฉพาะ
+    setProvince("all");
+  }, [selectedSiteCode, setProvince]);
 
   // รองรับหลายฟิลด์ของ noti (id/code/name/site/siteId/siteCode/siteName)
   const allowedSiteKeys = useMemo(() => {
@@ -251,27 +244,8 @@ export default function MapPanel({
   ]);
 
   /* ---------- auto set province for non-admin (ไม่แตะ UI) ---------- */
-  const firstAccessibleSite = useMemo(() => {
-    return Array.isArray(aclSites) && aclSites.length > 0 ? aclSites[0] : null;
-  }, [aclSites]);
-
-  const resolvedProvinceForRole = useMemo(() => {
-    if (userRole === "admin") return province;
-    if (province && province !== "all") return province;
-    const code = firstAccessibleSite?.province_code as string | undefined;
-    const nameTh = code ? PROVINCE_CODE_TO_TH[code] : undefined;
-    return nameTh || "all";
-  }, [userRole, province, firstAccessibleSite]);
-
-  useEffect(() => {
-    if (
-      userRole !== "admin" &&
-      province === "all" &&
-      resolvedProvinceForRole !== "all"
-    ) {
-      setProvince(resolvedProvinceForRole as any);
-    }
-  }, [userRole, province, resolvedProvinceForRole, setProvince]);
+  // ยกเลิก auto-focus province ตาม role; ให้ผู้ใช้เลือกจังหวัดเองจาก dropdown เท่านั้น
+  // ดังนั้นเมื่อกลับไป "ทั้งหมด" ให้คงเป็นระดับประเทศ (province === "all") จนกว่าผู้ใช้จะเลือกจังหวัดเอง
 
   /* ---------- i18n helpers ---------- */
   const getEventLabel = (val: string, fallback: string) =>
@@ -493,11 +467,22 @@ export default function MapPanel({
           showPins={true}
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
-          // โฟกัสจังหวัด (มาจาก useEffect ในข้อ 2)
-          focusProvince={
-            resolvedProvinceForRole !== "all"
-              ? (resolvedProvinceForRole as string)
+          // ถ้าเลือก site เฉพาะ → โฟกัสพิกัด site โดยตรง
+          focusSiteCenter={
+            selectedSiteCode && selectedSiteCode !== "all"
+              ? (() => {
+                  const s = accessibleSites?.find((x) => x.code === selectedSiteCode);
+                  const lat = Number(s?.lat);
+                  const lng = Number(s?.lng);
+                  return Number.isFinite(lat) && Number.isFinite(lng)
+                    ? ({ lat, lng } as { lat: number; lng: number })
+                    : null;
+                })()
               : null
+          }
+          // ถ้ายังไม่เลือก site → โฟกัสจังหวัดก็ต่อเมื่อผู้ใช้เลือกเองจาก dropdown เท่านั้น
+          focusProvince={
+            selectedSiteCode === "all" && province !== "all" ? (province as string) : null
           }
           lockZoomOut={selectedSiteCode !== "all"}
           onProvinceChange={(val) => {

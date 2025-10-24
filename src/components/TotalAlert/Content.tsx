@@ -3,7 +3,7 @@ import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
 import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import CameraTile from "../CameraTile";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
@@ -53,7 +53,7 @@ const bag = (n: any) =>
 const normalizeEventKey = (n: any): EventKey => {
   const s = bag(n);
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
+  if (/\bmotion\b/.test(s) || s.includes("motion detected") || s.includes("ตรวจจับการเคลื่อนไหว") || s.includes("ตรวจพบการเคลื่อนไหว")) return "motion";
   if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
   if (
     /notis\.(camera|device)offline/.test(s) ||
@@ -99,14 +99,36 @@ export default function Content({ statItems }: Props) {
   const { selected } = useStatSelection();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const { abs } = useUserPath();
+  const params = useParams();
+  const { absSite } = useUserPath();
   // รวม notis ทั้งหมด
+  // รวม notis และกรองตาม site context ถ้ามี :siteCode
   const allEvents = React.useMemo<Noti[]>(() => {
     const a = Array.isArray(alertNotis) ? alertNotis : [];
     const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
-    return [...a, ...b];
-  }, []);
+    let list: Noti[] = [...a, ...b];
+    const siteCode = params.siteCode ? String(params.siteCode) : null;
+    if (siteCode) {
+      const nameOrCode = (n: any): string[] => {
+        const raw = [
+          n?.siteId,
+          n?.site_id,
+          n?.siteCode,
+          n?.site_code,
+          n?.siteName,
+          n?.site_name,
+          n?.site,
+          n?.site?.id,
+          n?.site?.code,
+          n?.site?.name,
+        ].filter(Boolean).map((x: any) => String(x));
+        // ใน mock มักจะใช้ชื่อ site → ใส่ทั้งชื่อและโค้ดเท่าที่หาได้
+        return Array.from(new Set(raw));
+      };
+      list = list.filter((n) => nameOrCode(n).includes(siteCode));
+    }
+    return list;
+  }, [params.siteCode]);
 
   // นับยอดการ์ดจาก notis จริง (คีย์กลาง)
   const counts = React.useMemo<Record<EventKey, number>>(() => {
@@ -171,11 +193,11 @@ export default function Content({ statItems }: Props) {
     const next = (ids[0] ?? "") as EventKey;
     if (!next) {
       setSelectedStat(null);
-      navigate(abs("/dashboard"));
+      navigate(absSite("/dashboard"));
       return;
     }
     setSelectedStat(next);
-    navigate(abs(`/alert?event=${next}`));
+    navigate(absSite(`/alert?event=${next}`));
   };
 
   return (

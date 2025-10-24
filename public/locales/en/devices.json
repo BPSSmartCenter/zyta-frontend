@@ -5,7 +5,7 @@
   },
   "header": {
     "cctvCard": "CCTV Cameras",
-    "intercomeCard": "Intercom",
+    "intercomeCard": "Red box",
     "waterCard": "Water Meter",
     "electricCard": "Electric Meter",
     "airCard": "Air Sensor"

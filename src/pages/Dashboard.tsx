@@ -333,15 +333,58 @@ export default function Dashboard() {
   // ---------- Filters (เธเธ logic เน€เธ”เธดเธก) ----------
 
   // รวม Alert + Well-being แล้วกรองด้วย searchEvent ทีเดียว
+  // ใช้ตรรกะกรอง Site แบบเดียวกับ MapPanel (ใช้ code/name/id ได้)
   const filteredAllAlerts = React.useMemo(() => {
-    const source = filterByAcl([...notis, ...wellBeingNotis]);
+    // 1) รวม notis ทั้งหมดก่อน
+    let list: AnyNoti[] = [...notis, ...wellBeingNotis] as any;
+
+    // 2) ถ้าผู้ใช้ไม่ใช่ admin → กรองเฉพาะไซต์ที่อนุญาต
+    if (role !== "admin") {
+      const allowed = new Set((accessibleSites ?? []).map((s) => String(s.name)));
+      list = list.filter((n: any) => allowed.has(String(n.site)));
+    }
+
+    // 3) ถ้าเลือก Site เฉพาะ → กรองด้วย selectedSiteCode (เทียบได้ทั้งชื่อและโค้ด)
+    if (selectedSiteCode && selectedSiteCode !== "all") {
+      const nameToCode = new Map((accessibleSites ?? []).map((s) => [String(s.name), String(s.code)]));
+      list = list.filter((n: any) => {
+        const raw = [
+          (n as any).siteId,
+          (n as any).site_id,
+          (n as any).siteCode,
+          (n as any).site_code,
+          (n as any).siteName,
+          (n as any).site_name,
+          (n as any).site,
+          (n as any)?.site?.id,
+          (n as any)?.site?.code,
+          (n as any)?.site?.name,
+        ].filter(Boolean).map((x) => String(x));
+        // map ชื่อไซต์ -> code เพื่อเทียบกับ selectedSiteCode ได้
+        const withCodes = raw.flatMap((v) => {
+          const c = nameToCode.get(v);
+          return c ? [v, c] : [v];
+        });
+        return withCodes.includes(String(selectedSiteCode));
+      });
+    }
+
+    // 4) ค้นหาตามกล่อง searchEvent (หัวข้อ All Events)
     const q = searchEvent.trim().toLowerCase();
-    if (!q) return source as any;
-    // ใช้ makeHaystack เดิมเพื่อค้นหากว้าง ทั้ง title/site/date/detail
-    return source.filter((n: any) =>
+    if (!q) return list as any;
+    return list.filter((n: any) =>
       makeHaystack(n as AnyNoti, { includeDetail: true }).includes(q)
     );
-  }, [searchEvent, i18n.language, makeHaystack, filterByAcl]);
+  }, [
+    notis,
+    wellBeingNotis,
+    role,
+    accessibleSites,
+    selectedSiteCode,
+    searchEvent,
+    i18n.language,
+    makeHaystack,
+  ]);
 
   const filteredNotis = React.useMemo(() => {
     const source = filterByAcl(notis);
@@ -591,7 +634,11 @@ export default function Dashboard() {
         setDate={setDate}
       />
 
-      <Header statItems={statItemsForHeader} events={headerEvents as any} />
+      <Header
+        statItems={statItemsForHeader}
+        events={headerEvents as any}
+        selectedSiteCode={selectedSiteCode}
+      />
 
       <ContentLayout {...contentLayoutProps} />
 

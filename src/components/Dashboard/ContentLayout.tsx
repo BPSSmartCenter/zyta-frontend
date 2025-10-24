@@ -159,7 +159,7 @@ export default function ContentLayout(props: Props) {
               <UserManagement />
             </div>
             <div className="p-6 w-full rounded-xl bg-white">
-              <DeviceCount />
+              <DeviceCount siteCode={props.selectedSiteCode} />
             </div>
           </div>
         </div>

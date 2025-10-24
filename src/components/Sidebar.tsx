@@ -36,7 +36,13 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const { t } = useTranslation("sidebar");
   const navigate = useNavigate();
   const location = useLocation();
-  const { abs, base } = useUserPath();
+  const { abs, base, absSite } = useUserPath();
+  const goSiteOrGlobal = (path: string) => {
+    const scMatch = location.pathname.match(/\/site\/([^\/]+)/);
+    const sc = scMatch?.[1];
+    if (sc) return navigate(absSite(path, sc));
+    return navigate(abs(path));
+  };
 
   const [account, setAccount] = useState<{
     name: string;
@@ -83,8 +89,16 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   // logout modal
   const [logoutOpen, setLogoutOpen] = useState(false);
   const handleConfirmLogout = async () => {
-    try { await apiLogout(); } catch (e) { /* ignore */ }
-    try { mockLogout(); } catch (e) { /* ignore */ }
+    try {
+      await apiLogout();
+    } catch (e) {
+      /* ignore */
+    }
+    try {
+      mockLogout();
+    } catch (e) {
+      /* ignore */
+    }
     setLogoutOpen(false);
     navigate("/", { replace: true });
   };
@@ -148,10 +162,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     const pathNoBase = location.pathname.startsWith(base)
       ? location.pathname.slice(base.length) || "/"
       : location.pathname;
-    if (pathNoBase.startsWith("/alert"))
-      openAccordion("alert-accordion");
-    if (pathNoBase.startsWith("/devices"))
-      openAccordion("devices-accordion");
+    if (pathNoBase.startsWith("/alert")) openAccordion("alert-accordion");
+    if (pathNoBase.startsWith("/devices")) openAccordion("devices-accordion");
   }, [location.pathname, base]);
 
   const sidebarClass = useMemo(() => {
@@ -514,7 +526,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       <ul className="pt-1 ps-7 space-y-1">
                         <li>
                           <a
-                            onClick={() => go("/devices?type=cctv")}
+                            onClick={() => goSiteOrGlobal('/devices?type=cctv')}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("cctv")
@@ -527,7 +539,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => go("/devices?type=intercom")}
+                            onClick={() => goSiteOrGlobal('/devices?type=redbox')}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("intercom")
@@ -536,13 +548,13 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                             )}
                           >
                             {t("menu.devices_intercom", {
-                              defaultValue: "Intercom",
+                              defaultValue: "redbox",
                             })}
                           </a>
                         </li>
                         <li>
                           <a
-                            onClick={() => go("/devices?type=watermeter")}
+                            onClick={() => goSiteOrGlobal('/devices?type=watermeter')}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("watermeter")
@@ -557,7 +569,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => go("/devices?type=electricmeter")}
+                            onClick={() => goSiteOrGlobal('/devices?type=electricmeter')}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("electricmeter")
@@ -572,7 +584,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => go("/devices?type=airsensor")}
+                            onClick={() => goSiteOrGlobal('/devices?type=airsensor')}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("airsensor")

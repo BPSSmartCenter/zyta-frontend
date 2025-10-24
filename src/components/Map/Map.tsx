@@ -238,29 +238,14 @@ export default function Map({
 
     if (!map) return;
 
-    const r = removedOnPinRef.current;
-
-    if (
-      r.provinces &&
-      provincesLayerRef.current &&
-      !map.hasLayer(provincesLayerRef.current)
-    ) {
+    // Always ensure layers exist on map if ref exists, regardless of flags
+    if (provincesLayerRef.current && !map.hasLayer(provincesLayerRef.current)) {
       provincesLayerRef.current.addTo(map);
     }
-
-    if (
-      r.districts &&
-      districtsLayerRef.current &&
-      !map.hasLayer(districtsLayerRef.current)
-    ) {
+    if (districtsLayerRef.current && !map.hasLayer(districtsLayerRef.current)) {
       districtsLayerRef.current.addTo(map);
     }
-
-    if (
-      r.subdistricts &&
-      subdistrictsLayerRef.current &&
-      !map.hasLayer(subdistrictsLayerRef.current)
-    ) {
+    if (subdistrictsLayerRef.current && !map.hasLayer(subdistrictsLayerRef.current)) {
       subdistrictsLayerRef.current.addTo(map);
     }
 
@@ -1131,6 +1116,15 @@ export default function Map({
     prevFocusRef.current = focusProvince ?? null;
     if (!focusProvince) return;
 
+    // ถ้ามี focusSiteCenter อยู่ ให้ข้ามการ drilldown จังหวัด (เรากำลังโฟกัสที่พิกัดไซต์)
+    if (focusSiteCenter) return;
+
+    // Ensure overlays are present before entering province (in case coming back from pin view)
+    reattachRegionLayersAfterPinView();
+
+    // ✅ เผื่อเพิ่งซูมจากหมุด: ใส่ชั้นพื้นที่กลับมาก่อนเสมอ
+    reattachRegionLayersAfterPinView();
+
     // ✅ ย้ำให้ทั้งชั้น "dim" ก่อน drilldown เพื่อกัน race
     isDrillingRef.current = true; // กัน hover ยิงทับระหว่างแอนิเมชัน
     setProvincesVariant("dim"); // dim ทั้งชั้นจังหวัดทันที
@@ -1165,11 +1159,17 @@ export default function Map({
 
   useEffect(() => {
     if (!focusSiteCenter) return;
-    const map = mapRef.current;
-    if (!map) return;
-    const target = [focusSiteCenter.lat, focusSiteCenter.lng] as any;
-    const targetZoom = Math.min(18, map.getMaxZoom() ?? 19);
-    map.flyTo(target, targetZoom, { animate: true });
+    // ใช้ zoomToLatLng เพื่อให้พฤติกรรมเหมือนคลิกที่ marker:
+    // - ถอดชั้นจังหวัด/อำเภอ/ตำบล
+    // - ปิด dim/mask ตามตรรกะเดิม
+    const ll = L.latLng(focusSiteCenter.lat, focusSiteCenter.lng);
+    zoomToLatLng(ll);
+  }, [focusSiteCenter]);
+
+  // เมื่อยกเลิก focusSiteCenter (เช่น เลือก "ทั้งหมด") ให้กู้คืนชั้น overlay กลับเป็นมุมมองประเทศเสมอ
+  useEffect(() => {
+    if (focusSiteCenter) return;
+    resetToCountry(true);
   }, [focusSiteCenter]);
 
   /* lockZoomOut -> minZoom guard */
