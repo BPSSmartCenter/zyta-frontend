@@ -14,3 +14,14 @@ export async function me(): Promise<MeResponse> {
   const { data } = await api.get("/users/me");
   return data;
 }
+
+export type UserStatsResponse = {
+  total: number;
+  byRole: { admin: number; officer: number; user: number };
+};
+
+export async function getUserStats(site?: string): Promise<UserStatsResponse> {
+  const url = site ? `/users/stats?site=${encodeURIComponent(site)}` : "/users/stats";
+  const { data } = await api.get(url);
+  return data;
+}

@@ -3,6 +3,8 @@ import AlertEvents from "./AlertEvents";
 import WellBeingEvents from "./WellBeingEvents";
 import MapPanel from "./MapPanel";
 import UserManagement from "./UserManagement";
+import { regionLabels, regionColors, roleLabels, roleColors } from "./dashboard.constants";
+import { getUserStats } from "../../api/user";
 import DeviceCount from "./DeviceCount";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
@@ -96,6 +98,42 @@ export default function ContentLayout(props: Props) {
     return allItems.filter((n: any) => bag(n).includes(q));
   }, [allItems, searchEvent]);
 
+  // Compute region-site counts from accessibleSites
+  const regionSeriesFromSites = React.useMemo(() => {
+    const counts = [0, 0, 0, 0]; // [north, northeast, south, central]
+    const map: Record<string, number> = {
+      // Central
+      "10": 2, // กรุงเทพมหานคร
+      "73": 3, // นครปฐม
+    };
+    const sites = props.accessibleSites ?? [];
+    for (const s of sites) {
+      const code = String(s?.province_code ?? "").trim();
+      const idx = map[code] ?? 3; // default central if unknown
+      counts[idx] += 1;
+    }
+    return counts;
+  }, [JSON.stringify(props.accessibleSites)]);
+
+  // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
+  const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<number[] | null>(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const code = props.selectedSiteCode;
+        const stats = await getUserStats(code && code !== "all" ? String(code) : undefined);
+        const series = [stats.byRole.officer ?? 0, stats.byRole.user ?? 0, stats.byRole.admin ?? 0];
+        if (!cancelled) setRoleSeriesFromApi(series);
+      } catch {
+        if (!cancelled) setRoleSeriesFromApi(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.selectedSiteCode]);
+
   return (
     <div className="flex flex-col px-6 gap-3">
       {/* 
@@ -156,10 +194,24 @@ export default function ContentLayout(props: Props) {
               className="p-6 w-full rounded-xl bg-white hover:cursor-pointer"
               onClick={() => navigate(abs("/usermanage"))}
             >
-              <UserManagement />
+              <UserManagement
+                regionSeries={regionSeriesFromSites}
+                regionLabels={regionLabels}
+                regionColors={regionColors}
+                roleSeries={roleSeriesFromApi ?? undefined}
+                roleLabels={roleLabels}
+                roleColors={roleColors}
+              />
             </div>
             <div className="p-6 w-full rounded-xl bg-white">
-              <DeviceCount siteCode={props.selectedSiteCode} />
+              <DeviceCount
+                siteCode={props.selectedSiteCode}
+                // Mock for now: only 1 electric meter, others 0; offline 100%
+                counts={{ cameras: 0, intercom: 0, waterMeter: 0, electricMeter: 1, airSensor: 0, zyta: 0 }}
+                offlineCount={0}
+                onlineCount={0}
+                offlinePercent={100}
+              />
             </div>
           </div>
         </div>

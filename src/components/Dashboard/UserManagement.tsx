@@ -125,11 +125,35 @@ function DonutBlock({
   );
 }
 
-export default function UserManagement() {
+type UserManagementProps = {
+  regionSeries?: number[];
+  regionLabels?: string[];
+  regionColors?: string[];
+  roleSeries?: number[];
+  roleLabels?: string[];
+  roleColors?: string[];
+};
+
+export default function UserManagement(props: UserManagementProps = {}) {
   const { t } = useTranslation(["dashboard"]);
+  const {
+    regionSeries: regionSeriesProp,
+    regionLabels: regionLabelsProp,
+    regionColors: regionColorsProp,
+    roleSeries: roleSeriesProp,
+    roleLabels: roleLabelsProp,
+    roleColors: roleColorsProp,
+  } = props;
+
+  const regionSeriesData = regionSeriesProp ?? regionSeries;
+  const regionLabelsData = regionLabelsProp ?? regionLabels;
+  const regionColorsData = regionColorsProp ?? regionColors;
+  const roleSeriesData = roleSeriesProp ?? roleSeries;
+  const roleLabelsData = roleLabelsProp ?? roleLabels;
+  const roleColorsData = roleColorsProp ?? roleColors;
 
   return (
-    <form className="flex flex-col justify-center py-2  gap-4">
+    <form className="flex flex-col justify-center py-0  gap-4">
       <h1 className="text-[22px] font-semibold">
         {t("userMgmt.title", { defaultValue: "USER MANAGEMENT" })}
       </h1>
@@ -140,9 +164,9 @@ export default function UserManagement() {
           <DonutBlock
             scope="region"
             title={t("userMgmt.region.title", { defaultValue: "จำนวนไซต์" })}
-            series={regionSeries}
-            labels={regionLabels}
-            colors={regionColors}
+            series={regionSeriesData}
+            labels={regionLabelsData}
+            colors={regionColorsData}
           />
         </div>
 
@@ -152,9 +176,9 @@ export default function UserManagement() {
             title={t("userMgmt.role.title", {
               defaultValue: "จำนวน user ที่ใช้งาน",
             })}
-            series={roleSeries}
-            labels={roleLabels}
-            colors={roleColors}
+            series={roleSeriesData}
+            labels={roleLabelsData}
+            colors={roleColorsData}
           />
         </div>
       </div>

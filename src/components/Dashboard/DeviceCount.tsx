@@ -12,9 +12,24 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 
-type Props = { siteCode?: string };
+type DeviceCounts = {
+  cameras: number;
+  intercom: number;
+  waterMeter: number;
+  electricMeter: number;
+  airSensor: number;
+  zyta: number;
+};
 
-export default function DeviceCount({ siteCode }: Props) {
+type Props = {
+  siteCode?: string;
+  counts?: Partial<DeviceCounts>;
+  offlinePercent?: number; // if provided, overrides computed
+  offlineCount?: number;
+  onlineCount?: number;
+};
+
+export default function DeviceCount({ siteCode, counts, offlinePercent, offlineCount, onlineCount }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const langKey = i18n.language || "en";
   const navigate = useNavigate();
@@ -42,6 +57,24 @@ export default function DeviceCount({ siteCode }: Props) {
     return navigate(abs(`/devices?type=${type}`));
   };
 
+  // Defaults (mock): only 1 electric meter, others 0; offline 100%
+  const mergedCounts: DeviceCounts = {
+    cameras: 0,
+    intercom: 0,
+    waterMeter: 0,
+    electricMeter: 1,
+    airSensor: 0,
+    zyta: 0,
+    ...(counts || {}),
+  } as DeviceCounts;
+
+  const offlineOnline = (() => {
+    const oc = typeof offlineCount === "number" ? offlineCount : 1;
+    const on = typeof onlineCount === "number" ? onlineCount : 0;
+    const pct = typeof offlinePercent === "number" ? offlinePercent : ((oc / Math.max(oc + on, 1)) * 100);
+    return { oc, on, pct };
+  })();
+
   return (
     <form className="flex flex-col gap-3 hover:cursor-default">
       <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
@@ -51,7 +84,7 @@ export default function DeviceCount({ siteCode }: Props) {
       <div className="flex">
         <RadialBar
           key={`radial-offline-${langKey}`} // ← บังคับ remount เมื่อภาษาเปลี่ยน
-          value={(45 / (45 + 89)) * 100}
+          value={offlineOnline.pct}
           label={labelOffline}
           mainColor="#FB3F3F"
           primaryColor="#A9DB4E"
@@ -74,7 +107,7 @@ export default function DeviceCount({ siteCode }: Props) {
                 items={[{ label: labelOffline, color: "#FB3F3F" }]}
                 labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[18px] font-semibold">45</h1>
+              <h1 className="text-[18px] font-semibold">{offlineOnline.oc}</h1>
             </div>
 
             <div className="flex flex-col w-[70px] h-[60px] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
@@ -82,12 +115,12 @@ export default function DeviceCount({ siteCode }: Props) {
                 items={[{ label: labelOnline, color: "#A9DB4E" }]}
                 labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[18px] font-semibold">89</h1>
+              <h1 className="text-[18px] font-semibold">{offlineOnline.on}</h1>
             </div>
           </div>
 
           <h1 className="mt-2 lg:text-[24px] md:text-[18px] whitespace-nowrap font-semibold text-[#1E1E1E]">
-            {titleTotal} <span>134</span>
+            {titleTotal} <span>{offlineOnline.oc + offlineOnline.on}</span>
           </h1>
         </div>
       </div>
@@ -102,7 +135,7 @@ export default function DeviceCount({ siteCode }: Props) {
             <img src={cctvImage} alt="" width={36} />
             <span>
               {labelCameraCount}{" "}
-              <span className="text-red-500 font-semibold">24</span>
+              <span className="text-red-500 font-semibold">{mergedCounts.cameras}</span>
             </span>
           </div>
 
@@ -114,7 +147,7 @@ export default function DeviceCount({ siteCode }: Props) {
             <img src={intercomeImage} alt="" width={36} />
             <span>
               {labelIntercom}{" "}
-              <span className="text-red-500 font-semibold">45</span>
+              <span className="text-red-500 font-semibold">{mergedCounts.intercom}</span>
             </span>
           </div>
         </li>
@@ -128,7 +161,7 @@ export default function DeviceCount({ siteCode }: Props) {
             <img src={waterTapImage} alt="" width={36} />
             <span>
               {labelWater}{" "}
-              <span className="text-red-500 font-semibold">45</span>
+              <span className="text-red-500 font-semibold">{mergedCounts.waterMeter}</span>
             </span>
           </div>
 
@@ -140,7 +173,7 @@ export default function DeviceCount({ siteCode }: Props) {
             <img src={solarImage} alt="" width={36} />
             <span>
               {labelElectric}{" "}
-              <span className="text-red-500 font-semibold">34</span>
+              <span className="text-red-500 font-semibold">{mergedCounts.electricMeter}</span>
             </span>
           </div>
         </li>
@@ -153,7 +186,7 @@ export default function DeviceCount({ siteCode }: Props) {
           >
             <img src={windImage} alt="" width={36} />
             <span>
-              {labelAir} <span className="text-red-500 font-semibold">87</span>
+              {labelAir} <span className="text-red-500 font-semibold">{mergedCounts.airSensor}</span>
             </span>
           </div>
 
@@ -161,7 +194,7 @@ export default function DeviceCount({ siteCode }: Props) {
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
             <span>
-              {labelAlert} <span className="text-red-500 font-semibold">1</span>
+              {labelAlert} <span className="text-red-500 font-semibold">{mergedCounts.zyta}</span>
             </span>
           </div>
         </li>

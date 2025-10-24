@@ -4,11 +4,7 @@ import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 
 // ดึง helpers + data series
-import {
-  getSeriesByPeriod,
-  niceUp,
-  EVENT_OPTIONS,
-} from "./Dashboard/dashboard.constants";
+import { niceUp, EVENT_OPTIONS } from "./Dashboard/dashboard.constants";
 
 import Dropdown from "./Dropdown";
 import { useTranslation } from "react-i18next";
@@ -140,11 +136,16 @@ export default function Chart({
     [period, dayLabels, monthLabels]
   );
 
-  // เลือกชุดข้อมูลตามช่วงเวลา (daily alias weekly)
-  const raw = React.useMemo<Series[]>(
-    () => getSeriesByPeriod(period) as unknown as Series[],
-    [period]
-  );
+  // เลือกชุดข้อมูลตามช่วงเวลา (mock 0 ทุกรายการ; daily ใช้ความยาวเดียวกับ weekly)
+  const raw = React.useMemo<Series[]>(() => {
+    const len = period === "monthly" ? 12 : 7;
+    const z = Array.from({ length: len }, () => 0);
+    return [
+      { name: "08:00 - 16:00", data: z.slice() },
+      { name: "16:00 - 24:00", data: z.slice() },
+      { name: "24:00 - 08:00", data: z.slice() },
+    ];
+  }, [period]);
 
   // ทำให้ series สอดคล้องกับจำนวน category และกัน mutate
   const series = React.useMemo<Series[]>(
@@ -156,7 +157,8 @@ export default function Chart({
   const maxVal = React.useMemo(() => {
     let m = 0;
     for (const s of series) for (const v of s.data) if (v > m) m = v;
-    return niceUp(m * 1.1, 10);
+    const up = niceUp(m * 1.1, 10);
+    return up > 0 ? up : 5; // ป้องกัน max=0 เมื่อไม่มีข้อมูล
   }, [series]);
 
   // กัน layout กระตุก: ยิง resize หลัง chart mount
