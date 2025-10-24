@@ -29,7 +29,13 @@ type Props = {
   onlineCount?: number;
 };
 
-export default function DeviceCount({ siteCode, counts, offlinePercent, offlineCount, onlineCount }: Props) {
+export default function DeviceCount({
+  siteCode,
+  counts,
+  offlinePercent,
+  offlineCount,
+  onlineCount,
+}: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const langKey = i18n.language || "en";
   const navigate = useNavigate();
@@ -50,7 +56,7 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
     defaultValue: "Electric meter",
   });
   const labelAir = t("devices.air", { defaultValue: "Air" });
-  const labelAlert = t("devices.zyta", { defaultValue: "ZYTA Alert" });
+  const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
 
   const goDevices = (type: string) => {
     if (siteCode) return navigate(absSite(`/devices?type=${type}`, siteCode));
@@ -71,7 +77,10 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
   const offlineOnline = (() => {
     const oc = typeof offlineCount === "number" ? offlineCount : 1;
     const on = typeof onlineCount === "number" ? onlineCount : 0;
-    const pct = typeof offlinePercent === "number" ? offlinePercent : ((oc / Math.max(oc + on, 1)) * 100);
+    const pct =
+      typeof offlinePercent === "number"
+        ? offlinePercent
+        : (oc / Math.max(oc + on, 1)) * 100;
     return { oc, on, pct };
   })();
 
@@ -135,7 +144,9 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
             <img src={cctvImage} alt="" width={36} />
             <span>
               {labelCameraCount}{" "}
-              <span className="text-red-500 font-semibold">{mergedCounts.cameras}</span>
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.cameras}
+              </span>
             </span>
           </div>
 
@@ -147,7 +158,9 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
             <img src={intercomeImage} alt="" width={36} />
             <span>
               {labelIntercom}{" "}
-              <span className="text-red-500 font-semibold">{mergedCounts.intercom}</span>
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.intercom}
+              </span>
             </span>
           </div>
         </li>
@@ -161,7 +174,9 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
             <img src={waterTapImage} alt="" width={36} />
             <span>
               {labelWater}{" "}
-              <span className="text-red-500 font-semibold">{mergedCounts.waterMeter}</span>
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.waterMeter}
+              </span>
             </span>
           </div>
 
@@ -173,7 +188,9 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
             <img src={solarImage} alt="" width={36} />
             <span>
               {labelElectric}{" "}
-              <span className="text-red-500 font-semibold">{mergedCounts.electricMeter}</span>
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.electricMeter}
+              </span>
             </span>
           </div>
         </li>
@@ -186,7 +203,10 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
           >
             <img src={windImage} alt="" width={36} />
             <span>
-              {labelAir} <span className="text-red-500 font-semibold">{mergedCounts.airSensor}</span>
+              {labelAir}{" "}
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.airSensor}
+              </span>
             </span>
           </div>
 
@@ -194,7 +214,10 @@ export default function DeviceCount({ siteCode, counts, offlinePercent, offlineC
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
             <span>
-              {labelAlert} <span className="text-red-500 font-semibold">{mergedCounts.zyta}</span>
+              {labelAlert}{" "}
+              <span className="text-red-500 font-semibold">
+                {mergedCounts.zyta}
+              </span>
             </span>
           </div>
         </li>

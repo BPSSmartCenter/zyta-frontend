@@ -3,7 +3,12 @@ import AlertEvents from "./AlertEvents";
 import WellBeingEvents from "./WellBeingEvents";
 import MapPanel from "./MapPanel";
 import UserManagement from "./UserManagement";
-import { regionLabels, regionColors, roleLabels, roleColors } from "./dashboard.constants";
+import {
+  regionLabels,
+  regionColors,
+  roleLabels,
+  roleColors,
+} from "./dashboard.constants";
 import { getUserStats } from "../../api/user";
 import DeviceCount from "./DeviceCount";
 import FaceRecognize from "./FaceRecognize";
@@ -117,7 +122,9 @@ export default function ContentLayout(props: Props) {
 
   // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
   // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)
-  const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<number[] | null>(null);
+  const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<
+    number[] | null
+  >(null);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -129,7 +136,11 @@ export default function ContentLayout(props: Props) {
           // รวมทุกไซต์
           console.debug("[UserMgmt] fetch global /users/stats");
           const global = await getUserStats();
-          const series = [global.byRole.officer ?? 0, global.byRole.user ?? 0, global.byRole.admin ?? 0];
+          const series = [
+            global.byRole.officer ?? 0,
+            global.byRole.user ?? 0,
+            global.byRole.admin ?? 0,
+          ];
           if (!cancelled) setRoleSeriesFromApi(series);
           return;
         }
@@ -142,8 +153,15 @@ export default function ContentLayout(props: Props) {
         ]);
         console.debug("[UserMgmt] global stats:", global);
         console.debug("[UserMgmt] site stats:", site);
-        const series = [site.byRole.officer ?? 0, site.byRole.user ?? 0, global.byRole.admin ?? 0];
-        console.debug("[UserMgmt] composed series [officer,user,admin] =", series);
+        const series = [
+          site.byRole.officer ?? 0,
+          site.byRole.user ?? 0,
+          global.byRole.admin ?? 0,
+        ];
+        console.debug(
+          "[UserMgmt] composed series [officer,user,admin] =",
+          series
+        );
         if (!cancelled) setRoleSeriesFromApi(series);
       } catch (e) {
         console.debug("[UserMgmt] fetch stats failed", e);
@@ -224,7 +242,11 @@ export default function ContentLayout(props: Props) {
                   /* no-op */
                 }
               }}
-              style={{ cursor: (props as any)?.role === "admin" ? "pointer" : "default", opacity: (props as any)?.role === "admin" ? 1 : 0.9 }}
+              style={{
+                cursor:
+                  (props as any)?.role === "admin" ? "pointer" : "default",
+                opacity: (props as any)?.role === "admin" ? 1 : 0.9,
+              }}
               aria-disabled={(props as any)?.role !== "admin"}
             >
               <UserManagement
@@ -240,7 +262,14 @@ export default function ContentLayout(props: Props) {
               <DeviceCount
                 siteCode={props.selectedSiteCode}
                 // Mock for now: only 1 electric meter, others 0; offline 100%
-                counts={{ cameras: 0, intercom: 0, waterMeter: 0, electricMeter: 1, airSensor: 0, zyta: 0 }}
+                counts={{
+                  cameras: 0,
+                  intercom: 0,
+                  waterMeter: 0,
+                  electricMeter: 1,
+                  airSensor: 0,
+                  zyta: 0,
+                }}
                 offlineCount={0}
                 onlineCount={0}
                 offlinePercent={100}
