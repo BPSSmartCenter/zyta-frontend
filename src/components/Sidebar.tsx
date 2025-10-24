@@ -47,6 +47,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const [account, setAccount] = useState<{
     name: string;
     email: string;
+    role?: "admin" | "officer" | "user";
   } | null>(null);
   useEffect(() => {
     let mounted = true;
@@ -56,7 +57,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
         if (!mounted || !u) return;
         const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
         const fallback = u.email.split("@")[0];
-        setAccount({ name: fullName || fallback, email: u.email });
+        setAccount({ name: fullName || fallback, email: u.email, role: u.role as any });
         return;
       } catch {
         const u = mockMe();
@@ -71,7 +72,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
           .filter((v) => typeof v === "string" && String(v).trim().length > 0)
           .join(" ");
         const fallback = u.email.split("@")[0];
-        setAccount({ name: fullName || fallback, email: u.email });
+        setAccount({ name: fullName || fallback, email: u.email, role: (u as any).role as any });
       }
     })();
     return () => {
@@ -526,7 +527,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       <ul className="pt-1 ps-7 space-y-1">
                         <li>
                           <a
-                            onClick={() => goSiteOrGlobal('/devices?type=cctv')}
+                            onClick={() => goSiteOrGlobal("/devices?type=cctv")}
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("cctv")
@@ -539,22 +540,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => goSiteOrGlobal('/devices?type=redbox')}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.devicesType("intercom")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.devices_intercom", {
-                              defaultValue: "redbox",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() => goSiteOrGlobal('/devices?type=watermeter')}
+                            onClick={() =>
+                              goSiteOrGlobal("/devices?type=watermeter")
+                            }
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("watermeter")
@@ -569,7 +557,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => goSiteOrGlobal('/devices?type=electricmeter')}
+                            onClick={() =>
+                              goSiteOrGlobal("/devices?type=electricmeter")
+                            }
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("electricmeter")
@@ -584,7 +574,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         </li>
                         <li>
                           <a
-                            onClick={() => goSiteOrGlobal('/devices?type=airsensor')}
+                            onClick={() =>
+                              goSiteOrGlobal("/devices?type=airsensor")
+                            }
                             className={cx(
                               "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
                               active.devicesType("airsensor")
@@ -601,7 +593,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                     </div>
                   </li>
 
-                  {/* ===== การจัดการผู้ใช้ / User Management ===== */}
+                  {/* ===== การจัดการผู้ใช้ / User Management (admin only) ===== */}
+                  {account?.role === "admin" && (
                   <li>
                     <button
                       type="button"
@@ -637,6 +630,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       </span>
                     </button>
                   </li>
+                  )}
                 </ul>
               </div>
             </div>

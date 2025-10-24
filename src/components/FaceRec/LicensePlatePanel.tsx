@@ -2,6 +2,8 @@
 import { plateList, plateDetail, confidenceHeader } from "./faceRec.constant";
 import { useTranslation } from "react-i18next";
 
+plateList;
+
 const GREEN_BOX_SVG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -42,7 +44,7 @@ export default function LicensePlatePanel() {
                   <path d="M2 21v-4" />
                   <path d="M7 9h.01" />
                 </svg>
-                hikvision
+                —
               </span>
               <span className="flex gap-1">
                 <div className="flex justify-center items-center w-[15px] h-[14.5px] bg-white rounded-full">
@@ -62,14 +64,14 @@ export default function LicensePlatePanel() {
                     <circle cx="12" cy="12" r="10" />
                   </svg>
                 </div>
-                2022-05-13 08:37:55
+                ———
               </span>
             </div>
           </div>
 
           <div className="lg-1024:w-[300px] w-full bg-black text-white text-sm overflow-y-auto">
             <div className="flex flex-col">
-              {plateList.map((p, i) => (
+              {/* {plateList.map((p, i) => (
                 <div
                   key={i}
                   className="flex items-center justify-between gap-2 border-b border-gray-600 px-2 py-3 hover:bg-gray-700 cursor-pointer"
@@ -91,7 +93,7 @@ export default function LicensePlatePanel() {
                     </div>
                   </div>
                 </div>
-              ))}
+              ))} */}
             </div>
           </div>
         </div>

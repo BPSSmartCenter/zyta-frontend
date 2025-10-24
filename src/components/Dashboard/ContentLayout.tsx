@@ -116,16 +116,37 @@ export default function ContentLayout(props: Props) {
   }, [JSON.stringify(props.accessibleSites)]);
 
   // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
+  // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)
   const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<number[] | null>(null);
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const code = props.selectedSiteCode;
-        const stats = await getUserStats(code && code !== "all" ? String(code) : undefined);
-        const series = [stats.byRole.officer ?? 0, stats.byRole.user ?? 0, stats.byRole.admin ?? 0];
+        const raw = (props.selectedSiteCode ?? "").toString().trim();
+        const isAll = !raw || raw === "all";
+
+        if (isAll) {
+          // รวมทุกไซต์
+          console.debug("[UserMgmt] fetch global /users/stats");
+          const global = await getUserStats();
+          const series = [global.byRole.officer ?? 0, global.byRole.user ?? 0, global.byRole.admin ?? 0];
+          if (!cancelled) setRoleSeriesFromApi(series);
+          return;
+        }
+
+        // ไซต์เฉพาะ: admin ให้มาจาก global เสมอ, user/officer จากไซต์
+        console.debug("[UserMgmt] fetch site /users/stats?site=", raw);
+        const [global, site] = await Promise.all([
+          getUserStats(),
+          getUserStats(raw),
+        ]);
+        console.debug("[UserMgmt] global stats:", global);
+        console.debug("[UserMgmt] site stats:", site);
+        const series = [site.byRole.officer ?? 0, site.byRole.user ?? 0, global.byRole.admin ?? 0];
+        console.debug("[UserMgmt] composed series [officer,user,admin] =", series);
         if (!cancelled) setRoleSeriesFromApi(series);
-      } catch {
+      } catch (e) {
+        console.debug("[UserMgmt] fetch stats failed", e);
         if (!cancelled) setRoleSeriesFromApi(null);
       }
     })();
@@ -191,8 +212,20 @@ export default function ContentLayout(props: Props) {
               - บนจอใหญ่จัด 2 คอลัมน์เคียงกันให้เหมือนภาพ */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 lg-1399:grid-cols-2 gap-3">
             <div
-              className="p-6 w-full rounded-xl bg-white hover:cursor-pointer"
-              onClick={() => navigate(abs("/usermanage"))}
+              className="p-6 w-full rounded-xl bg-white"
+              onClick={() => {
+                // เปิดหน้า UserManagement เฉพาะ admin เท่านั้น
+                try {
+                  const role = (props as any).role as string | undefined;
+                  if (String(role).toLowerCase() === "admin") {
+                    navigate(abs("/usermanage"));
+                  }
+                } catch {
+                  /* no-op */
+                }
+              }}
+              style={{ cursor: (props as any)?.role === "admin" ? "pointer" : "default", opacity: (props as any)?.role === "admin" ? 1 : 0.9 }}
+              aria-disabled={(props as any)?.role !== "admin"}
             >
               <UserManagement
                 regionSeries={regionSeriesFromSites}

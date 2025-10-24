@@ -44,7 +44,7 @@ export default function CCTVPanel({ camera, weather, devices }: Props) {
 
   const met = {
     location: weather?.location ?? "Lebak, Bangkok",
-    tempC: weather?.tempC ?? 36,
+    tempC: weather?.tempC ?? 0,
     description: weather?.description ?? "Outdoor Temperature",
   };
 
@@ -61,7 +61,7 @@ export default function CCTVPanel({ camera, weather, devices }: Props) {
       id: "tv",
       title: "Benq TV",
       subtitle: "Connect - Standby",
-      defaultOn: true,
+      defaultOn: false,
       icon: tvImage,
       activeImg: tvSelected, // ← ใช้รูป Selected ตอน active
     },

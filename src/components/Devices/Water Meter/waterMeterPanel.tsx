@@ -98,8 +98,8 @@ export default function WaterMeterPanel(_: Props) {
   );
 
   // ค่าเริ่มต้นให้เหมือนภาพ
-  const [fromTime, setFromTime] = useState<string>("09:30 PM");
-  const [toTime, setToTime] = useState<string>("01:30 AM");
+  const [fromTime, setFromTime] = useState<string>("08:00 AM");
+  const [toTime, setToTime] = useState<string>("08:00 AM");
 
   // ✅ state สำหรับ Thermostat ซ้าย/ขวา (อันละชุด)
   const [thermoLeft, setThermoLeft] = useState<{
@@ -107,9 +107,9 @@ export default function WaterMeterPanel(_: Props) {
     valueLabel: string;
     maxLabel: string;
   }>({
-    initialValue: 2000,
+    initialValue: 0,
     valueLabel: t("devices.waterMeter.domesticWater"),
-    maxLabel: t("devices.waterMeter.ofMl", { max: 3000 }) as string,
+    maxLabel: t("devices.waterMeter.ofMl", { max: 0 }) as string,
   });
 
   const [thermoRight, setThermoRight] = useState<{
@@ -117,9 +117,9 @@ export default function WaterMeterPanel(_: Props) {
     valueLabel: string;
     maxLabel: string;
   }>({
-    initialValue: 2000,
+    initialValue: 0,
     valueLabel: t("devices.waterMeter.drinkingWater"),
-    maxLabel: t("devices.waterMeter.ofMl", { max: 3000 }) as string,
+    maxLabel: t("devices.waterMeter.ofMl", { max: 0 }) as string,
   });
 
   const toNumber = (v: number | string) => {
@@ -250,12 +250,12 @@ export default function WaterMeterPanel(_: Props) {
                 {[
                   {
                     img: phWaterDrop,
-                    value: 10,
+                    value: 0,
                     valueLabel: t("devices.waterMeter.ph"),
                   },
                   {
                     img: waterIcon,
-                    value: 200,
+                    value: 0,
                     valueLabel: t("devices.waterMeter.flowRate"),
                     valueLabel2: t("devices.waterMeter.flowRateUnit"),
                   },
@@ -292,12 +292,12 @@ export default function WaterMeterPanel(_: Props) {
                 {[
                   {
                     img: phWaterDrop,
-                    value: 10,
+                    value: 0,
                     valueLabel: t("devices.waterMeter.ph"),
                   },
                   {
                     img: TDSIcon,
-                    value: 80,
+                    value: 0,
                     valueLabel: t("devices.waterMeter.tds"),
                     valueLabel2: t("devices.waterMeter.tdsUnit"),
                   },
@@ -324,42 +324,12 @@ export default function WaterMeterPanel(_: Props) {
 
         <div className="col-span-1 flex flex-wrap flex-row lg-1355:flex-col gap-3 ">
           {[
-            {
-              img: waterDrop,
-              value: 1500,
-              valueLabel: t("devices.waterMeter.waterToday"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
-            {
-              img: waterDrop,
-              value: 1500,
-              valueLabel: t("devices.waterMeter.waterToday"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
-            {
-              img: waterECIcon,
-              value: 150000,
-              valueLabel: t("devices.waterMeter.monthUsage"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
-            {
-              img: waterDrop,
-              value: 1500,
-              valueLabel: t("devices.waterMeter.waterToday"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
-            {
-              img: waterDrop,
-              value: 1500,
-              valueLabel: t("devices.waterMeter.waterToday"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
-            {
-              img: waterDrop,
-              value: 1500,
-              valueLabel: t("devices.waterMeter.waterToday"),
-              unit: t("devices.waterMeter.literUnit"),
-            },
+            { img: waterDrop, value: 0, valueLabel: t("devices.waterMeter.waterToday"), unit: t("devices.waterMeter.literUnit") },
+            { img: waterDrop, value: 0, valueLabel: t("devices.waterMeter.waterToday"), unit: t("devices.waterMeter.literUnit") },
+            { img: waterECIcon, value: 0, valueLabel: t("devices.waterMeter.monthUsage"), unit: t("devices.waterMeter.literUnit") },
+            { img: waterDrop, value: 0, valueLabel: t("devices.waterMeter.waterToday"), unit: t("devices.waterMeter.literUnit") },
+            { img: waterDrop, value: 0, valueLabel: t("devices.waterMeter.waterToday"), unit: t("devices.waterMeter.literUnit") },
+            { img: waterDrop, value: 0, valueLabel: t("devices.waterMeter.waterToday"), unit: t("devices.waterMeter.literUnit") },
           ].map((kpi, idx) => (
             <SideCardValue
               key={idx}
@@ -377,13 +347,14 @@ export default function WaterMeterPanel(_: Props) {
           <WaterStackedChart
             height={460}
             title={t("devices.waterMeter.chart.title")}
+            series={[{ name: "A", data: Array(12).fill(0) }, { name: "B", data: Array(12).fill(0) }, { name: "C", data: Array(12).fill(0) }]}
           />
         </div>
         <div className="flex col-span-6 sm-560:col-span-2 justify-center items-center">
           <WaterMultiRadial
             height={240}
-            total={1000}
-            values={[88, 62, 38]}
+            total={0}
+            values={[0, 0, 0]}
             labels={["series1", "series2", "series3"]}
             className="p-0 m-0"
           />
@@ -394,6 +365,7 @@ export default function WaterMeterPanel(_: Props) {
         <WaterAreaStackedChart
           yTitle={t("devices.waterMeter.chart.yTitle")}
           height={340}
+          series={[{ name: "A", data: Array(12).fill(0) }, { name: "B", data: Array(12).fill(0) }, { name: "C", data: Array(12).fill(0) }]}
         />
       </div>
     </>

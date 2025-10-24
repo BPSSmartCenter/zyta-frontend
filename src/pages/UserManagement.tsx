@@ -8,6 +8,14 @@ import Content_Create from "../components/UserManagement/Content_Create";
 import Content_Reset from "../components/UserManagement/Content_Reset";
 import { ToastProvider, useToast } from "../hook/toastProvider";
 import {
+  listUsers,
+  createUser as apiCreateUser,
+  updateUser as apiUpdateUser,
+  deleteUser as apiDeleteUser,
+  resetUserPassword as apiResetPassword,
+  type AdminUserDto,
+} from "../api/adminUsers";
+import {
   ADMIN_ROWS,
   type AdminRow,
 } from "../components/UserManagement/user.constant";
@@ -16,10 +24,36 @@ export default function UserManagement() {
   return (
     <Sidebar>
       <ToastProvider>
-        <UserManagementInner />
+        <UserManagementGuarded />
       </ToastProvider>
     </Sidebar>
   );
+}
+
+function UserManagementGuarded() {
+  const [allowed, setAllowed] = React.useState<boolean | null>(null);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await import("../api/user")).me();
+        setAllowed(String(me.role).toLowerCase() === "admin");
+      } catch {
+        setAllowed(false);
+      }
+    })();
+  }, []);
+
+  if (allowed === null) {
+    return <div className="p-6">Loading…</div>;
+  }
+  if (!allowed) {
+    // redirect away silently
+    if (typeof window !== "undefined") {
+      window.location.replace("/dashboard");
+    }
+    return null;
+  }
+  return <UserManagementInner />;
 }
 
 function UserManagementInner() {
@@ -30,6 +64,31 @@ function UserManagementInner() {
   const [creating, setCreating] = React.useState<boolean>(false);
   const [resetting, setResetting] = React.useState<AdminRow | null>(null); // ← เพิ่ม
 
+  const mapDto = (u: AdminUserDto): AdminRow => ({
+    id: u.id,
+    fullName: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+    email: u.email,
+    role: (u.role === "admin" ? "Admin" : u.role === "officer" ? "Officer" : "User") as any,
+    addedAt: u.createdAt,
+    lastAccessAt: u.updatedAt,
+    active: !!u.active,
+    avatar: "",
+  });
+
+  const refresh = React.useCallback(async () => {
+    try {
+      const items = await listUsers();
+      setRows(items.map(mapDto));
+    } catch (e) {
+      console.error("listUsers failed", e);
+      setRows([]);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
     <div className="p-4 bg-[#F8FBFE]">
       <Navbar title="User management" />
@@ -38,29 +97,39 @@ function UserManagementInner() {
       {creating ? (
         <Content_Create
           onCancel={() => setCreating(false)}
-          onCreate={({ password, avatarFile, ...created }) => {
-            setRows((prev) => [created, ...prev]);
-            setCreating(false);
-            show({
-              variant: "success",
-              message: (
-                <span className="text-white font-semibold">Create Success</span>
-              ),
-            });
+          onCreate={async ({ password, avatarFile, ...created }) => {
+            try {
+              const [firstName, ...rest] = (created.fullName || "").split(" ");
+              const lastName = rest.join(" ");
+              await apiCreateUser({
+                firstName: firstName || "",
+                lastName,
+                email: created.email,
+                password,
+                role: created.role === "Admin" ? "admin" : created.role === "Officer" ? "officer" : "user",
+              });
+              await refresh();
+              setCreating(false);
+              show({ variant: "success", message: (<span className="text-white font-semibold">Create Success</span>) });
+            } catch (e) {
+              console.error(e);
+              show({ variant: "error", message: (<span className="text-white font-semibold">Create failed</span>) });
+            }
           }}
         />
       ) : resetting ? (
         <Content_Reset
           user={resetting}
           onCancel={() => setResetting(null)}
-          onReset={() => {
-            setResetting(null);
-            show({
-              variant: "success",
-              message: (
-                <span className="text-white font-semibold">Password Reset</span>
-              ),
-            });
+          onReset={async ({ user, newPassword }) => {
+            try {
+              await apiResetPassword(user.id, newPassword);
+              setResetting(null);
+              show({ variant: "success", message: (<span className="text-white font-semibold">Password Reset</span>) });
+            } catch (e) {
+              console.error(e);
+              show({ variant: "error", message: (<span className="text-white font-semibold">Reset failed</span>) });
+            }
           }}
         />
       ) : editing ? (
@@ -68,15 +137,23 @@ function UserManagementInner() {
           user={editing}
           allUsers={rows}
           onCancel={() => setEditing(null)}
-          onSave={(next) => {
-            setRows((prev) => prev.map((x) => (x.id === next.id ? next : x)));
-            setEditing(null);
-            show({
-              variant: "success",
-              message: (
-                <span className="text-white font-semibold">Edit saved</span>
-              ),
-            });
+          onSave={async (next) => {
+            try {
+              const [firstName, ...rest] = (next.fullName || "").split(" ");
+              const lastName = rest.join(" ");
+              await apiUpdateUser(next.id, {
+                firstName,
+                lastName,
+                email: next.email,
+                role: next.role === "Admin" ? "admin" : next.role === "Officer" ? "officer" : "user",
+              });
+              await refresh();
+              setEditing(null);
+              show({ variant: "success", message: (<span className="text-white font-semibold">Edit saved</span>) });
+            } catch (e) {
+              console.error(e);
+              show({ variant: "error", message: (<span className="text-white font-semibold">Edit failed</span>) });
+            }
           }}
         />
       ) : (
@@ -86,6 +163,23 @@ function UserManagementInner() {
           onEdit={setEditing}
           onCreateClick={() => setCreating(true)}
           onReset={(row) => setResetting(row)} // ← hook เข้าปุ่มกุญแจ
+          onDelete={async (row) => {
+            try {
+              await apiDeleteUser(row.id);
+              await refresh();
+              show({ variant: "success", message: (<span className="text-white font-semibold">Deleted</span>) });
+            } catch (e) {
+              console.error(e);
+              show({ variant: "error", message: (<span className="text-white font-semibold">Delete failed</span>) });
+            }
+          }}
+          onToggleActive={async (row, nextActive) => {
+            try {
+              await apiUpdateUser(row.id, { active: nextActive });
+            } catch (e) {
+              console.error(e);
+            }
+          }}
         />
       )}
     </div>

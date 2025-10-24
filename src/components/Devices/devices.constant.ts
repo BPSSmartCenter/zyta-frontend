@@ -1,8 +1,8 @@
 import {
   cctvImage,
   cctvSelected,
-  intercomeImage,
-  intercomeSelected,
+  // intercomeImage,
+  // intercomeSelected,
   waterTapImage,
   waterTapSelected,
   solarImage,
@@ -34,12 +34,6 @@ export const DEVICE_CARDS: DeviceCard[] = [
     activeImg: cctvSelected,
   },
   {
-    id: "intercom-1",
-    img: intercomeImage,
-    label: "header.intercomeCard",
-    activeImg: intercomeSelected,
-  },
-  {
     id: "water-1",
     img: waterTapImage,
     label: "header.waterCard",
@@ -69,44 +63,7 @@ export type CCTVRow = {
   timeISO: string; // ISO string
 };
 
-export const CCTV_ROWS: CCTVRow[] = [
-  {
-    id: "1",
-    site: "SITE C",
-    event: "fire detected",
-    picture: GREEN_BOX_SVG,
-    camera: "hikvision",
-    status: "UNRESOLVED",
-    timeISO: "2025-01-06T17:24:55",
-  },
-  {
-    id: "3",
-    site: "SITE C",
-    event: "face detected",
-    picture: GREEN_BOX_SVG,
-    camera: "hikvision",
-    status: "UNRESOLVED",
-    timeISO: "2025-01-06T12:05:10",
-  },
-  {
-    id: "4",
-    site: "SITE C",
-    event: "face detected",
-    picture: GREEN_BOX_SVG,
-    camera: "hikvision",
-    status: "RESOLVED",
-    timeISO: "2025-01-06T10:11:00",
-  },
-  {
-    id: "5",
-    site: "SITE B",
-    event: "intrusion detected",
-    picture: GREEN_BOX_SVG,
-    camera: "hikvision",
-    status: "UNRESOLVED",
-    timeISO: "2025-01-05T22:41:30",
-  },
-];
+export const CCTV_ROWS: CCTVRow[] = [];
 
 // สำหรับ Dropdown ฟิลเตอร์
 export const CCTV_SITE_OPTIONS = [
@@ -138,13 +95,13 @@ export type ElectricDay = (typeof ELECTRIC_DAYS)[number];
 
 /** ค่า Conversion รายวัน (0–100) */
 export const ELECTRIC_CONVERSIONS_MAP: Record<ElectricDay, number> = {
-  Sun: 90,
-  Mon: 30,
-  Tue: 20,
-  Wed: 40,
-  Thu: 20,
-  Fri: 40,
-  Sat: 50,
+  Sun: 0,
+  Mon: 0,
+  Tue: 0,
+  Wed: 0,
+  Thu: 0,
+  Fri: 0,
+  Sat: 0,
 };
 
 /** list ตามลำดับวัน (พร้อมใช้กับ grid) */
@@ -155,31 +112,31 @@ export const ELECTRIC_CONVERSIONS_LIST: number[] = ELECTRIC_DAYS.map(
 /** ซีรีส์กราฟเส้นของแต่ละวัน (ตัวอย่าง mock) */
 export const ELECTRIC_DAY_SERIES: Record<ElectricDay, ApexAxisChartSeries> = {
   Sun: [
-    { name: "Traffic", data: [120, 60, 140, 80, 180, 40, 170, 90, 160] },
-    { name: "Payment", data: [200, 70, 260, 110, 300, 120, 330, 210, 230] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Mon: [
-    { name: "Traffic", data: [80, 110, 90, 150, 100, 130, 70, 160, 120] },
-    { name: "Payment", data: [140, 100, 180, 120, 200, 150, 220, 170, 210] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Tue: [
-    { name: "Traffic", data: [60, 100, 70, 130, 90, 120, 60, 140, 110] },
-    { name: "Payment", data: [110, 90, 150, 100, 180, 130, 200, 150, 180] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Wed: [
-    { name: "Traffic", data: [90, 140, 100, 160, 110, 150, 80, 170, 130] },
-    { name: "Payment", data: [150, 120, 200, 140, 220, 170, 240, 190, 230] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Thu: [
-    { name: "Traffic", data: [70, 120, 80, 140, 100, 130, 70, 150, 120] },
-    { name: "Payment", data: [130, 100, 170, 120, 200, 150, 210, 170, 200] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Fri: [
-    { name: "Traffic", data: [100, 60, 140, 80, 160, 60, 180, 100, 190] },
-    { name: "Payment", data: [160, 120, 200, 140, 230, 180, 260, 210, 250] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
   Sat: [
-    { name: "Traffic", data: [110, 90, 130, 70, 150, 90, 140, 110, 160] },
-    { name: "Payment", data: [180, 140, 220, 160, 240, 190, 250, 210, 270] },
+    { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
+    { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
   ],
 };

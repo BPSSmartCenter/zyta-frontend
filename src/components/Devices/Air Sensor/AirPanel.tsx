@@ -142,7 +142,7 @@ export default function AirPanel(_: Props) {
     maxLabel: string;
   }>({
     valueLabel: "PM 2.5",
-    initialValue: 10,
+    initialValue: 0,
     maxLabel: "µg/m³",
   });
 
@@ -157,14 +157,14 @@ export default function AirPanel(_: Props) {
     {
       img: "",
       imgLabel: "PM 2.5",
-      value: 10,
+      value: 0,
       valueLabel: "PM 2.5",
       valueLabel2: "µg/m³",
     },
     {
       img: "",
       imgLabel: "PM 10",
-      value: 10,
+      value: 0,
       valueLabel: "PM 10",
       valueLabel2: "µg/m³",
     },
@@ -294,7 +294,7 @@ export default function AirPanel(_: Props) {
 
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={24}
+                initialValue={0}
                 max={50}
                 maxLabel={""}
                 valueLabel={`🌢 62%`}
@@ -345,11 +345,9 @@ export default function AirPanel(_: Props) {
             {/* icon + data */}
             <div className="mt-2 flex flex-col items-center">
               <WeatherEmoji />
-              <p className="mt-0 text-white/90 text-sm">
-                Today, 14 December 2024
-              </p>
-              <p className="mt-1 text-[56px] leading-none font-bold">36°</p>
-              <p className="mt-1 text-white/90">Sunny</p>
+              <p className="mt-0 text-white/90 text-sm">Today</p>
+              <p className="mt-1 text-[56px] leading-none font-bold">0°</p>
+              <p className="mt-1 text-white/90">-</p>
 
               {/* wind & hum */}
               <div className="mt-6 flex flex-col gap-3 text-white/95">
@@ -361,7 +359,7 @@ export default function AirPanel(_: Props) {
                   <img src={waterDrop} className="w-4 h-4" alt="" />
                   <span className="text-sm">Hum</span>
                   <span className="opacity-70">|</span>
-                  <span className="text-sm">13%</span>
+                  <span className="text-sm">0%</span>
                 </div>
               </div>
             </div>
@@ -376,7 +374,7 @@ export default function AirPanel(_: Props) {
                   <div className="text-sm flex items-center justify-center gap-2">
                     <div className="leading-none">Wind</div>
                     <div>|</div>
-                    <div className="text-white/90 text-xs">22km/h</div>
+                    <div className="text-white/90 text-xs">0km/h</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -384,7 +382,7 @@ export default function AirPanel(_: Props) {
                   <div className="text-sm flex items-center justify-center gap-2">
                     <div className="leading-none">Hum</div>
                     <div>|</div>
-                    <div className="text-white/90 text-xs">13%</div>
+                    <div className="text-white/90 text-xs">0%</div>
                   </div>
                 </div>
               </div>
@@ -394,7 +392,7 @@ export default function AirPanel(_: Props) {
                   <PinIcon className="w-4 h-4" />
                   <span>Bangkok</span>
                 </div>
-                <div className="text-3xl font-bold leading-none mt-1">36°</div>
+                <div className="text-3xl font-bold leading-none mt-1">0°</div>
               </div>
             </div>
           </div>
@@ -408,7 +406,7 @@ export default function AirPanel(_: Props) {
                   <div className="text-sm flex items-center justify-center gap-2">
                     <div className="leading-none">Wind</div>
                     <div>|</div>
-                    <div className="text-white/90 text-xs">18km/h</div>
+                    <div className="text-white/90 text-xs">0km/h</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -416,7 +414,7 @@ export default function AirPanel(_: Props) {
                   <div className="text-sm flex items-center justify-center gap-2">
                     <div className="leading-none">Hum</div>
                     <div>|</div>
-                    <div className="text-white/90 text-xs">18%</div>
+                    <div className="text-white/90 text-xs">0%</div>
                   </div>
                 </div>
               </div>
@@ -426,7 +424,7 @@ export default function AirPanel(_: Props) {
                   <PinIcon className="w-4 h-4" />
                   <span>Phuket</span>
                 </div>
-                <div className="text-3xl font-bold leading-none mt-1">44°</div>
+                <div className="text-3xl font-bold leading-none mt-1">0°</div>
               </div>
             </div>
           </div>

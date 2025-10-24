@@ -14,7 +14,8 @@ type Props = {
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "Admin" },
-  { label: "Staff", value: "Staff" },
+  { label: "Officer", value: "Officer" },
+  { label: "User", value: "User" },
 ] as const;
 
 const normalizeEmail = (s: string) => s.trim().toLowerCase();
@@ -32,7 +33,7 @@ export default function Content_Edit({
   const [first, setFirst] = React.useState("");
   const [last, setLast] = React.useState("");
   const [email, setEmail] = React.useState(user.email);
-  const [role, setRole] = React.useState<"Admin" | "Staff">(user.role);
+  const [role, setRole] = React.useState<"Admin" | "Officer" | "User">(user.role as any);
 
   // modal state
   const [dupModal, setDupModal] = React.useState<{
@@ -159,7 +160,7 @@ export default function Content_Edit({
             <Dropdown
               options={ROLE_OPTIONS as any}
               value={role}
-              onChange={(v) => setRole(v as "Admin" | "Staff")}
+              onChange={(v) => setRole(v as "Admin" | "Officer" | "User")}
             >
               {({
                 open,

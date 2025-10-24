@@ -8,6 +8,8 @@ const GREEN_BOX_SVG =
     `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="36" viewBox="0 0 56 36"><rect x="0" y="0" width="56" height="36" rx="6" fill="#16A34A"/></svg>`
   );
 
+faceList;
+
 export default function FaceScanPanel() {
   const { t } = useTranslation("facerec");
 
@@ -42,7 +44,7 @@ export default function FaceScanPanel() {
                   <path d="M2 21v-4" />
                   <path d="M7 9h.01" />
                 </svg>
-                hikvision
+                —
               </span>
               <span className="flex gap-1">
                 <div className="flex justify-center items-center w-[15px] h-[14.5px] bg-white rounded-full">
@@ -62,7 +64,7 @@ export default function FaceScanPanel() {
                     <circle cx="12" cy="12" r="10" />
                   </svg>
                 </div>
-                2022-05-13 08:37:55
+                ———
               </span>
             </div>
           </div>
@@ -70,7 +72,7 @@ export default function FaceScanPanel() {
           {/* รายการใบหน้าด้านขวา */}
           <div className="lg-1024:w-[300px] w-full bg-black text-white text-sm overflow-y-auto">
             <div className="flex flex-col">
-              {faceList.slice(0, 5).map((f, i) => (
+              {/* {faceList.slice(0, 5).map((f, i) => (
                 <div
                   key={i}
                   className="flex items-center justify-between gap-2 border-b border-gray-600 px-2 py-3 hover:bg-gray-700 cursor-pointer"
@@ -92,7 +94,7 @@ export default function FaceScanPanel() {
                     </div>
                   </div>
                 </div>
-              ))}
+              ))} */}
             </div>
           </div>
         </div>

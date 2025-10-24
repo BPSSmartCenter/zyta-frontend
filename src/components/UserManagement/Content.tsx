@@ -38,6 +38,8 @@ type Props = {
   onEdit: (row: AdminRow) => void;
   onCreateClick?: () => void;
   onReset?: (row: AdminRow) => void;
+  onDelete?: (row: AdminRow) => void;
+  onToggleActive?: (row: AdminRow, nextActive: boolean) => Promise<void> | void;
 };
 
 export default function Content({
@@ -46,6 +48,8 @@ export default function Content({
   onEdit,
   onCreateClick,
   onReset,
+  onDelete,
+  onToggleActive,
 }: Props) {
   // const { t } = useTranslation("dashboard");
 
@@ -58,7 +62,8 @@ export default function Content({
   const ROLE_OPTIONS = [
     { label: "All Role", value: "all" },
     { label: "Admin", value: "Admin" },
-    { label: "Staff", value: "Staff" },
+    { label: "Officer", value: "Officer" },
+    { label: "User", value: "User" },
   ];
 
   const [status, setStatus] = React.useState("all");
@@ -293,13 +298,12 @@ export default function Content({
                   <div>
                     <Switch
                       checked={r.active}
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const checked = (e.target as HTMLInputElement).checked;
-                        setRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, active: checked } : x
-                          )
-                        );
+                        try {
+                          await onToggleActive?.(r, checked);
+                        } catch {}
+                        setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, active: checked } : x)));
                       }}
                     />
                   </div>
@@ -323,6 +327,7 @@ export default function Content({
                     <button
                       title="Delete"
                       className="hover:text-red-400 cursor-pointer"
+                      onClick={() => onDelete?.(r)}
                     >
                       <i className="material-icons-outlined">delete</i>
                     </button>

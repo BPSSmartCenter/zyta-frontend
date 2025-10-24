@@ -83,8 +83,8 @@
       "title": "Active users",
       "labels": {
         "0": "Officer",
-        "1": "Admin",
-        "2": "User"
+        "1": "User",
+        "2": "Admin"
       }
     }
   },

@@ -31,6 +31,13 @@
     "no_success": "Failed to send, please try again",
     "check_spam": "Please also check your Spam/Promotions folder"
   },
+  "modalInactive": {
+    "title": "Account restricted",
+    "top": "Your account is currently inactive and cannot be used to sign in.",
+    "mid": "Please contact the administrator to restore access,",
+    "bottom": "or try again later after your access is reinstated.",
+    "close": "OK"
+  },
   "remember": "Remember for 30 days",
   "forgot": "Forgot password?",
   "actions": {

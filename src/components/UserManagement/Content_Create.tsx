@@ -11,7 +11,8 @@ type Props = {
 
 const ROLE_OPTIONS = [
   { label: "Admin", value: "Admin" },
-  { label: "Staff", value: "Staff" },
+  { label: "Officer", value: "Officer" },
+  { label: "User", value: "User" },
 ] as const;
 
 /** validators (ยก logic จาก RegisterPage.tsx) */
@@ -32,7 +33,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
   const [last, setLast] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [emailTouched, setEmailTouched] = React.useState(false);
-  const [role, setRole] = React.useState<"Admin" | "Staff" | "">("");
+  const [role, setRole] = React.useState<"Admin" | "Officer" | "User" | "">("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
 
@@ -64,7 +65,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
       id: String(Date.now()),
       fullName: `${first.trim()} ${last.trim()}`.trim(),
       email: email.trim(),
-      role: role as "Admin" | "Staff",
+      role: role as "Admin" | "Officer" | "User",
       addedAt: new Date().toISOString(),
       lastAccessAt: new Date().toISOString(),
       active: true,
@@ -209,7 +210,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
             <Dropdown
               options={ROLE_OPTIONS as any}
               value={role}
-              onChange={(v) => setRole(v as "Admin" | "Staff")}
+              onChange={(v) => setRole(v as "Admin" | "Officer" | "User")}
             >
               {({
                 open,

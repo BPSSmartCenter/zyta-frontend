@@ -28,9 +28,8 @@ const Content: React.FC<Props> = ({
 
   // ถ้าไม่ส่ง stats มา ใช้ข้อความจาก i18n
   const defaultStats = stats ?? [
-    { key: "licensePlates", label: t("stats.licensePlates"), val: 124 },
-    { key: "faceScan", label: t("stats.faceScan"), val: 345 },
-    { key: "picture", label: t("stats.picture"), val: 54 },
+    { key: "licensePlates", label: t("stats.licensePlates"), val: 0 },
+    { key: "faceScan", label: t("stats.faceScan"), val: 0 },
   ];
 
   const [active, setActive] = React.useState<string>(defaultActive);
@@ -48,7 +47,7 @@ const Content: React.FC<Props> = ({
           selectionMode="single"
           activeIds={[active]}
           onChange={(ids) => setActive(ids[0] ?? active)}
-          className="grid grid-cols-1 md:grid-cols-3 md:gap-8 sm:gap-2 "
+          className="grid grid-cols-1 md:grid-cols-2 md:gap-8 sm:gap-2 "
         >
           {defaultStats.map((it) => (
             <StatCard
@@ -61,7 +60,7 @@ const Content: React.FC<Props> = ({
               reverseLayout
               inactiveBg="bg-white"
               activeBg="bg-cyan-500"
-              className="w-full md:max-w-full rounded-xl lg-1024:max-w-[400px]"
+              className="w-full md:max-w-full rounded-xl lg-1024:max-w-full"
             />
           ))}
         </StatCardGroup>

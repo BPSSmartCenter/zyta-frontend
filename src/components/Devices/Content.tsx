@@ -17,7 +17,6 @@ type Props = {};
 const TYPE_TO_ID: Record<string, string> = {
   cctv: "cctv-1",
   watermeter: "water-1",
-  redbox: "intercom-1",
   electricmeter: "electric-1",
   airsensor: "air-1",
 };
@@ -70,23 +69,23 @@ export default function Content({}: Props) {
 
   return (
     <>
-      <nav className="flex justify-between mt-10">
+      <nav className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6">
         <div className="flex flex-col gap-1 select-none">
           <h1 className="text-2xl font-semibold">{tDevices("nav.title")}</h1>
           <h1 className="text-gray-400">{tDevices("nav.subTitle")}</h1>
         </div>
 
-        <div className="gap-3 flex">
-          <button className="inline-flex h-10 w-10 md:w-[105px] items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50">
+        <div className="gap-2 flex flex-wrap">
+          <button className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50">
             <span className="truncate flex items-center gap-2">
               <img src={exportImage} alt="" />
-              <span className="hidden md:inline">{t("navbar.import")}</span>
+              <span className="hidden sm:inline">{t("navbar.import")}</span>
             </span>
           </button>
-          <button className="inline-flex h-10 w-10 md:w-[88px] items-center justify-center rounded-md px-3 bg-cyan text-white text-sm text-[#414651] font-inter font-bold hover:cursor-pointer">
+          <button className="inline-flex h-10 items-center justify-center rounded-md px-3 bg-cyan text-white text-sm text-[#414651] font-inter font-bold hover:cursor-pointer">
             <span className="flex w-full justify-center items-center gap-2">
               <i className="material-icons w-[24px]">add_2</i>
-              <p className="hidden md:block">{t("navbar.add")}</p>
+              <p className="hidden sm:block">{t("navbar.add")}</p>
             </span>
           </button>
         </div>
@@ -99,7 +98,7 @@ export default function Content({}: Props) {
         onChange={handleChange}
         className="mt-5"
       >
-        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           {DEVICE_CARDS.map((c) => (
             <li key={c.id}>
               <StatCard

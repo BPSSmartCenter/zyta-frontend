@@ -8,7 +8,7 @@ import { me as apiMe } from "../api/user";
 import { resendVerification } from "../api/auth";
 import { isAxiosError } from "axios";
 
-type ModalType = "generic" | "notVerified";
+type ModalType = "generic" | "notVerified" | "inactive";
 
 export default function Login() {
   const [open, setOpen] = useState(false);
@@ -30,6 +30,15 @@ export default function Login() {
         navigate(`/u/${user.id}/dashboard`, { replace: true });
       } catch (error) {
         // ถ้า backend ส่ง 403 + code=EMAIL_NOT_VERIFIED → โชว์ modal ขอให้ยืนยันอีเมล/กด "ส่งอีกครั้ง"
+        if (
+          isAxiosError(error) &&
+          error.response?.status === 403 &&
+          error.response?.data?.code === "ACCOUNT_INACTIVE"
+        ) {
+          setModalType("inactive");
+          setOpen(true);
+          return;
+        }
         if (
           isAxiosError(error) &&
           error.response?.status === 403 &&
@@ -74,6 +83,8 @@ export default function Login() {
         title={
           modalType === "notVerified"
             ? t("modalNotVerified.title")
+            : modalType === "inactive"
+            ? t("modalInactive.title")
             : t("modal.title")
         }
         message={
@@ -105,6 +116,14 @@ export default function Login() {
                 * {t("modalNotVerified.check_spam")}
               </p>
             </>
+          ) : modalType === "inactive" ? (
+            <>
+              {t("modalInactive.top")}
+              <br />
+              {t("modalInactive.mid")}
+              <br />
+              {t("modalInactive.bottom")}
+            </>
           ) : (
             <>
               {t("modal.top")}
@@ -115,7 +134,9 @@ export default function Login() {
             </>
           )
         }
-        closeLabel={t("modal.close")}
+        closeLabel={
+          modalType === "inactive" ? t("modalInactive.close") : t("modal.close")
+        }
       />
     </>
   );
