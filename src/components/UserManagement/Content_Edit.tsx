@@ -3,11 +3,13 @@ import Dropdown from "../Dropdown";
 import Modal from "../Modal";
 import { useToast } from "../../hook/toastProvider"; // ใช้ตาม path เดิมของโปรเจกต์คุณ
 import type { AdminRow } from "./user.constant";
+import { listSites } from "../../api/sites";
+import { getUser } from "../../api/adminUsers";
 
 type Props = {
   user: AdminRow;
   onCancel: () => void;
-  onSave: (next: AdminRow) => void;
+  onSave: (next: AdminRow & { siteIds?: string[] }) => void;
   /** ส่งรายชื่อผู้ใช้ทั้งหมดเข้ามาเพื่อเช็คซ้ำ (ยกเว้นตัวที่กำลังแก้) */
   allUsers?: AdminRow[];
 };
@@ -33,7 +35,13 @@ export default function Content_Edit({
   const [first, setFirst] = React.useState("");
   const [last, setLast] = React.useState("");
   const [email, setEmail] = React.useState(user.email);
-  const [role, setRole] = React.useState<"Admin" | "Officer" | "User">(user.role as any);
+  const [role, setRole] = React.useState<"Admin" | "Officer" | "User">(
+    user.role as any
+  );
+  const [siteOptions, setSiteOptions] = React.useState<
+    Array<{ label: string; value: string }>
+  >([]);
+  const [selectedSiteIds, setSelectedSiteIds] = React.useState<string[]>([]);
 
   // modal state
   const [dupModal, setDupModal] = React.useState<{
@@ -48,7 +56,41 @@ export default function Content_Edit({
     setLast(rest.join(" "));
     setEmail(user.email);
     setRole(user.role);
+    // fetch user sites for pre-select
+    (async () => {
+      try {
+        const u = await getUser(user.id);
+        const ids = Array.isArray(u?.sites)
+          ? (u.sites as any[]).map((s) => s.id).filter(Boolean)
+          : [];
+        setSelectedSiteIds(ids);
+      } catch {
+        setSelectedSiteIds([]);
+      }
+    })();
   }, [user]);
+
+  // fetch available sites (admin will get all)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const data = await listSites();
+        const arr = Array.isArray(data)
+          ? data
+          : Array.isArray((data as any)?.items)
+          ? (data as any).items
+          : [];
+        setSiteOptions(
+          arr.map((s: any) => ({
+            label: s.name || s.code || s.id,
+            value: s.id,
+          }))
+        );
+      } catch (e) {
+        setSiteOptions([]);
+      }
+    })();
+  }, []);
 
   const submit = () => {
     if (!first.trim() || !last.trim() || !email.trim()) {
@@ -59,11 +101,12 @@ export default function Content_Edit({
       return;
     }
 
-    const next: AdminRow = {
+    const next: AdminRow & { siteIds?: string[] } = {
       ...user,
       fullName: `${first.trim()} ${last.trim()}`.trim(),
       email: email.trim(),
       role,
+      siteIds: role === "Admin" ? undefined : selectedSiteIds,
     };
 
     // ===== Duplicate validation (ตามมาตรฐานทั่วไป) =====
@@ -210,6 +253,116 @@ export default function Content_Edit({
             </Dropdown>
           </div>
         </div>
+
+        {/* Sites (hidden for Admin) */}
+        {role !== "Admin" && (
+          <div className="grid grid-cols-12 items-start gap-4">
+            <label className="col-span-12 md:col-span-3 font-medium pt-2">
+              Sites access
+            </label>
+            <div className="col-span-12 md:col-span-9">
+              <Dropdown
+                options={siteOptions as any}
+                value="__multi__"
+                onChange={() => {}}
+              >
+                {({ open, getButtonProps, getMenuProps }) => (
+                  <div className="relative">
+                    <button
+                      {...getButtonProps({
+                        className:
+                          "h-[40px] w-full rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 hover:cursor-pointer",
+                      })}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <span className="truncate">
+                        {selectedSiteIds.length > 0
+                          ? `${selectedSiteIds.length} site(s) selected`
+                          : "Select sites"}
+                      </span>
+                      <i className="material-icons leading-none">
+                        {open ? "arrow_drop_up" : "arrow_drop_down"}
+                      </i>
+                    </button>
+
+                    {open && (
+                      <div
+                        {...getMenuProps({
+                          className:
+                            "absolute z-50 mt-1 min-w-[220px] whitespace-nowrap rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto",
+                        })}
+                        onMouseDown={(e) => e.preventDefault()}
+                      >
+                        <div className="mt-1">
+                          {siteOptions.map((opt: any) => {
+                            const checked = selectedSiteIds.includes(opt.value);
+                            return (
+                              <label
+                                key={opt.value}
+                                className={[
+                                  "flex items-center gap-2 rounded-md px-3 py-2 text-[14px] hover:bg-gray-50 hover:cursor-pointer",
+                                  checked ? "bg-gray-50" : "",
+                                ].join(" ")}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
+                                  checked={checked}
+                                  onChange={() =>
+                                    setSelectedSiteIds((prev) =>
+                                      prev.includes(opt.value)
+                                        ? prev.filter((v) => v !== opt.value)
+                                        : [...prev, opt.value]
+                                    )
+                                  }
+                                  onMouseDown={(e) => e.preventDefault()}
+                                />
+                                <span>{opt.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Dropdown>
+              {/* selected chips */}
+              {selectedSiteIds.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {selectedSiteIds.map((id) => {
+                    const label =
+                      siteOptions.find((s) => s.value === id)?.label || id;
+                    return (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-800 text-[12px] px-2 py-1 border border-gray-200"
+                      >
+                        {label}
+                        <button
+                          type="button"
+                          aria-label="Remove"
+                          className="ml-1 text-gray-500 hover:text-gray-800"
+                          onClick={() =>
+                            setSelectedSiteIds((prev) =>
+                              prev.filter((v) => v !== id)
+                            )
+                          }
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+              {/* helper text */}
+              <div className="text-[12px] text-gray-500 mt-1">
+                Choose one or more sites this user can access.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}

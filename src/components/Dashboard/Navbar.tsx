@@ -55,6 +55,19 @@ export default function Navbar({
     [t, i18n.language]
   );
 
+  const filteredSiteMenu = React.useMemo(() => {
+    const q = (searchSite || "").toLowerCase().trim();
+    if (!q) return [];
+    // แปลงเป็นเมนู: label แสดงชื่อ, value เก็บตัว value จริง
+    return siteOptions
+      .filter(
+        (s) =>
+          s.label.toLowerCase().includes(q) || s.value.toLowerCase().includes(q)
+      )
+      .slice(0, 50) // กันยาวเกิน
+      .map((s) => ({ label: s.label, value: s.value }));
+  }, [searchSite, siteOptions]);
+
   return (
     <div className="bg-[#FFFFFF] w-full rounded-lg border-b border-none">
       {/* Top bar */}
@@ -78,8 +91,18 @@ export default function Navbar({
             placeholder={t("navbar.searchPlaceholder")}
             onChange={setSearchSite}
             className="min-w-[140px]"
+            resultMenu={filteredSiteMenu}
+            onSelect={(item) => {
+              // เมื่อเลือกจากเมนู → setSelectedSite และเติมค่าในช่องค้นหาให้สวยๆ
+              const label = typeof item === "string" ? item : item.label;
+              const val =
+                typeof item === "string"
+                  ? item
+                  : String(item.value ?? item.label);
+              setSelectedSite(val);
+              setSearchSite(label);
+            }}
           />
-
           <Dropdown
             options={siteOptions as any}
             value={selectedSite}
@@ -119,7 +142,7 @@ export default function Navbar({
                   <div
                     {...getMenuProps({
                       className: [
-                        "absolute z-10 mt-12 min-w-[180px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                        "absolute z-10 mt-12 min-w-[200px] rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap",
                         "transition-all duration-150",
                         open
                           ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -229,8 +252,21 @@ export default function Navbar({
                 <div className="col-span-1">
                   <SearchInput
                     value={searchSite}
-                    placeholder="เธเนเธญเธเธเนเธเธซเธฒ Sites"
+                    placeholder={t("navbar.searchPlaceholder")}
                     onChange={setSearchSite}
+                    className="min-w-[140px]"
+                    resultMenu={filteredSiteMenu}
+                    onSelect={(item) => {
+                      // เมื่อเลือกจากเมนู → setSelectedSite และเติมค่าในช่องค้นหาให้สวยๆ
+                      const label =
+                        typeof item === "string" ? item : item.label;
+                      const val =
+                        typeof item === "string"
+                          ? item
+                          : String(item.value ?? item.label);
+                      setSelectedSite(val);
+                      setSearchSite(label);
+                    }}
                   />
                 </div>
 
@@ -264,7 +300,7 @@ export default function Navbar({
                           <button
                             {...getButtonProps({
                               className:
-                                "inline-flex h-10 w-full items-center justify-between rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50",
+                                "inline-flex h-10 min-w-[105px] items-center justify-between rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50",
                             })}
                           >
                             <span className="truncate">{selectedLabel}</span>
@@ -276,7 +312,7 @@ export default function Navbar({
                           <div
                             {...getMenuProps({
                               className: [
-                                "absolute z-50 mt-2 min-w-full rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                                "absolute z-50 mt-2 min-w-[200px] whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md",
                                 "transition-all duration-150",
                                 open
                                   ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -340,7 +376,7 @@ export default function Navbar({
                         <div
                           {...getMenuProps({
                             className: [
-                              "absolute z-50 mt-2 min-w-full rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                              "absolute z-50 mt-2 min-w-[105px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
                               "transition-all duration-150",
                               open
                                 ? "opacity-100 translate-y-0 pointer-events-auto"
@@ -354,7 +390,7 @@ export default function Navbar({
                               key={opt.value}
                               {...getItemProps(opt, {
                                 className:
-                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-[14px] hover:bg-gray-100 hover:cursor-pointer",
+                                  "flex min-w-[120px] items-center rounded-lg px-3 py-2 text-left text-[14px] hover:bg-gray-100 hover:cursor-pointer",
                               })}
                             >
                               {t(`navbar.exportOptions.${opt.value}`, {

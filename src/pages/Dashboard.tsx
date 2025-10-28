@@ -23,6 +23,7 @@ import { PROVINCE_CODE_TO_TH } from "../data/Dashboard/data";
 import type { Site } from "../data/Dashboard/data";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
+import { useFilters } from "../context/FiltersContext";
 
 const NON_ALL_COUNT = EVENT_OPTIONS.length - 1;
 
@@ -33,8 +34,9 @@ export default function Dashboard() {
   const params = useParams();
   const navigate = useNavigate();
 
-  const [date, setDate] = React.useState<DateValue>(today);
-  const [selectedSiteCode, setSelectedSiteCode] = React.useState("all");
+  const { date: globalDate, setDate: setGlobalDate, selectedSite: globalSite, setSelectedSite: setGlobalSite } = useFilters();
+  const [date, setDate] = React.useState<DateValue>(globalDate ?? today);
+  const [selectedSiteCode, setSelectedSiteCode] = React.useState(globalSite ?? "all");
   const [mapSeverity, setMapSeverity] = React.useState("all");
   const [province, setProvince] = React.useState("all");
   const [selectedEvents, setSelectedEvents] = React.useState<string[]>(["all"]);
@@ -70,6 +72,20 @@ export default function Dashboard() {
       }
     })();
   }, [params.uid, navigate]);
+
+  // keep context in sync with local dashboard state (date / site)
+  React.useEffect(() => {
+    if (
+      !globalDate ||
+      globalDate.y !== date.y ||
+      globalDate.m !== date.m ||
+      globalDate.d !== date.d
+    ) {
+      setGlobalDate(date);
+    }
+    if (globalSite !== selectedSiteCode) setGlobalSite(selectedSiteCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, selectedSiteCode]);
 
   React.useEffect(() => {
     (async () => {
@@ -451,8 +467,11 @@ export default function Dashboard() {
     []
   );
   const handleSelectedSiteChange = React.useCallback(
-    (value: string) => setSelectedSiteCode(value),
-    []
+    (value: string) => {
+      setSelectedSiteCode(value);
+      setGlobalSite(value);
+    },
+    [setGlobalSite]
   );
   const handleProvinceChange = React.useCallback(
     (value: string) => setProvince(value),

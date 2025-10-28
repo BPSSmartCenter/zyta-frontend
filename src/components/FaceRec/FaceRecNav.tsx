@@ -1,6 +1,7 @@
 // src/components/FaceRec/FaceRecNav.tsx
 import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
+import MiniFiltersBar from "../Shared/MiniFiltersBar";
 
 type Props = { title: string };
 
@@ -34,6 +35,7 @@ export default function FaceRecNav({ title }: Props) {
       </div>
 
       <div className="gap-6 flex items-center">
+        <MiniFiltersBar page="facerec" />
         {/* Import button */}
         <button
           type="button"

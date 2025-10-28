@@ -78,6 +78,7 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
         placeholder={t("search.placeholder")}
         onChange={setSearch}
         className="font-poppins"
+        disableMenu
       />
       <div className="lg-1399:h-[375px] h-[350px] lg:h	full overflow-y-auto px-2">
         <div className="space-y-2">

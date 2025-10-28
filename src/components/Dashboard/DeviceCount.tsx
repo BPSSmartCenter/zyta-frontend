@@ -44,7 +44,7 @@ export default function DeviceCount({
   const titleDevices = t("devices.title", { defaultValue: "DEVICES" });
   const labelOffline = t("devices.offline", { defaultValue: "Offline" });
   const labelOnline = t("devices.online", { defaultValue: "Online" });
-  const titleCameras = t("devices.cameras", { defaultValue: "Cameras" });
+  // const titleCameras = t("devices.cameras", { defaultValue: "Cameras" });
   const titleTotal = t("devices.total", { defaultValue: "Total" });
 
   const labelCameraCount = t("devices.camerasShort", {
@@ -63,7 +63,7 @@ export default function DeviceCount({
     return navigate(abs(`/devices?type=${type}`));
   };
 
-  // Defaults (mock): only 1 electric meter, others 0; offline 100%
+  // Defaults (mock): only 1 electric meter, others 0
   const mergedCounts: DeviceCounts = {
     cameras: 0,
     intercom: 0,
@@ -74,14 +74,30 @@ export default function DeviceCount({
     ...(counts || {}),
   } as DeviceCounts;
 
-  const offlineOnline = (() => {
-    const oc = typeof offlineCount === "number" ? offlineCount : 1;
-    const on = typeof onlineCount === "number" ? onlineCount : 0;
-    const pct =
+  // Mock per-type status for display (keep style; just append (on/off))
+  const statusByType = {
+    cameras: { on: 0, off: 0 },
+    intercom: { on: 0, off: 0 },
+    waterMeter: { on: 0, off: 0 },
+    electricMeter: { on: 1, off: 0 },
+    airSensor: { on: 0, off: 0 },
+    zyta: { on: 0, off: 0 },
+  } as const;
+
+  // คำนวณเปอร์เซ็นต์ออนไลน์จริงจากค่า on/off รวมทั้งหมด
+  const donut = (() => {
+    // รวมสถานะจาก props ถ้ามี ไม่งั้น fallback เป็น mock ข้างบน
+    const fallbackOn = 1;
+    const fallbackOff = 0;
+    const on = typeof onlineCount === "number" ? onlineCount : fallbackOn;
+    const oc = typeof offlineCount === "number" ? offlineCount : fallbackOff;
+    const sum = Math.max(on + oc, 1);
+    // ถ้าให้ offlinePercent มา ให้คิด online = 100 - offlinePercent เพื่อคง style เดิมแต่โชว์ออนไลน์
+    const pctOnline =
       typeof offlinePercent === "number"
-        ? offlinePercent
-        : (oc / Math.max(oc + on, 1)) * 100;
-    return { oc, on, pct };
+        ? 100 - offlinePercent
+        : (on / sum) * 100;
+    return { on, oc, pct: pctOnline, sum };
   })();
 
   return (
@@ -93,10 +109,10 @@ export default function DeviceCount({
       <div className="flex">
         <RadialBar
           key={`radial-offline-${langKey}`} // ← บังคับ remount เมื่อภาษาเปลี่ยน
-          value={offlineOnline.pct}
-          label={labelOffline}
-          mainColor="#FB3F3F"
-          primaryColor="#A9DB4E"
+          value={donut.pct}
+          label={labelOnline}
+          mainColor="#A9DB4E"
+          primaryColor="#FB3F3F"
           bg="#FFFFFF"
           height={170}
           width={170}
@@ -108,7 +124,7 @@ export default function DeviceCount({
         />
 
         <div className="flex flex-col gap-3">
-          <h1 className="text-[24px] font-semibold">{titleCameras}</h1>
+          <h1 className="text-[24px] font-semibold">{/* {titleCameras} */}</h1>
 
           <div className="flex gap-2 flex-wrap">
             <div className="flex flex-col w-[70px] h-[60px] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
@@ -116,7 +132,7 @@ export default function DeviceCount({
                 items={[{ label: labelOffline, color: "#FB3F3F" }]}
                 labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[18px] font-semibold">{offlineOnline.oc}</h1>
+              <h1 className="text-[18px] font-semibold">{donut.oc}</h1>
             </div>
 
             <div className="flex flex-col w-[70px] h-[60px] bg-[#F8FBFE] text-[#39B8EE] rounded-[10px] justify-center items-center gap-1">
@@ -124,12 +140,12 @@ export default function DeviceCount({
                 items={[{ label: labelOnline, color: "#A9DB4E" }]}
                 labelClassName="text-[#39B8EE] text-[13px]"
               />
-              <h1 className="text-[18px] font-semibold">{offlineOnline.on}</h1>
+              <h1 className="text-[18px] font-semibold">{donut.on}</h1>
             </div>
           </div>
 
           <h1 className="mt-2 lg:text-[24px] md:text-[18px] whitespace-nowrap font-semibold text-[#1E1E1E]">
-            {titleTotal} <span>{offlineOnline.oc + offlineOnline.on}</span>
+            {titleTotal} <span>{donut.sum}</span>
           </h1>
         </div>
       </div>
@@ -142,10 +158,19 @@ export default function DeviceCount({
             onClick={() => goDevices("cctv")}
           >
             <img src={cctvImage} alt="" width={36} />
-            <span>
-              {labelCameraCount}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.cameras}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelCameraCount}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.cameras}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.cameras.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.cameras.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
@@ -156,10 +181,19 @@ export default function DeviceCount({
             onClick={() => goDevices("intercom")}
           >
             <img src={intercomeImage} alt="" width={36} />
-            <span>
-              {labelIntercom}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.intercom}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelIntercom}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.intercom}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.intercom.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.intercom.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
@@ -172,10 +206,19 @@ export default function DeviceCount({
             onClick={() => goDevices("watermeter")}
           >
             <img src={waterTapImage} alt="" width={36} />
-            <span>
-              {labelWater}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.waterMeter}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelWater}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.waterMeter}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.waterMeter.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.waterMeter.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
@@ -186,10 +229,19 @@ export default function DeviceCount({
             onClick={() => goDevices("electricmeter")}
           >
             <img src={solarImage} alt="" width={36} />
-            <span>
-              {labelElectric}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.electricMeter}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelElectric}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.electricMeter}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.electricMeter.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.electricMeter.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
@@ -202,10 +254,19 @@ export default function DeviceCount({
             onClick={() => goDevices("airsensor")}
           >
             <img src={windImage} alt="" width={36} />
-            <span>
-              {labelAir}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.airSensor}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelAir}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.airSensor}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.airSensor.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.airSensor.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
@@ -213,10 +274,19 @@ export default function DeviceCount({
           {/* ZYTA → no action */}
           <div className="flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
-            <span>
-              {labelAlert}{" "}
-              <span className="text-red-500 font-semibold">
-                {mergedCounts.zyta}
+            <span className="flex flex-col leading-tight">
+              <span>
+                {labelAlert}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.zyta}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">{statusByType.zyta.on}</span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">{statusByType.zyta.off}</span>
+                <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>

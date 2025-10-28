@@ -261,7 +261,7 @@ export default function ContentLayout(props: Props) {
             <div className="p-6 w-full rounded-xl bg-white">
               <DeviceCount
                 siteCode={props.selectedSiteCode}
-                // Mock for now: only 1 electric meter, others 0; offline 100%
+                // Mock: Electric 1 online, others 0; ออนไลน์ 100%
                 counts={{
                   cameras: 0,
                   intercom: 0,
@@ -270,9 +270,9 @@ export default function ContentLayout(props: Props) {
                   airSensor: 0,
                   zyta: 0,
                 }}
+                onlineCount={1}
                 offlineCount={0}
-                onlineCount={0}
-                offlinePercent={100}
+                offlinePercent={0}
               />
             </div>
           </div>

@@ -1,7 +1,7 @@
 // src/components/Map/MapMarkers.ts
 import L from "leaflet";
 import type { Noti, Severity, NotiType } from "../../data/Dashboard/notis";
-import type { SeverityFilter } from "./MapTypes";
+import type { SeverityFilter, SitePoint } from "./MapTypes";
 
 /** สร้าง DivIcon พินสีเรียบ */
 function makePin(color: string) {
@@ -100,6 +100,7 @@ export function renderMarkers(
   aggregateBySite: boolean,
   severityFilter: SeverityFilter,
   _provinceCenters: Record<string, L.LatLngLiteral>,
+  sitePoints: SitePoint[] | undefined,
   t: (key: string, opts?: any) => string
 ) {
   void _map;
@@ -114,27 +115,96 @@ export function renderMarkers(
     layerGroup.clearLayers();
   } catch {}
 
-  // 1) คัดเฉพาะที่มี coords + ผ่าน severity filter
-  let list = notis.filter((n) => !!n.coords && severityPass(n, severityFilter));
+  // โหมด A: ถ้ามี sitePoints → วาดหมุดทุกไซต์ แล้วระบายสีตาม noti ล่าสุด (ผ่าน filter) ถ้ามี
+  if (Array.isArray(sitePoints) && sitePoints.length > 0) {
+    // สร้างดัชนีเหตุการณ์ล่าสุดต่อ site (ตามชื่อ noti.site)
+    let pool = notis.filter((n) => severityPass(n, severityFilter));
+    if (aggregateBySite) pool = groupBySiteLatest(pool);
+    const latestBySiteName = new Map<string, Noti>();
+    for (const n of pool) {
+      const key = String(n.site ?? "");
+      if (!key) continue;
+      const prev = latestBySiteName.get(key);
+      if (!prev || new Date(n.date).getTime() > new Date(prev.date).getTime()) {
+        latestBySiteName.set(key, n);
+      }
+    }
 
-  // 2) ถ้าต้องการ aggregate ให้เหลือล่าสุดต่อ site
-  if (aggregateBySite) list = groupBySiteLatest(list);
-
-  // 3) วาดหมุด
-  list.forEach((n) => {
-    const { lat, lng } = n.coords!; // ผ่าน filter แล้ว จึง non-null
-
-    const marker = L.marker([lat, lng], {
-      icon: getPinForNoti(n),
-      pane: "markersPane", // อยู่เหนือ dim/shade
-    });
-
-    const title = n.titleKey
-      ? t(n.titleKey, { defaultValue: n.title })
-      : n.title;
     const siteLabel = t("map.site", { defaultValue: "Site" });
     const dateLabel = t("map.date", { defaultValue: "Date" });
+    const NEUTRAL = makePin("#CBD5E1"); // สีไม่ Alert (slate-300)
 
+    sitePoints.forEach((sp) => {
+      const n = latestBySiteName.get(String(sp.name));
+      const icon = n ? getPinForNoti(n) : NEUTRAL;
+      const marker = L.marker([sp.lat, sp.lng], {
+        icon,
+        pane: "markersPane",
+      });
+
+      marker.addTo(layerGroup);
+
+      if (n) {
+        const title = n.titleKey ? t(n.titleKey, { defaultValue: n.title }) : n.title;
+        const labelHtml = `
+          <div style="
+            background:#000; color:#fff;
+            border-radius:8px; padding:6px 8px;
+            box-shadow:0 4px 12px rgba(0,0,0,.45);
+            pointer-events:none; white-space:nowrap;
+          ">
+            <div style="font-weight:700;font-size:12px;margin-bottom:2px">${title}</div>
+            <div style="font-size:11px;opacity:.9">${siteLabel}: ${n.site}</div>
+            <div style="font-size:11px;opacity:.9">${dateLabel}: ${fmtDate(n.date as any)}</div>
+          </div>
+        `;
+        marker.bindTooltip(labelHtml, {
+          direction: "top",
+          permanent: false,
+          sticky: true,
+          opacity: 1,
+          className: "marker-label",
+          pane: "markerLabels",
+          offset: L.point(0, -14),
+        });
+      } else {
+        // ไม่มีเหตุการณ์ → แสดง badge แค่ชื่อ Site ด้วยสไตล์เดิม
+        const labelHtml = `
+          <div style="
+            background:#000; color:#fff;
+            border-radius:8px; padding:6px 8px;
+            box-shadow:0 4px 12px rgba(0,0,0,.45);
+            pointer-events:none; white-space:nowrap;
+          ">
+            <div style="font-weight:700;font-size:12px">${sp.name}</div>
+          </div>
+        `;
+        marker.bindTooltip(labelHtml, {
+          direction: "top",
+          permanent: false,
+          sticky: true,
+          opacity: 1,
+          className: "marker-label",
+          pane: "markerLabels",
+          offset: L.point(0, -14),
+        });
+      }
+    });
+    return;
+  }
+
+  // โหมด B (ย้อนกลับได้): ไม่มี sitePoints → วาดตาม noti ที่มี coords แบบเดิม
+  let list = notis.filter((n) => !!n.coords && severityPass(n, severityFilter));
+  if (aggregateBySite) list = groupBySiteLatest(list);
+  list.forEach((n) => {
+    const { lat, lng } = n.coords!;
+    const marker = L.marker([lat, lng], {
+      icon: getPinForNoti(n),
+      pane: "markersPane",
+    });
+    const title = n.titleKey ? t(n.titleKey, { defaultValue: n.title }) : n.title;
+    const siteLabel = t("map.site", { defaultValue: "Site" });
+    const dateLabel = t("map.date", { defaultValue: "Date" });
     const labelHtml = `
       <div style="
         background:#000; color:#fff;
@@ -142,23 +212,19 @@ export function renderMarkers(
         box-shadow:0 4px 12px rgba(0,0,0,.45);
         pointer-events:none; white-space:nowrap;
       ">
-        <div style="font-weight:700;font-size:12px;margin-bottom:2px">${title}</div>
-        <div style="font-size:11px;opacity:.9">${siteLabel}: ${n.site}</div>
-        <div style="font-size:11px;opacity:.9">${dateLabel}: ${fmtDate(
-      n.date as any
-    )}</div>
+        <div style=\"font-weight:700;font-size:12px;margin-bottom:2px\">${title}</div>
+        <div style=\"font-size:11px;opacity:.9\">${siteLabel}: ${n.site}</div>
+        <div style=\"font-size:11px;opacity:.9\">${dateLabel}: ${fmtDate(n.date as any)}</div>
       </div>
     `;
-
     marker.addTo(layerGroup);
-
     marker.bindTooltip(labelHtml, {
       direction: "top",
-      permanent: false, // hover เท่านั้น
+      permanent: false,
       sticky: true,
       opacity: 1,
       className: "marker-label",
-      pane: "markerLabels", // ป้ายอยู่ชั้นสูงกว่าหมุด
+      pane: "markerLabels",
       offset: L.point(0, -14),
     });
   });

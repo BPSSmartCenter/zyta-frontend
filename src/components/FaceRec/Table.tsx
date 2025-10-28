@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../Dropdown";
 import DatePicker, { type DateValue } from "../DateInput";
+import { useFilters } from "../../context/FiltersContext";
 import SearchInput from "../SearchInput";
 import { FACE_REC_ROWS, type FaceRecRow } from "./faceRec.constant";
 
@@ -26,9 +27,10 @@ type Opt = { label: string; value: string };
 
 export default function Table() {
   const { t } = useTranslation("facerec");
+  const { date: globalDate, setDate: setGlobalDate } = useFilters();
 
   /* -------- Filters state -------- */
-  const [date, setDate] = React.useState<DateValue | undefined>(undefined);
+  const [date, setDate] = React.useState<DateValue | undefined>(globalDate);
   const [q, setQ] = React.useState("");
   const [province, setProvince] = React.useState<string>("all");
 
@@ -68,6 +70,20 @@ export default function Table() {
   }, [date, q, province]);
 
   React.useEffect(() => setPage(1), [date, q, province]);
+
+  // sync with global filter when external changes occur
+  React.useEffect(() => {
+    if (
+      globalDate &&
+      (!date ||
+        date.y !== globalDate.y ||
+        date.m !== globalDate.m ||
+        date.d !== globalDate.d)
+    ) {
+      setDate(globalDate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalDate?.y, globalDate?.m, globalDate?.d]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -159,7 +175,13 @@ export default function Table() {
           </Dropdown>
 
           {/* Date */}
-          <DatePicker value={date} onChange={setDate} />
+          <DatePicker
+            value={date}
+            onChange={(v) => {
+              setDate(v);
+              setGlobalDate(v);
+            }}
+          />
         </div>
 
         {/* Search (ช่องขวา) */}

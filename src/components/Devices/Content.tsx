@@ -11,6 +11,7 @@ import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 import AirPanel from "./Air Sensor/AirPanel";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import MiniFiltersBar from "../Shared/MiniFiltersBar";
 
 type Props = {};
 
@@ -72,10 +73,10 @@ export default function Content({}: Props) {
       <nav className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6">
         <div className="flex flex-col gap-1 select-none">
           <h1 className="text-2xl font-semibold">{tDevices("nav.title")}</h1>
-          <h1 className="text-gray-400">{tDevices("nav.subTitle")}</h1>
         </div>
 
-        <div className="gap-2 flex flex-wrap">
+        <div className="gap-2 flex flex-wrap items-center">
+          <MiniFiltersBar page="devices" />
           <button className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50">
             <span className="truncate flex items-center gap-2">
               <img src={exportImage} alt="" />

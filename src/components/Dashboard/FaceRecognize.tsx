@@ -67,6 +67,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
         onChange={setSearch}
         className="font-poppins"
         inputClassName="placeholder:text-[13px]!"
+        disableMenu
       />
 
       <div className="lg-1399:h-[500px] lg:h-full h-[350px] overflow-y-auto px-2">

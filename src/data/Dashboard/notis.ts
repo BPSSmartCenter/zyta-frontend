@@ -55,7 +55,7 @@ export const notis: Noti[] = [
   //   img: motionNoti,
   //   titleKey: "notis.motionDetected",
   //   title: "ตรวจพบการเคลื่อนไหว",
-  //   site: "Site A",
+  //   site: "อาคารบรมนาถศรีนครินทร์",
   //   coords: { lat: 13.7563, lng: 100.5018 }, // Bangkok
   //   date: "2025-02-11",
   //   severity: "medium",

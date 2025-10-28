@@ -97,7 +97,7 @@ function UserManagementInner() {
       {creating ? (
         <Content_Create
           onCancel={() => setCreating(false)}
-          onCreate={async ({ password, avatarFile, ...created }) => {
+          onCreate={async ({ password, avatarFile, siteIds, ...created }) => {
             try {
               const [firstName, ...rest] = (created.fullName || "").split(" ");
               const lastName = rest.join(" ");
@@ -107,6 +107,7 @@ function UserManagementInner() {
                 email: created.email,
                 password,
                 role: created.role === "Admin" ? "admin" : created.role === "Officer" ? "officer" : "user",
+                ...(Array.isArray(siteIds) ? { siteIds } : {}),
               });
               await refresh();
               setCreating(false);
@@ -146,6 +147,10 @@ function UserManagementInner() {
                 lastName,
                 email: next.email,
                 role: next.role === "Admin" ? "admin" : next.role === "Officer" ? "officer" : "user",
+                // include siteIds for non-admins
+                ...(Array.isArray((next as any).siteIds)
+                  ? { siteIds: (next as any).siteIds as string[] }
+                  : {}),
               });
               await refresh();
               setEditing(null);

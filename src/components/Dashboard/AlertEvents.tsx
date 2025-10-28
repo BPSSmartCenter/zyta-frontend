@@ -119,6 +119,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
         placeholder={t("search.placeholder")}
         onChange={setSearch}
         className="font-poppins"
+        disableMenu
       />
 
       <div className="lg:h-[590px] h-[350px] overflow-y-auto px-2">

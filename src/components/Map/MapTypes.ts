@@ -4,6 +4,13 @@ import type { Noti, Severity } from "../../data/Dashboard/notis";
 export type SiteCoord = { lat: number; lng: number };
 export type SiteCoordMap = Record<string, SiteCoord>;
 
+export type SitePoint = {
+  name: string;
+  lat: number;
+  lng: number;
+  code?: string;
+};
+
 export type SeverityFilter = Severity | "all" | undefined;
 
 export type Props = {
@@ -11,6 +18,8 @@ export type Props = {
   showPins?: boolean;
   aggregateBySite?: boolean;
   severityFilter?: SeverityFilter;
+  /** รายการจุดไซต์ถาวรสำหรับปักหมุด (ถ้ามีจะวาดหมุดทุกไซต์เสมอ แล้วเปลี่ยนสีตาม Event) */
+  sitePoints?: SitePoint[];
 
   /** จังหวัดที่จะโฟกัส (ชื่อไทยให้ตรง geojson เช่น "กรุงเทพมหานคร") */
   focusProvince?: string | null;

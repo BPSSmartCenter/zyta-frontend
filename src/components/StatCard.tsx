@@ -4,7 +4,7 @@ import type React from "react";
 import type { PropsWithChildren } from "react";
 import defaultFireImage from "../assets/fire.png";
 import { useTranslation } from "react-i18next";
-import Switch from "./Switch";
+// import Switch from "./Switch";
 import type { SwitchProps } from "./Switch";
 
 /* ===================== Group Context ===================== */
@@ -100,7 +100,7 @@ const StatCard: React.FC<Props> = ({
   startActive = false,
   reverseLayout = false,
   variant = "default",
-  switchProps,
+  // switchProps,
   className,
   onToggle,
   onClick,
@@ -183,7 +183,7 @@ const StatCard: React.FC<Props> = ({
 
   /* ========== NEW VARIANT: boxWithSwitch ========== */
   if (variant === "boxWithSwitch") {
-    const swId = switchProps?.id ?? (id ? `sw-${id}` : undefined); // unique id per card
+    // const swId = switchProps?.id ?? (id ? `sw-${id}` : undefined); // unique id per card
     return (
       <div
         onClick={handleToggle} // คลิกการ์ด = เลือกการ์ด (bg cyan)
@@ -201,7 +201,7 @@ const StatCard: React.FC<Props> = ({
         {/* คลิกสวิตช์ = toggle สวิตช์อย่างเดียว */}
         <div>
           <div onClick={(e) => e.stopPropagation()} className="inline-flex">
-            <Switch {...switchProps} id={swId} />
+            {/* <Switch {...switchProps} id={swId} /> */}
           </div>
         </div>
       </div>

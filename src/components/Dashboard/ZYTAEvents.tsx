@@ -43,6 +43,7 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
         placeholder={t("search.placeholder")}
         onChange={setSearch}
         className="font-poppins"
+        disableMenu
       />
 
       <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2">

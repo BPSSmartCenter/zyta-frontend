@@ -44,6 +44,7 @@ export default function Map({
 
   onProvinceChange,
   lockZoomOut = false,
+  sitePoints,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
@@ -1043,6 +1044,8 @@ export default function Map({
 
           provinceCentersRef.current,
 
+          sitePoints,
+
           t
         );
 
@@ -1094,9 +1097,11 @@ export default function Map({
 
       provinceCentersRef.current,
 
+      sitePoints,
+
       t
     );
-  }, [notis, aggregateBySite, severityFilter, t, i18n.language]);
+  }, [notis, aggregateBySite, severityFilter, sitePoints, t, i18n.language]);
 
   // โฟกัสจังหวัดจาก dropdown (null = ทุกพื้นที่)
 

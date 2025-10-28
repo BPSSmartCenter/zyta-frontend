@@ -258,6 +258,27 @@ export default function MapPanel({
 
   const onSelectProvince = (val: string) => setProvince(val);
 
+  /* ---------- sitePoints (พิกัดไซต์ถาวรสำหรับปักหมุด) ---------- */
+  const sitePoints = useMemo(
+    () =>
+      (accessibleSites ?? [])
+        .map((s) => {
+          const lat = Number((s as any)?.lat);
+          const lng = Number((s as any)?.lng);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+          const name = String((s as any)?.name ?? (s as any)?.code ?? (s as any)?.id ?? "");
+          if (!name) return null;
+          return { name, lat, lng, code: (s as any)?.code as any } as {
+            name: string;
+            lat: number;
+            lng: number;
+            code?: string;
+          };
+        })
+        .filter(Boolean) as Array<{ name: string; lat: number; lng: number; code?: string }>,
+    [JSON.stringify(accessibleSites)]
+  );
+
   /* ---------- render (UI เดิม) ---------- */
   return (
     <div
@@ -467,6 +488,7 @@ export default function MapPanel({
           showPins={true}
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
+          sitePoints={sitePoints}
           // ถ้าเลือก site เฉพาะ → โฟกัสพิกัด site โดยตรง
           focusSiteCenter={
             selectedSiteCode && selectedSiteCode !== "all"

@@ -7,6 +7,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
+import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import {
   notis as alertNotis,
   wellBeingNotis,
@@ -207,7 +208,8 @@ export default function Content({ statItems }: Props) {
       {/* Top bar */}
       <nav className="flex justify-between mt-10">
         <h1 className="text-2xl font-semibold">{tAlert("totalAlertsToday")}</h1>
-        <div className="gap-3 flex">
+        <div className="gap-3 flex items-center">
+          <MiniFiltersBar page="alert" />
           <button className="inline-flex h-10 w-10 md:w-[105px] items-center justify-center rounded-md border border-gray-300 px-3 text-sm font-inter font-bold">
             <span className="truncate flex items-center gap-2">
               <img src={exportImage} alt="" />
