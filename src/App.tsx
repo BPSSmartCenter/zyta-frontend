@@ -53,6 +53,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="alert" element={<TotalAlert />} />
               <Route path="devices" element={<Devices />} />
+              <Route path="facerec" element={<FaceRecognize />} />
             </Route>
           </Route>
         </Route>

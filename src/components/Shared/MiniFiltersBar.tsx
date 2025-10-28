@@ -1,8 +1,9 @@
+import React from "react";
 import Dropdown from "../Dropdown";
 import DatePicker from "../DateInput";
 import { useFilters } from "../../context/FiltersContext";
 import { useUserPath } from "../../routes/useUserPath";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 type Props = {
   page?: "devices" | "alert" | "facerec" | "dashboard";
@@ -15,12 +16,22 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
 
   const { abs, absSite } = useUserPath();
   const navigate = useNavigate();
+  const params = useParams();
+
+  // Sync context with current route param if present
+  React.useEffect(() => {
+    const routeSite = params.siteCode ? String(params.siteCode) : null;
+    if (routeSite && routeSite !== selectedSite) {
+      setSelectedSite(routeSite);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.siteCode]);
 
   const onChangeSite = (val: string) => {
     setSelectedSite(val);
     // Navigate for pages that support :siteCode in URL
     if (!page) return;
-    if (page === "devices" || page === "alert" || page === "dashboard") {
+    if (page === "devices" || page === "alert" || page === "dashboard" || page === "facerec") {
       const siteCode = val && val !== "all" ? val : undefined;
       const path = `/${page}`;
       const to = siteCode ? absSite(path, siteCode) : abs(path);

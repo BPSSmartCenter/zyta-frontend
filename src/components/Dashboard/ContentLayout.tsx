@@ -11,6 +11,7 @@ import {
 } from "./dashboard.constants";
 import { getUserStats } from "../../api/user";
 import DeviceCount from "./DeviceCount";
+import { getElectricDevices } from "../../api/electric";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
 import React from "react";
@@ -120,6 +121,95 @@ export default function ContentLayout(props: Props) {
     return counts;
   }, [JSON.stringify(props.accessibleSites)]);
 
+  // ----- Device inventory counts (inverters only for electric) -----
+  const [deviceCounts, setDeviceCounts] = React.useState<
+    Partial<{ cameras: number; intercom: number; waterMeter: number; electricMeter: number; airSensor: number; zyta: number }>
+  >({});
+  const [deviceTotals, setDeviceTotals] = React.useState<{ online: number; offline: number }>({ online: 0, offline: 0 });
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        // const role = String((props as any)?.role || "").toLowerCase();
+        const sites = Array.isArray(props.accessibleSites) ? props.accessibleSites : [];
+        const selected = String(props.selectedSiteCode || "");
+
+        // Resolve site IDs to fetch: single site, or aggregate across accessible sites
+        let siteIds: string[] = [];
+        if (!selected || selected === "all") {
+          // Admin: aggregate across all sites; others: aggregate across only accessible sites (could be empty)
+          // Use site.code as external SiteId for inventory endpoint
+          siteIds = sites.map((s: any) => String(s.code ?? s.id)).filter(Boolean);
+        } else {
+          const s = sites.find((x: any) => String(x.code) === selected);
+          if (s?.code || s?.id) siteIds = [String(s.code ?? s.id)];
+        }
+
+        if (siteIds.length === 0) {
+          console.debug("[DeviceCount] no siteIds resolved for inventory", {
+            selected,
+            sitesCount: sites.length,
+          });
+          setDeviceCounts({});
+          setDeviceTotals({ online: 0, offline: 0 });
+          return;
+        }
+
+        // Fetch electric devices in parallel and aggregate inverter count
+        const results = await Promise.all(
+          sites
+            .filter((s: any) => siteIds.includes(String(s.code ?? s.id)))
+            .map(async (s: any) => {
+              const id1 = String(s.code ?? "");
+              const id2 = String(s.id ?? "");
+              // Try with code first (backend accepts code or id)
+              try {
+                const resp = await getElectricDevices(id1);
+                const items = Array.isArray(resp?.items) ? resp.items : [];
+                const count = items.filter((it: any) => {
+                  const cat = (it?.meta?.deviceCategory || it?.meta?.details?.deviceCategory || "").toString();
+                  const model = (it?.model || "").toString();
+                  return cat === "INVERTER" || model.startsWith("INVERTER:");
+                }).length;
+                return count as number;
+              } catch (e1) {
+                try {
+                  const resp2 = await getElectricDevices(id2);
+                  const items2 = Array.isArray(resp2?.items) ? resp2.items : [];
+                  const count2 = items2.filter((it: any) => {
+                    const cat = (it?.meta?.deviceCategory || it?.meta?.details?.deviceCategory || "").toString();
+                    const model = (it?.model || "").toString();
+                    return cat === "INVERTER" || model.startsWith("INVERTER:");
+                  }).length;
+                  return count2 as number;
+                } catch (e2) {
+                  console.debug("[DeviceCount] inventory fetch failed for site", {
+                    siteCode: s.code,
+                    siteId: s.id,
+                  });
+                  return 0;
+                }
+              }
+            })
+        );
+
+        const totalInverters = results.reduce((a, b) => a + b, 0);
+        console.debug("[DeviceCount] aggregated inverters", {
+          selected,
+          siteIds,
+          totalInverters,
+        });
+        setDeviceCounts({ electricMeter: totalInverters });
+        // Until we have online/offline status per device, treat counted devices as online
+        setDeviceTotals({ online: totalInverters, offline: 0 });
+      } catch (e) {
+        // keep previous on failure
+        setDeviceCounts((prev) => prev);
+        setDeviceTotals((prev) => prev);
+      }
+    })();
+  }, [props.selectedSiteCode, JSON.stringify(props.accessibleSites)]);
+
   // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
   // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)
   const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<
@@ -131,32 +221,67 @@ export default function ContentLayout(props: Props) {
       try {
         const raw = (props.selectedSiteCode ?? "").toString().trim();
         const isAll = !raw || raw === "all";
+        const role = String((props as any)?.role || "").toLowerCase();
+        const hasAnySite = Array.isArray(props.accessibleSites) && props.accessibleSites.length > 0;
 
-        if (isAll) {
-          // รวมทุกไซต์
-          console.debug("[UserMgmt] fetch global /users/stats");
-          const global = await getUserStats();
-          const series = [
-            global.byRole.officer ?? 0,
-            global.byRole.user ?? 0,
-            global.byRole.admin ?? 0,
-          ];
-          if (!cancelled) setRoleSeriesFromApi(series);
+        // Wait for sites to load before deciding; avoid showing 0 on first paint
+        if (props.accessibleSites == null) return;
+
+        // If non-admin and no accessible sites, don't fetch; show zeros
+        if (role !== "admin" && !hasAnySite) {
+          if (!cancelled) setRoleSeriesFromApi([0, 0, 0]);
           return;
         }
 
-        // ไซต์เฉพาะ: admin ให้มาจาก global เสมอ, user/officer จากไซต์
+        if (isAll) {
+          if (role === "admin") {
+            // Admin: use global stats directly (all sites)
+            const global = await getUserStats();
+            const series = [
+              global.byRole.officer ?? 0,
+              global.byRole.user ?? 0,
+              global.byRole.admin ?? 0,
+            ];
+            if (!cancelled) setRoleSeriesFromApi(series);
+            return;
+          }
+          // Non-admin: aggregate across accessible sites
+          const codes = (props.accessibleSites || [])
+            .map((s: any) => String(s.code || "").trim())
+            .filter(Boolean);
+          if (codes.length === 0) {
+            if (!cancelled) setRoleSeriesFromApi([0, 0, 0]);
+            return;
+          }
+          const results = await Promise.all(
+            codes.map(async (c) => {
+              try {
+                return await getUserStats(c);
+              } catch {
+                return { byRole: { admin: 0, officer: 0, user: 0 } } as any;
+              }
+            })
+          );
+          const sum = results.reduce(
+            (acc, r: any) => ({
+              admin: acc.admin + (r?.byRole?.admin ?? 0),
+              officer: acc.officer + (r?.byRole?.officer ?? 0),
+              user: acc.user + (r?.byRole?.user ?? 0),
+            }),
+            { admin: 0, officer: 0, user: 0 }
+          );
+          if (!cancelled)
+            setRoleSeriesFromApi([sum.officer, sum.user, sum.admin]);
+          return;
+        }
+
+        // Specific site: always use that site's stats for all roles
         console.debug("[UserMgmt] fetch site /users/stats?site=", raw);
-        const [global, site] = await Promise.all([
-          getUserStats(),
-          getUserStats(raw),
-        ]);
-        console.debug("[UserMgmt] global stats:", global);
-        console.debug("[UserMgmt] site stats:", site);
+        const site = await getUserStats(raw);
         const series = [
           site.byRole.officer ?? 0,
           site.byRole.user ?? 0,
-          global.byRole.admin ?? 0,
+          site.byRole.admin ?? 0,
         ];
         console.debug(
           "[UserMgmt] composed series [officer,user,admin] =",
@@ -171,7 +296,11 @@ export default function ContentLayout(props: Props) {
     return () => {
       cancelled = true;
     };
-  }, [props.selectedSiteCode]);
+  }, [
+    props.selectedSiteCode,
+    (props as any)?.role,
+    JSON.stringify(props.accessibleSites),
+  ]);
 
   return (
     <div className="flex flex-col px-6 gap-3">
@@ -261,18 +390,9 @@ export default function ContentLayout(props: Props) {
             <div className="p-6 w-full rounded-xl bg-white">
               <DeviceCount
                 siteCode={props.selectedSiteCode}
-                // Mock: Electric 1 online, others 0; ออนไลน์ 100%
-                counts={{
-                  cameras: 0,
-                  intercom: 0,
-                  waterMeter: 0,
-                  electricMeter: 1,
-                  airSensor: 0,
-                  zyta: 0,
-                }}
-                onlineCount={1}
-                offlineCount={0}
-                offlinePercent={0}
+                counts={deviceCounts as any}
+                onlineCount={deviceTotals.online}
+                offlineCount={deviceTotals.offline}
               />
             </div>
           </div>

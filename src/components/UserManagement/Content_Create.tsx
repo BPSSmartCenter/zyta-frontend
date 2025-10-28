@@ -6,7 +6,11 @@ import { listSites } from "../../api/sites";
 type Props = {
   onCancel: () => void;
   onCreate: (
-    next: AdminRow & { password: string; avatarFile?: File | null; siteIds?: string[] }
+    next: AdminRow & {
+      password: string;
+      avatarFile?: File | null;
+      siteIds?: string[];
+    }
   ) => void;
 };
 
@@ -37,7 +41,9 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
   const [role, setRole] = React.useState<"Admin" | "Officer" | "User" | "">("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [siteOptions, setSiteOptions] = React.useState<Array<{ label: string; value: string }>>([]);
+  const [siteOptions, setSiteOptions] = React.useState<
+    Array<{ label: string; value: string }>
+  >([]);
   const [selectedSiteIds, setSelectedSiteIds] = React.useState<string[]>([]);
 
   // validations (เหมือน RegisterPage)
@@ -73,7 +79,10 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
           ? (data as any).items
           : [];
         setSiteOptions(
-          arr.map((s: any) => ({ label: s.name || s.code || s.id, value: s.id }))
+          arr.map((s: any) => ({
+            label: s.name || s.code || s.id,
+            value: s.id,
+          }))
         );
       } catch (e) {
         setSiteOptions([]);
@@ -93,7 +102,12 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
       active: true,
       avatar: avatarPreview || "",
     };
-    onCreate({ ...next, password, avatarFile, siteIds: role === "Admin" ? undefined : selectedSiteIds });
+    onCreate({
+      ...next,
+      password,
+      avatarFile,
+      siteIds: role === "Admin" ? undefined : selectedSiteIds,
+    });
   };
 
   return (
@@ -105,7 +119,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
         <div className="grid grid-cols-12 items-center gap-4">
           <div className="col-span-12 md:col-span-3" />
           <div className="col-span-12 md:col-span-9 flex items-center gap-4">
-            <div className="w-[82px] h-[82px] rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+            {/* <div className="w-[82px] h-[82px] rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
               {avatarPreview ? (
                 <img
                   src={avatarPreview}
@@ -120,10 +134,10 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                   person
                 </i>
               )}
-            </div>
+            </div> */}
 
             <div className="flex flex-col gap-2">
-              {/* ซ่อนไว้แต่ยังเข้าถึงได้ด้วย label */}
+              {/* ซ่อนไว้แต่ยังเข้าถึงได้ด้วย label
               <input
                 id="avatarUpload"
                 ref={fileRef}
@@ -136,18 +150,18 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                   const f = e.target.files?.[0] ?? null;
                   setAvatarFile(f);
                 }}
-              />
+              /> */}
 
-              <span className="text-gray-600">Select file to upload</span>
+              {/* <span className="text-gray-600">Select file to upload</span> */}
 
               <div className="flex items-center gap-2">
                 {/* ใช้ label เป็นปุ่ม โดยผูกกับ input ผ่าน htmlFor */}
-                <label
+                {/* <label
                   htmlFor="avatarUpload"
                   className="px-3 py-1.5 rounded-md bg-cyan text-white text-sm cursor-pointer"
                 >
                   Upload photo
-                </label>
+                </label> */}
 
                 {avatarFile && (
                   <button
@@ -290,7 +304,11 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
               Sites access
             </label>
             <div className="col-span-12 md:col-span-9">
-              <Dropdown options={siteOptions as any} value="__multi__" onChange={() => {}}>
+              <Dropdown
+                options={siteOptions as any}
+                value="__multi__"
+                onChange={() => {}}
+              >
                 {({ open, getButtonProps, getMenuProps }) => (
                   <div className="relative">
                     <button
@@ -314,7 +332,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                       <div
                         {...getMenuProps({
                           className:
-                            "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto",
+                            "absolute z-50 mt-1 min-w-[220px] whitespace-nowrap rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto",
                         })}
                         onMouseDown={(e) => e.preventDefault()}
                       >
@@ -356,7 +374,8 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
               {selectedSiteIds.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedSiteIds.map((id) => {
-                    const label = siteOptions.find((s) => s.value === id)?.label || id;
+                    const label =
+                      siteOptions.find((s) => s.value === id)?.label || id;
                     return (
                       <span
                         key={id}
@@ -368,7 +387,9 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                           aria-label="Remove"
                           className="ml-1 text-gray-500 hover:text-gray-800"
                           onClick={() =>
-                            setSelectedSiteIds((prev) => prev.filter((v) => v !== id))
+                            setSelectedSiteIds((prev) =>
+                              prev.filter((v) => v !== id)
+                            )
                           }
                         >
                           ×

@@ -63,41 +63,43 @@ export default function DeviceCount({
     return navigate(abs(`/devices?type=${type}`));
   };
 
-  // Defaults (mock): only 1 electric meter, others 0
+  // Defaults: all 0 (real values can override via props.counts)
   const mergedCounts: DeviceCounts = {
     cameras: 0,
     intercom: 0,
     waterMeter: 0,
-    electricMeter: 1,
+    electricMeter: 0,
     airSensor: 0,
     zyta: 0,
     ...(counts || {}),
   } as DeviceCounts;
 
-  // Mock per-type status for display (keep style; just append (on/off))
+  // Per-type status placeholders (keep style; values can be wired later)
   const statusByType = {
     cameras: { on: 0, off: 0 },
     intercom: { on: 0, off: 0 },
     waterMeter: { on: 0, off: 0 },
-    electricMeter: { on: 1, off: 0 },
+    electricMeter: { on: 0, off: 0 },
     airSensor: { on: 0, off: 0 },
     zyta: { on: 0, off: 0 },
   } as const;
 
   // คำนวณเปอร์เซ็นต์ออนไลน์จริงจากค่า on/off รวมทั้งหมด
   const donut = (() => {
-    // รวมสถานะจาก props ถ้ามี ไม่งั้น fallback เป็น mock ข้างบน
-    const fallbackOn = 1;
+    // รวมสถานะจาก props ถ้ามี ไม่งั้น fallback เป็น 0
+    const fallbackOn = 0;
     const fallbackOff = 0;
     const on = typeof onlineCount === "number" ? onlineCount : fallbackOn;
     const oc = typeof offlineCount === "number" ? offlineCount : fallbackOff;
-    const sum = Math.max(on + oc, 1);
-    // ถ้าให้ offlinePercent มา ให้คิด online = 100 - offlinePercent เพื่อคง style เดิมแต่โชว์ออนไลน์
+    const sumRaw = Math.max(0, on + oc);
+    // ถ้าให้ offlinePercent มา ให้คิด online = 100 - offlinePercent
     const pctOnline =
       typeof offlinePercent === "number"
-        ? 100 - offlinePercent
-        : (on / sum) * 100;
-    return { on, oc, pct: pctOnline, sum };
+        ? Math.max(0, Math.min(100, 100 - offlinePercent))
+        : sumRaw === 0
+        ? 0
+        : (on / sumRaw) * 100;
+    return { on, oc, pct: pctOnline, sum: sumRaw };
   })();
 
   return (
@@ -238,7 +240,7 @@ export default function DeviceCount({
               </span>
               <span>
                 <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.electricMeter.on}</span>
+                <span className="text-green-600 font-semibold">{mergedCounts.electricMeter}</span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">{statusByType.electricMeter.off}</span>
                 <span className="text-gray-500">)</span>

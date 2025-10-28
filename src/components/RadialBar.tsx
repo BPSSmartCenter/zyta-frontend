@@ -54,14 +54,15 @@ const RadialBar: React.FC<RadialBarProps> = ({
 }) => {
   const chartWidth = width ?? height;
 
+  const zero = Number(value) <= 0;
   const options: ApexOptions = {
     chart: {
       type: "radialBar",
       sparkline: { enabled: true },
       toolbar: { show: false },
     },
-    colors: [mainColor],
-    stroke: { lineCap: rounded ? "round" : "butt" },
+    colors: [zero ? "#00000000" : mainColor],
+    stroke: { lineCap: rounded && !zero ? "round" : "butt" },
     plotOptions: {
       radialBar: {
         hollow: { size: hollowSize, background: bg },

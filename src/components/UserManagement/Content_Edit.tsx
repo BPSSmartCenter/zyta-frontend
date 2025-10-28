@@ -141,11 +141,8 @@ export default function Content_Edit({
     }
     // ================================================
 
+    // Delegate to parent; parent will show success toast after API completes
     onSave(next);
-    show({
-      message: <span className="text-white font-semibold">Edit saved</span>,
-      variant: "success",
-    });
   };
 
   return (
