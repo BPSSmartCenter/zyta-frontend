@@ -7,7 +7,7 @@ import {
 } from "../Dashboard/dashboard.constants";
 import { notis, wellBeingNotis } from "../../data/Dashboard/notis";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { me } from "../../data/Dashboard/auth";
 
@@ -87,6 +87,23 @@ export default function MapPanel({
   accessibleSites,
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
+  // Compute i18n label for multi-select events (inside component)
+  const multiEventLabel = useMemo(() => {
+    if (selectedEvents.includes("all")) {
+      return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
+    }
+    const count = selectedEvents.length;
+    if (count > 1) {
+      return t("map.selectedCount", { count, defaultValue: `เลือก ${count}` });
+    }
+    if (count === 1) {
+      const single = selectedEvents[0];
+      const opt = EVENT_OPTIONS.find((o) => o.value === single);
+      return opt ? t(`events.${opt.value}`, { defaultValue: opt.label }) : single;
+    }
+    return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
+  }, [selectedEvents, t]);
+  const labelForButton = multiEventLabel || buttonLabel;
   const userRole: "admin" | "officer" | "user" = (me()?.role as any) || "admin";
 
   /* ---------- ACL sites (ใช้ object เต็มจาก accessSites) ---------- */
@@ -105,9 +122,6 @@ export default function MapPanel({
     if (!selectedSiteCode) return;
     if (selectedSiteCode === "all") {
       setProvince("all");
-      // บังคับ remount map หนึ่งครั้ง เมื่อละทิ้งโหมด Site → ป้องกัน layer ค้าง
-      // (Map.tsx จะ init overlays ใหม่ในสถานะประเทศ)
-      setMapVersion((v) => v + 1);
       return;
     }
     // ยกเลิก province zoom เสมอเมื่อเลือก site เฉพาะ
@@ -155,33 +169,8 @@ export default function MapPanel({
     return Array.from(new Set(withCodes));
   };
 
-  /* ---------- container + remount on resize (ของเดิม) ---------- */
+  /* ---------- container (no remount on resize; Map handles resize) ---------- */
   const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const [mapVersion, setMapVersion] = useState(0);
-
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    let timer: number | null = null;
-    let lastW = el.clientWidth;
-    const onSize = (w: number) => {
-      if (timer) clearTimeout(timer!);
-      timer = window.setTimeout(() => {
-        if (Math.abs(w - lastW) >= 1) {
-          lastW = w;
-          setMapVersion((v) => v + 1);
-        }
-      }, 120);
-    };
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) onSize(entry.contentRect.width);
-    });
-    ro.observe(el);
-    return () => {
-      if (timer) clearTimeout(timer!);
-      ro.disconnect();
-    };
-  }, []);
 
   /* ---------- merge notis + filter by selected events ---------- */
   const allTagged: WithGroup[] = useMemo(() => {
@@ -302,7 +291,7 @@ export default function MapPanel({
                 })}
                 onMouseDown={(e) => e.preventDefault()}
               >
-                <span className="truncate text-cyan-500">{buttonLabel}</span>
+                <span className="truncate text-cyan-500">{labelForButton}</span>
                 <i className="material-icons arrow-icon leading-none text-cyan-500">
                   {open ? "keyboard_arrow_up" : "keyboard_arrow_down"}
                 </i>
@@ -482,7 +471,7 @@ export default function MapPanel({
       </div>
 
       {/* แผนที่ */}
-      <div className="mt-3" key={mapVersion}>
+      <div className="mt-3">
         <MapView
           notis={notisForMap}
           showPins={true}
@@ -509,9 +498,6 @@ export default function MapPanel({
           lockZoomOut={selectedSiteCode !== "all"}
           onProvinceChange={(val) => {
             setProvince(val);
-            if (val === "all") {
-              setMapVersion((v) => v + 1);
-            }
           }}
         />
       </div>

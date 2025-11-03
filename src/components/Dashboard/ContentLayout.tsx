@@ -11,12 +11,16 @@ import {
 } from "./dashboard.constants";
 import { getUserStats } from "../../api/user";
 import DeviceCount from "./DeviceCount";
+import { useDeviceInventory } from "../../context/DeviceInventoryContext";
 import { getElectricDevices } from "../../api/electric";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import { me as apiMe } from "../../api/user";
+
+const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
 
 type Props = {
   // left column
@@ -81,6 +85,17 @@ export default function ContentLayout(props: Props) {
   } = props;
 
   const navigate = useNavigate();
+  const [isMaster, setIsMaster] = React.useState(false);
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const me = await apiMe();
+        setIsMaster(String(me?.email || "").toLowerCase() === MASTER_EMAIL);
+      } catch {
+        setIsMaster(false);
+      }
+    })();
+  }, []);
 
   const { abs } = useUserPath();
   const allItems = React.useMemo(
@@ -126,9 +141,11 @@ export default function ContentLayout(props: Props) {
     Partial<{ cameras: number; intercom: number; waterMeter: number; electricMeter: number; airSensor: number; zyta: number }>
   >({});
   const [deviceTotals, setDeviceTotals] = React.useState<{ online: number; offline: number }>({ online: 0, offline: 0 });
+  const { setCounts: setGlobalCounts, setLoading: setCountsLoading } = useDeviceInventory();
 
   React.useEffect(() => {
     (async () => {
+      setCountsLoading(true);
       try {
         // const role = String((props as any)?.role || "").toLowerCase();
         const sites = Array.isArray(props.accessibleSites) ? props.accessibleSites : [];
@@ -152,6 +169,8 @@ export default function ContentLayout(props: Props) {
           });
           setDeviceCounts({});
           setDeviceTotals({ online: 0, offline: 0 });
+          setGlobalCounts({});
+          setCountsLoading(false);
           return;
         }
 
@@ -202,10 +221,23 @@ export default function ContentLayout(props: Props) {
         setDeviceCounts({ electricMeter: totalInverters });
         // Until we have online/offline status per device, treat counted devices as online
         setDeviceTotals({ online: totalInverters, offline: 0 });
+        // Update global inventory counts for use across Dashboard/Sidebar/Devices
+        setGlobalCounts((prev) => ({
+          ...prev,
+          electricMeter: totalInverters,
+          // These remain zero until endpoints are available
+          cameras: Number(prev.cameras ?? 0),
+          waterMeter: Number(prev.waterMeter ?? 0),
+          airSensor: Number(prev.airSensor ?? 0),
+          intercom: Number(prev.intercom ?? 0),
+          zyta: Number(prev.zyta ?? 0),
+        }));
       } catch (e) {
         // keep previous on failure
         setDeviceCounts((prev) => prev);
         setDeviceTotals((prev) => prev);
+      } finally {
+        setCountsLoading(false);
       }
     })();
   }, [props.selectedSiteCode, JSON.stringify(props.accessibleSites)]);
@@ -361,10 +393,9 @@ export default function ContentLayout(props: Props) {
             <div
               className="p-6 w-full rounded-xl bg-white"
               onClick={() => {
-                // เปิดหน้า UserManagement เฉพาะ admin เท่านั้น
+                // เปิดหน้า UserManagement เฉพาะ super admin เท่านั้น
                 try {
-                  const role = (props as any).role as string | undefined;
-                  if (String(role).toLowerCase() === "admin") {
+                  if (isMaster) {
                     navigate(abs("/usermanage"));
                   }
                 } catch {
@@ -372,11 +403,10 @@ export default function ContentLayout(props: Props) {
                 }
               }}
               style={{
-                cursor:
-                  (props as any)?.role === "admin" ? "pointer" : "default",
-                opacity: (props as any)?.role === "admin" ? 1 : 0.9,
+                cursor: isMaster ? "pointer" : "default",
+                opacity: isMaster ? 1 : 0.9,
               }}
-              aria-disabled={(props as any)?.role !== "admin"}
+              aria-disabled={!isMaster}
             >
               <UserManagement
                 regionSeries={regionSeriesFromSites}

@@ -271,19 +271,12 @@ export default function Content({
                   <div className="text-gray-500">
                     {String(i + 1).padStart(2, "0")}
                   </div>
-                  <div className="flex items-center justify-start w-full gap-3">
-                    <img
-                      src={r.avatar}
-                      alt=""
-                      className="size-9 rounded-full object-cover"
-                    />
+                  <div className="flex items-center justify-center w-full">
                     <span className="font-bold text-gray-800 truncate">
                       {r.fullName}
                     </span>
                   </div>
-                  <div className="text-gray-800 truncate w-full text-left">
-                    {r.email}
-                  </div>
+                  <div className="text-gray-800 truncate w-full">{r.email}</div>
                   <div className="font-bold text-gray-800 select-none">
                     {r.role}
                   </div>
@@ -303,7 +296,11 @@ export default function Content({
                         try {
                           await onToggleActive?.(r, checked);
                         } catch {}
-                        setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, active: checked } : x)));
+                        setRows((prev) =>
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, active: checked } : x
+                          )
+                        );
                       }}
                     />
                   </div>

@@ -73,6 +73,8 @@ export default function Map({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const viewStackRef = useRef<ViewState[]>([]);
+  // Guard to avoid resetting view on container resize
+  const resizingGuardRef = useRef(false);
 
   const [canZoomOut, setCanZoomOut] = useState(false);
 
@@ -336,6 +338,31 @@ export default function Map({
 
     document.head.appendChild(style);
   };
+
+  // Keep map view stable on container resize (e.g., sidebar toggle)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const el = map.getContainer();
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      try {
+        const center = map.getCenter();
+        const zoom = map.getZoom();
+        resizingGuardRef.current = true;
+        map.invalidateSize(false);
+        map.setView(center, zoom, { animate: false });
+      } catch {
+      } finally {
+        // release guard in next task
+        setTimeout(() => (resizingGuardRef.current = false), 0);
+      }
+    });
+    ro.observe(el);
+    return () => {
+      try { ro.disconnect(); } catch {}
+    };
+  }, []);
 
   const fitThailandTight = (animate = false) => {
     const map = mapRef.current;
@@ -1174,6 +1201,8 @@ export default function Map({
   // เมื่อยกเลิก focusSiteCenter (เช่น เลือก "ทั้งหมด") ให้กู้คืนชั้น overlay กลับเป็นมุมมองประเทศเสมอ
   useEffect(() => {
     if (focusSiteCenter) return;
+    // Skip auto-reset while resizing
+    if (resizingGuardRef.current) return;
     resetToCountry(true);
   }, [focusSiteCenter]);
 

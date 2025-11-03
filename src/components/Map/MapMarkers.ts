@@ -132,7 +132,7 @@ export function renderMarkers(
 
     const siteLabel = t("map.site", { defaultValue: "Site" });
     const dateLabel = t("map.date", { defaultValue: "Date" });
-    const NEUTRAL = makePin("#CBD5E1"); // สีไม่ Alert (slate-300)
+    const NEUTRAL = makePin("#003a81ff");
 
     sitePoints.forEach((sp) => {
       const n = latestBySiteName.get(String(sp.name));
@@ -145,7 +145,9 @@ export function renderMarkers(
       marker.addTo(layerGroup);
 
       if (n) {
-        const title = n.titleKey ? t(n.titleKey, { defaultValue: n.title }) : n.title;
+        const title = n.titleKey
+          ? t(n.titleKey, { defaultValue: n.title })
+          : n.title;
         const labelHtml = `
           <div style="
             background:#000; color:#fff;
@@ -155,7 +157,9 @@ export function renderMarkers(
           ">
             <div style="font-weight:700;font-size:12px;margin-bottom:2px">${title}</div>
             <div style="font-size:11px;opacity:.9">${siteLabel}: ${n.site}</div>
-            <div style="font-size:11px;opacity:.9">${dateLabel}: ${fmtDate(n.date as any)}</div>
+            <div style="font-size:11px;opacity:.9">${dateLabel}: ${fmtDate(
+          n.date as any
+        )}</div>
           </div>
         `;
         marker.bindTooltip(labelHtml, {
@@ -202,7 +206,9 @@ export function renderMarkers(
       icon: getPinForNoti(n),
       pane: "markersPane",
     });
-    const title = n.titleKey ? t(n.titleKey, { defaultValue: n.title }) : n.title;
+    const title = n.titleKey
+      ? t(n.titleKey, { defaultValue: n.title })
+      : n.title;
     const siteLabel = t("map.site", { defaultValue: "Site" });
     const dateLabel = t("map.date", { defaultValue: "Date" });
     const labelHtml = `
@@ -214,7 +220,9 @@ export function renderMarkers(
       ">
         <div style=\"font-weight:700;font-size:12px;margin-bottom:2px\">${title}</div>
         <div style=\"font-size:11px;opacity:.9\">${siteLabel}: ${n.site}</div>
-        <div style=\"font-size:11px;opacity:.9\">${dateLabel}: ${fmtDate(n.date as any)}</div>
+        <div style=\"font-size:11px;opacity:.9\">${dateLabel}: ${fmtDate(
+      n.date as any
+    )}</div>
       </div>
     `;
     marker.addTo(layerGroup);

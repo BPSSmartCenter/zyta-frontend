@@ -32,6 +32,8 @@
     "title": "แผนที่",
     "anySeverity": "ทุกความรุนแรง",
     "allLocation": "ทุกพื้นที่",
+    "allEvents": "เหตุการณ์ทั้งหมด",
+    "selectedCount": "เลือก {{count}}",
     "severity": {
       "low": "ระดำต่ำ",
       "medium": "ระดับปานกลาง",

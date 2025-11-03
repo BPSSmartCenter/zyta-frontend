@@ -3,7 +3,7 @@ import Dropdown from "../Dropdown";
 import DatePicker from "../DateInput";
 import { useFilters } from "../../context/FiltersContext";
 import { useUserPath } from "../../routes/useUserPath";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 
 type Props = {
   page?: "devices" | "alert" | "facerec" | "dashboard";
@@ -17,6 +17,7 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
   const { abs, absSite } = useUserPath();
   const navigate = useNavigate();
   const params = useParams();
+  const location = useLocation();
 
   // Sync context with current route param if present
   React.useEffect(() => {
@@ -34,8 +35,13 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
     if (page === "devices" || page === "alert" || page === "dashboard" || page === "facerec") {
       const siteCode = val && val !== "all" ? val : undefined;
       const path = `/${page}`;
-      const to = siteCode ? absSite(path, siteCode) : abs(path);
-      navigate(to);
+      const pathname = siteCode ? absSite(path, siteCode) : abs(path);
+      // Preserve existing query string on Devices page (e.g. ?type=electricmeter)
+      if (page === "devices") {
+        navigate({ pathname, search: location.search || "" });
+      } else {
+        navigate(pathname);
+      }
     }
   };
 

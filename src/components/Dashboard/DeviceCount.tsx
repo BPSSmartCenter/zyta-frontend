@@ -1,16 +1,10 @@
 import RadialBar from "../RadialBar";
 import DonutLegend from "../DonutLegend";
-import {
-  cctvImage,
-  intercomeImage,
-  solarImage,
-  windImage,
-  waterTapImage,
-  alertCyan,
-} from "../../assets/index";
+import { cctvImage, solarImage, windImage, waterTapImage } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import { useDeviceInventory } from "../../context/DeviceInventoryContext";
 
 type DeviceCounts = {
   cameras: number;
@@ -50,20 +44,20 @@ export default function DeviceCount({
   const labelCameraCount = t("devices.camerasShort", {
     defaultValue: "Cameras",
   });
-  const labelIntercom = t("devices.intercom", { defaultValue: "Intercom" });
   const labelWater = t("devices.waterMeter", { defaultValue: "Water meter" });
   const labelElectric = t("devices.electricMeter", {
     defaultValue: "Electric meter",
   });
   const labelAir = t("devices.air", { defaultValue: "Air" });
-  const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
+  // const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
 
   const goDevices = (type: string) => {
     if (siteCode) return navigate(absSite(`/devices?type=${type}`, siteCode));
     return navigate(abs(`/devices?type=${type}`));
   };
 
-  // Defaults: all 0 (real values can override via props.counts)
+  const { counts: globalCounts } = useDeviceInventory();
+  // Defaults: all 0 (real values can override via props.counts, then global)
   const mergedCounts: DeviceCounts = {
     cameras: 0,
     intercom: 0,
@@ -71,6 +65,7 @@ export default function DeviceCount({
     electricMeter: 0,
     airSensor: 0,
     zyta: 0,
+    ...(globalCounts || {}),
     ...(counts || {}),
   } as DeviceCounts;
 
@@ -101,6 +96,10 @@ export default function DeviceCount({
         : (on / sumRaw) * 100;
     return { on, oc, pct: pctOnline, sum: sumRaw };
   })();
+
+  const isZero = (n?: number) => !n || Number(n) <= 0;
+  const disabledBtnClass = "opacity-40 cursor-not-allowed pointer-events-none";
+  const enabledBtnClass = "hover:opacity-80 cursor-pointer";
 
   return (
     <form className="flex flex-col gap-3 hover:cursor-default">
@@ -152,16 +151,20 @@ export default function DeviceCount({
         </div>
       </div>
 
-      <ul className="flex flex-col gap-7 font-inter text-[16px]  text-cyan-500">
-        <li className="flex gap-4 justify-around">
-          {/* Cameras → /devices?type=cctv */}
-          <div
-            className="flex items-center gap-4 hover:cursor-pointer"
-            onClick={() => goDevices("cctv")}
+      {/* Device list: 2 columns x 3 rows, responsive */}
+      <ul className="grid grid-cols-2 gap-x-8 gap-y-6 font-inter text-[16px] text-cyan-500 w-full">
+        {/* Cameras */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.cameras)}
+            disabled={isZero(mergedCounts.cameras)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass}`}
+            onClick={() => !isZero(mergedCounts.cameras) && goDevices("cctv")}
           >
             <img src={cctvImage} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
                 {labelCameraCount}{" "}
                 <span className="text-black font-semibold">
                   {mergedCounts.cameras}
@@ -169,115 +172,25 @@ export default function DeviceCount({
               </span>
               <span>
                 <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.cameras.on}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.cameras.off}</span>
-                <span className="text-gray-500">)</span>
-              </span>
-            </span>
-          </div>
-
-          {/* Intercom → /devices?type=intercom */}
-          <div
-            className="flex items-center gap-4 hover:cursor-pointer"
-            onClick={() => goDevices("intercom")}
-          >
-            <img src={intercomeImage} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
-                {labelIntercom}{" "}
-                <span className="text-black font-semibold">
-                  {mergedCounts.intercom}
+                <span className="text-green-600 font-semibold">
+                  {statusByType.cameras.on}
                 </span>
-              </span>
-              <span>
-                <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.intercom.on}</span>
                 <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.intercom.off}</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.cameras.off}
+                </span>
                 <span className="text-gray-500">)</span>
               </span>
             </span>
-          </div>
+          </button>
         </li>
 
-        <li className="flex gap-4 justify-around">
-          {/* Water Meter → /devices?type=watermeter */}
-          <div
-            className="flex items-center gap-4 hover:cursor-pointer"
-            onClick={() => goDevices("watermeter")}
-          >
-            <img src={waterTapImage} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
-                {labelWater}{" "}
-                <span className="text-black font-semibold">
-                  {mergedCounts.waterMeter}
-                </span>
-              </span>
-              <span>
-                <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.waterMeter.on}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.waterMeter.off}</span>
-                <span className="text-gray-500">)</span>
-              </span>
-            </span>
-          </div>
-
-          {/* Electric Meter → /devices?type=electricmeter */}
-          <div
-            className="flex items-center gap-4 hover:cursor-pointer"
-            onClick={() => goDevices("electricmeter")}
-          >
-            <img src={solarImage} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
-                {labelElectric}{" "}
-                <span className="text-black font-semibold">
-                  {mergedCounts.electricMeter}
-                </span>
-              </span>
-              <span>
-                <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{mergedCounts.electricMeter}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.electricMeter.off}</span>
-                <span className="text-gray-500">)</span>
-              </span>
-            </span>
-          </div>
-        </li>
-
-        <li className="flex gap-4 justify-around">
-          {/* Air Sensor → /devices?type=airsensor */}
-          <div
-            className="flex items-center gap-4 hover:cursor-pointer"
-            onClick={() => goDevices("airsensor")}
-          >
-            <img src={windImage} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
-                {labelAir}{" "}
-                <span className="text-black font-semibold">
-                  {mergedCounts.airSensor}
-                </span>
-              </span>
-              <span>
-                <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.airSensor.on}</span>
-                <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.airSensor.off}</span>
-                <span className="text-gray-500">)</span>
-              </span>
-            </span>
-          </div>
-
-          {/* ZYTA → no action */}
-          <div className="flex items-center gap-4">
+        {/* Red Box (ZYTA) – non-clickable to preserve current behavior */}
+        {/* <li>
+          <div className="w-full min-h-[56px] flex items-center gap-4">
             <img src={alertCyan} alt="" width={36} />
-            <span className="flex flex-col leading-tight">
-              <span>
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
                 {labelAlert}{" "}
                 <span className="text-black font-semibold">
                   {mergedCounts.zyta}
@@ -285,13 +198,113 @@ export default function DeviceCount({
               </span>
               <span>
                 <span className="text-gray-500">(</span>
-                <span className="text-green-600 font-semibold">{statusByType.zyta.on}</span>
+                <span className="text-green-600 font-semibold">
+                  {statusByType.zyta.on}
+                </span>
                 <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">{statusByType.zyta.off}</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.zyta.off}
+                </span>
                 <span className="text-gray-500">)</span>
               </span>
             </span>
           </div>
+        </li> */}
+
+        {/* Water Meter */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.waterMeter)}
+            disabled={isZero(mergedCounts.waterMeter)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.waterMeter) ? disabledBtnClass : enabledBtnClass}`}
+            onClick={() => !isZero(mergedCounts.waterMeter) && goDevices("watermeter")}
+          >
+            <img src={waterTapImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelWater}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.waterMeter}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">
+                  {statusByType.waterMeter.on}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.waterMeter.off}
+                </span>
+                <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
+        </li>
+
+        {/* Electric Meter */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.electricMeter)}
+            disabled={isZero(mergedCounts.electricMeter)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.electricMeter) ? disabledBtnClass : enabledBtnClass}`}
+            onClick={() => !isZero(mergedCounts.electricMeter) && goDevices("electricmeter")}
+          >
+            <img src={solarImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelElectric}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.electricMeter}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">
+                  {mergedCounts.electricMeter}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.electricMeter.off}
+                </span>
+                <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
+        </li>
+
+        {/* Air Sensor */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.airSensor)}
+            disabled={isZero(mergedCounts.airSensor)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.airSensor) ? disabledBtnClass : enabledBtnClass}`}
+            onClick={() => !isZero(mergedCounts.airSensor) && goDevices("airsensor")}
+          >
+            <img src={windImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelAir}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.airSensor}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">
+                  {statusByType.airSensor.on}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.airSensor.off}
+                </span>
+                <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
         </li>
       </ul>
     </form>

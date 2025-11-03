@@ -1,0 +1,71 @@
+import React from "react";
+
+export type DeviceTypeKey =
+  | "cctv"
+  | "watermeter"
+  | "electricmeter"
+  | "airsensor"
+  | "intercom"
+  | "zyta";
+
+export type DeviceCounts = Partial<{
+  cameras: number;
+  intercom: number;
+  waterMeter: number;
+  electricMeter: number;
+  airSensor: number;
+  zyta: number;
+}>;
+
+type Ctx = {
+  counts: DeviceCounts;
+  setCounts: React.Dispatch<React.SetStateAction<DeviceCounts>>;
+  loading: boolean;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+const DeviceInventoryContext = React.createContext<Ctx | null>(null);
+
+export function DeviceInventoryProvider({ children }: { children?: React.ReactNode }) {
+  const [counts, setCounts] = React.useState<DeviceCounts>({});
+  const [loading, setLoading] = React.useState<boolean>(false);
+
+  const value = React.useMemo(() => ({ counts, setCounts, loading, setLoading }), [counts, loading]);
+  return (
+    <DeviceInventoryContext.Provider value={value}>{children}</DeviceInventoryContext.Provider>
+  );
+}
+
+export function useDeviceInventory() {
+  const ctx = React.useContext(DeviceInventoryContext);
+  if (!ctx) {
+    return {
+      counts: {},
+      setCounts: () => {},
+      loading: false,
+      setLoading: () => {},
+    } as unknown as Ctx;
+  }
+  return ctx;
+}
+
+export function getCountForType(map: DeviceCounts, type: DeviceTypeKey): number {
+  // Normalize keys between UI routes and counts object
+  switch (type) {
+    case "cctv":
+      return Number(map.cameras ?? 0);
+    case "watermeter":
+      return Number(map.waterMeter ?? 0);
+    case "electricmeter":
+      return Number(map.electricMeter ?? 0);
+    case "airsensor":
+      return Number(map.airSensor ?? 0);
+    case "intercom":
+      return Number(map.intercom ?? 0);
+    case "zyta":
+      return Number(map.zyta ?? 0);
+    default:
+      return 0;
+  }
+}
+

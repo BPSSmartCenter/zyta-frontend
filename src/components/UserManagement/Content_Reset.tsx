@@ -44,7 +44,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
             htmlFor="reset-name"
             className="col-span-12 md:col-span-3 font-medium"
           >
-            First name <span className="text-red-500">*</span>
+            Full name <span className="text-red-500">*</span>
           </label>
           <input
             id="reset-name"

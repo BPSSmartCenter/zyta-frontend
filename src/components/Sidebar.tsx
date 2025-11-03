@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { brandImage, sidebarIcon } from "../assets/index";
+import { brandImage, sidebarIcon, userIcon } from "../assets/index";
 import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
@@ -9,6 +9,8 @@ import { logout as mockLogout } from "../data/Dashboard/auth";
 import { useUserPath } from "../routes/useUserPath";
 import { logout as apiLogout } from "../api/auth";
 import { me as apiMe } from "../api/user";
+import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
+const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
 
 /** breakpoint hook */
 function useIsDesktop1024() {
@@ -83,9 +85,12 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   // mobile toggle
   const [openMobile, setOpenMobile] = useState(false);
 
-  // used-space dismiss (footer package)
-  const [showUsedSpace, setShowUsedSpace] = useState(true);
-  const handleDismissUsed = () => setShowUsedSpace(false); // ยุบจริง ไม่เหลือช่องว่าง
+  // ===== Search state (filters menu realtime) =====
+  const [searchQ, setSearchQ] = useState("");
+
+  // // used-space dismiss (footer package)
+  // const [showUsedSpace, setShowUsedSpace] = useState(true);
+  // const handleDismissUsed = () => setShowUsedSpace(false); // ยุบจริง ไม่เหลือช่องว่าง
 
   // logout modal
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -133,7 +138,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     const pathNoBase = location.pathname.startsWith(base)
       ? location.pathname.slice(base.length) || "/"
       : location.pathname;
-    if (pathNoBase === "/dashboard") {
+    const pathScoped = pathNoBase.replace(/^\/site\/[^/]+/, "");
+    if (pathScoped === "/dashboard") {
       document.querySelectorAll<HTMLElement>(".hs-accordion").forEach((acc) => {
         acc.classList.remove("active");
         const content = acc.querySelector<HTMLElement>(".hs-accordion-content");
@@ -163,26 +169,23 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     const pathNoBase = location.pathname.startsWith(base)
       ? location.pathname.slice(base.length) || "/"
       : location.pathname;
-    if (pathNoBase.startsWith("/alert")) openAccordion("alert-accordion");
-    if (pathNoBase.startsWith("/devices")) openAccordion("devices-accordion");
+    const pathScoped = pathNoBase.replace(/^\/site\/[^/]+/, "");
+    if (pathScoped.startsWith("/alert")) openAccordion("alert-accordion");
+    if (pathScoped.startsWith("/devices")) openAccordion("devices-accordion");
   }, [location.pathname, base]);
 
-  const sidebarClass = useMemo(() => {
-    const base =
-      "w-64 h-full fixed top-0 left-0 z-60 bg-white border-e border-gray-200 transition-transform duration-300";
-    if (isDesktop) return `${base} translate-x-0`;
-    return `${base} ${openMobile ? "translate-x-0" : "-translate-x-full"}`;
-  }, [isDesktop, openMobile]);
+  // sidebar open logic will be computed after we know the route
 
-  const toggleStyle: React.CSSProperties = useMemo(
-    () => ({ transform: openMobile ? "translateX(16rem)" : "translateX(0)" }),
-    [openMobile]
-  );
+  // no need translate button; we hide it when open
 
   // helper: navigate + close on mobile
   const go = (path: string) => {
     navigate(abs(path));
-    if (!isDesktop) setOpenMobile(false);
+    if (!isDesktop || /* collapse on dashboard even desktop */ (typeof window !== "undefined")) {
+      // collapseMode is computed later but available at runtime in closure
+      // @ts-ignore
+      if (!isDesktop || (typeof collapseMode !== "undefined" && collapseMode)) setOpenMobile(false);
+    }
   };
 
   // ===== active helpers for highlight =====
@@ -193,40 +196,60 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const pathNoBase = location.pathname.startsWith(base)
     ? location.pathname.slice(base.length) || "/"
     : location.pathname;
+  const pathScoped = pathNoBase.replace(/^\/site\/[^/]+/, "");
+
+  // collapse only on Dashboard page
+  const collapseMode = pathScoped === "/dashboard";
+  const isOpen = isDesktop ? (collapseMode ? openMobile : true) : openMobile;
+
+  const sidebarClass = useMemo(() => {
+    const baseCls =
+      "w-64 h-full fixed top-0 left-0 z-60 bg-white border-e border-gray-200 transition-transform duration-300";
+    return `${baseCls} ${isOpen ? "translate-x-0" : "-translate-x-full"}`;
+  }, [isOpen]);
   const active = {
-    home: pathNoBase === "/dashboard",
-    alert: pathNoBase.startsWith("/alert"),
+    home: pathScoped === "/dashboard",
+    alert: pathScoped.startsWith("/alert"),
     alertEvent: (k: string) =>
-      pathNoBase.startsWith("/alert") && url.get("event") === k,
-    facerec: pathNoBase.startsWith("/facerec"),
-    devices: pathNoBase.startsWith("/devices"),
+      pathScoped.startsWith("/alert") && url.get("event") === k,
+    facerec: pathScoped.startsWith("/facerec"),
+    devices: pathScoped.startsWith("/devices"),
     devicesType: (k: string) =>
-      pathNoBase.startsWith("/devices") && url.get("type") === k,
-    usermanage: pathNoBase.startsWith("/usermanage"),
+      pathScoped.startsWith("/devices") && url.get("type") === k,
+    usermanage: pathScoped.startsWith("/usermanage"),
   };
   // =======================================
+  const { counts: inventoryCounts } = useDeviceInventory();
 
   return (
     <div className="relative">
-      {/* Mobile toggle */}
-      {!isDesktop && (
-        <button
-          type="button"
-          onClick={() => setOpenMobile((v) => !v)}
-          aria-label={t("aria.toggleSidebar")}
-          style={toggleStyle}
-          className="lg-1024:hidden fixed top-3 left-3 z-[70] inline-flex items-center justify-center size-9 rounded-full bg-white border border-gray-200 hover:bg-gray-100 cursor-pointer shadow transition-transform duration-300 will-change-transform"
-        >
-          <img
-            src={sidebarIcon}
-            alt={t("aria.toggleSidebar")}
-            className="size-5"
-          />
-        </button>
+      {/* Toggle button */}
+      {collapseMode ? (
+        !isOpen && (
+          <button
+            type="button"
+            onClick={() => setOpenMobile(true)}
+            aria-label={t("aria.toggleSidebar")}
+            className="fixed bottom-4 left-4 z-[70] inline-flex items-center justify-center w-12 h-12 rounded-full bg-white border border-gray-200 hover:bg-gray-100 cursor-pointer shadow-md"
+          >
+            <img src={userIcon} alt={t("aria.toggleSidebar")} className="w-6 h-6" />
+          </button>
+        )
+      ) : (
+        !isDesktop && (
+          <button
+            type="button"
+            onClick={() => setOpenMobile((v) => !v)}
+            aria-label={t("aria.toggleSidebar")}
+            className="lg-1024:hidden fixed top-3 left-3 z-[70] inline-flex items-center justify-center size-9 rounded-full bg-white border border-gray-200 hover:bg-gray-100 cursor-pointer shadow"
+          >
+            <img src={sidebarIcon} alt={t("aria.toggleSidebar")} className="size-5" />
+          </button>
+        )
       )}
 
-      {/* Backdrop for mobile */}
-      {!isDesktop && openMobile && (
+      {/* Backdrop for overlay click-close */}
+      {((collapseMode && isOpen) || (!collapseMode && !isDesktop && openMobile)) && (
         <div
           className="fixed inset-0 z-50 bg-black/40"
           onClick={() => setOpenMobile(false)}
@@ -248,9 +271,13 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
               onClick={() => go("/dashboard")}
             />
 
+            {/* Search filters menu in realtime */}
             <SearchInput
+              value={searchQ}
+              onChange={setSearchQ}
               placeholder={t("search.placeholder")}
-              className="mb-4"
+              className="mb-4 w-full"
+              disableMenu={true}
             />
           </header>
 
@@ -270,38 +297,61 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
               >
                 <ul className="space-y-1">
                   {/* ===== หน้าแรก / Home ===== */}
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => go("/dashboard")}
-                      className={cx(
-                        "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
-                        active.home
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-800 hover:bg-gray-100"
-                      )}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-house"
-                      >
-                        <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
-                        <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                      </svg>
-                      <span>{t("menu.home", { defaultValue: "หน้าแรก" })}</span>
-                    </button>
-                  </li>
+                  {(() => {
+                    const label = t("menu.home", { defaultValue: "หน้าแรก" });
+                    const q = searchQ.trim().toLowerCase();
+                    const show = !q || label.toLowerCase().includes(q);
+                    if (!show) return null;
+                    return (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => go("/dashboard")}
+                          className={cx(
+                            "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                            active.home
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-800 hover:bg-gray-100"
+                          )}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-house"
+                          >
+                            <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
+                            <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                          </svg>
+                          <span>{label}</span>
+                        </button>
+                      </li>
+                    );
+                  })()}
 
                   {/* ===== การแจ้งเตือน / Notification (Dropdown) ===== */}
-                  <li className="hs-accordion" id="alert-accordion">
+                  {(() => {
+                    const headerLabel = t("menu.notification", { defaultValue: "การแจ้งเตือน" });
+                    const q = searchQ.trim().toLowerCase();
+                    const items = [
+                      { key: "fire", label: t("menu.alerts_fire", { defaultValue: "ตรวจพบไฟไหม้" }) },
+                      { key: "motion", label: t("menu.alerts_motion", { defaultValue: "ตรวจพบการเคลื่อนไหว" }) },
+                      { key: "offline", label: t("menu.alerts_offline", { defaultValue: "จำนวนกล้อง" }) },
+                      { key: "fall", label: t("menu.alerts_fall", { defaultValue: "ตรวจพบการล้ม" }) },
+                      { key: "sleep", label: t("menu.alerts_sleep", { defaultValue: "ตรวจพบนอนหลับ" }) },
+                    ];
+                    const matchedItems = !q ? items : items.filter((it) => it.label.toLowerCase().includes(q));
+                    const showSection = !q || headerLabel.toLowerCase().includes(q) || matchedItems.length > 0;
+                    if (!showSection) return null;
+                    const forceOpen = !!q;
+                    return (
+                  <li className={cx("hs-accordion", forceOpen && "active")} id="alert-accordion">
                     <button
                       type="button"
                       className={cx(
@@ -328,11 +378,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M10.268 21a2 2 0 0 0 3.464 0" />
                         <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
                       </svg>
-                      <span>
-                        {t("menu.notification", {
-                          defaultValue: "การแจ้งเตือน",
-                        })}
-                      </span>
+                      <span>{headerLabel}</span>
 
                       <svg
                         className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
@@ -354,88 +400,36 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       </svg>
                     </button>
 
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
+                    <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
                       <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a
-                            onClick={() => go("/alert?event=fire")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.alertEvent("fire")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.alerts_fire", {
-                              defaultValue: "ตรวจพบไฟไหม้",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() => go("/alert?event=motion")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.alertEvent("motion")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.alerts_motion", {
-                              defaultValue: "ตรวจพบการเคลื่อนไหว",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() => go("/alert?event=offline")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.alertEvent("offline")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.alerts_offline", {
-                              defaultValue: "จำนวนกล้อง",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() => go("/alert?event=fall")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.alertEvent("fall")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.alerts_fall", {
-                              defaultValue: "ตรวจพบการล้ม",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() => go("/alert?event=sleep")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.alertEvent("sleep")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.alerts_sleep", {
-                              defaultValue: "ตรวจพบนอนหลับ",
-                            })}
-                          </a>
-                        </li>
+                        {matchedItems.map((it) => (
+                          <li key={it.key}>
+                            <a
+                              onClick={() => go(`/alert?event=${it.key}`)}
+                              className={cx(
+                                "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                                active.alertEvent(it.key)
+                                  ? "bg-gray-100 text-gray-900"
+                                  : "hover:bg-gray-100"
+                              )}
+                            >
+                              {it.label}
+                            </a>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </li>
+                    );
+                  })()}
 
                   {/* ===== การจดจำใบหน้า / Face Regconize (ลิงก์เดี่ยว → /facerec) ===== */}
+                  {(() => {
+                    const label = t("menu.facerec", { defaultValue: "การจดจำใบหน้า" });
+                    const q = searchQ.trim().toLowerCase();
+                    const show = !q || label.toLowerCase().includes(q);
+                    if (!show) return null;
+                    return (
                   <li>
                     <button
                       type="button"
@@ -463,14 +457,28 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                       </svg>
-                      <span>
-                        {t("menu.facerec", { defaultValue: "การจดจำใบหน้า" })}
-                      </span>
+                      <span>{label}</span>
                     </button>
                   </li>
+                    );
+                  })()}
 
                   {/* ===== อุปกรณ์ / Devices (Dropdown) ===== */}
-                  <li className="hs-accordion" id="devices-accordion">
+                  {(() => {
+                    const headerLabel = t("menu.devices", { defaultValue: "อุปกรณ์" });
+                    const q = searchQ.trim().toLowerCase();
+                    const items = [
+                      { key: "cctv", label: t("menu.devices_cctv", { defaultValue: "CCTV" }) },
+                      { key: "watermeter", label: t("menu.devices_watermeter", { defaultValue: "Water Meter" }) },
+                      { key: "electricmeter", label: t("menu.devices_electricmeter", { defaultValue: "Electric Meter" }) },
+                      { key: "airsensor", label: t("menu.devices_airsensor", { defaultValue: "Air Sensor" }) },
+                    ] as const;
+                    const matched = !q ? items : items.filter((it) => it.label.toLowerCase().includes(q));
+                    const showSection = !q || headerLabel.toLowerCase().includes(q) || matched.length > 0;
+                    if (!showSection) return null;
+                    const forceOpen = !!q;
+                    return (
+                  <li className={cx("hs-accordion", forceOpen && "active")} id="devices-accordion">
                     <button
                       type="button"
                       className={cx(
@@ -499,9 +507,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M2 21v-4" />
                         <path d="M7 9h.01" />
                       </svg>
-                      <span>
-                        {t("menu.devices", { defaultValue: "อุปกรณ์" })}
-                      </span>
+                      <span>{headerLabel}</span>
 
                       <svg
                         className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
@@ -523,78 +529,48 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       </svg>
                     </button>
 
-                    <div className="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden">
+                    <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
                       <ul className="pt-1 ps-7 space-y-1">
-                        <li>
-                          <a
-                            onClick={() => goSiteOrGlobal("/devices?type=cctv")}
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.devicesType("cctv")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.devices_cctv", { defaultValue: "CCTV" })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() =>
-                              goSiteOrGlobal("/devices?type=watermeter")
-                            }
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.devicesType("watermeter")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.devices_watermeter", {
-                              defaultValue: "Water Meter",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() =>
-                              goSiteOrGlobal("/devices?type=electricmeter")
-                            }
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.devicesType("electricmeter")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.devices_electricmeter", {
-                              defaultValue: "Electric Meter",
-                            })}
-                          </a>
-                        </li>
-                        <li>
-                          <a
-                            onClick={() =>
-                              goSiteOrGlobal("/devices?type=airsensor")
-                            }
-                            className={cx(
-                              "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                              active.devicesType("airsensor")
-                                ? "bg-gray-100 text-gray-900"
-                                : "hover:bg-gray-100"
-                            )}
-                          >
-                            {t("menu.devices_airsensor", {
-                              defaultValue: "Air Sensor",
-                            })}
-                          </a>
-                        </li>
+                        {matched.map((it) => {
+                          const zero = getCountForType(inventoryCounts as any, it.key as any) <= 0;
+                          return (
+                            <li key={it.key}>
+                              <a
+                                aria-disabled={zero}
+                                onClick={() => {
+                                  if (zero) return;
+                                  goSiteOrGlobal(`/devices?type=${it.key}`);
+                                }}
+                                className={cx(
+                                  "block py-2 px-2.5 text-sm rounded-lg",
+                                  zero
+                                    ? "opacity-40 cursor-not-allowed pointer-events-none"
+                                    : "cursor-pointer",
+                                  active.devicesType(it.key)
+                                    ? "bg-gray-100 text-gray-900"
+                                    : zero
+                                    ? ""
+                                    : "hover:bg-gray-100"
+                                )}
+                              >
+                                {it.label}
+                              </a>
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   </li>
+                    );
+                  })()}
 
-                  {/* ===== การจัดการผู้ใช้ / User Management (admin only) ===== */}
-                  {account?.role === "admin" && (
+                  {/* ===== การจัดการผู้ใช้ / User Management (super admin only) ===== */}
+                  {String(account?.email || "").toLowerCase() === MASTER_EMAIL && (() => {
+                    const label = t("menu.user_management", { defaultValue: "การจัดการผู้ใช้" });
+                    const q = searchQ.trim().toLowerCase();
+                    const show = !q || label.toLowerCase().includes(q);
+                    if (!show) return null;
+                    return (
                   <li>
                     <button
                       type="button"
@@ -623,14 +599,11 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                         <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                         <circle cx="9" cy="7" r="4" />
                       </svg>
-                      <span>
-                        {t("menu.user_management", {
-                          defaultValue: "การจัดการผู้ใช้",
-                        })}
-                      </span>
+                      <span>{label}</span>
                     </button>
                   </li>
-                  )}
+                    );
+                  })()}
                 </ul>
               </div>
             </div>
@@ -674,7 +647,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                 </a>
               </div>
 
-              {showUsedSpace && (
+              {/* {showUsedSpace && (
                 <div className="mx-2 mb-2 rounded-lg border border-gray-200 p-3">
                   <p className="text-xs font-medium text-gray-800">
                     {t("footer.useSpace")}
@@ -697,7 +670,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                     </button>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Account → sign out */}
               <div className="px-2 pb-2">
@@ -709,7 +682,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                 >
                   <img
                     className="size-6 rounded-full"
-                    src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=160&h=160&auto=format&fit=facearea&facepad=3"
+                    src={userIcon}
                     alt="Avatar"
                   />
                   <div className="flex-1 text-left">
@@ -761,7 +734,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       <div
         className={[
           "min-h-160 bg-white transition-all duration-300",
-          "lg-1024:ms-64",
+          // keep margin on desktop unless in dashboard collapse + closed state
+          isDesktop && !(collapseMode && !isOpen) ? "lg-1024:ms-64" : "",
           contentClassName,
         ].join(" ")}
       >

@@ -50,6 +50,8 @@ import tvSelected from "./televisionSelected.png";
 import cloudyDay1 from "./cloudyDay1.svg";
 import alertCyan from "./alertCyan.png";
 
+import userIcon from "./user.png";
+
 export {
   brandImage,
   exportImage,
@@ -95,4 +97,5 @@ export {
   tvSelected,
   cloudyDay1,
   alertCyan,
+  userIcon,
 };

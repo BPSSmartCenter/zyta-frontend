@@ -20,11 +20,13 @@ import ScrollToTop from "./hook/useScrollToTop";
 import RequireAuth from "./routes/RequireAuth";
 import { me as apiMe } from "./api/user";
 import { FiltersProvider } from "./context/FiltersContext";
+import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 
 function App() {
   console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
   return (
     <BrowserRouter>
+      <DeviceInventoryProvider>
       <FiltersProvider>
         <ScrollToTop smooth={true} />
         <ScrollUnlocker />
@@ -62,6 +64,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </FiltersProvider>
+      </DeviceInventoryProvider>
     </BrowserRouter>
   );
 }

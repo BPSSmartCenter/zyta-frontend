@@ -86,6 +86,7 @@ type Props = {
   className?: string;
   onToggle?: (active: boolean) => void; // สำหรับ default variant
   onClick?: React.MouseEventHandler<HTMLDivElement>;
+  disabled?: boolean;
 };
 
 const StatCard: React.FC<Props> = ({
@@ -104,6 +105,7 @@ const StatCard: React.FC<Props> = ({
   className,
   onToggle,
   onClick,
+  disabled = false,
 }) => {
   const group = useContext(StatCardGroupContext);
   const { t } = useTranslation(["dashboard"]);
@@ -170,6 +172,7 @@ const StatCard: React.FC<Props> = ({
   }, [currentBg, isTailwindBg]);
 
   const handleToggle = () => {
+    if (disabled) return;
     if (group) {
       if (!id) return;
       group.toggle(id);
@@ -188,10 +191,12 @@ const StatCard: React.FC<Props> = ({
       <div
         onClick={handleToggle} // คลิกการ์ด = เลือกการ์ด (bg cyan)
         className={[
-          "p-6 flex justify-between w-full border border-cyan rounded-lg cursor-pointer",
+          "p-6 flex justify-between w-full border border-cyan rounded-lg",
+          disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
           active ? "bg-cyan text-white" : "",
           className || "",
         ].join(" ")}
+        aria-disabled={disabled}
       >
         <div className="text-center flex flex-col items-center select-none gap-2 whitespace-nowrap">
           <img src={currentImg} alt="" />
@@ -214,6 +219,7 @@ const StatCard: React.FC<Props> = ({
       onClick={handleToggle}
       className={[
         "w-[225px] h-[95px] rounded-md select-none border border-cyan-500 hover:cursor-pointer hover:shadow-xl hover:scale-[1.01]",
+        disabled ? "opacity-40 cursor-not-allowed" : "",
         reverseLayout
           ? "flex items-center justify-between px-4"
           : "flex justify-center items-center gap-6",
@@ -221,6 +227,7 @@ const StatCard: React.FC<Props> = ({
         className || "",
       ].join(" ")}
       style={!isTailwindBg ? { backgroundColor: currentBg } : undefined}
+      aria-disabled={disabled}
     >
       {reverseLayout ? (
         <>

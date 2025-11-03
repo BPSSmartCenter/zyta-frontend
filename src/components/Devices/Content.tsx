@@ -12,6 +12,7 @@ import AirPanel from "./Air Sensor/AirPanel";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
+import { useDeviceInventory, getCountForType } from "../../context/DeviceInventoryContext";
 
 type Props = {};
 
@@ -38,13 +39,38 @@ export default function Content({}: Props) {
 
   const { abs, absSite } = useUserPath();
   const { siteCode } = useParams();
+  const { counts: inventoryCounts } = useDeviceInventory();
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();
     return q && TYPE_TO_ID[q] ? q : "cctv"; // default: cctv
   }, [location.search]);
 
+  // If current URL points to a zero-count type and there exists any available type, redirect to the first available
   const selectedId = useMemo(() => TYPE_TO_ID[urlType], [urlType]);
+  const availableTypes = (Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>).filter(
+    (k) => getCountForType(inventoryCounts as any, k as any) > 0
+  );
+
+  if (typeof window !== "undefined") {
+    const isZero = getCountForType(inventoryCounts as any, urlType as any) <= 0;
+    if (isZero && availableTypes.length > 0) {
+      const nextType = availableTypes[0];
+      const params = new URLSearchParams(location.search);
+      params.set("type", nextType);
+      if (siteCode) {
+        navigate(
+          { pathname: absSite("/devices", siteCode), search: `?${params.toString()}` },
+          { replace: true }
+        );
+      } else {
+        navigate(
+          { pathname: abs("/devices"), search: `?${params.toString()}` },
+          { replace: true }
+        );
+      }
+    }
+  }
 
   // เปลี่ยนการ์ด → อัปเดต URL (เปลี่ยนเฉพาะ search เพื่อลดการกระพริบ)
   const handleChange = (ids: string[]) => {
@@ -95,23 +121,29 @@ export default function Content({}: Props) {
       {/* กลุ่มการ์ด: single select */}
       <StatCardGroup
         selectionMode="single"
-        activeIds={[selectedId]}
+        activeIds={getCountForType(inventoryCounts as any, urlType as any) > 0 ? [selectedId] : []}
         onChange={handleChange}
         className="mt-5"
       >
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          {DEVICE_CARDS.map((c) => (
-            <li key={c.id}>
-              <StatCard
-                id={c.id}
-                variant="boxWithSwitch"
-                img={c.img}
-                activeImg={c.activeImg}
-                label={tDevices(c.label)}
-                switchProps={{ defaultChecked: true }}
-              />
-            </li>
-          ))}
+          {DEVICE_CARDS.map((c) => {
+            const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
+            const countVal = type ? getCountForType(inventoryCounts as any, type as any) : 0;
+            const disabled = !type || countVal <= 0;
+            return (
+              <li key={c.id}>
+                <StatCard
+                  id={c.id}
+                  variant="boxWithSwitch"
+                  img={c.img}
+                  activeImg={c.activeImg}
+                  label={tDevices(c.label)}
+                  val={countVal}
+                  disabled={disabled}
+                />
+              </li>
+            );
+          })}
         </ul>
       </StatCardGroup>
 
