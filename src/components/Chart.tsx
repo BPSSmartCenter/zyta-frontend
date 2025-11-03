@@ -121,6 +121,24 @@ export default function Chart({
   const { t, i18n } = useTranslation(["dashboard"]);
   const locale = useLocaleFromI18n(i18n.language);
 
+  // Align event multi-select label with MapPanel behavior
+  const multiEventLabel = React.useMemo(() => {
+    if (selectedEvents.includes("all")) {
+      return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
+    }
+    const count = selectedEvents.length;
+    if (count > 1) {
+      return t("map.selectedCount", { count, defaultValue: `เลือก ${count}` });
+    }
+    if (count === 1) {
+      const single = selectedEvents[0];
+      const opt = EVENT_OPTIONS.find((o) => o.value === single);
+      return opt ? t(`events.${opt.value}`, { defaultValue: opt.label }) : single;
+    }
+    return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
+  }, [selectedEvents, t]);
+  const labelForButton = multiEventLabel || buttonLabel;
+
   // เปลี่ยนช่วงเวลา (Daily ใช้ข้อมูลเดียวกับ Weekly)
   const [period, setPeriod] = React.useState<"daily" | "weekly" | "monthly">(
     "weekly"
@@ -319,7 +337,7 @@ export default function Chart({
                         })}
                         onMouseDown={(e) => e.preventDefault()}
                       >
-                        <span className="truncate">{buttonLabel}</span>
+                        <span className="truncate">{labelForButton}</span>
                         <i className="material-icons leading-none">
                           {open ? "arrow_drop_up" : "arrow_drop_down"}
                         </i>

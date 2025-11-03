@@ -35,7 +35,7 @@
     "anySeverity": "Any Severity",
     "allLocation": "All Location",
     "allEvents": "All Events",
-    "selectedCount": "All Events Selected {{count}}",
+    "selectedCount": "Selected {{count}}",
     "severity": {
       "low": "Low",
       "medium": "Medium",
