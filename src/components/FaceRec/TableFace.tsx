@@ -1,14 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import { useTranslation } from "react-i18next";
-import Dropdown from "../Dropdown";
-import DatePicker, { type DateValue } from "../DateInput";
+import { useFilters } from "../../context/FiltersContext";
+
 import SearchInput from "../SearchInput";
 import { FACE_SCAN_ROWS, type FaceScanRow } from "./faceRec.constant";
-
-const sameYMD = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
+import { useFaceRec } from "../../context/FaceRecContext";
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
@@ -21,47 +17,36 @@ const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   });
 };
 
-type Opt = { label: string; value: string };
-
 export default function TableFaceScan() {
+  const faceRec = useFaceRec();
   const { t } = useTranslation("facerec");
+  const { date: globalDate } = useFilters();
 
   // selection
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   // Filters
   const [nameQ, setNameQ] = React.useState("");
-  const [status, setStatus] = React.useState<string>("all");
-  const [date, setDate] = React.useState<DateValue | undefined>(undefined);
 
   // Pager
   const [page, setPage] = React.useState(1);
   const pageSize = 5;
 
-  const STATUS_OPTIONS: Opt[] = [
-    { label: t("filters.statusAll", { defaultValue: "All statuses" }), value: "all" },
-    { label: "อนุญาต", value: "อนุญาต" },
-    { label: "ไม่อนุญาต", value: "ไม่อนุญาต" },
-    { label: "เข้าแล้ว", value: "เข้าแล้ว" },
-    { label: "ออกแล้ว", value: "ออกแล้ว" },
-  ];
-
   const rowsFiltered: FaceScanRow[] = React.useMemo(() => {
-    return FACE_SCAN_ROWS
-      .filter((r) => (status === "all" ? true : r.inout === status))
+    const rows = (faceRec?.faceRows && faceRec.faceRows.length>0)? faceRec.faceRows : FACE_SCAN_ROWS;
+    return rows
       .filter((r) => {
-        if (!date) return true;
+        if (!globalDate) return true;
         const d = new Date(r.timeInISO);
-        const sel = new Date(date.y, date.m - 1, date.d);
-        return sameYMD(d, sel);
+        return d.getFullYear() === (globalDate as any).y && d.getMonth() === (globalDate as any).m - 1 && d.getDate() === (globalDate as any).d;
       })
       .filter((r) => {
         if (!nameQ.trim()) return true;
         return r.fullName.toLowerCase().includes(nameQ.toLowerCase());
       });
-  }, [status, date, nameQ]);
+  }, [nameQ, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d, faceRec?.faceRows?.length]);
 
-  React.useEffect(() => setPage(1), [status, date, nameQ]);
+  React.useEffect(() => setPage(1), [nameQ, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -70,9 +55,8 @@ export default function TableFaceScan() {
     clampedPage * pageSize
   );
 
-  // Province column: 180px → 140px
   const GRID_COLS =
-    "grid-cols-[48px_100px_150px_180px_140px_minmax(260px,1.6fr)_150px_200px]";
+    "grid-cols-[48px_100px_150px_180px_140px_minmax(260px,1.6fr)_200px]";
 
   return (
     <div className="p-6">
@@ -89,54 +73,9 @@ export default function TableFaceScan() {
             value={nameQ}
             onChange={(e) => setNameQ(e.target.value)}
           />
-
-          {/* Status (Dropdown) */}
-          <Dropdown options={STATUS_OPTIONS} value={status} onChange={setStatus}>
-            {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
-              <div className="relative">
-                <button
-                  {...getButtonProps({
-                    className:
-                      "h-[40px] min-w-[130px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 hover:cursor-pointer",
-                  })}
-                >
-                  <span className="truncate">
-                    {selected?.label ?? t("filters.status", { defaultValue: "Status" })}
-                  </span>
-                  <i className="material-icons leading-none">
-                    {open ? "arrow_drop_up" : "arrow_drop_down"}
-                  </i>
-                </button>
-
-                {open && (
-                  <div
-                    {...getMenuProps({
-                      className:
-                        "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg",
-                    })}
-                  >
-                    {options.map((opt) => (
-                      <button
-                        key={opt.value}
-                        {...getItemProps(opt, {
-                          className:
-                            "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
-                        })}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </Dropdown>
-
-          {/* Date */}
-          <DatePicker value={date} onChange={setDate} />
         </div>
 
-        {/* Search ทางขวา */}
+        {/* Search */}
         <SearchInput
           value={nameQ}
           onChange={setNameQ}
@@ -158,8 +97,7 @@ export default function TableFaceScan() {
             <div>{t("table.gender", { defaultValue: "GENDER" })}</div>
             <div>{t("table.province", { defaultValue: "PROVINCE" })}</div>
             <div>{t("table.inout", { defaultValue: "IN/OUT STATUS" })}</div>
-            <div>{t("table.timeIn", { defaultValue: "TIME IN" })}</div>
-            <div>{t("table.timeOut", { defaultValue: "TIME OUT" })}</div>
+            <div>{t("table.timestamp", { defaultValue: "Timestamp" })}</div>
           </div>
           <hr className="border-gray-200" />
 
@@ -211,16 +149,10 @@ export default function TableFaceScan() {
                 {/* IN/OUT STATUS */}
                 <div className="text-gray-800">{r.inout}</div>
 
-                {/* TIME IN */}
+                {/* EVENT TIME */}
                 <div className="text-gray-700">
                   <div>{new Date(r.timeInISO).toLocaleString()}</div>
                   <div className="text-[12px] text-gray-500">{relHours(r.timeInISO, t)}</div>
-                </div>
-
-                {/* TIME OUT */}
-                <div className="text-gray-700">
-                  <div>{new Date(r.timeOutISO).toLocaleString()}</div>
-                  <div className="text-[12px] text-gray-500">{relHours(r.timeOutISO, t)}</div>
                 </div>
               </div>
             );
@@ -228,7 +160,7 @@ export default function TableFaceScan() {
         </div>
       </div>
 
-      {/* Pager (5 rows/page) — ย้ายออกมาอยู่ "ใต้" ตาราง */}
+      {/* Pager (5 rows/page) */}
       <div className="mt-3 flex items-center justify-between px-2 pb-3">
         <div className="flex items-center gap-2">
           <button

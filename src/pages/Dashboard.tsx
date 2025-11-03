@@ -1,28 +1,25 @@
-// src/pages/Dashboard/Dashboard.tsx
+﻿// src/pages/Dashboard/Dashboard.tsx
 import React from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import ContentLayout from "../components/Dashboard/ContentLayout";
 import Header from "../components/Dashboard/Header";
 import SnapshotChartSection from "../components/Chart";
-import type { DateValue } from "../components/DateInput";
 import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
 import { notis, wellBeingNotis, recognizeNotis, ZYTA_NOTIS } from "../data/Dashboard/notis";
+import { useFaceRec } from "../context/FaceRecContext";
 import { statItems } from "../components/Dashboard/dashboard.constants";
+import { useFilters } from "../context/FiltersContext";
 
 // keep master key seeded in backend; not used for dashboard gating
 
 type Site = { id?: string; code?: string; name?: string; province_code?: string };
 type SiteOption = { label: string; value: string; i18nKey?: string };
 
-function today(): DateValue {
-  const d = new Date();
-  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() } as any;
-}
-
 export default function Dashboard() {
+  const faceRec = useFaceRec();
   const { t } = useTranslation(["dashboard"]);
 
   // Navbar state
@@ -31,7 +28,8 @@ export default function Dashboard() {
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
   const [selectedSite, setSelectedSite] = React.useState("all");
-  const [date, setDate] = React.useState<DateValue>(today());
+  // Use global FiltersContext date so Navbar/MiniFiltersBar drive filtering
+  const { date: globalDate, setDate: setGlobalDate } = useFilters();
   // Role + sites for ContentLayout behavior similar to original
   const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(null);
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
@@ -84,21 +82,41 @@ export default function Dashboard() {
   const [mapSeverity, setMapSeverity] = React.useState("all");
   const [province, setProvince] = React.useState("all");
 
+  const matchGlobalDate = React.useCallback((s: string) => {
+    if (!globalDate) return true;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return true;
+    return (
+      d.getFullYear() === (globalDate as any).y &&
+      d.getMonth() + 1 === (globalDate as any).m &&
+      d.getDate() === (globalDate as any).d
+    );
+  }, [(globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]);
+
   const filteredNotis = React.useMemo(() => {
     const q = searchEvent.toLowerCase().trim();
     const src = notis as unknown as any[];
-    return src.filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchEvent]);
+    return src
+      .filter((n) => matchGlobalDate(n?.date))
+      .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
+  }, [searchEvent, matchGlobalDate]);
+
   const filteredWellBeginNotis = React.useMemo(() => {
     const q = searchWB.toLowerCase().trim();
     const src = wellBeingNotis as unknown as any[];
-    return src.filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchWB]);
+    return src
+      .filter((n) => matchGlobalDate(n?.date))
+      .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
+  }, [searchWB, matchGlobalDate]);
+
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();
-    const src = recognizeNotis as unknown as any[];
-    return src.filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchFR]);
+    const dynamic = (faceRec?.dashboardNotis ?? []) as unknown as any[];
+    const src = dynamic.length ? dynamic : (recognizeNotis as unknown as any[]);
+    return src
+      .filter((n) => matchGlobalDate(n?.date))
+      .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
+  }, [searchFR, JSON.stringify(faceRec?.dashboardNotis), matchGlobalDate]);
   const filterZYTA = React.useMemo(() => {
     const q = searchZYTA.toLowerCase().trim();
     const src = ZYTA_NOTIS as unknown as any[];
@@ -159,8 +177,8 @@ export default function Dashboard() {
           siteOptions={siteOptions}
           selectedSite={selectedSite}
           setSelectedSite={setSelectedSite}
-          date={date}
-          setDate={setDate}
+          date={globalDate as any}
+          setDate={setGlobalDate as any}
         />
 
         <Header statItems={statItems as any} selectedSiteCode={selectedSite} />
@@ -176,4 +194,14 @@ export default function Dashboard() {
     </Sidebar>
   );
 }
+
+
+
+
+
+
+
+
+
+
 

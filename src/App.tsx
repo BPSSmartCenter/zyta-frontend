@@ -1,4 +1,4 @@
-// src/App.tsx
+﻿// src/App.tsx
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import {
@@ -21,12 +21,14 @@ import RequireAuth from "./routes/RequireAuth";
 import { me as apiMe } from "./api/user";
 import { FiltersProvider } from "./context/FiltersContext";
 import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
+import { FaceRecProvider } from "./context/FaceRecContext";
 
 function App() {
   console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
   return (
     <BrowserRouter>
       <DeviceInventoryProvider>
+      <FaceRecProvider>
       <FiltersProvider>
         <ScrollToTop smooth={true} />
         <ScrollUnlocker />
@@ -39,7 +41,7 @@ function App() {
         <Route path="/forgot" element={<Forgot />} />
         <Route path="/reset" element={<Reset />} />
 
-        {/* legacy path: redirect ไป /u/:uid/dashboard */}
+        {/* legacy path: redirect เนเธ /u/:uid/dashboard */}
         <Route path="/dashboard" element={<LegacyDashboardRedirect />} />
 
         {/* protected */}
@@ -64,12 +66,13 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </FiltersProvider>
+      </FaceRecProvider>
       </DeviceInventoryProvider>
     </BrowserRouter>
   );
 }
 
-/** ตัวช่วย: ถ้าใครยังกด /dashboard อยู่ ให้ redirect ไป /u/:myUid/dashboard */
+/** เธ•เธฑเธงเธเนเธงเธข: เธ–เนเธฒเนเธเธฃเธขเธฑเธเธเธ” /dashboard เธญเธขเธนเน เนเธซเน redirect เนเธ /u/:myUid/dashboard */
 function LegacyDashboardRedirect() {
   const [to, setTo] = useState<string | null>(null);
   useEffect(() => {
@@ -109,3 +112,5 @@ function RootLoginOrDashboard() {
   return <Navigate to={to} replace />;
 }
 export default App;
+
+

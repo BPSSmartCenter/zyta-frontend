@@ -10,7 +10,7 @@ export const GREEN_BOX_SVG =
   );
 
 /* ---------- License Plates: Panel + Table ---------- */
-export type FaceRecRow = {
+export type LicensePlateRow = {
   id: string;
   picture: string;
   platePicture: string;
@@ -75,7 +75,7 @@ export const plateDetail = {
 export const confidenceHeader = ["—", "—", "—", "—", "—", "—"];
 
 // ✅ ตาราง License Plates (ต้องมีชื่อนี้!)
-export const FACE_REC_ROWS: FaceRecRow[] = [
+export const FACE_REC_ROWS: LicensePlateRow[] = [
   // {
   //   id: "lp-1",
   //   picture: GREEN_BOX_SVG,
@@ -118,6 +118,7 @@ export type FaceScanRow = {
   inout: string; // อนุญาต/ไม่อนุญาต/เข้าแล้ว/ออกแล้ว
   timeInISO: string;
   timeOutISO: string;
+  cameraName?: string;
 };
 
 // รายการฝั่งขวาใน FaceScanPanel (5 แถว + มี gender บรรทัดกลาง)

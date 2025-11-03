@@ -20,7 +20,7 @@ type Props = {
   items: FR[];
 };
 
-const USE_MOCK_REDIRECT = true;
+const USE_MOCK_REDIRECT = false;
 const OPEN_IN_NEW_TAB = false;
 const MOCK_FACEREC_URL =
   "https://bpstech.online/d/dbb32996-2e79-4e04-9963-48e62e2c885d/21062885-26cd-5e06-a9b8-67c449dc0cfb?orgId=1&from=1710928419213&to=1774000419213";
