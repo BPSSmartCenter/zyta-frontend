@@ -11,8 +11,7 @@ import {
 } from "./dashboard.constants";
 import { getUserStats } from "../../api/user";
 import DeviceCount from "./DeviceCount";
-import { useDeviceInventory } from "../../context/DeviceInventoryContext";
-import { getElectricDevices } from "../../api/electric";
+import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
 import React from "react";
@@ -136,111 +135,10 @@ export default function ContentLayout(props: Props) {
     return counts;
   }, [JSON.stringify(props.accessibleSites)]);
 
-  // ----- Device inventory counts (inverters only for electric) -----
-  const [deviceCounts, setDeviceCounts] = React.useState<
-    Partial<{ cameras: number; intercom: number; waterMeter: number; electricMeter: number; airSensor: number; zyta: number }>
-  >({});
-  const [deviceTotals, setDeviceTotals] = React.useState<{ online: number; offline: number }>({ online: 0, offline: 0 });
-  const { setCounts: setGlobalCounts, setLoading: setCountsLoading } = useDeviceInventory();
-
-  React.useEffect(() => {
-    (async () => {
-      setCountsLoading(true);
-      try {
-        // const role = String((props as any)?.role || "").toLowerCase();
-        const sites = Array.isArray(props.accessibleSites) ? props.accessibleSites : [];
-        const selected = String(props.selectedSiteCode || "");
-
-        // Resolve site IDs to fetch: single site, or aggregate across accessible sites
-        let siteIds: string[] = [];
-        if (!selected || selected === "all") {
-          // Admin: aggregate across all sites; others: aggregate across only accessible sites (could be empty)
-          // Use site.code as external SiteId for inventory endpoint
-          siteIds = sites.map((s: any) => String(s.code ?? s.id)).filter(Boolean);
-        } else {
-          const s = sites.find((x: any) => String(x.code) === selected);
-          if (s?.code || s?.id) siteIds = [String(s.code ?? s.id)];
-        }
-
-        if (siteIds.length === 0) {
-          console.debug("[DeviceCount] no siteIds resolved for inventory", {
-            selected,
-            sitesCount: sites.length,
-          });
-          setDeviceCounts({});
-          setDeviceTotals({ online: 0, offline: 0 });
-          setGlobalCounts({});
-          setCountsLoading(false);
-          return;
-        }
-
-        // Fetch electric devices in parallel and aggregate inverter count
-        const results = await Promise.all(
-          sites
-            .filter((s: any) => siteIds.includes(String(s.code ?? s.id)))
-            .map(async (s: any) => {
-              const id1 = String(s.code ?? "");
-              const id2 = String(s.id ?? "");
-              // Try with code first (backend accepts code or id)
-              try {
-                const resp = await getElectricDevices(id1);
-                const items = Array.isArray(resp?.items) ? resp.items : [];
-                const count = items.filter((it: any) => {
-                  const cat = (it?.meta?.deviceCategory || it?.meta?.details?.deviceCategory || "").toString();
-                  const model = (it?.model || "").toString();
-                  return cat === "INVERTER" || model.startsWith("INVERTER:");
-                }).length;
-                return count as number;
-              } catch (e1) {
-                try {
-                  const resp2 = await getElectricDevices(id2);
-                  const items2 = Array.isArray(resp2?.items) ? resp2.items : [];
-                  const count2 = items2.filter((it: any) => {
-                    const cat = (it?.meta?.deviceCategory || it?.meta?.details?.deviceCategory || "").toString();
-                    const model = (it?.model || "").toString();
-                    return cat === "INVERTER" || model.startsWith("INVERTER:");
-                  }).length;
-                  return count2 as number;
-                } catch (e2) {
-                  console.debug("[DeviceCount] inventory fetch failed for site", {
-                    siteCode: s.code,
-                    siteId: s.id,
-                  });
-                  return 0;
-                }
-              }
-            })
-        );
-
-        const totalInverters = results.reduce((a, b) => a + b, 0);
-        console.debug("[DeviceCount] aggregated inverters", {
-          selected,
-          siteIds,
-          totalInverters,
-        });
-        setDeviceCounts({ electricMeter: totalInverters });
-        // Until we have online/offline status per device, treat counted devices as online
-        setDeviceTotals({ online: totalInverters, offline: 0 });
-        // Update global inventory counts for use across Dashboard/Sidebar/Devices
-        setGlobalCounts((prev) => ({
-          ...prev,
-          electricMeter: totalInverters,
-          // These remain zero until endpoints are available
-          cameras: Number(prev.cameras ?? 0),
-          waterMeter: Number(prev.waterMeter ?? 0),
-          airSensor: Number(prev.airSensor ?? 0),
-          intercom: Number(prev.intercom ?? 0),
-          zyta: Number(prev.zyta ?? 0),
-        }));
-      } catch (e) {
-        // keep previous on failure
-        setDeviceCounts((prev) => prev);
-        setDeviceTotals((prev) => prev);
-      } finally {
-        setCountsLoading(false);
-      }
-    })();
-  }, [props.selectedSiteCode, JSON.stringify(props.accessibleSites)]);
+  const { counts: deviceCounts, totals: deviceTotals } = useDeviceInventoryLoader({
+    selectedSiteCode: props.selectedSiteCode,
+    accessibleSites: props.accessibleSites,
+  });
 
   // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
   // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)

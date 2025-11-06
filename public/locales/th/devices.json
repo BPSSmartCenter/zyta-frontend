@@ -80,6 +80,7 @@
         "accumulated": "กำลังไฟสะสม",
         "current": "กระแสไฟฟ้า",
         "frequency": "ความถี่",
+        "temperature": "อุณหภูมิ",
         "humidity": "ความชื้น"
       },
       "units": {

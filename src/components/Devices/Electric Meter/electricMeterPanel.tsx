@@ -1,4 +1,5 @@
-﻿import React, { useMemo, useState } from "react";
+
+import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
@@ -13,12 +14,7 @@ import plugWhiteIcon from "../../../assets/plug.png";
 import { ElectricRadialBasic } from "../../RadialBar";
 import { ElectricLineBasicChart } from "../../Chart";
 import { useFilters } from "../../../context/FiltersContext";
-import {
-  ELECTRIC_DAYS,
-  ELECTRIC_CONVERSIONS_LIST,
-  ELECTRIC_DAY_SERIES,
-  type ElectricDay,
-} from "../devices.constant";
+import { updateElectricOverview, getElectricDevices } from "../../../api/electric";
 
 type Props = {
   siteCode?: string;
@@ -30,7 +26,7 @@ type CardValueProps = {
   value: number | string;
   valueLabel: string;
   valueLabel2: string;
-  onClick?: () => void; // โ เน€เธเธดเนเธกเธชเธณเธซเธฃเธฑเธเธเธฅเธดเธ
+  onClick?: () => void; // ← เพิ่มสำหรับคลิก
 };
 
 type SideCardValueProps = {
@@ -38,6 +34,17 @@ type SideCardValueProps = {
   valueLabel: string;
   value: number | string;
   unit: string;
+};
+
+type ComparisonItem = {
+  key: string;
+  label: string;
+  displayDate: string;
+  percentage: number;
+  percentLabel: string;
+  previousKwh: number;
+  todayKwh: number;
+  series: number[];
 };
 
 function formatWithComma(v: number | string) {
@@ -66,20 +73,28 @@ function CardValue({
         <img src={img} className="p-3 w-full" alt="" />
       </div>
       <h1 className="text-[24px] font-bold">{shown}</h1>
-      <span>
-        {valueLabel} <p>{valueLabel2}</p>
-      </span>
+      <div className="flex flex-col">
+        <span>{valueLabel}</span>
+        <p>{valueLabel2}</p>
+      </div>
     </div>
   );
 }
 
 function SideCardValue({ img, value, valueLabel, unit }: SideCardValueProps) {
+  const renderValue =
+    value === null || value === undefined
+      ? "-"
+      : typeof value === "number" && Number.isFinite(value)
+      ? value.toLocaleString("en-US")
+      : value;
+
   return (
     <div className="font-poppins flex flex-col flex-1 text-center items-center justify-center p-5 bg-white w-full min-h-[100px] rounded-lg gap-5 select-none">
       <div>
         <h1 className="text-gray-600 text-[20px]">{valueLabel}</h1>
         <p className="text-gray-600 font-bold text-[30px] whitespace-nowrap">
-          {formatWithComma(value)} <span>{unit}</span>
+          {renderValue} <span>{unit}</span>
         </p>
       </div>
       <div className="rounded-full bg-[#A9DB4E]">
@@ -89,7 +104,7 @@ function SideCardValue({ img, value, valueLabel, unit }: SideCardValueProps) {
   );
 }
 
-// ------- helpers เธชเธณเธซเธฃเธฑเธ time dropdown -------
+// ------- helpers สำหรับ time dropdown -------
 const formatTime = (h: number, m: number) => {
   const ampm = h >= 12 ? "PM" : "AM";
   const hh = (h % 12 || 12).toString().padStart(2, "0");
@@ -97,13 +112,111 @@ const formatTime = (h: number, m: number) => {
   return `${hh}:${mm} ${ampm}`;
 };
 
-import { getInverterTelemetry } from "../../../api/solaredge";
+import { fetchEquipmentTelemetry } from "../../../api/equipment";
+
+type DailySeries = {
+  key: string;
+  date: Date;
+  isToday: boolean;
+  totalWh: number;
+  totalKwh: number;
+  halfHourSeries: number[];
+};
+
+type DailyTelemetryPoint = {
+  timestamp: number;
+  totalWh: number;
+};
+
+const HALF_HOUR_SLOTS = Array.from({ length: 24 * 2 }, (_, idx) => {
+  const hour = Math.floor(idx / 2);
+  const minute = (idx % 2) * 30;
+  return {
+    hour,
+    minute,
+    label: `${String(hour).padStart(2, "0")}:${minute === 0 ? "00" : "30"}`,
+  };
+});
+
+const HALF_HOUR_LABELS = HALF_HOUR_SLOTS.map((slot) => slot.label);
+
+const startOfDay = (d: Date) => {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+};
+
+const endOfDay = (d: Date) => {
+  const copy = new Date(d);
+  copy.setHours(23, 59, 59, 999);
+  return copy;
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+const formatDateTimeForApi = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(
+    d.getHours()
+  )}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+
+const normalizeTelemetries = (raw: any[]): DailyTelemetryPoint[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const ts = new Date(item?.date ?? 0).getTime();
+      const total = Number(item?.totalEnergy ?? 0);
+      if (!Number.isFinite(total) || Number.isNaN(ts)) return null;
+      return { timestamp: ts, totalWh: total };
+    })
+    .filter((p): p is DailyTelemetryPoint => !!p && Number.isFinite(p.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp);
+};
+
+const buildHalfHourSeries = (
+  points: DailyTelemetryPoint[],
+  dayStart: Date
+): number[] => {
+  if (!points.length) return HALF_HOUR_SLOTS.map(() => 0);
+  const baseline = points[0].totalWh;
+  let cursor = 0;
+  let latest = baseline;
+  return HALF_HOUR_SLOTS.map((slot) => {
+    const slotTs = new Date(
+      dayStart.getFullYear(),
+      dayStart.getMonth(),
+      dayStart.getDate(),
+      slot.hour,
+      slot.minute,
+      59,
+      999
+    ).getTime();
+    while (cursor < points.length && points[cursor].timestamp <= slotTs) {
+      latest = points[cursor].totalWh;
+      cursor += 1;
+    }
+    const delta = latest - baseline;
+    return delta > 0 ? delta / 1000 : 0;
+  });
+};
+
+const formatWeekdayLabel = (date: Date) =>
+  new Intl.DateTimeFormat("th-TH", { weekday: "short" }).format(date);
+
+const formatDateLabel = (date: Date) =>
+  new Intl.DateTimeFormat("th-TH", {
+    day: "2-digit",
+    month: "short",
+  }).format(date);
+
+const sanitizeSeries = (arr: number[]) =>
+  arr.map((value) => (Number.isFinite(value) ? Number(value.toFixed(2)) : 0));
 
 export default function ElectricMeterPanel({ siteCode }: Props) {
   const { selectedSite, date: filtersDate } = useFilters();
   const { t } = useTranslation("devices");
 
-  // options เธ—เธธเธ 30 เธเธฒเธ—เธต
+  // options ทุก 30 นาที
+
   const timeOptions = useMemo(
     () =>
       Array.from({ length: 24 * 2 }, (_, i) => {
@@ -115,12 +228,35 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     []
   );
 
-  // เธเนเธฒเน€เธฃเธดเนเธกเธ•เนเธเนเธซเนเน€เธซเธกเธทเธญเธเน€เธ”เธดเธก
-  const [fromTime, setFromTime] = useState<string>("09:30 PM");
-  const [toTime, setToTime] = useState<string>("01:30 AM");
-  const [selected, setSelected] = useState<ElectricDay>("Sun");
+  const defaultTimeRange = React.useMemo(() => {
+    const now = new Date();
+    const to = new Date(now);
+    to.setSeconds(0, 0);
+    const mins = to.getMinutes();
+    if (mins >= 30) {
+      to.setMinutes(30, 0, 0);
+    } else {
+      to.setMinutes(0, 0, 0);
+    }
+    if (to.getTime() > now.getTime()) {
+      to.setMinutes(to.getMinutes() - 30);
+    }
+    const from = new Date(to.getTime() - 30 * 60 * 1000);
+    const makeLabel = (d: Date) => formatTime(d.getHours(), d.getMinutes());
+    return {
+      from: makeLabel(from),
+      to: makeLabel(to),
+    };
+  }, []);
+
+  const [fromTime, setFromTime] = useState<string>(defaultTimeRange.from);
+  const [toTime, setToTime] = useState<string>(defaultTimeRange.to);
+  const [selectedComparisonKey, setSelectedComparisonKey] = useState<string | null>(
+    null
+  );
+  const [dailySeries, setDailySeries] = useState<DailySeries[]>([]);
   // Compute ISO date range from selected day/time (use selected date)
-  const computeRange = React.useCallback(() => {
+    const computeRange = React.useCallback(() => {
     const base = (typeof filtersDate === "object" && filtersDate) ? new Date(filtersDate.y, (filtersDate.m||1)-1, filtersDate.d||1) : new Date();
     const yyyy = base.getFullYear();
     const mm = String(base.getMonth() + 1).padStart(2, "0");
@@ -136,37 +272,30 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       return `${String(h).padStart(2, "0")}:${min}`;
     };
     const from = `${yyyy}-${mm}-${dd} ${to24(fromTime)}:00`;
-    let to = `${yyyy}-${mm}-${dd} ${to24(toTime)}:00`;
-    // handle overnight (to past midnight): if to <= from, add 1 day to to-date
-    const fromObj = new Date(`${yyyy}-${mm}-${dd}T${to24(fromTime)}:00`);
-    const toObj = new Date(`${yyyy}-${mm}-${dd}T${to24(toTime)}:00`);
-    if (toObj.getTime() <= fromObj.getTime()) {
-      const d = new Date(base); d.setDate(d.getDate() + 1);
-      const yy = d.getFullYear(); const mm2 = String(d.getMonth()+1).padStart(2,"0"); const dd2 = String(d.getDate()).padStart(2,"0");
-      to = `${yy}-${mm2}-${dd2} ${to24(toTime)}:00`;
-    }
+    const to = `${yyyy}-${mm}-${dd} ${to24(toTime)}:00`;
+    // Force same-date range even if to < from (per requirement)
     return { from, to };
-  }, [fromTime, toTime]);
+  }, [fromTime, toTime, filtersDate]);
 
   // fetched data
 
-  // โ… state เน€เธเธเธฒเธฐ Thermostat เธ•เธฑเธงเนเธฃเธ (เธเนเธฒเธข)
+  // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
   const [thermoOne, setThermoOne] = useState<{
     initialValue: number;
     valueLabel: string;
     maxLabel: string;
+    useLifetimeMax?: boolean;
   }>({
     initialValue: 0,
     valueLabel: t("devices.electric.side.unitKwh"),
     maxLabel: "",
+    useLifetimeMax: false,
   });
 
   const toNumber = (v: number | string) => {
     const n = typeof v === "number" ? v : Number(v);
     return Number.isFinite(n) ? n : 0;
   };
-  // SolarEdge telemetry + computed metrics
-  const [telemetries, setTelemetries] = useState<any[]>([]);
   const [metrics, setMetrics] = useState({
     voltage: 0,
     current: 0,
@@ -175,84 +304,204 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     lifetimeKwh: 0,
     monthKwh: 0,
   });
-  const seKey = (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('seKey') || new URLSearchParams(window.location.search).get('api_key') : null) || (import.meta as any).env?.VITE_SOLAREDGE_API_KEY;
+  const [temperatureC, setTemperatureC] = useState(0);
+  // overview-derived values for side cards and max bound
+  const [overviewTodayValue, setOverviewTodayValue] = useState<number | null>(null);
+  const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
+  const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const urlStartTime = qs?.get('startTime') || undefined;
-  // const urlEndTime = qs?.get('endTime') || undefined; // unused
-  // const urlSiteId = qs?.get('siteId') || undefined; // unused
   const urlInverterSN = qs?.get('inverterSN') || undefined;
-  const seSiteId = (selectedSite && selectedSite !== 'all' ? String(selectedSite) : (siteCode && /^\d+$/.test(String(siteCode)) ? String(siteCode) : (import.meta as any).env?.VITE_SOLAREDGE_SITE_ID)) || '3078000';
-  const seInverterSN = (import.meta as any).env?.VITE_SOLAREDGE_INVERTER_SN || '7B0C44D5-A0';
+  const siteForApi =
+    selectedSite && selectedSite !== "all"
+      ? String(selectedSite)
+      : siteCode && /^\d+$/.test(String(siteCode))
+      ? String(siteCode)
+      : "3078000";
+  const inverterSN = urlInverterSN || "7B0C44D5-A0";
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      const daysToFetch = 8; // today + previous 7 days
+      const entries: DailySeries[] = [];
+      for (let i = 0; i < daysToFetch; i++) {
+        const base = new Date();
+        base.setHours(0, 0, 0, 0);
+        base.setDate(base.getDate() - i);
+        const dayStart = startOfDay(base);
+        const dayEnd = endOfDay(base);
+
+        try {
+          const res = await fetchEquipmentTelemetry({
+            siteIdOrCode: siteForApi,
+            sn: inverterSN,
+            startTime: formatDateTimeForApi(dayStart),
+            endTime: formatDateTimeForApi(dayEnd),
+            category: "INVERTER",
+          });
+          const list: any[] = (res?.data as any)?.telemetries ?? [];
+          const points = normalizeTelemetries(list);
+          const halfHourSeries = buildHalfHourSeries(points, dayStart);
+          const dayKwh = halfHourSeries.length
+            ? halfHourSeries[halfHourSeries.length - 1]
+            : 0;
+          entries.push({
+            key: formatDateTimeForApi(dayStart).slice(0, 10),
+            date: dayStart,
+            isToday: i === 0,
+            totalWh:
+              points.length > 1
+                ? Math.max(0, points[points.length - 1].totalWh - points[0].totalWh)
+                : 0,
+            totalKwh: dayKwh,
+            halfHourSeries,
+          });
+        } catch {
+          entries.push({
+            key: formatDateTimeForApi(dayStart).slice(0, 10),
+            date: dayStart,
+            isToday: i === 0,
+            totalWh: 0,
+            totalKwh: 0,
+            halfHourSeries: HALF_HOUR_SLOTS.map(() => 0),
+          });
+        }
+      }
+
+      if (!active) return;
+      entries.sort((a, b) => b.date.getTime() - a.date.getTime());
+      setDailySeries(entries);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [siteForApi, inverterSN]);
+
+  const todaySeriesData = React.useMemo(
+    () => dailySeries.find((item) => item.isToday) ?? null,
+    [dailySeries]
+  );
+
+  const comparisonItems = React.useMemo<ComparisonItem[]>(() => {
+    const today = dailySeries.find((item) => item.isToday);
+    if (!today) return [];
+
+    const todayKwh = today.totalKwh;
+
+    const ranked = dailySeries
+      .filter((item) => !item.isToday)
+      .map((item) => {
+        const previousKwh = item.totalKwh;
+        const ratio = previousKwh > 0 ? todayKwh / previousKwh : 0;
+        const cappedPercent = Math.max(0, Math.min(100, ratio * 100));
+        return {
+          key: item.key,
+          label: formatWeekdayLabel(item.date),
+          displayDate: formatDateLabel(item.date),
+          percentage: cappedPercent,
+          previousKwh,
+          todayKwh,
+          series: item.halfHourSeries,
+          date: item.date,
+        };
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    return ranked.map(({ date, percentage, ...rest }) => {
+      const formattedPercent = Number.isFinite(percentage)
+        ? `${percentage % 1 === 0 ? percentage.toFixed(0) : percentage.toFixed(1)}%`
+        : "-";
+      return {
+        ...rest,
+        percentage,
+        percentLabel: formattedPercent,
+      };
+    });
+  }, [dailySeries]);
+
+  React.useEffect(() => {
+    if (!comparisonItems.length) {
+      setSelectedComparisonKey(null);
+      return;
+    }
+    setSelectedComparisonKey((prev) => {
+      if (prev && comparisonItems.some((item) => item.key === prev)) {
+        return prev;
+      }
+      return comparisonItems[0]?.key ?? null;
+    });
+  }, [comparisonItems]);
+
+  const selectedComparison = React.useMemo(
+    () => comparisonItems.find((item) => item.key === selectedComparisonKey) ?? null,
+    [comparisonItems, selectedComparisonKey]
+  );
+
+  const chartCategories = React.useMemo(() => HALF_HOUR_LABELS, []);
+
+  const chartSeriesData = React.useMemo(() => {
+    const todaySeries = todaySeriesData?.halfHourSeries ?? HALF_HOUR_SLOTS.map(() => 0);
+    const baseSeries = [{
+      name: t("devices.electric.chart.today", { defaultValue: "Today" }),
+      data: sanitizeSeries(todaySeries),
+    }];
+
+    if (!selectedComparison) {
+      return baseSeries;
+    }
+
+    return [
+      baseSeries[0],
+      {
+        name: `${selectedComparison.label} ${selectedComparison.displayDate}`.trim(),
+        data: sanitizeSeries(selectedComparison.series),
+      },
+    ];
+  }, [selectedComparison, t, todaySeriesData]);
 
   React.useEffect(() => {
     (async () => {
       try {
-        if (!seKey) return;
         const range = computeRange();
-        const list = await getInverterTelemetry({
-          siteId: seSiteId,
-          inverterSN: (urlInverterSN ?? seInverterSN),
-          startTime: range.from,
-          endTime: range.to,
-          apiKey: seKey,
-        });
-        setTelemetries(list);
-        if (Array.isArray(list) && list.length > 0) {
-          const first: any = list[0];
-          const last: any = list[list.length - 1];
-          const phaseVs = [last?.L1Data?.acVoltage, last?.L2Data?.acVoltage, last?.L3Data?.acVoltage].filter((v) => Number.isFinite(Number(v))) as number[];
-          const voltage = phaseVs.length ? phaseVs.reduce((a, b) => a + Number(b), 0) / phaseVs.length : (Number.isFinite(Number(last?.vL1To2)) ? Number(last?.vL1To2) / Math.sqrt(3) : 0);
-          const currents = [last?.L1Data?.acCurrent, last?.L2Data?.acCurrent, last?.L3Data?.acCurrent].filter((v) => Number.isFinite(Number(v))) as number[];
-          const current = currents.length ? currents.reduce((a, b) => a + Number(b), 0) / currents.length : 0;
-          const freqs = [last?.L1Data?.acFrequency, last?.L2Data?.acFrequency, last?.L3Data?.acFrequency].filter((v) => Number.isFinite(Number(v))) as number[];
-          const frequency = freqs.length ? freqs.reduce((a, b) => a + Number(b), 0) / freqs.length : 0;
-          const eFirst = Number(first?.totalEnergy || 0);
-          const eLast = Number(last?.totalEnergy || 0);
-          const consumptionKwh = eLast > eFirst ? (eLast - eFirst) / 1000 : 0;
-          const lifetimeKwh = eLast / 1000;
-          setMetrics((m) => ({ ...m, voltage, current, frequency, consumptionKwh, lifetimeKwh }));
+        console.debug('[FE] fetch equipment', {siteForApi, inverterSN, range});
+        const res = await fetchEquipmentTelemetry({ siteIdOrCode: siteForApi, sn: inverterSN, startTime: range.from, endTime: range.to, category: 'INVERTER' });
+        const list: any[] = (res?.data as any)?.telemetries ?? [];
+        const t1: any = (res?.data as any)?.telemetryFirst ?? list[0] ?? null;
+        const t2: any = (res?.data as any)?.telemetryLast ?? (list.length ? list[list.length-1] : null);
+        console.debug('[FE] rangeRes', { count: list.length });
+
+        const last: any = (t2 || t1 || {});
+        const phaseVs = [last?.L1Data?.acVoltage, last?.L2Data?.acVoltage, last?.L3Data?.acVoltage].filter((v: any) => Number.isFinite(Number(v))) as number[];
+        const voltage = phaseVs.length ? phaseVs.reduce((a, b) => a + Number(b), 0) / phaseVs.length : (([last?.vL1To2, last?.vL2To3, last?.vL3To1].map(Number).filter((n) => Number.isFinite(n)) as number[]).reduce((a, b) => a + b, 0) / 3) || 0;
+        const currents = [last?.L1Data?.acCurrent, last?.L2Data?.acCurrent, last?.L3Data?.acCurrent].map(Number).filter((n) => Number.isFinite(n)) as number[];
+        const current = currents.length ? currents.reduce((a, b) => a + b, 0) / currents.length : 0;
+        const freqs = [last?.L1Data?.acFrequency, last?.L2Data?.acFrequency, last?.L3Data?.acFrequency].map(Number).filter((n) => Number.isFinite(n)) as number[];
+        const frequency = freqs.length ? freqs.reduce((a, b) => a + b, 0) / freqs.length : 0;
+        const eFirst = Number(t1?.totalEnergy ?? 0);
+        const eLast = Number(t2?.totalEnergy ?? t1?.totalEnergy ?? 0);
+        const consumptionKwh = eLast > eFirst ? (eLast - eFirst) / 1000 : 0;
+        const lifetimeKwh = eLast / 1000;
+        const tempRaw =
+          last?.temperature ??
+          last?.Temperature ??
+          last?.L1Data?.temperature ??
+          last?.L1Data?.Temperature ??
+          last?.envTemp ??
+          0;
+        const temperature = Number(tempRaw);
+        setMetrics((m) => ({ ...m, voltage, current, frequency, consumptionKwh, lifetimeKwh }));
+        if (Number.isFinite(temperature)) {
+          setTemperatureC(temperature);
         } else {
-          setMetrics((m) => ({ ...m, voltage: 0, current: 0, frequency: 0, consumptionKwh: 0 }));
+          setTemperatureC(0);
         }
       } catch (e) {
         // ignore
       }
     })();
-  }, [siteCode, computeRange, seKey]);
+  }, [computeRange, siteForApi, inverterSN]);
 
-  React.useEffect(() => {
-    (async () => {
-      try {
-        if (!seKey) return;
-        const now = (typeof filtersDate === "object" && filtersDate) ? new Date(filtersDate.y, (filtersDate.m||1)-1, filtersDate.d||1) : (urlStartTime ? new Date(urlStartTime.replace(' ', 'T')) : new Date());
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const start = startOfMonth.getFullYear() + "-" + pad(startOfMonth.getMonth() + 1) + "-" + pad(startOfMonth.getDate()) + " 00:00:00";
-        const range = computeRange();
-        const list = await getInverterTelemetry({
-          siteId: seSiteId,
-          inverterSN: (urlInverterSN ?? seInverterSN),
-          startTime: start,
-          endTime: range.to,
-          apiKey: seKey,
-        });
-        if (Array.isArray(list) && list.length > 0) {
-          const eFirst = Number(list[0]?.totalEnergy || 0);
-          const eLast = Number(list[list.length - 1]?.totalEnergy || 0);
-          const monthKwh = eLast > eFirst ? (eLast - eFirst) / 1000 : 0;
-          setMetrics((m) => ({ ...m, monthKwh }));
-        } else {
-          setMetrics((m) => ({ ...m, monthKwh: 0 }));
-        }
-      } catch (e) {
-        // ignore
-      }
-    })();
-  }, [siteCode, computeRange, seKey]);
-
-  // telemetry-driven chart data
-  const chartCats = React.useMemo(() => telemetries.map((t: any) => String(t?.date ?? '').slice(11, 16)), [telemetries]);
-  const chartSeries = React.useMemo(() => [{ name: 'Active Power', data: telemetries.map((t: any) => Number(t?.totalActivePower || 0)) }], [telemetries]);
 
   // Update left gauge from telemetry-based today consumption (kWh)
   React.useEffect(() => {
@@ -262,6 +511,103 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       initialValue: Math.round(toNumber(today)),
     }));
   }, [metrics.consumptionKwh]);
+
+  // Ensure device.meta overview is refreshed and consumed for side cards / max bound
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        await updateElectricOverview(siteForApi, inverterSN);
+      } catch {
+        // ignore updater failures; still attempt to read cached meta
+      }
+
+      try {
+        const res = await getElectricDevices(siteForApi);
+        const items: any[] = Array.isArray((res as any)?.items)
+          ? (res as any).items
+          : Array.isArray((res as any)?.data?.items)
+          ? (res as any).data.items
+          : [];
+        const identity = `INVERTER:${inverterSN}`.toUpperCase();
+        const device = items.find((item) => {
+          const model = String(item?.model ?? "");
+          return model.toUpperCase() === identity;
+        });
+        const overviewMeta = device?.meta?.overview;
+        if (!active) return;
+        if (!overviewMeta) {
+          setOverviewTodayValue(null);
+          setOverviewMonthValue(null);
+          setOverviewLifetimeValue(null);
+          return;
+        }
+        const toNum = (value: any): number | null => {
+          if (typeof value === "number") return Number.isFinite(value) ? value : null;
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+
+        const toKwh = (kwhCandidate: any, ...whCandidates: any[]): number | null => {
+          const kwh = toNum(kwhCandidate);
+          if (kwh !== null) return kwh;
+          for (const whSource of whCandidates) {
+            const wh = toNum(whSource);
+            if (wh !== null) {
+              return wh / 1000;
+            }
+          }
+          return null;
+        };
+
+        const dayKwh = toKwh(
+          overviewMeta.lastDayKwh ?? overviewMeta.today_kwh,
+          overviewMeta.lastDayWh,
+          overviewMeta.lastDayData?.energy,
+          overviewMeta.todayWh
+        );
+        const monthKwh = toKwh(
+          overviewMeta.lastMonthKwh,
+          overviewMeta.lastMonthWh,
+          overviewMeta.lastMonthData?.energy
+        );
+        const lifetimeKwh = toKwh(
+          overviewMeta.lifeTimeKwh ?? overviewMeta.lifetimeKwh,
+          overviewMeta.lifeTimeWh,
+          overviewMeta.lifeTimeData?.energy,
+          overviewMeta.lifetimeWh
+        );
+
+        setOverviewTodayValue(dayKwh);
+        setOverviewMonthValue(monthKwh);
+        setOverviewLifetimeValue(lifetimeKwh);
+        if (monthKwh !== null) {
+          setMetrics((m) => ({ ...m, monthKwh }));
+        }
+      } catch {
+        if (!active) return;
+        setOverviewTodayValue(null);
+        setOverviewMonthValue(null);
+        setOverviewLifetimeValue(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [siteForApi, inverterSN]);
+
+  const lifetimeMaxValue =
+    typeof overviewLifetimeValue === "number" && Number.isFinite(overviewLifetimeValue)
+      ? overviewLifetimeValue
+      : null;
+  const sideCardTodayValue =
+    overviewTodayValue !== null && overviewTodayValue !== undefined
+      ? overviewTodayValue
+      : metrics.consumptionKwh;
+  const sideCardMonthValue =
+    overviewMonthValue !== null && overviewMonthValue !== undefined
+      ? overviewMonthValue
+      : metrics.monthKwh;
 
   return (
     <>
@@ -369,15 +715,19 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               )}
             </Dropdown>
           </div>
-          {/* โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€โ”€ */}
+          {/* ──────────────────────────────────── */}
 
           <div className="flex flex-col md:flex-row w-full justify-around gap-10 lg:gap-0">
             <div className="flex flex-col items-center gap-20">
-              {/* โ… เธฃเธต-mount เน€เธกเธทเนเธญเธเนเธฒเน€เธเธฅเธตเนเธขเธ */}
+              {/* ✅ รี-mount เมื่อค่าเปลี่ยน */}
               <Thermostat
-                key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}`}
+                key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}-${thermoOne.useLifetimeMax ? 'l' : 'n'}`}
                 initialValue={thermoOne.initialValue}
-                max={200000}
+                max={
+                  thermoOne.useLifetimeMax
+                    ? Math.max(1, lifetimeMaxValue ?? thermoOne.initialValue)
+                    : 450
+                }
                 maxLabel={thermoOne.maxLabel}
                 valueLabel={thermoOne.valueLabel}
               />
@@ -385,11 +735,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={0}
-                max={50}
+                initialValue={Math.round(temperatureC)}
+                value={Math.round(temperatureC)}
+                max={60}
                 maxLabel={""}
-                valueLabel={``}
-                unit=""
+                valueLabel={t("devices.electric.cards.temperature", { defaultValue: "Temperature" })}
+                unit="°C"
               />
             </div>
           </div>
@@ -440,13 +791,15 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                 value={kpi.value}
                 valueLabel={kpi.valueLabel}
                 valueLabel2={kpi.valueLabel2}
-                onClick={() =>
+                onClick={() => {
+                  const isAccumulated = kpi.valueLabel === t("devices.electric.cards.accumulated");
                   setThermoOne({
                     initialValue: toNumber(kpi.value),
                     valueLabel: kpi.valueLabel,
                     maxLabel: kpi.valueLabel2,
+                    useLifetimeMax: !!isAccumulated,
                   })
-                }
+                }}
               />
             ))}
           </div>
@@ -456,13 +809,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           {[
             {
               img: plugWhiteIcon,
-              value: metrics.consumptionKwh,
+              value: sideCardTodayValue,
               valueLabel: t("devices.electric.side.today"),
               unit: t("devices.electric.side.unitKwh"),
             },
             {
               img: boltWhiteIcon,
-              value: metrics.monthKwh,
+              value: sideCardMonthValue,
               valueLabel: t("devices.electric.side.month"),
               unit: t("devices.electric.side.unitKwh"),
             },
@@ -479,47 +832,65 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       </div>
 
       <div className="bg-white rounded-xl p-6">
-        {/* เนเธ–เธเธฃเธฒเธขเธงเธฑเธ + เธงเธ Radial */}
+        {/* แถบรายวัน + วง Radial */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          {ELECTRIC_CONVERSIONS_LIST.map((v, i) => {
-            const day = ELECTRIC_DAYS[i];
-            const isActive = selected === day;
-            return (
-              <button
-                key={day}
-                type="button"
-                onClick={() => setSelected(day)}
-                className={[
-                  "flex flex-col hover: text-left border-b transition-colors",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50 cursor-pointer ",
-                  isActive
-                    ? "border-b-2 border-cyan"
-                    : "border-b border-transparent",
-                ].join(" ")}
-              >
-                <span className="text-xl font-semibold mb-1">{day}</span>
-                <div className="flex items-center gap-4 pb-2">
-                  <div className="flex flex-col text-center">
-                    <h1 className="text-sm text-gray-400">Conversion</h1>
-                    <p className="text-2xl font-bold">{v}%</p>
+          {comparisonItems.length ? (
+            comparisonItems.map((item) => {
+              const isActive = item.key === selectedComparisonKey;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setSelectedComparisonKey(item.key)}
+                  className={[
+                    "flex flex-col text-left border-b transition-colors",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50 cursor-pointer",
+                    isActive
+                      ? "border-b-2 border-cyan"
+                      : "border-b border-transparent",
+                  ].join(" ")}
+                >
+                  <div className="mb-1">
+                    <span className="text-xl font-semibold text-gray-800">{item.label}</span>
+                    <span className="ml-2 text-sm text-gray-400">{item.displayDate}</span>
                   </div>
-                  <ElectricRadialBasic value={v} />
-                </div>
-              </button>
-            );
-          })}
+                  <div className="flex items-center justify-between pb-2">
+                    <span className="text-2xl font-semibold text-gray-700">
+                      {item.percentLabel}
+                    </span>
+                    <ElectricRadialBasic
+                      value={Math.max(0, Math.min(100, item.percentage))}
+                    />
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="col-span-full text-center text-sm text-gray-400">
+              {t("devices.electric.radial.noHistory", { defaultValue: "No historical data" })}
+            </div>
+          )}
         </div>
 
-        {/* เธเธฃเธฒเธเน€เธชเนเธเน€เธเธฅเธตเนเธขเธเธ•เธฒเธกเธงเธฑเธ */}
+        {/* กราฟเส้นเปลี่ยนตามวัน */}
         <ElectricLineBasicChart
-          key={selected}
-          categories={chartCats?.length ? chartCats : undefined}
-          series={chartSeries?.[0]?.data?.length ? chartSeries : ELECTRIC_DAY_SERIES[selected]}
+          key={selectedComparison?.key ?? "today"}
+          categories={chartCategories}
+          series={chartSeriesData}
         />
       </div>
     </>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 

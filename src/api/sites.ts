@@ -17,3 +17,8 @@ export async function getSiteInventory(siteId: string) {
     return data;
   }
 }
+
+export async function getSiteDetails(siteIdOrCode: string) {
+  const { data } = await api.get(`/site/${encodeURIComponent(siteIdOrCode)}/details`);
+  return data;
+}

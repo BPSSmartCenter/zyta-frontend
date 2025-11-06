@@ -1,21 +1,11 @@
 // src/components/CCTV/cctvTable.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
-import Dropdown from "../../Dropdown";
-import DatePicker, { type DateValue } from "../../DateInput";
 import SearchInput from "../../SearchInput";
 import {
   CCTV_ROWS,
-  CCTV_SITE_OPTIONS,
-  CCTV_EVENT_OPTIONS,
   type CCTVRow,
 } from "../devices.constant";
-
-/* helpers */
-const sameYMD = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
@@ -29,42 +19,24 @@ const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   });
 };
 
-// รองรับ value “all” และข้อความ “All Sites/ทุกไซต์”, “All Event/ทุกเหตุการณ์”
-const isAllSite = (v: string) => ["all", "All Sites", "ทุกไซต์"].includes(v);
-const isAllEvent = (v: string) =>
-  ["all", "All Event", "ทุกเหตุการณ์"].includes(v);
-
 export default function CCTVTable() {
   const { t } = useTranslation("devices");
 
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  // ⬇️ ตั้งค่าเริ่มต้นเป็นข้อความ “All Sites” และ “All Event”
-  const [site, setSite] = React.useState<string>("All Sites");
-  const [event, setEvent] = React.useState<string>("All Event");
-  const [date, setDate] = React.useState<DateValue | undefined>(undefined);
   const [query, setQuery] = React.useState<string>("");
 
   const [page, setPage] = React.useState(1);
   const pageSize = 5;
 
-  // กรองด้วยค่า value (normalize “all” ให้เสมอ)
   const rowsFiltered: CCTVRow[] = React.useMemo(() => {
-    return CCTV_ROWS.filter((r) => (isAllSite(site) ? true : r.site === site))
-      .filter((r) => (isAllEvent(event) ? true : r.event === event))
-      .filter((r) => {
-        if (!date) return true;
-        const d = new Date(r.timeISO);
-        const sel = new Date(date.y, date.m - 1, date.d);
-        return sameYMD(d, sel);
-      })
-      .filter((r) => {
-        if (!query.trim()) return true;
-        // ค้นหาตาม event (คง logic เดิม)
-        return r.event.toLowerCase().includes(query.toLowerCase());
-      });
-  }, [site, event, date, query]);
+    if (!query.trim()) return CCTV_ROWS;
+    const lowered = query.toLowerCase();
+    return CCTV_ROWS.filter((r) =>
+      r.event.toLowerCase().includes(lowered)
+    );
+  }, [query]);
 
-  React.useEffect(() => setPage(1), [site, event, date, query]);
+  React.useEffect(() => setPage(1), [query]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -86,157 +58,14 @@ export default function CCTVTable() {
       </div>
 
       {/* Filters row */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Sites */}
-          <Dropdown options={CCTV_SITE_OPTIONS} value={site} onChange={setSite}>
-            {({
-              open,
-              selected,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-              options,
-            }) => {
-              // ปุ่ม: ถ้า “ทั้งหมด” → ใช้คำแปล; ถ้าเป็นชื่อไซต์จริง ๆ ไม่ต้องแปล
-              const buttonLabel =
-                selected?.value && isAllSite(selected.value)
-                  ? t("table.filters.site", { defaultValue: "All Sites" })
-                  : selected?.label ?? selected?.value ?? "Site";
-
-              return (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "h-[40px] min-w-[180px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 hover:cursor-pointer",
-                    })}
-                  >
-                    <span className="truncate">{buttonLabel}</span>
-                    <i className="material-icons leading-none">
-                      {open ? "arrow_drop_up" : "arrow_drop_down"}
-                    </i>
-                  </button>
-
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg",
-                      })}
-                    >
-                      {options.map((opt) => {
-                        // เมนู: แปลเฉพาะ “All Sites”; รายชื่อไซต์ปล่อยตาม label เดิม
-                        const label = isAllSite(opt.value)
-                          ? t("table.filters.site", {
-                              defaultValue: "All Sites",
-                            })
-                          : opt.label ?? opt.value;
-                        return (
-                          <button
-                            key={opt.value}
-                            {...getItemProps(opt, {
-                              className:
-                                "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
-                            })}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-          </Dropdown>
-
-          {/* Events */}
-          <Dropdown
-            options={CCTV_EVENT_OPTIONS}
-            value={event}
-            onChange={setEvent}
-          >
-            {({
-              open,
-              selected,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-              options,
-            }) => {
-              // ปุ่ม: “All Event” แปลจาก i18n; อื่น ๆ แปลผ่าน table.events.<value>
-              const buttonLabel =
-                selected?.value && isAllEvent(selected.value)
-                  ? t("table.filters.event", { defaultValue: "All Event" })
-                  : t(`table.events.${selected?.value}`, {
-                      defaultValue:
-                        selected?.label ?? selected?.value ?? "Event",
-                    });
-
-              return (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "h-[40px] min-w-[180px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 hover:cursor-pointer",
-                    })}
-                  >
-                    <span className="truncate">{buttonLabel}</span>
-                    <i className="material-icons leading-none">
-                      {open ? "arrow_drop_up" : "arrow_drop_down"}
-                    </i>
-                  </button>
-
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg",
-                      })}
-                    >
-                      {options.map((opt) => {
-                        // เมนู: ใช้ mapping i18n สำหรับ event ทุกตัว; “ทั้งหมด” ใช้ table.filters.event
-                        const label = isAllEvent(opt.value)
-                          ? t("table.filters.event", {
-                              defaultValue: "All Event",
-                            })
-                          : t(`table.events.${opt.value}`, {
-                              defaultValue: opt.label ?? opt.value,
-                            });
-                        return (
-                          <button
-                            key={opt.value}
-                            {...getItemProps(opt, {
-                              className:
-                                "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
-                            })}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-          </Dropdown>
-
-          {/* Date */}
-          <DatePicker value={date} onChange={setDate} />
-        </div>
-
-        {/* Search (คงสไตล์เดิม) */}
-        <SearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder={t("table.searchPlaceholder", {
-            defaultValue: "Search events",
-          })}
-          className="w-full md:w-[340px]"
-        />
-      </div>
+      <SearchInput
+        value={query}
+        onChange={setQuery}
+        placeholder={t("table.searchPlaceholder", {
+          defaultValue: "Search events",
+        })}
+        className="w-full md:w-[340px]"
+      />
 
       {/* Table */}
       <div className="mt-4 overflow-x-auto rounded-lg bg-white">

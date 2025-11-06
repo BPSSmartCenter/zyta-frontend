@@ -16,6 +16,13 @@ export async function getElectricOverview(siteCode: string) {
   return data;
 }
 
+export async function updateElectricOverview(siteCode: string, sn: string) {
+  const params = new URLSearchParams();
+  params.set("sn", sn);
+  const { data } = await api.get(`/site/${encodeURIComponent(siteCode)}/electric/overview/update?${params.toString()}`);
+  return data as { ok: boolean; today_kwh: number; month_kwh: number } | any;
+}
+
 export async function getElectricSeries(
   siteCode: string,
   opts: { from: string; to: string; timeUnit?: string; meters?: string }

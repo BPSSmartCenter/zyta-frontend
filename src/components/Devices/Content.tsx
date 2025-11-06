@@ -11,6 +11,8 @@ import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 import AirPanel from "./Air Sensor/AirPanel";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import { useFilters } from "../../context/FiltersContext";
+import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import { useDeviceInventory, getCountForType } from "../../context/DeviceInventoryContext";
 
@@ -40,6 +42,11 @@ export default function Content({}: Props) {
   const { abs, absSite } = useUserPath();
   const { siteCode } = useParams();
   const { counts: inventoryCounts } = useDeviceInventory();
+  const { selectedSite } = useFilters();
+
+  useDeviceInventoryLoader({
+    selectedSiteCode: siteCode ?? selectedSite,
+  });
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();

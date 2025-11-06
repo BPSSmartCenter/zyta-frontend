@@ -78,7 +78,7 @@ const Thermostat: React.FC<ThermostatProps> = ({
             </p>
           </div>
           <p className="text-[40px] font-bold text-gray-700">
-            {safeValue}
+            {Math.round(safeValue)}
             {unit}
           </p>
           <p className="flex text-[#424242] items-center gap-1 text-gray-500 text-xl">
