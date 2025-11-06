@@ -9,6 +9,7 @@ import TableFaceScan from "./TableFace";
 import Table from "./Table";
 import { useFaceRec } from "../../context/FaceRecContext";
 import { useFilters } from "../../context/FiltersContext";
+import { toDateKey } from "../../utils/notis";
 
 // no static placeholder; show latest preview image instead
 
@@ -24,20 +25,19 @@ const Content: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation("facerec");
   const faceRec = useFaceRec();
-  const { date: globalDate } = useFilters();
+  const { date: globalDate, dateTouched } = useFilters();
+
+  const selectedDateKey = React.useMemo(
+    () => (dateTouched ? toDateKey(globalDate) : null),
+    [dateTouched, globalDate]
+  );
 
   const matchDate = React.useCallback(
     (iso: string) => {
-      if (!globalDate) return true;
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return true;
-      return (
-        d.getFullYear() === (globalDate as any).y &&
-        d.getMonth() + 1 === (globalDate as any).m &&
-        d.getDate() === (globalDate as any).d
-      );
+      if (!selectedDateKey) return true;
+      return toDateKey(iso) === selectedDateKey;
     },
-    [(globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]
+    [selectedDateKey]
   );
 
   const filteredFaceRows = React.useMemo(() => {

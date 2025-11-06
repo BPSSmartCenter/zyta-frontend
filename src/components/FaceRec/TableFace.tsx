@@ -1,59 +1,56 @@
-﻿import React from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import { useFilters } from "../../context/FiltersContext";
-
 import SearchInput from "../SearchInput";
 import { FACE_SCAN_ROWS, type FaceScanRow } from "./faceRec.constant";
 import { useFaceRec } from "../../context/FaceRecContext";
+import { toDateKey } from "../../utils/notis";
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
   const at = new Date(fromISO).getTime();
   const diffH = Math.max(0, Math.round((now - at) / 36e5));
   if (diffH === 0) return t("relative.justNow", { defaultValue: "just now" });
-  return t("relative.hoursAgo", {
-    count: diffH,
-    defaultValue: "{{count}} hours ago",
-  });
+  return t("relative.hoursAgo", { count: diffH, defaultValue: "{{count}} hours ago" });
 };
 
 export default function TableFaceScan() {
   const faceRec = useFaceRec();
   const { t } = useTranslation("facerec");
-  const { date: globalDate } = useFilters();
+  const { date: globalDate, dateTouched } = useFilters();
 
-  // selection
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-
-  // Filters
   const [nameQ, setNameQ] = React.useState("");
-
-  // Pager
   const [page, setPage] = React.useState(1);
   const pageSize = 5;
 
+  const allRows: FaceScanRow[] =
+    faceRec?.faceRows && faceRec.faceRows.length > 0
+      ? (faceRec.faceRows as any)
+      : (FACE_SCAN_ROWS as any);
+
+  const selectedDateKey = React.useMemo(
+    () => (dateTouched ? toDateKey(globalDate) : null),
+    [dateTouched, globalDate]
+  );
+
   const rowsFiltered: FaceScanRow[] = React.useMemo(() => {
-    const rows = (faceRec?.faceRows && faceRec.faceRows.length>0)? faceRec.faceRows : FACE_SCAN_ROWS;
-    return rows
+    return allRows
       .filter((r) => {
-        if (!globalDate) return true;
-        const d = new Date(r.timeInISO);
-        return d.getFullYear() === (globalDate as any).y && d.getMonth() === (globalDate as any).m - 1 && d.getDate() === (globalDate as any).d;
+        if (!selectedDateKey) return true;
+        return toDateKey(r.timeInISO) === selectedDateKey;
       })
       .filter((r) => {
         if (!nameQ.trim()) return true;
         return r.fullName.toLowerCase().includes(nameQ.toLowerCase());
       });
-  }, [nameQ, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d, faceRec?.faceRows?.length]);
+  }, [allRows, selectedDateKey, nameQ]);
 
-  React.useEffect(() => setPage(1), [nameQ, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]);
+  React.useEffect(() => setPage(1), [nameQ, selectedDateKey]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
-  const pageRows = rowsFiltered.slice(
-    (clampedPage - 1) * pageSize,
-    clampedPage * pageSize
-  );
+  const pageRows = rowsFiltered.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
 
   const GRID_COLS =
     "grid-cols-[48px_100px_150px_180px_140px_minmax(260px,1.6fr)_200px]";
@@ -63,7 +60,6 @@ export default function TableFaceScan() {
       {/* Filters row */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          {/* NAME */}
           <input
             type="text"
             placeholder={t("filters.name", { defaultValue: "Name" })}
@@ -75,7 +71,6 @@ export default function TableFaceScan() {
           />
         </div>
 
-        {/* Search */}
         <SearchInput
           value={nameQ}
           onChange={setNameQ}
@@ -87,7 +82,6 @@ export default function TableFaceScan() {
       {/* Table */}
       <div className="mt-4 overflow-x-auto rounded-lg bg-white">
         <div className="inline-block w-full min-w-[950px] align-middle">
-          {/* Header */}
           <div
             className={`grid w-full ${GRID_COLS} place-items-center px-4 py-3 text-[12px] font-medium text-gray-500 text-center bg-gray-100`}
           >
@@ -101,58 +95,52 @@ export default function TableFaceScan() {
           </div>
           <hr className="border-gray-200" />
 
-          {/* Rows */}
-          {pageRows.map((r) => {
+          {pageRows.map((r, idx) => {
             const isSel = selectedId === r.id;
-            const cbId = `fs-check-${r.id}`;
-            const nameCellId = `fs-name-${r.id}`;
+            const checkboxId = `fs-check-${r.id || idx}`;
+            const nameCellId = `fs-name-${r.id || idx}`;
             return (
               <div
-                key={r.id}
+                key={r.id || idx}
                 className={[
                   `grid w-full ${GRID_COLS} place-items-center px-4 py-3 text-[14px] text-center`,
                   "border-t border-gray-100",
                   isSel ? "bg-blue-50" : "bg-white",
                 ].join(" ")}
               >
-                {/* NO + checkbox */}
                 <div className="flex items-center justify-center gap-2">
                   <input
-                    id={cbId}
+                    id={checkboxId}
                     type="checkbox"
                     checked={isSel}
-                    onChange={(e) => setSelectedId(e.target.checked ? r.id : null)}
+                    onChange={(e) => setSelectedId(e.target.checked ? (r.id || null) : null)}
                     className="size-5 rounded-md focus:ring-0 checked:border-cyan checked:bg-cyan hover:cursor-pointer"
                     aria-labelledby={nameCellId}
                   />
-                  <label htmlFor={cbId} className="sr-only">
+                  <label htmlFor={checkboxId} className="sr-only">
                     {t("a11y.selectRow", { defaultValue: "Select row" })}
                   </label>
                 </div>
 
-                {/* PICTURE */}
                 <div className="h-[60px] w-[80px] overflow-hidden rounded-md">
                   <img src={r.picture} alt="" className="h-full w-full object-cover" />
                 </div>
 
-                {/* FULL NAME */}
                 <div id={nameCellId} className="text-gray-800">
                   {r.fullName}
                 </div>
 
-                {/* GENDER */}
                 <div className="text-gray-800">{r.gender}</div>
 
-                {/* PROVINCE */}
                 <div className="text-gray-800">{r.province}</div>
 
-                {/* IN/OUT STATUS */}
                 <div className="text-gray-800">{r.inout}</div>
 
-                {/* EVENT TIME */}
                 <div className="text-gray-700">
                   <div>{new Date(r.timeInISO).toLocaleString()}</div>
-                  <div className="text-[12px] text-gray-500">{relHours(r.timeInISO, t)}</div>
+                  <div className="text-[12px] text-gray-500">
+                    {relHours(r.timeInISO, t)}
+                  </div>
                 </div>
               </div>
             );
@@ -160,7 +148,6 @@ export default function TableFaceScan() {
         </div>
       </div>
 
-      {/* Pager (5 rows/page) */}
       <div className="mt-3 flex items-center justify-between px-2 pb-3">
         <div className="flex items-center gap-2">
           <button

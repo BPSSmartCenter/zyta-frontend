@@ -1,7 +1,6 @@
 // src/data/dashboard.ts
 import {
   fireNoti,
-  // motionNoti,
   deviceNoti,
   fallingNoti,
   sleepingNoti,
@@ -12,7 +11,6 @@ import {
   fireCamera,
   sleepCamera,
   fallCamera,
-  // motionCamera,
   offlineDeviceCamera,
 } from "../../assets/index";
 
@@ -30,19 +28,30 @@ export {
   fireNoti,
 };
 
-export type NotiType = "alert" | "warning" | "info" | "normal";
+export type NotiType = "alert" | "warning" | "info" | "normal" | "offline";
 
 export type Severity = "low" | "medium" | "critical";
 
 export type Noti = {
+  id?: string;
   type: NotiType; // ← ห้ามเป็น string กว้างๆ
   img?: string;
   titleKey?: string;
   title: string;
   site: string;
+  siteId?: string;
+  siteCode?: string;
+  siteName?: string;
   coords?: { lat: number; lng: number };
+  lat?: number;
+  lng?: number;
   date: string; // ISO string หรือ YYYY-MM-DD
+  occurredAt?: string;
+  createdAt?: string;
   severity?: Severity; // optional ได้
+  deviceId?: string;
+  deviceModel?: string;
+  meta?: Record<string, unknown> | null;
   screenshot?: string;
 };
 

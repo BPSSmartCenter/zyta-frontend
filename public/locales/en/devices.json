@@ -91,7 +91,8 @@
         "today": "Today's consumption",
         "month": "This month's consumption",
         "unitKwh": "kWh"
-      }
+      },
+      "noData": "No data"
     }
   }
 }

@@ -2,6 +2,8 @@
 import React from "react";
 import { listFaceRecEvents, faceRecStreamUrl, type FaceRecWebhookPayload } from "../api/facerec";
 import type { Noti } from "../data/Dashboard/notis";
+import { useNotisFeed } from "./NotisContext";
+import { sortByNewest } from "../utils/notis";
 import { GREEN_BOX_SVG, type FaceScanRow, type LicensePlateRow } from "../components/FaceRec/faceRec.constant";
 
 export type FaceRecEventDTO = {
@@ -99,6 +101,84 @@ const FaceRecCtx = React.createContext<FaceRecState>(defaultState);
 
 export function FaceRecProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<FaceRecState>(defaultState);
+  const { items: notisItems } = useNotisFeed();
+
+  const derivedFromNotis = React.useMemo(() => {
+    const faces: FaceScanRow[] = [];
+    const faceNotis: Array<Noti & { img?: string }> = [];
+    const plates: LicensePlateRow[] = [];
+    const plateNotis: Array<Noti & { img?: string }> = [];
+
+    sortByNewest(notisItems).forEach((n) => {
+      const meta = (n.meta ?? {}) as any;
+      const kind = (meta?.kind ?? "").toString().toLowerCase();
+      if (kind === "face") {
+        const occurred = new Date(n.occurredAt ?? n.date ?? Date.now()).toISOString();
+        const person = meta?.person ?? {};
+        const id = `noti-face-${n.id ?? meta?.rawId ?? occurred}`;
+        const genderRaw = String(person.gender || "").toUpperCase();
+        const row: FaceScanRow = {
+          id,
+          picture: (n.img as string) || meta?.picture || GREEN_BOX_SVG,
+          fullName: person.fullName ?? n.title ?? "-",
+          gender: genderRaw === "FEMALE" ? "FEMALE" : "MALE",
+          province: meta?.province ?? n.site ?? "-",
+          inout: meta?.inout ?? "IN",
+          timeInISO: occurred,
+          timeOutISO: occurred,
+          cameraName: meta?.cameraName ?? meta?.camera ?? undefined,
+        };
+        faces.push(row);
+        faceNotis.push({
+          ...n,
+          img: (n.img as string) || meta?.picture,
+          type: n.type,
+          occurredAt: occurred,
+        } as any);
+      } else if (kind === "plate") {
+        const occurred = new Date(n.occurredAt ?? n.date ?? Date.now()).toISOString();
+        const id = `noti-plate-${n.id ?? meta?.rawId ?? occurred}`;
+        const confidenceHeader = Array.isArray(meta?.confidenceHeader) && meta.confidenceHeader.length
+          ? meta.confidenceHeader
+          : ["-","-","-","-","-","-"];
+        const row: LicensePlateRow = {
+          id,
+          picture: meta?.picture || (n.img as string) || GREEN_BOX_SVG,
+          platePicture: meta?.platePicture || meta?.picture || (n.img as string) || GREEN_BOX_SVG,
+          plateText: meta?.plateText ?? meta?.plate ?? n.title ?? "-",
+          province: meta?.province ?? n.site ?? "-",
+          confidenceHeader,
+          cameraName: meta?.cameraName ?? meta?.camera ?? "-",
+          timestamp: occurred,
+        };
+        plates.push(row);
+        plateNotis.push({
+          ...n,
+          img: row.platePicture,
+          occurredAt: occurred,
+        } as any);
+      }
+    });
+
+    return {
+      faceRows: faces,
+      faceDashboard: faceNotis,
+      plateRows: plates,
+      plateDashboard: plateNotis,
+    };
+  }, [notisItems]);
+
+  const mergeById = <T,>(
+    base: ReadonlyArray<T>,
+    extra: ReadonlyArray<T>,
+    getId: (item: T) => string,
+    getTime: (item: T) => number
+  ): T[] => {
+    const map = new Map<string, T>();
+    base.forEach((item) => map.set(getId(item), item));
+    extra.forEach((item) => map.set(getId(item), item));
+    return Array.from(map.values()).sort((a, b) => getTime(b) - getTime(a));
+  };
 
   React.useEffect(() => {
     let es: EventSource | null = null;
@@ -183,7 +263,99 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return <FaceRecCtx.Provider value={state}>{children}</FaceRecCtx.Provider>;
+  const combinedFaceRows = React.useMemo(
+    () =>
+      mergeById(
+        state.faceRows,
+        derivedFromNotis.faceRows,
+        (r) => r.id,
+        (r) => new Date(r.timeInISO).getTime()
+      ),
+    [state.faceRows, derivedFromNotis.faceRows]
+  );
+
+  const combinedPlateRows = React.useMemo(
+    () =>
+      mergeById(
+        state.plateRows,
+        derivedFromNotis.plateRows,
+        (r) => r.id,
+        (r) => new Date(r.timestamp).getTime()
+      ),
+    [state.plateRows, derivedFromNotis.plateRows]
+  );
+
+  const combinedDashboardNotis = React.useMemo(
+    () =>
+      mergeById(
+        state.dashboardNotis,
+        [...derivedFromNotis.faceDashboard, ...derivedFromNotis.plateDashboard],
+        (n) => String(n.id ?? `${n.site}-${n.date}-${n.titleKey ?? n.title}`),
+        (n) => new Date((n as any).occurredAt ?? n.date).getTime()
+      ),
+    [state.dashboardNotis, derivedFromNotis.faceDashboard, derivedFromNotis.plateDashboard]
+  );
+
+  const faceList = React.useMemo(
+    () =>
+      combinedFaceRows
+        .slice(-5)
+        .reverse()
+        .map((r) => ({
+          fullName: r.fullName,
+          gender: r.gender,
+          timestamp: new Date(r.timeInISO).toLocaleString(),
+        })),
+    [combinedFaceRows]
+  );
+
+  const plateList = React.useMemo(
+    () =>
+      combinedPlateRows
+        .slice(-5)
+        .reverse()
+        .map((r) => ({
+          plate: r.plateText,
+          province: r.province,
+          timestamp: new Date(r.timestamp).toLocaleString(),
+        })),
+    [combinedPlateRows]
+  );
+
+  const latestFace = combinedFaceRows[combinedFaceRows.length - 1];
+  const latestPlate = combinedPlateRows[combinedPlateRows.length - 1];
+
+  const value: FaceRecState = {
+    dashboardNotis: combinedDashboardNotis.slice(-100),
+    faceRows: combinedFaceRows,
+    faceList,
+    faceDetail: latestFace
+      ? {
+          fullName: latestFace.fullName,
+          gender: latestFace.gender,
+          province: latestFace.province,
+          status: latestFace.inout,
+          timeIn: new Date(latestFace.timeInISO).toLocaleString(),
+          timeOut: new Date(latestFace.timeOutISO).toLocaleString(),
+        }
+      : state.faceDetail,
+    plateRows: combinedPlateRows,
+    plateList,
+    plateDetail: latestPlate
+      ? {
+          plate: latestPlate.plateText,
+          province: latestPlate.province,
+          type: "-",
+          owner: "-",
+          color: "-",
+          camera: latestPlate.cameraName,
+          timestamp: new Date(latestPlate.timestamp).toLocaleString(),
+        }
+      : state.plateDetail,
+    plateConfidenceHeader: latestPlate?.confidenceHeader ?? state.plateConfidenceHeader,
+  };
+
+  return <FaceRecCtx.Provider value={value}>{children}</FaceRecCtx.Provider>;
 }
 
 export function useFaceRec() {

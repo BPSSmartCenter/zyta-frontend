@@ -8,10 +8,9 @@ import * as React from "react";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
-import {
-  notis as alertNotis,
-  wellBeingNotis,
-} from "../../data/Dashboard/notis";
+import { useNotisFeed } from "../../context/NotisContext";
+import { matchesSite, toDateKey } from "../../utils/notis";
+import { useFilters } from "../../context/FiltersContext";
 
 /* ---------- types ---------- */
 type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
@@ -102,34 +101,26 @@ export default function Content({ statItems }: Props) {
   const navigate = useNavigate();
   const params = useParams();
   const { absSite } = useUserPath();
-  // รวม notis ทั้งหมด
-  // รวม notis และกรองตาม site context ถ้ามี :siteCode
+  const { items: liveNotis } = useNotisFeed();
+  const { date: globalDate, selectedSite: selectedSiteFilter } = useFilters();
+  const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
+  const routeSite = params.siteCode ? String(params.siteCode) : null;
+  const contextSite =
+    selectedSiteFilter && selectedSiteFilter !== "all"
+      ? selectedSiteFilter
+      : null;
+  const effectiveSite = routeSite ?? contextSite;
+  // รวม notis จริง
   const allEvents = React.useMemo<Noti[]>(() => {
-    const a = Array.isArray(alertNotis) ? alertNotis : [];
-    const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
-    let list: Noti[] = [...a, ...b];
-    const siteCode = params.siteCode ? String(params.siteCode) : null;
-    if (siteCode) {
-      const nameOrCode = (n: any): string[] => {
-        const raw = [
-          n?.siteId,
-          n?.site_id,
-          n?.siteCode,
-          n?.site_code,
-          n?.siteName,
-          n?.site_name,
-          n?.site,
-          n?.site?.id,
-          n?.site?.code,
-          n?.site?.name,
-        ].filter(Boolean).map((x: any) => String(x));
-        // ใน mock มักจะใช้ชื่อ site → ใส่ทั้งชื่อและโค้ดเท่าที่หาได้
-        return Array.from(new Set(raw));
-      };
-      list = list.filter((n) => nameOrCode(n).includes(siteCode));
+    let list: Noti[] = Array.isArray(liveNotis) ? liveNotis : [];
+    if (effectiveSite) {
+      list = list.filter((n) => matchesSite(n, effectiveSite));
+    }
+    if (selectedDateKey) {
+      list = list.filter((n) => toDateKey(n.date) === selectedDateKey);
     }
     return list;
-  }, [params.siteCode]);
+  }, [effectiveSite, selectedDateKey, liveNotis]);
 
   // นับยอดการ์ดจาก notis จริง (คีย์กลาง)
   const counts = React.useMemo<Record<EventKey, number>>(() => {
@@ -266,3 +257,5 @@ export default function Content({ statItems }: Props) {
     </>
   );
 }
+
+

@@ -10,6 +10,8 @@ export type SiteOption = { label: string; value: string; i18nKey?: string };
 type FiltersState = {
   date: DateValue;
   setDate: (v: DateValue) => void;
+  dateTouched: boolean;
+  resetDateTouched: () => void;
 
   selectedSite: string;
   setSelectedSite: (v: string) => void;
@@ -26,12 +28,22 @@ const FiltersContext = React.createContext<FiltersState | undefined>(undefined);
 export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
-  const [date, setDate] = React.useState<DateValue>(defaultToday);
+  const [date, setDateState] = React.useState<DateValue>(defaultToday);
+  const [dateTouched, setDateTouched] = React.useState<boolean>(true);
   const [selectedSite, setSelectedSite] = React.useState<string>("all");
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
   const [searchSite, setSearchSite] = React.useState("");
+
+  const setDate = React.useCallback((v: DateValue) => {
+    setDateState(v);
+    setDateTouched(true);
+  }, []);
+
+  const resetDateTouched = React.useCallback(() => {
+    setDateTouched(false);
+  }, []);
 
   // Fetch role + sites to build dropdown options; include "All" for admin
   React.useEffect(() => {
@@ -96,6 +108,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     () => ({
       date,
       setDate,
+      dateTouched,
+      resetDateTouched,
       selectedSite,
       setSelectedSite,
       siteOptions,
@@ -103,7 +117,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       searchSite,
       setSearchSite,
     }),
-    [date, selectedSite, siteOptions, searchSite]
+    [date, setDate, dateTouched, resetDateTouched, selectedSite, siteOptions, searchSite]
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
@@ -114,4 +128,3 @@ export function useFilters() {
   if (!ctx) throw new Error("useFilters must be used within FiltersProvider");
   return ctx;
 }
-

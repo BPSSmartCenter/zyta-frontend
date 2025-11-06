@@ -8,10 +8,17 @@ import SnapshotChartSection from "../components/Chart";
 import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
-import { notis, wellBeingNotis, recognizeNotis, ZYTA_NOTIS } from "../data/Dashboard/notis";
+import {
+  notis as mockNotis,
+  recognizeNotis,
+  ZYTA_NOTIS,
+} from "../data/Dashboard/notis";
 import { useFaceRec } from "../context/FaceRecContext";
 import { statItems } from "../components/Dashboard/dashboard.constants";
 import { useFilters } from "../context/FiltersContext";
+import { useNotisFeed } from "../context/NotisContext";
+import type { Noti } from "../data/Dashboard/notis";
+import { matchesSite, sortByNewest, toDateKey, decorateNotiForDisplay } from "../utils/notis";
 
 // keep master key seeded in backend; not used for dashboard gating
 
@@ -21,6 +28,7 @@ type SiteOption = { label: string; value: string; i18nKey?: string };
 export default function Dashboard() {
   const faceRec = useFaceRec();
   const { t } = useTranslation(["dashboard"]);
+  const { items: liveNotis } = useNotisFeed();
 
   // Navbar state
   const [searchSite, setSearchSite] = React.useState("");
@@ -82,32 +90,65 @@ export default function Dashboard() {
   const [mapSeverity, setMapSeverity] = React.useState("all");
   const [province, setProvince] = React.useState("all");
 
-  const matchGlobalDate = React.useCallback((s: string) => {
-    if (!globalDate) return true;
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return true;
-    return (
-      d.getFullYear() === (globalDate as any).y &&
-      d.getMonth() + 1 === (globalDate as any).m &&
-      d.getDate() === (globalDate as any).d
+  const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
+
+  const matchGlobalDate = React.useCallback(
+    (value: string) => {
+      if (!selectedDateKey) return true;
+      return toDateKey(value) === selectedDateKey;
+    },
+    [selectedDateKey]
+  );
+
+  const baseNotis = React.useMemo<Noti[]>(() => {
+    if (Array.isArray(liveNotis) && liveNotis.length) return liveNotis;
+    return ((mockNotis as Noti[]) ?? []).map((n) => decorateNotiForDisplay(n));
+  }, [liveNotis]);
+
+  const siteScopedNotis = React.useMemo(() => {
+    if (!selectedSite || selectedSite === "all") return sortByNewest(baseNotis);
+    return sortByNewest(baseNotis.filter((n) => matchesSite(n, selectedSite)));
+  }, [baseNotis, selectedSite]);
+
+  const dateScopedNotis = React.useMemo(
+    () => siteScopedNotis.filter((n) => matchGlobalDate(n?.date)),
+    [siteScopedNotis, matchGlobalDate]
+  );
+
+  const alertEventSource = React.useMemo(() => {
+    const allow = new Set(["alert", "warning", "normal", "offline"]);
+    return dateScopedNotis.filter((n) =>
+      allow.has(String(n.type || "").toLowerCase())
     );
-  }, [(globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]);
+  }, [dateScopedNotis]);
+
+  const wellBeingSource = React.useMemo(() => {
+    return dateScopedNotis.filter((n) => {
+      const type = (n.type || "").toLowerCase();
+      const severity = (n.severity || "").toLowerCase();
+      return (
+        type === "alert" ||
+        type === "warning" ||
+        severity === "critical" ||
+        severity === "medium"
+      );
+    });
+  }, [dateScopedNotis]);
 
   const filteredNotis = React.useMemo(() => {
     const q = searchEvent.toLowerCase().trim();
-    const src = notis as unknown as any[];
+    const src = alertEventSource;
     return src
       .filter((n) => matchGlobalDate(n?.date))
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchEvent, matchGlobalDate]);
+  }, [searchEvent, matchGlobalDate, alertEventSource]);
 
   const filteredWellBeginNotis = React.useMemo(() => {
     const q = searchWB.toLowerCase().trim();
-    const src = wellBeingNotis as unknown as any[];
-    return src
+    return wellBeingSource
       .filter((n) => matchGlobalDate(n?.date))
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchWB, matchGlobalDate]);
+  }, [searchWB, matchGlobalDate, wellBeingSource]);
 
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();
@@ -138,7 +179,15 @@ export default function Dashboard() {
       setSite: setMapSeverity,
       province,
       setProvince,
-      mapNotis: ([] as any[]).concat(filteredNotis as unknown as any[], filteredWellBeginNotis as unknown as any[]),
+      mapNotis: ((): any[] => {
+        const map = new Map<string, Noti>();
+        const all = [...filteredNotis, ...filteredWellBeginNotis];
+        all.forEach((n) => {
+          const key = n.id ?? `${n.site}-${n.date}-${n.title}`;
+          if (!map.has(key)) map.set(key, n);
+        });
+        return Array.from(map.values());
+      })(),
       searchFR,
       setSearchFR,
       filteredRecognize,
@@ -181,7 +230,11 @@ export default function Dashboard() {
           setDate={setGlobalDate as any}
         />
 
-        <Header statItems={statItems as any} selectedSiteCode={selectedSite} />
+        <Header
+          statItems={statItems as any}
+          selectedSiteCode={selectedSite}
+          events={dateScopedNotis}
+        />
 
         <ContentLayout {...(contentLayoutProps as any)} />
 

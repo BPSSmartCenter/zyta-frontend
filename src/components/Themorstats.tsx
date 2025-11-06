@@ -9,6 +9,7 @@ type ThermostatProps = {
   valueLabel?: React.ReactNode;
   initialValue: number; // ใช้เป็นค่าเริ่มต้น (uncontrolled)
   value?: number; // ✅ ใหม่: ถ้าส่งมาจะใช้ค่านี้เป็นตัวแสดงผล (controlled)
+  valueDisplay?: React.ReactNode; // ถ้าส่งมา จะใช้เป็นข้อความแสดงค่ากลาง
 };
 
 const Thermostat: React.FC<ThermostatProps> = ({
@@ -18,6 +19,7 @@ const Thermostat: React.FC<ThermostatProps> = ({
   valueLabel,
   initialValue,
   value,
+  valueDisplay,
 }) => {
   const [temperature, setTemperature] = useState<number>(initialValue);
 
@@ -29,6 +31,16 @@ const Thermostat: React.FC<ThermostatProps> = ({
   // ใช้ค่า value ถ้าถูกส่งมา ไม่งั้นใช้ state ภายใน
   const raw = value ?? temperature;
   const safeValue = Math.min(Math.max(raw, 0), max); // clamp 0..max
+  const hasCustomDisplay = valueDisplay !== undefined;
+  const isTextDisplay = typeof valueDisplay === "string";
+  const displayNode = hasCustomDisplay ? (
+    valueDisplay
+  ) : (
+    <>
+      {Math.round(safeValue)}
+      {unit}
+    </>
+  );
 
   return (
     <div className="relative min-w-[244px] min-h-[244px] select-none">
@@ -77,9 +89,13 @@ const Thermostat: React.FC<ThermostatProps> = ({
               {valueLabel}
             </p>
           </div>
-          <p className="text-[40px] font-bold text-gray-700">
-            {Math.round(safeValue)}
-            {unit}
+          <p
+            className={[
+              hasCustomDisplay && isTextDisplay ? "text-2xl" : "text-[40px]",
+              "font-bold text-gray-700",
+            ].join(" ")}
+          >
+            {displayNode}
           </p>
           <p className="flex text-[#424242] items-center gap-1 text-gray-500 text-xl">
             {maxLabel}

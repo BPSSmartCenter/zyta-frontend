@@ -2,13 +2,13 @@
   "totalAlertsToday": "แจ้งเตือนทั้งหมด (วันนี้)",
   "sitesAlertsTitle": "ตารางการแจ้งเตือนแบบรายไซต์ (Sites Alerts Table)",
   "filters": {
-    "cameraAll": "กล้องทั้งหมด",
+    "cameraAll": "ไซต์ทั้งหมด",
     "eventAll": "เหตุการณ์ทั้งหมด"
   },
   "table": {
     "headers": {
       "no": "ลำดับ",
-      "camera": "กล้อง",
+      "site": "ไซต์",
       "event": "เหตุการณ์",
       "picture": "รูปภาพ",
       "cameraName": "ชื่อกล้อง",

@@ -22,6 +22,7 @@ import { me as apiMe } from "./api/user";
 import { FiltersProvider } from "./context/FiltersContext";
 import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 import { FaceRecProvider } from "./context/FaceRecContext";
+import { NotisProvider } from "./context/NotisContext";
 
 function App() {
   console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
@@ -29,6 +30,7 @@ function App() {
     <BrowserRouter>
       <DeviceInventoryProvider>
       <FaceRecProvider>
+      <NotisProvider>
       <FiltersProvider>
         <ScrollToTop smooth={true} />
         <ScrollUnlocker />
@@ -66,6 +68,7 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       </FiltersProvider>
+      </NotisProvider>
       </FaceRecProvider>
       </DeviceInventoryProvider>
     </BrowserRouter>

@@ -1,6 +1,6 @@
 import React from "react";
 import Dropdown from "../Dropdown";
-import DatePicker, { type DateValue } from "../DateInput";
+import DatePicker from "../DateInput";
 import SearchInput from "../SearchInput";
 import { useTranslation } from "react-i18next";
 import { useSearchParams, useParams } from "react-router-dom";
@@ -10,10 +10,9 @@ import {
   type AlertRow,
 } from "./totalAlert.constant";
 import type { Noti } from "../../data/Dashboard/notis";
-import {
-  notis as alertNotis,
-  wellBeingNotis,
-} from "../../data/Dashboard/notis";
+import { useNotisFeed } from "../../context/NotisContext";
+import { matchesSite, toDateKey } from "../../utils/notis";
+import { useFilters } from "../../context/FiltersContext";
 
 /* ---------- utils ---------- */
 const sameYMD = (a: Date, b: Date) =>
@@ -32,15 +31,10 @@ const relHours = (iso: string, t: (k: string, o?: any) => string) => {
         defaultValue: "{{count}} hours ago",
       });
 };
-const extractCameraNumber = (s?: string | null) =>
-  s?.match(/(\d+)/)?.[1] ? parseInt(s.match(/(\d+)/)![1], 10) : null;
-const useCameraLabelT = () => {
-  const { t } = useTranslation("alert");
+const useSiteLabel = () => {
   return (label?: string | null) => {
-    const num = extractCameraNumber(label);
-    return num != null
-      ? t("camera.numbered", { number: num, defaultValue: `Camera ${num}` })
-      : label ?? "";
+    if (!label) return "";
+    return label.toString().trim();
   };
 };
 const isAllOption = (
@@ -57,7 +51,9 @@ const isAllOption = (
   if (v === "all") return true;
   if (kind === "camera")
     return (
-      (l.includes("all") && l.includes("camera")) || l.includes("กล้องทั้งหมด")
+      (l.includes("all") && (l.includes("camera") || l.includes("site"))) ||
+      l.includes("กล้องทั้งหมด") ||
+      l.includes("ไซต์ทั้งหมด")
     );
   return (
     (l.includes("all") && l.includes("event")) || l.includes("เหตุการณ์ทั้งหมด")
@@ -118,18 +114,39 @@ const parseForcedEvent = (s?: string | null): PrimaryEvent => {
 };
 
 /* ---------- noti -> row ---------- */
-const DEFAULT_CAMERA_LABEL = "Camera 1";
+const DEFAULT_SITE_LABEL = "-";
 const DEFAULT_CAMERA_NAME = "Camera 1";
 const DEFAULT_STATUS: AlertRow["status"] = "UNRESOLVED";
 
 const toRow = (n: Noti, i: number, ev: PrimaryEvent): AlertRow => {
   const ts = new Date((n as any).date);
+  const siteLabel =
+    String(
+      (n as any).siteName ??
+        (n as any).site_name ??
+        n.site ??
+        n.siteCode ??
+        n.siteId ??
+        (n as any)?.site?.name ??
+        (n as any)?.site?.code ??
+        ""
+    ).trim() || DEFAULT_SITE_LABEL;
+  const deviceName =
+    String(
+      (n as any).deviceName ??
+        (n as any).device_name ??
+        (n as any).deviceLabel ??
+        (n as any).device_label ??
+        n.deviceModel ??
+        n.deviceId ??
+        ""
+    ).trim() || DEFAULT_CAMERA_NAME;
   return {
     id: String((n as any).id ?? `${ev}-${i}-${+ts}`),
-    cameraLabel: DEFAULT_CAMERA_LABEL,
+    cameraLabel: siteLabel,
     event: ev,
     picture: getPic(n),
-    cameraName: (n as any).site ?? DEFAULT_CAMERA_NAME,
+    cameraName: deviceName,
     status: DEFAULT_STATUS,
     timestamp: isNaN(ts.getTime())
       ? new Date().toISOString()
@@ -139,37 +156,27 @@ const toRow = (n: Noti, i: number, ev: PrimaryEvent): AlertRow => {
 
 export default function Table() {
   const { t } = useTranslation("alert");
-  const tCamera = useCameraLabelT();
+  const formatSiteLabel = useSiteLabel();
   const [searchParams] = useSearchParams();
   const params = useParams();
+  const { items: liveNotis } = useNotisFeed();
+  const { date: globalDate, setDate: setGlobalDate, selectedSite } = useFilters();
+  const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
+  const routeSite = params.siteCode ? String(params.siteCode) : null;
+  const contextSite =
+    selectedSite && selectedSite !== "all" ? selectedSite : null;
+  const effectiveSite = routeSite ?? contextSite;
 
   const allNotis = React.useMemo<Noti[]>(() => {
-    const a = Array.isArray(alertNotis) ? alertNotis : [];
-    const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
-    let list: Noti[] = [...a, ...b];
-    const siteCode = params.siteCode ? String(params.siteCode) : null;
-    if (siteCode) {
-      const nameOrCode = (n: any): string[] => {
-        const raw = [
-          n?.siteId,
-          n?.site_id,
-          n?.siteCode,
-          n?.site_code,
-          n?.siteName,
-          n?.site_name,
-          n?.site,
-          n?.site?.id,
-          n?.site?.code,
-          n?.site?.name,
-        ]
-          .filter(Boolean)
-          .map((x: any) => String(x));
-        return Array.from(new Set(raw));
-      };
-      list = list.filter((n) => nameOrCode(n).includes(siteCode));
+    let list: Noti[] = Array.isArray(liveNotis) ? liveNotis : [];
+    if (effectiveSite) {
+      list = list.filter((n) => matchesSite(n, effectiveSite));
+    }
+    if (selectedDateKey) {
+      list = list.filter((n) => toDateKey(n.date) === selectedDateKey);
     }
     return list;
-  }, [params.siteCode]);
+  }, [effectiveSite, selectedDateKey, liveNotis]);
 
   const forcedEvent = parseForcedEvent(searchParams.get("event"));
 
@@ -192,29 +199,19 @@ export default function Table() {
     [notisForTable, forcedEvent]
   );
 
-  // default date = ล่าสุดในชุดนั้น
-  const defaultDate: DateValue | undefined = React.useMemo(() => {
-    if (!rowsAll.length) return undefined;
-    const d = new Date(rowsAll[0].timestamp);
-    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rowsAll]);
-
   /* -------- filters -------- */
   const [cameraFilter, setCameraFilter] = React.useState("all");
   const [eventFilter, setEventFilter] = React.useState("all");
-  const [date, setDate] = React.useState<DateValue | undefined>(defaultDate);
   const [q, setQ] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
-  // sync dropdown + reset date เมื่อเปลี่ยนหมวด
+  // sync dropdown เมื่อเปลี่ยนหมวด
   React.useEffect(() => {
     const match = EVENT_OPTIONS.find(
       (o) => String(o.value ?? "").toLowerCase() === forcedEvent
     );
     if (match && typeof match.value === "string") setEventFilter(match.value);
-    setDate(defaultDate);
-  }, [forcedEvent, defaultDate]);
+  }, [forcedEvent]);
 
   /* -------- pagination & data -------- */
   const [page, setPage] = React.useState(1);
@@ -227,9 +224,9 @@ export default function Table() {
         cameraFilter === "all" ? true : r.cameraLabel === cameraFilter
       )
       .filter((r) => {
-        if (!date) return true;
+        if (!globalDate) return true;
         const d = new Date(r.timestamp);
-        const sel = new Date(date.y, date.m - 1, date.d);
+        const sel = new Date(globalDate.y, globalDate.m - 1, globalDate.d);
         return sameYMD(d, sel);
       })
       .filter((r) =>
@@ -239,7 +236,7 @@ export default function Table() {
               .includes(q.toLowerCase())
           : true
       );
-  }, [rowsAll, cameraFilter, eventFilter, date, q]);
+  }, [rowsAll, cameraFilter, eventFilter, globalDate, q]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -250,7 +247,7 @@ export default function Table() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [cameraFilter, eventFilter, date, q, forcedEvent]);
+  }, [cameraFilter, eventFilter, globalDate, q, forcedEvent]);
 
   return (
     <div className="p-6">
@@ -281,8 +278,8 @@ export default function Table() {
               options,
             }) => {
               const selectedLabel = isAllOption(selected, "camera")
-                ? t("filters.cameraAll", { defaultValue: "All CAMERA" })
-                : tCamera(selected?.label);
+                ? t("filters.cameraAll", { defaultValue: "All Sites" })
+                : formatSiteLabel(selected?.label);
               return (
                 <div className="relative">
                   <button
@@ -293,7 +290,7 @@ export default function Table() {
                   >
                     <span className="truncate">
                       {selectedLabel ||
-                        t("filters.cameraAll", { defaultValue: "All CAMERA" })}
+                        t("filters.cameraAll", { defaultValue: "All Sites" })}
                     </span>
                     <i className="material-icons leading-none">
                       {open ? "arrow_drop_up" : "arrow_drop_down"}
@@ -309,9 +306,9 @@ export default function Table() {
                       {options.map((opt) => {
                         const label = isAllOption(opt, "camera")
                           ? t("filters.cameraAll", {
-                              defaultValue: "All CAMERA",
+                              defaultValue: "All Sites",
                             })
-                          : tCamera(opt.label);
+                          : formatSiteLabel(opt.label);
                         return (
                           <button
                             key={String(opt.value ?? opt.label)}
@@ -401,7 +398,7 @@ export default function Table() {
           </Dropdown>
 
           {/* Date */}
-          <DatePicker value={date} onChange={setDate} />
+          <DatePicker value={globalDate} onChange={setGlobalDate} />
         </div>
 
         {/* Search */}
@@ -420,7 +417,7 @@ export default function Table() {
         <div className="inline-block w-full min-w=[750px] md:min-w-0 align-middle">
           <div className="grid grid-cols-[48px_1.2fr_1fr_120px_1fr_1fr_1.4fr] place-items-center px-4 py-3 text-[12px] font-medium text-gray-500 text-center bg-gray-100">
             <div>{t("table.headers.no", { defaultValue: "NO" })}</div>
-            <div>{t("table.headers.camera", { defaultValue: "Camera" })}</div>
+            <div>{t("table.headers.site", { defaultValue: "Site" })}</div>
             <div>{t("table.headers.event", { defaultValue: "Event" })}</div>
             <div>{t("table.headers.picture", { defaultValue: "Picture" })}</div>
             <div>
@@ -468,7 +465,7 @@ export default function Table() {
                   id={cameraCellId}
                   className="text-cyan font-inter underline cursor-pointer"
                 >
-                  {tCamera(r.cameraLabel)}
+                  {formatSiteLabel(r.cameraLabel)}
                 </div>
                 <div className="text-gray-700">
                   {t(`events.${r.event}`, { defaultValue: r.event })}

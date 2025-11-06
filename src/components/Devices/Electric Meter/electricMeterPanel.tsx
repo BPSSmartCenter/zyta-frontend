@@ -199,11 +199,11 @@ const buildHalfHourSeries = (
   });
 };
 
-const formatWeekdayLabel = (date: Date) =>
-  new Intl.DateTimeFormat("th-TH", { weekday: "short" }).format(date);
+const formatWeekdayLabel = (date: Date, locale = "th-TH") =>
+  new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date);
 
-const formatDateLabel = (date: Date) =>
-  new Intl.DateTimeFormat("th-TH", {
+const formatDateLabel = (date: Date, locale = "th-TH") =>
+  new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
   }).format(date);
@@ -213,7 +213,11 @@ const sanitizeSeries = (arr: number[]) =>
 
 export default function ElectricMeterPanel({ siteCode }: Props) {
   const { selectedSite, date: filtersDate } = useFilters();
-  const { t } = useTranslation("devices");
+  const { t, i18n } = useTranslation("devices");
+  const locale = React.useMemo(
+    () => (i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
+    [i18n.language]
+  );
 
   // options ทุก 30 นาที
 
@@ -280,16 +284,20 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   // fetched data
 
   // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
-  const [thermoOne, setThermoOne] = useState<{
+const [thermoOne, setThermoOne] = useState<{
     initialValue: number;
     valueLabel: string;
     maxLabel: string;
     useLifetimeMax?: boolean;
+    source: "auto" | "card";
+    cardKey?: string;
   }>({
     initialValue: 0,
-    valueLabel: t("devices.electric.side.unitKwh"),
-    maxLabel: "",
+    valueLabel: t("devices.electric.cards.consumption"),
+    maxLabel: t("devices.electric.units.kwh"),
     useLifetimeMax: false,
+    source: "auto",
+    cardKey: undefined,
   });
 
   const toNumber = (v: number | string) => {
@@ -304,7 +312,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     lifetimeKwh: 0,
     monthKwh: 0,
   });
-  const [temperatureC, setTemperatureC] = useState(0);
+  const [temperatureC, setTemperatureC] = useState<number | null>(null);
   // overview-derived values for side cards and max bound
   const [overviewTodayValue, setOverviewTodayValue] = useState<number | null>(null);
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
@@ -397,8 +405,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const cappedPercent = Math.max(0, Math.min(100, ratio * 100));
         return {
           key: item.key,
-          label: formatWeekdayLabel(item.date),
-          displayDate: formatDateLabel(item.date),
+          label: formatWeekdayLabel(item.date, locale),
+          displayDate: formatDateLabel(item.date, locale),
           percentage: cappedPercent,
           previousKwh,
           todayKwh,
@@ -418,7 +426,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         percentLabel: formattedPercent,
       };
     });
-  }, [dailySeries]);
+  }, [dailySeries, locale]);
 
   React.useEffect(() => {
     if (!comparisonItems.length) {
@@ -488,14 +496,15 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           last?.L1Data?.temperature ??
           last?.L1Data?.Temperature ??
           last?.envTemp ??
-          0;
-        const temperature = Number(tempRaw);
+          null;
+        const temperature =
+          tempRaw === null || tempRaw === undefined ? null : Number(tempRaw);
         setMetrics((m) => ({ ...m, voltage, current, frequency, consumptionKwh, lifetimeKwh }));
-        if (Number.isFinite(temperature)) {
-          setTemperatureC(temperature);
-        } else {
-          setTemperatureC(0);
-        }
+        setTemperatureC(
+          typeof temperature === "number" && Number.isFinite(temperature)
+            ? temperature
+            : null
+        );
       } catch (e) {
         // ignore
       }
@@ -503,14 +512,87 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   }, [computeRange, siteForApi, inverterSN]);
 
 
+  const cardItems = React.useMemo(
+    () => [
+      {
+        id: "voltage",
+        img: voltageIcon,
+        value: metrics.voltage,
+        valueLabel: t("devices.electric.cards.voltage"),
+        valueLabel2: t("devices.electric.units.volt"),
+      },
+      {
+        id: "consumption",
+        img: plugIcon,
+        value: metrics.consumptionKwh,
+        valueLabel: t("devices.electric.cards.consumption"),
+        valueLabel2: t("devices.electric.units.kwh"),
+      },
+      {
+        id: "accumulated",
+        img: transformIcon,
+        value: metrics.lifetimeKwh,
+        valueLabel: t("devices.electric.cards.accumulated"),
+        valueLabel2: t("devices.electric.units.kwh"),
+      },
+      {
+        id: "current",
+        img: IletterIcon,
+        value: metrics.current,
+        valueLabel: t("devices.electric.cards.current"),
+        valueLabel2: t("devices.electric.units.amp"),
+      },
+      {
+        id: "frequency",
+        img: wavesineIcon,
+        value: metrics.frequency,
+        valueLabel: t("devices.electric.cards.frequency"),
+        valueLabel2: t("devices.electric.units.hz"),
+      },
+      {
+        id: "humidity",
+        img: waterSupplieIcon,
+        value: 0,
+        valueLabel: t("devices.electric.cards.humidity"),
+        valueLabel2: t("devices.electric.units.gm3"),
+      },
+    ],
+    [metrics, t]
+  );
+
   // Update left gauge from telemetry-based today consumption (kWh)
   React.useEffect(() => {
     const today = Number(metrics.consumptionKwh || 0);
-    setThermoOne((prev) => ({
-      ...prev,
-      initialValue: Math.round(toNumber(today)),
-    }));
+    setThermoOne((prev) => {
+      if (prev.source !== "auto") return prev;
+      const nextValue = Math.round(toNumber(today));
+      if (prev.initialValue === nextValue) return prev;
+      return { ...prev, initialValue: nextValue };
+    });
   }, [metrics.consumptionKwh]);
+
+  // Keep card-driven Thermostat in sync with live card values
+  React.useEffect(() => {
+    setThermoOne((prev) => {
+      if (prev.source !== "card" || !prev.cardKey) return prev;
+      const card = cardItems.find((item) => item.id === prev.cardKey);
+      if (!card) return prev;
+      const nextValue = Math.round(toNumber(card.value));
+      if (
+        prev.initialValue === nextValue &&
+        prev.valueLabel === card.valueLabel &&
+        prev.maxLabel === card.valueLabel2
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        initialValue: nextValue,
+        valueLabel: card.valueLabel,
+        maxLabel: card.valueLabel2,
+      };
+    });
+  }, [cardItems]);
 
   // Ensure device.meta overview is refreshed and consumed for side cards / max bound
   React.useEffect(() => {
@@ -608,6 +690,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     overviewMonthValue !== null && overviewMonthValue !== undefined
       ? overviewMonthValue
       : metrics.monthKwh;
+  const hasTemperature = typeof temperatureC === "number" && Number.isFinite(temperatureC);
+  const temperatureValue = hasTemperature ? Math.round(Number(temperatureC)) : 0;
+  const temperatureDisplay = hasTemperature
+    ? undefined
+    : t("devices.electric.noData", { defaultValue: "No data" });
 
   return (
     <>
@@ -735,69 +822,35 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={Math.round(temperatureC)}
-                value={Math.round(temperatureC)}
+                initialValue={temperatureValue}
+                value={hasTemperature ? temperatureValue : undefined}
+                valueDisplay={temperatureDisplay}
                 max={60}
                 maxLabel={""}
                 valueLabel={t("devices.electric.cards.temperature", { defaultValue: "Temperature" })}
-                unit="°C"
+                unit={hasTemperature ? "°C" : ""}
               />
             </div>
           </div>
 
           {/* value cards */}
           <div className="flex flex-wrap gap-4">
-            {[
-              {
-                img: voltageIcon,
-                value: metrics.voltage,
-                valueLabel: t("devices.electric.cards.voltage"),
-                valueLabel2: t("devices.electric.units.volt"),
-              },
-              {
-                img: plugIcon,
-                value: metrics.consumptionKwh,
-                valueLabel: t("devices.electric.cards.consumption"),
-                valueLabel2: t("devices.electric.units.kwh"),
-              },
-              {
-                img: transformIcon,
-                value: metrics.lifetimeKwh,
-                valueLabel: t("devices.electric.cards.accumulated"),
-                valueLabel2: t("devices.electric.units.kwh"),
-              },
-              {
-                img: IletterIcon,
-                value: metrics.current,
-                valueLabel: t("devices.electric.cards.current"),
-                valueLabel2: t("devices.electric.units.amp"),
-              },
-              {
-                img: wavesineIcon,
-                value: metrics.frequency,
-                valueLabel: t("devices.electric.cards.frequency"),
-                valueLabel2: t("devices.electric.units.hz"),
-              },
-              {
-                img: waterSupplieIcon,
-                value: 0,
-                valueLabel: t("devices.electric.cards.humidity"),
-                valueLabel2: t("devices.electric.units.gm3"),
-              },
-            ].map((kpi, idx) => (
+            {cardItems.map((kpi) => (
               <CardValue
-                key={idx}
+                key={kpi.id}
                 img={kpi.img}
                 value={kpi.value}
                 valueLabel={kpi.valueLabel}
                 valueLabel2={kpi.valueLabel2}
                 onClick={() => {
-                  const isAccumulated = kpi.valueLabel === t("devices.electric.cards.accumulated");
+                  const isAccumulated = kpi.id === "accumulated";
                   setThermoOne({
                     initialValue: toNumber(kpi.value),
                     valueLabel: kpi.valueLabel,
                     maxLabel: kpi.valueLabel2,
                     useLifetimeMax: !!isAccumulated,
+                    source: "card",
+                    cardKey: kpi.id,
                   })
                 }}
               />
@@ -882,8 +935,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     </>
   );
 }
-
-
 
 
 

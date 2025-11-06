@@ -6,10 +6,8 @@ import { useTranslation } from "react-i18next";
 import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
-import {
-  notis as alertNotis,
-  wellBeingNotis,
-} from "../../data/Dashboard/notis";
+import { useNotisFeed } from "../../context/NotisContext";
+import { isFaceRecNoti } from "../../utils/notis";
 
 /* ---------- types ---------- */
 type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
@@ -138,6 +136,7 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
   const navigate = useNavigate();
   const location = useLocation(); // ⬅️ ใช้เพื่อตรวจเส้นทางปัจจุบัน
   const { absSite, base } = useUserPath();
+  const { items: liveNotis } = useNotisFeed();
 
   // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logicตาม base /u/:uid)
   React.useEffect(() => {
@@ -153,10 +152,9 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
   // ใช้ events ที่ถูกส่งเข้ามา "แม้จะเป็น []" (เพื่อให้แสดง 0 ได้จริง)
   const source = React.useMemo<Noti[]>(() => {
     if (Array.isArray(events)) return events;
-    const a = Array.isArray(alertNotis) ? alertNotis : [];
-    const b = Array.isArray(wellBeingNotis) ? wellBeingNotis : [];
-    return [...a, ...b];
-  }, [events]);
+    if (Array.isArray(liveNotis) && liveNotis.length) return liveNotis;
+    return [];
+  }, [events, liveNotis]);
 
   // นับยอดตามคีย์กลาง
   const counts = React.useMemo<Record<EventKey, number>>(() => {
@@ -218,6 +216,7 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
 
     // โหมดจริง: คัดเฉพาะ noti ที่มีรูป
     const tiles: CameraItem[] = source
+      .filter((n) => !isFaceRecNoti(n))
       .filter((n) => !!getPic(n))
       .sort(
         (a, b) =>

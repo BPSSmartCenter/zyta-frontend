@@ -21,7 +21,7 @@ const bag = (n: any) =>
     .map((x: any) => String(x).toLowerCase().trim())
     .join(" | ");
 
-const getEventKey = (n: Noti): EventKey => {
+const getEventKey = (n: Noti): EventKey | null => {
   const s = bag(n);
 
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
@@ -53,8 +53,7 @@ const getEventKey = (n: Noti): EventKey => {
   )
     return "motion";
 
-  // default เพื่อให้เข้าเพจ alert ได้แน่ ๆ
-  return "motion";
+  return null;
 };
 /* ---------------------------------------------------------------- */
 
@@ -75,8 +74,8 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
     });
   };
 
-  const handleClick = (n: Noti) => {
-    const ev = getEventKey(n);
+  const navigateToEvent = (ev: EventKey | null) => {
+    if (!ev) return;
     navigate(abs(`/alert?event=${ev}`));
   };
 
@@ -135,17 +134,24 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+              const eventKey = getEventKey(n);
+              const isNavigable = Boolean(eventKey);
 
               return (
                 <div
                   key={i}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleClick(n)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") handleClick(n);
+                  role={isNavigable ? "button" : "presentation"}
+                  tabIndex={isNavigable ? 0 : -1}
+                  onClick={() => {
+                    if (isNavigable) navigateToEvent(eventKey);
                   }}
-                  className="cursor-pointer outline-none select-none"
+                  onKeyDown={(e) => {
+                    if (!isNavigable) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigateToEvent(eventKey);
+                    }
+                  }}
+                  className={`${isNavigable ? "cursor-pointer" : "cursor-default"} outline-none select-none`}
                 >
                   <NotiCard
                     type={n.type as any}

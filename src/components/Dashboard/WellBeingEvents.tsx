@@ -1,3 +1,4 @@
+import React from "react";
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
@@ -28,7 +29,7 @@ const bag = (n: any) =>
     .map((x: any) => String(x).toLowerCase().trim())
     .join(" | ");
 
-const getEventKey = (n: WB): EventKey => {
+const getEventKey = (n: WB): EventKey | null => {
   const s = bag(n);
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
   if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
@@ -42,7 +43,7 @@ const getEventKey = (n: WB): EventKey => {
     return "offline";
   if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
     return "sleep";
-  return "motion";
+  return null;
 };
 /* ------------------------------------------ */
 
@@ -51,6 +52,21 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
   const navigate = useNavigate();
 
   const { abs } = useUserPath();
+  const sortedItems = React.useMemo(
+    () =>
+      [...items].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [items]
+  );
+  const list = React.useMemo(() => {
+    const q = (search || "").toLowerCase().trim();
+    if (!q) return sortedItems;
+    return sortedItems.filter((n: any) =>
+      JSON.stringify(n).toLowerCase().includes(q)
+    );
+  }, [sortedItems, search]);
+
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -63,8 +79,8 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
     });
   };
 
-  const handleClick = (n: WB) => {
-    const ev = getEventKey(n);
+  const navigateToEvent = (ev: EventKey | null) => {
+    if (!ev) return;
     navigate(abs(`/alert?event=${ev}`));
   };
 
@@ -82,28 +98,35 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
       />
       <div className="lg-1399:h-[375px] h-[350px] lg:h	full overflow-y-auto px-2">
         <div className="space-y-2">
-          {items.length === 0 ? (
+          {list.length === 0 ? (
             <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">
               {t("common.noResults")}
             </div>
           ) : (
-            items.map((n, i) => {
+            list.map((n, i) => {
               const title = n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+              const eventKey = getEventKey(n);
+              const isNavigable = Boolean(eventKey);
 
               return (
                 <div
                   key={i}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleClick(n)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") handleClick(n);
+                  role={isNavigable ? "button" : "presentation"}
+                  tabIndex={isNavigable ? 0 : -1}
+                  onClick={() => {
+                    if (isNavigable) navigateToEvent(eventKey);
                   }}
-                  className="cursor-pointer outline-none select-none"
+                  onKeyDown={(e) => {
+                    if (!isNavigable) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigateToEvent(eventKey);
+                    }
+                  }}
+                  className={`${isNavigable ? "cursor-pointer" : "cursor-default"} outline-none select-none`}
                 >
                   <NotiCard
                     type={n.type as any}

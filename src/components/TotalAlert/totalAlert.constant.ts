@@ -10,16 +10,16 @@ export type AlertStatus = "RESOLVED" | "UNRESOLVED";
 
 export type AlertRow = {
   id: string;
-  cameraLabel: string; // กล้องที่ 1
+  cameraLabel: string; // site label / fallback text
   event: string; // fire detected
   picture: string; // image url
-  cameraName: string; // hikvision
+  cameraName: string; // device name / fallback
   status: AlertStatus;
   timestamp: string; // ISO string
 };
 
 export const CAMERA_OPTIONS = [
-  { label: "All CAMERA", value: "all" },
+  { label: "All Sites", value: "all" },
   { label: "กล้องที่ 1", value: "กล้องที่ 1" },
   { label: "กล้องที่ 2", value: "กล้องที่ 2" },
   { label: "กล้องที่ 3", value: "กล้องที่ 3" },

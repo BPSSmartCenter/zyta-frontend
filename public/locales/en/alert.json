@@ -2,13 +2,13 @@
   "totalAlertsToday": "Total Alerts (Today)",
   "sitesAlertsTitle": "Sites Alerts Table",
   "filters": {
-    "cameraAll": "All CAMERA",
+    "cameraAll": "All Sites",
     "eventAll": "All Event"
   },
   "table": {
     "headers": {
       "no": "NO",
-      "camera": "CAMERA",
+      "site": "SITE",
       "event": "EVENT",
       "picture": "PICTURE",
       "cameraName": "CAMERA NAME",

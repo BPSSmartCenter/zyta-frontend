@@ -5,11 +5,12 @@ import {
   SEVERITY_OPTIONS,
   LOCATION_OPTIONS,
 } from "../Dashboard/dashboard.constants";
-import { notis, wellBeingNotis } from "../../data/Dashboard/notis";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { me } from "../../data/Dashboard/auth";
+import { useNotisFeed } from "../../context/NotisContext";
+import { notiSeverity } from "../../utils/notis";
 
 /* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {
@@ -87,6 +88,7 @@ export default function MapPanel({
   accessibleSites,
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
+  const { items: liveNotis } = useNotisFeed();
   // Compute i18n label for multi-select events (inside component)
   const multiEventLabel = useMemo(() => {
     if (selectedEvents.includes("all")) {
@@ -174,17 +176,12 @@ export default function MapPanel({
 
   /* ---------- merge notis + filter by selected events ---------- */
   const allTagged: WithGroup[] = useMemo(() => {
-    if (Array.isArray(overrideNotis)) {
-      // ใช้ชุดที่มาจาก Dashboard โดยตรง (กรองตาม Site/ACL แล้ว)
-      return overrideNotis.map((n) => ({ ...n, _group: "notis" as const }));
-    }
-    const a = notis.map((n) => ({ ...n, _group: "notis" as const }));
-    const b = wellBeingNotis.map((n) => ({
+    const base = Array.isArray(overrideNotis) ? overrideNotis : liveNotis;
+    return (base ?? []).map((n) => ({
       ...n,
-      _group: "wellbeing" as const,
+      _group: notiSeverity(n) === "critical" ? ("wellbeing" as const) : ("notis" as const),
     }));
-    return [...a, ...b];
-  }, [overrideNotis]);
+  }, [overrideNotis, liveNotis]);
 
   const eventsSet = useMemo(
     () => new Set(selectedEvents.includes("all") ? ["all"] : selectedEvents),

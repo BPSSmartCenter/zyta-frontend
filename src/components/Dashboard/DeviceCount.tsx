@@ -1,6 +1,11 @@
 import RadialBar from "../RadialBar";
 import DonutLegend from "../DonutLegend";
-import { cctvImage, solarImage, windImage, waterTapImage } from "../../assets/index";
+import {
+  cctvImage,
+  solarImage,
+  windImage,
+  waterTapImage,
+} from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
@@ -159,7 +164,9 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.cameras)}
             disabled={isZero(mergedCounts.cameras)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass}`}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${
+              isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass
+            }`}
             onClick={() => !isZero(mergedCounts.cameras) && goDevices("cctv")}
           >
             <img src={cctvImage} alt="" width={36} />
@@ -173,7 +180,8 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {statusByType.cameras.on}
+                  {/* {statusByType.cameras.on} */}
+                  {mergedCounts.cameras}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">
@@ -217,8 +225,14 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.waterMeter)}
             disabled={isZero(mergedCounts.waterMeter)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.waterMeter) ? disabledBtnClass : enabledBtnClass}`}
-            onClick={() => !isZero(mergedCounts.waterMeter) && goDevices("watermeter")}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${
+              isZero(mergedCounts.waterMeter)
+                ? disabledBtnClass
+                : enabledBtnClass
+            }`}
+            onClick={() =>
+              !isZero(mergedCounts.waterMeter) && goDevices("watermeter")
+            }
           >
             <img src={waterTapImage} alt="" width={36} />
             <span className="flex flex-col leading-tight text-left min-w-0">
@@ -249,8 +263,14 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.electricMeter)}
             disabled={isZero(mergedCounts.electricMeter)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.electricMeter) ? disabledBtnClass : enabledBtnClass}`}
-            onClick={() => !isZero(mergedCounts.electricMeter) && goDevices("electricmeter")}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${
+              isZero(mergedCounts.electricMeter)
+                ? disabledBtnClass
+                : enabledBtnClass
+            }`}
+            onClick={() =>
+              !isZero(mergedCounts.electricMeter) && goDevices("electricmeter")
+            }
           >
             <img src={solarImage} alt="" width={36} />
             <span className="flex flex-col leading-tight text-left min-w-0">
@@ -281,8 +301,14 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.airSensor)}
             disabled={isZero(mergedCounts.airSensor)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.airSensor) ? disabledBtnClass : enabledBtnClass}`}
-            onClick={() => !isZero(mergedCounts.airSensor) && goDevices("airsensor")}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${
+              isZero(mergedCounts.airSensor)
+                ? disabledBtnClass
+                : enabledBtnClass
+            }`}
+            onClick={() =>
+              !isZero(mergedCounts.airSensor) && goDevices("airsensor")
+            }
           >
             <img src={windImage} alt="" width={36} />
             <span className="flex flex-col leading-tight text-left min-w-0">

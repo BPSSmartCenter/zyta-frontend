@@ -97,13 +97,16 @@ export default function ContentLayout(props: Props) {
   }, []);
 
   const { abs } = useUserPath();
-  const allItems = React.useMemo(
-    () =>
-      [...filteredNotis, ...filteredWellBeginNotis].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      ),
-    [filteredNotis, filteredWellBeginNotis]
-  );
+  const allItems = React.useMemo(() => {
+    const map = new Map<string, any>();
+    [...filteredNotis, ...filteredWellBeginNotis].forEach((n: any) => {
+      const key = n?.id ?? `${n?.site}-${n?.date}-${n?.title}`;
+      if (!map.has(key)) map.set(key, n);
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [filteredNotis, filteredWellBeginNotis]);
 
   const bag = (n: any) =>
     [n?.event, n?.titleKey, n?.title, n?.site, n?.type, n?.date]

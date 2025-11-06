@@ -1,9 +1,10 @@
-﻿import React from "react";
+import React from "react";
 import { useTranslation } from "react-i18next";
 import SearchInput from "../SearchInput";
 import { FACE_REC_ROWS, type LicensePlateRow } from "./faceRec.constant";
 import { useFaceRec } from "../../context/FaceRecContext";
 import { useFilters } from "../../context/FiltersContext";
+import { toDateKey } from "../../utils/notis";
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
@@ -16,31 +17,37 @@ const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
 export default function Table() {
   const faceRec = useFaceRec();
   const { t } = useTranslation("facerec");
-  const { date: globalDate } = useFilters();
+  const { date: globalDate, dateTouched } = useFilters();
 
   const [q, setQ] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-  const pageSize = 5;
   const [page, setPage] = React.useState(1);
+  const pageSize = 5;
 
-  const rowsFiltered: LicensePlateRow[] = React.useMemo(() => {
-    const rows: LicensePlateRow[] = (faceRec?.plateRows && faceRec.plateRows.length > 0)
+  const allRows: LicensePlateRow[] =
+    faceRec?.plateRows && faceRec.plateRows.length > 0
       ? (faceRec.plateRows as any)
       : (FACE_REC_ROWS as any);
-    return rows
+
+  const selectedDateKey = React.useMemo(
+    () => (dateTouched ? toDateKey(globalDate) : null),
+    [dateTouched, globalDate]
+  );
+
+  const rowsFiltered: LicensePlateRow[] = React.useMemo(() => {
+    return allRows
       .filter((r) => {
-        if (!globalDate) return true;
-        const d = new Date(r.timestamp);
-        return d.getFullYear() === (globalDate as any).y && d.getMonth() === (globalDate as any).m - 1 && d.getDate() === (globalDate as any).d;
+        if (!selectedDateKey) return true;
+        return toDateKey(r.timestamp) === selectedDateKey;
       })
       .filter((r) => {
         if (!q.trim()) return true;
-        const s = `${r.plateText} ${r.province} ${r.cameraName}`.toLowerCase();
-        return s.includes(q.toLowerCase());
+        const haystack = `${r.plateText} ${r.province} ${r.cameraName}`.toLowerCase();
+        return haystack.includes(q.toLowerCase());
       });
-  }, [q, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d, faceRec?.plateRows?.length]);
+  }, [allRows, selectedDateKey, q]);
 
-  React.useEffect(() => setPage(1), [q, (globalDate as any)?.y, (globalDate as any)?.m, (globalDate as any)?.d]);
+  React.useEffect(() => setPage(1), [q, selectedDateKey]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -92,7 +99,11 @@ export default function Table() {
             return (
               <div
                 key={r.id || idx}
-                className={[`grid ${GRID_COLS} place-items-center px-4 py-3 text-[14px] text-center`, "border-t border-gray-100", isSel ? "bg-blue-50" : "bg-white"].join(" ")}
+                className={[
+                  `grid ${GRID_COLS} place-items-center px-4 py-3 text-[14px] text-center`,
+                  "border-t border-gray-100",
+                  isSel ? "bg-blue-50" : "bg-white",
+                ].join(" ")}
               >
                 <div className="flex items-center justify-center gap-2">
                   <input
@@ -127,7 +138,9 @@ export default function Table() {
                     <thead>
                       <tr>
                         {r.confidenceHeader.map((ch, i) => (
-                          <th key={i} className="border px-2 py-1 font-bold">{ch}</th>
+                          <th key={i} className="border px-2 py-1 font-bold">
+                            {ch}
+                          </th>
                         ))}
                       </tr>
                     </thead>
@@ -151,14 +164,20 @@ export default function Table() {
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className={["h-[34px] rounded-md border px-3 text-[14px]", clampedPage <= 1 ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer"].join(" ")}
+            className={[
+              "h-[34px] rounded-md border px-3 text-[14px]",
+              clampedPage <= 1 ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer",
+            ].join(" ")}
           >
             {t("pager.prev", { defaultValue: "Previous" })}
           </button>
           <button
             type="button"
             onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            className={["h-[34px] rounded-md border px-3 text-[14px]", clampedPage >= pageCount ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer"].join(" ")}
+            className={[
+              "h-[34px] rounded-md border px-3 text-[14px]",
+              clampedPage >= pageCount ? "text-gray-400 border-gray-200 cursor-not-allowed" : "border-gray-300 cursor-pointer",
+            ].join(" ")}
           >
             {t("pager.next", { defaultValue: "Next" })}
           </button>
