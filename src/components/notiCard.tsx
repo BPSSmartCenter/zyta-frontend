@@ -3,17 +3,23 @@ import React from "react";
 import fireNoti from "../assets/firenoti.svg";
 import motionNoti from "../assets/motionnoti.svg";
 import deviceNoti from "../assets/devicenoti.svg";
+import fallingNoti from "../assets/fallingnoti.svg";
+import sleepingNoti from "../assets/sleepingnoti.svg";
+import alertImage from "../assets/alert.png";
 
 type NotiType = "alert" | "warning" | "offline" | "normal" | "success" | "info";
 
 type NotiCardProps = {
   type: NotiType;
   title: string;
+  titleKey?: string;
   site?: string;
   date?: string | number | Date;
   detail?: string;
   img?: string;
   icon?: React.ReactNode;
+  forceDefaultImage?: boolean;
+  forceImageOnly?: boolean;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   className?: string;
 };
@@ -90,26 +96,85 @@ const palette: Record<
   },
 };
 
-const DefaultIcon: React.FC<{ type: NotiType }> = ({ type }) => {
-  if (type === "alert") return <img src={fireNoti} alt="" />;
-  if (type === "warning") return <img src={motionNoti} alt="" />;
-  if (type === "offline") return <img src={deviceNoti} alt="" />;
-  if (type === "info") return <img src={deviceNoti} alt="" />;
-  return <img src={deviceNoti} alt="" />;
+const hasKeyword = (haystack: string, keywords: string[]) =>
+  keywords.some((kw) => haystack.includes(kw));
+
+const fallbackImgFor = (
+  type: NotiType,
+  title: string,
+  titleKey?: string,
+  strictDefaults = false
+) => {
+  const normalizedKey = (titleKey || "").toLowerCase();
+  const normalizedTitle = (title || "").toLowerCase();
+  const blob = `${type} ${normalizedKey} ${normalizedTitle}`;
+
+  if (
+    normalizedKey.includes("deviceoffline") ||
+    normalizedKey.includes("cameraoffline")
+  ) {
+    return deviceNoti;
+  }
+
+  if (
+    hasKeyword(blob, ["fall", "ล้ม", "notis.falldetected"])
+  )
+    return fallingNoti;
+  if (
+    hasKeyword(blob, ["sleep", "หลับ", "notis.sleepinglong"])
+  )
+    return sleepingNoti;
+  if (
+    hasKeyword(blob, ["offline", "ออฟ", "อุปกรณ์ออฟไลน์", "notis.deviceoffline", "notis.cameraoffline"])
+  )
+    return deviceNoti;
+  if (
+    hasKeyword(blob, ["motion", "เคลื่อนไหว", "notis.motiondetected"])
+  )
+    return motionNoti;
+  if (
+    hasKeyword(blob, ["fire", "ไฟ", "notis.firedetected"])
+  )
+    return fireNoti;
+
+  if (!strictDefaults) {
+    if (type === "offline") return deviceNoti;
+    if (type === "warning") return motionNoti;
+    if (type === "alert") return fireNoti;
+  }
+
+  return alertImage;
 };
 
 const NotiCard: React.FC<NotiCardProps> = ({
   type,
   title,
+  titleKey,
   site,
   date,
   detail,
   img,
   icon,
+  forceDefaultImage,
+  forceImageOnly,
   onClick,
   className,
 }) => {
   const p = palette[type as keyof typeof palette] ?? palette.normal;
+  const normalizedImg = React.useMemo(
+    () => (typeof img === "string" ? img.trim() : ""),
+    [img]
+  );
+  const displayImg = React.useMemo(() => {
+    if (forceDefaultImage) {
+      return fallbackImgFor(type, title, titleKey, true);
+    }
+    if (normalizedImg.length) {
+      return normalizedImg;
+    }
+    if (forceImageOnly) return undefined;
+    return fallbackImgFor(type, title, titleKey);
+  }, [forceDefaultImage, forceImageOnly, normalizedImg, type, title, titleKey]);
 
   const metaPieces = [
     detail && String(detail).trim(),
@@ -134,10 +199,12 @@ const NotiCard: React.FC<NotiCardProps> = ({
           type !== "normal" && p.iconBg
         )}
       >
-        {img ? (
-          <img width={30} src={img} alt="" />
-        ) : (
-          icon ?? <DefaultIcon type={type} />
+        {icon ? (
+          icon
+        ) : displayImg ? (
+          <img width={30} src={displayImg} alt="" />
+        ) : forceImageOnly ? null : (
+          <img width={30} src={deviceNoti} alt="" />
         )}
       </div>
 

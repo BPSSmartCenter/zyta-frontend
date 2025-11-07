@@ -82,16 +82,25 @@ const bag = (n: any) =>
     .join(" | ");
 
 const normalizeEventKey = (n: Noti): EventKey => {
+  const key = String(n?.titleKey || "").toLowerCase();
   const s = bag(n);
+  if (key === "notis.motiondetected") return "motion";
+  if (key === "notis.falldetected") return "fall";
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
   if (
     /\bmotion\b/.test(s) ||
     s.includes("motion detected") ||
-    s.includes("��Ǩ�Ѻ�������͹���") ||
-    s.includes("��Ǩ���������͹���")
+    s.includes("notis.motiondetected") ||
+    s.includes("ตรวจพบการเคลื่อนไหว") ||
+    s.includes("ตรวจจับการเคลื่อนไหว")
   )
     return "motion";
-  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
+  if (
+    /\bfall\b/.test(s) ||
+    s.includes("ตรวจพบคนล้ม") ||
+    s.includes("notis.falldetected")
+  )
+    return "fall";
   if (
     /notis\.(camera|device)offline/.test(s) ||
     /(?:camera|device)\s*offline/.test(s) ||

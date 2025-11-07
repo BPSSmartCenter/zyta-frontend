@@ -115,7 +115,13 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
       if (kind === "face") {
         const occurred = new Date(n.occurredAt ?? n.date ?? Date.now()).toISOString();
         const person = meta?.person ?? {};
-        const id = `noti-face-${n.id ?? meta?.rawId ?? occurred}`;
+        const rawId =
+          meta?.faceRow?.id ??
+          meta?.rawId ??
+          meta?.person?.id ??
+          meta?.person?.rawId ??
+          n.id;
+        const id = String(rawId ?? occurred);
         const genderRaw = String(person.gender || "").toUpperCase();
         const row: FaceScanRow = {
           id,
@@ -137,7 +143,13 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
         } as any);
       } else if (kind === "plate") {
         const occurred = new Date(n.occurredAt ?? n.date ?? Date.now()).toISOString();
-        const id = `noti-plate-${n.id ?? meta?.rawId ?? occurred}`;
+        const rawId =
+          meta?.row?.id ??
+          meta?.rawId ??
+          meta?.plateId ??
+          (meta?.plate ?? meta?.plateText) ??
+          n.id;
+        const id = String(rawId ?? occurred);
         const confidenceHeader = Array.isArray(meta?.confidenceHeader) && meta.confidenceHeader.length
           ? meta.confidenceHeader
           : ["-","-","-","-","-","-"];

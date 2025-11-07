@@ -7,6 +7,7 @@ import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import { useNotisFeed } from "../../context/NotisContext";
+import { resolveDefaultNotiImage } from "../../utils/notis";
 import { isFaceRecNoti } from "../../utils/notis";
 
 /* ---------- types ---------- */
@@ -25,6 +26,7 @@ type CameraItem = {
   imgSrc?: string;
   embedUrl?: string;
   embedTitle?: string;
+  isFallback?: boolean;
 };
 
 type Props = {
@@ -44,15 +46,25 @@ const MONITOR_URL =
 const USE_MOCK_CAMERA = false;
 
 /* ---------- helpers ---------- */
-const getPic = (n: any) =>
-  n?.screenshot ??
-  n?.screenShot ??
-  n?.screenshotUrl ??
-  n?.thumbnail ??
-  n?.img ??
-  n?.image ??
-  n?.picture ??
-  undefined;
+const getPic = (n: any): { src?: string; isFallback: boolean } => {
+  const fromScreenshot =
+    typeof n?.screenshot === "string" && n.screenshot.trim().length
+      ? n.screenshot
+      : undefined;
+  const fromImg =
+    typeof n?.img === "string" && n.img.trim().length ? n.img : undefined;
+  const src = fromScreenshot ?? fromImg;
+
+  if (src) {
+    return {
+      src,
+      isFallback: false,
+    };
+  }
+
+  const fallback = resolveDefaultNotiImage(n);
+  return { src: fallback, isFallback: Boolean(fallback) };
+};
 
 const ringClass = (n: Noti) => {
   const t = (n.type || "").toLowerCase();
@@ -92,7 +104,8 @@ const normalizeEventKey = (n: any): EventKey => {
     /\bfall\b/.test(s) ||
     s.includes("ตรวจพบคนล้ม") ||
     s.includes("ตรวจพบการล้ม") ||
-    s.includes("fall detected")
+    s.includes("fall detected") ||
+    s.includes("notis.falldetected")
   )
     return "fall";
 
@@ -217,17 +230,21 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
     // โหมดจริง: คัดเฉพาะ noti ที่มีรูป
     const tiles: CameraItem[] = source
       .filter((n) => !isFaceRecNoti(n))
-      .filter((n) => !!getPic(n))
       .sort(
         (a, b) =>
           new Date((b as any).date).getTime() -
           new Date((a as any).date).getTime()
       )
       .slice(0, MAX_HEADER_IMAGES)
-      .map<CameraItem>((n) => ({
-        imgSrc: getPic(n) || undefined,
-        ringColor: ringClass(n),
-      }));
+      .map<CameraItem>((n) => {
+        const pic = getPic(n);
+        return {
+          imgSrc: pic.src,
+          ringColor: ringClass(n),
+          isFallback: pic.isFallback,
+        };
+      })
+      .filter((tile) => !!tile.imgSrc);
 
     // ถ้าไม่เจอรูปจาก notis และไม่มี cameraItems ให้ "ไม่แสดงอะไรเลย"
     if (tiles.length === 0 && !(cameraItems && cameraItems.length)) {
@@ -340,6 +357,7 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
                   imgSrc={c.imgSrc}
                   embedUrl={c.embedUrl}
                   embedTitle={c.embedTitle}
+                  isFallbackImg={c.isFallback}
                   className="w-full"
                 />
               </div>
@@ -397,14 +415,15 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
       {computedCamera.length > 0 && (
         <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
           {computedCamera.map((c, i) => (
-            <CameraTile
-              key={i}
-              ringColor={c.ringColor}
-              imgSrc={c.imgSrc}
-              embedUrl={c.embedUrl}
-              embedTitle={c.embedTitle}
-              className="p-1!"
-            />
+                <CameraTile
+                  key={i}
+                  ringColor={c.ringColor}
+                  imgSrc={c.imgSrc}
+                  embedUrl={c.embedUrl}
+                  embedTitle={c.embedTitle}
+                  isFallbackImg={c.isFallback}
+                  className="p-1!"
+                />
           ))}
         </div>
       )}

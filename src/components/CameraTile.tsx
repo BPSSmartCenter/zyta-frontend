@@ -14,6 +14,8 @@ type CameraTileProps = {
   className?: string;
   /** Alt text used by the image and as the iframe fallback title */
   alt?: string;
+  /** Flag to show tinted background when we only have a placeholder image */
+  isFallbackImg?: boolean;
 };
 
 const CameraTile: React.FC<CameraTileProps> = ({
@@ -23,8 +25,10 @@ const CameraTile: React.FC<CameraTileProps> = ({
   imgSrc,
   className = "",
   alt = "camera-tile",
+  isFallbackImg = false,
 }) => {
   const title = embedTitle || alt;
+  const frameBg = isFallbackImg ? "bg-[#FEE4E8]" : "bg-white";
 
   return (
     // Keep the original aspect ratio wrapper so existing layouts stay intact
@@ -36,7 +40,7 @@ const CameraTile: React.FC<CameraTileProps> = ({
       ].join(" ")}
     >
       {/* Inner frame with rounded corners and white background */}
-      <div className="absolute inset-1 rounded-xl overflow-hidden bg-white">
+      <div className={`absolute inset-1 rounded-xl overflow-hidden ${frameBg}`}>
         {embedUrl ? (
           <div className="h-full w-full overflow-hidden">
             <iframe

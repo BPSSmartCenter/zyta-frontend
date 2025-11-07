@@ -8,11 +8,7 @@ import SnapshotChartSection from "../components/Chart";
 import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
-import {
-  notis as mockNotis,
-  recognizeNotis,
-  ZYTA_NOTIS,
-} from "../data/Dashboard/notis";
+import { notis as mockNotis, ZYTA_NOTIS } from "../data/Dashboard/notis";
 import { useFaceRec } from "../context/FaceRecContext";
 import { statItems } from "../components/Dashboard/dashboard.constants";
 import { useFilters } from "../context/FiltersContext";
@@ -152,12 +148,13 @@ export default function Dashboard() {
 
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();
-    const dynamic = (faceRec?.dashboardNotis ?? []) as unknown as any[];
-    const src = dynamic.length ? dynamic : (recognizeNotis as unknown as any[]);
-    return src
+    const dynamic = ((faceRec?.dashboardNotis ?? []) as unknown as any[]).filter(
+      (n: any) => String(n?.type || "").toLowerCase() === "info"
+    );
+    return dynamic
       .filter((n) => matchGlobalDate(n?.date))
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchFR, JSON.stringify(faceRec?.dashboardNotis), matchGlobalDate]);
+  }, [searchFR, matchGlobalDate, JSON.stringify(faceRec?.dashboardNotis)]);
   const filterZYTA = React.useMemo(() => {
     const q = searchZYTA.toLowerCase().trim();
     const src = ZYTA_NOTIS as unknown as any[];

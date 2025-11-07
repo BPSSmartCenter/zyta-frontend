@@ -223,11 +223,34 @@ curl -X POST http://localhost:3000/webhooks/notis \
   }'
 ```
 
+**Informational – license plate detected**
+```bash
+curl -X POST http://localhost:3000/webhooks/notis \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: CAM-3078-ENTRANCE" \
+  -d '{
+    "type": "info",
+    "titleKey": "notis.plateDetected",
+    "severity": "low",
+    "occurredAt": "2025-02-11T03:27:00+07:00",
+    "meta": {
+      "kind": "plate",
+      "rawId": "plate-001",
+      "plateText": "กข 1234",
+      "province": "กรุงเทพมหานคร",
+      "cameraName": "Entrance Cam",
+      "confidenceHeader": ["A", "B", "C", "D", "E", "F"],
+      "picture": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ...",
+      "platePicture": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ..."
+    }
+  }'
+```
+
 **Normal – device offline notice**
 ```bash
 curl -X POST http://localhost:3000/webhooks/notis \
   -H "Content-Type: application/json" \
-  -d '{
+  -d '{ 
     "type": "normal",
     "title": "ตรวจพบอุปกรณ์ออฟไลน์",
     "siteId": "3078000",

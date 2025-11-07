@@ -33,7 +33,12 @@ const getEventKey = (n: WB): EventKey | null => {
   const s = bag(n);
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
   if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
-  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
+  if (
+    /\bfall\b/.test(s) ||
+    s.includes("ตรวจพบคนล้ม") ||
+    s.includes("notis.falldetected")
+  )
+    return "fall";
   if (
     /notis\.(camera|device)offline/.test(s) ||
     /(?:camera|device)\s*offline/.test(s) ||
@@ -128,13 +133,15 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
                   }}
                   className={`${isNavigable ? "cursor-pointer" : "cursor-default"} outline-none select-none`}
                 >
-                  <NotiCard
-                    type={n.type as any}
-                    title={title}
-                    img={n.img as any}
-                    site={site}
-                    date={dateText}
-                  />
+                <NotiCard
+                  type={n.type as any}
+                  titleKey={n.titleKey}
+                  title={title}
+                  img={n.img as any}
+                  site={site}
+                  date={dateText}
+                  forceDefaultImage
+                />
                 </div>
               );
             })

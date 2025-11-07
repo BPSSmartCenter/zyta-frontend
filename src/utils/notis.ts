@@ -111,24 +111,6 @@ const matchBag = (n: Noti): string => {
 const containsAny = (haystack: string, needles: string[]) =>
   needles.some((needle) => haystack.includes(needle));
 
-const extractRawImage = (n: Noti): string | undefined => {
-  const candidates = [
-    (n as any).screenshot,
-    (n as any).screenShot,
-    (n as any).screenshotUrl,
-    (n as any).thumbnail,
-    (n as any).img,
-    (n as any).image,
-    (n as any).picture,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-  return undefined;
-};
-
 export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   const key = String(n.titleKey || "").toLowerCase();
   const title = String(n.title || "").toLowerCase();
@@ -229,29 +211,20 @@ export const isFaceRecNoti = (n: Noti): boolean => {
 export const decorateNotiForDisplay = (n: Noti): Noti => {
   if ((n as any).__prepared) return n;
 
-  const fallback = resolveDefaultNotiImage(n);
-  const rawImage = extractRawImage(n);
-
-  let nextType = n.type;
-  if (fallback === deviceNoti) nextType = "offline" as Noti["type"];
-  else if (fallback === motionNoti) nextType = "warning";
-  else if (
-    fallback === fireNoti ||
-    fallback === fallingNoti ||
-    fallback === sleepingNoti
-  )
-    nextType = "alert";
+  const trimmedImg =
+    typeof n.img === "string" && n.img.trim().length ? n.img.trim() : undefined;
+  const rawShot =
+    typeof (n as any).screenshot === "string" && (n as any).screenshot.trim().length
+      ? (n as any).screenshot.trim()
+      : undefined;
 
   const next: Noti = {
     ...n,
-    type: nextType,
-    img: fallback,
+    img: trimmedImg,
   };
 
-  if (rawImage && rawImage !== fallback) {
-    (next as any).screenshot = rawImage;
-  } else if ((n as any).screenshot) {
-    (next as any).screenshot = (n as any).screenshot;
+  if (rawShot) {
+    (next as any).screenshot = rawShot;
   }
 
   (next as any).__prepared = true;

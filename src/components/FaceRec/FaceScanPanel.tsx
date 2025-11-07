@@ -21,13 +21,20 @@ export default function FaceScanPanel() {
     return allRows.filter((r: any) => toDateKey(r?.timeInISO) === selectedDateKey);
   }, [allRows, selectedDateKey]);
 
-  const getRowForListIndex = (i: number) => {
-    if (!rows.length) return null;
-    const idx = rows.length - 1 - i; // faceList shows newest at top
-    return rows[idx] ?? null;
-  };
+  const visibleRows = React.useMemo(() => rows.slice(0, 5), [rows]);
 
-  const selRow = getRowForListIndex(selectedIdx) || (rows.length ? rows[rows.length - 1] : null);
+  React.useEffect(() => {
+    if (!visibleRows.length) {
+      if (selectedIdx !== 0) setSelectedIdx(0);
+      return;
+    }
+    if (selectedIdx >= visibleRows.length) {
+      setSelectedIdx(0);
+    }
+  }, [visibleRows.length, selectedIdx]);
+
+  const selRow =
+    visibleRows[selectedIdx] ?? visibleRows[0] ?? (rows.length ? rows[0] : null);
   const fallbackDetail = (faceRec?.faceDetail ?? (FACE_DETAIL_CONST as any)) as any;
   const detail = selRow
     ? {
@@ -97,34 +104,31 @@ export default function FaceScanPanel() {
 
           <div className="lg-1024:w-[300px] w-full bg-black text-white text-sm overflow-y-auto">
             <div className="flex flex-col">
-              {rows
-                .slice(-5)
-                .reverse()
-                .map((f: any, i: number) => (
-                  <div
-                    key={f.id ?? i}
-                    onClick={() => setSelectedIdx(i)}
-                    className={[
-                      "flex items-center justify-between gap-2 border-b border-gray-600 px-2 py-3 hover:bg-gray-700 cursor-pointer",
-                      selectedIdx === i ? "bg-gray-700" : "",
-                    ].join(" ")}
-                  >
-                    <div className="flex gap-3 items-center justify-center ">
-                      <img
-                        src={getRowForListIndex(i)?.picture || ""}
-                        alt=""
-                        className="w-10 h-10 object-cover rounded-full"
-                      />
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{f.fullName}</span>
-                        <span className="text-[11px] text-gray-300 uppercase">{f.gender}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(f.timeInISO).toLocaleString()}
-                        </span>
-                      </div>
+              {visibleRows.map((f: any, i: number) => (
+                <div
+                  key={f.id ?? i}
+                  onClick={() => setSelectedIdx(i)}
+                  className={[
+                    "flex items-center justify-between gap-2 border-b border-gray-600 px-2 py-3 hover:bg-gray-700 cursor-pointer",
+                    selectedIdx === i ? "bg-gray-700" : "",
+                  ].join(" ")}
+                >
+                  <div className="flex gap-3 items-center justify-center ">
+                    <img
+                      src={f.picture || ""}
+                      alt=""
+                      className="w-10 h-10 object-cover rounded-full"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{f.fullName}</span>
+                      <span className="text-[11px] text-gray-300 uppercase">{f.gender}</span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(f.timeInISO).toLocaleString()}
+                      </span>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -142,7 +146,7 @@ export default function FaceScanPanel() {
               <strong>{t("table.gender", { defaultValue: "GENDER" })}:</strong> {detail.gender}
             </p>
             <p>
-              <strong>{t("table.province", { defaultValue: "PROVINCE" })}:</strong> {detail.province}
+              <strong>{t("table.site", { defaultValue: "SITE" })}:</strong> {detail.province}
             </p>
             <p>
               <strong>{t("filters.status", { defaultValue: "Status" })}:</strong> {detail.status}

@@ -85,7 +85,7 @@ export default function Table() {
             <div>{t("table.picture", { defaultValue: "PICTURE" })}</div>
             <div>{t("table.platePicture", { defaultValue: "LICENSE PLATES PICTURE" })}</div>
             <div>{t("table.plateText", { defaultValue: "LICENSE PLATES TEXT" })}</div>
-            <div>{t("table.province", { defaultValue: "PROVINCE" })}</div>
+            <div>{t("table.site", { defaultValue: "SITE" })}</div>
             <div>{t("table.confidence", { defaultValue: "CONFIDENCE" })}</div>
             <div>{t("table.cameraName", { defaultValue: "CAMERA NAME" })}</div>
             <div>{t("table.timestamp", { defaultValue: "TIMESTAMP" })}</div>

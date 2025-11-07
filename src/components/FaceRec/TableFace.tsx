@@ -89,7 +89,7 @@ export default function TableFaceScan() {
             <div>{t("table.picture", { defaultValue: "PICTURE" })}</div>
             <div>{t("table.fullName", { defaultValue: "FULL NAME" })}</div>
             <div>{t("table.gender", { defaultValue: "GENDER" })}</div>
-            <div>{t("table.province", { defaultValue: "PROVINCE" })}</div>
+            <div>{t("table.site", { defaultValue: "SITE" })}</div>
             <div>{t("table.inout", { defaultValue: "IN/OUT STATUS" })}</div>
             <div>{t("table.timestamp", { defaultValue: "Timestamp" })}</div>
           </div>

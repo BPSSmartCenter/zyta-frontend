@@ -97,11 +97,13 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
                 >
                   <NotiCard
                     type={n.type}
+                    titleKey={n.titleKey}
                     img={n.img}
                     title={title}
                     detail={n.detail}
                     site={site}
                     date={dateText}
+                    forceImageOnly
                   />
                 </div>
               );

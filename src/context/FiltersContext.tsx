@@ -29,7 +29,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
   const [date, setDateState] = React.useState<DateValue>(defaultToday);
-  const [dateTouched, setDateTouched] = React.useState<boolean>(true);
+  const [dateTouched, setDateTouched] = React.useState<boolean>(false);
   const [selectedSite, setSelectedSite] = React.useState<string>("all");
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },

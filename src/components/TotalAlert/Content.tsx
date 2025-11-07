@@ -9,7 +9,7 @@ import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import { useNotisFeed } from "../../context/NotisContext";
-import { matchesSite, toDateKey } from "../../utils/notis";
+import { matchesSite, toDateKey, resolveDefaultNotiImage } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
 
 /* ---------- types ---------- */
@@ -21,19 +21,29 @@ type StatItem = {
   img: string;
   activeImg: string;
 };
-type CameraItem = { ringColor: string; imgSrc: string; alt?: string };
+type CameraItem = { ringColor: string; imgSrc: string; alt?: string; isFallback?: boolean };
 type Props = { statItems?: StatItem[]; cameraItems?: CameraItem[] };
 
 /* ---------- helpers ---------- */
-const getPic = (n: any) =>
-  n?.screenshot ??
-  n?.screenShot ??
-  n?.screenshotUrl ??
-  n?.thumbnail ??
-  n?.img ??
-  n?.image ??
-  n?.picture ??
-  undefined;
+const getPic = (n: any): { src?: string; isFallback: boolean } => {
+  const fromScreenshot =
+    typeof n?.screenshot === "string" && n.screenshot.trim().length
+      ? n.screenshot
+      : undefined;
+  const fromImg =
+    typeof n?.img === "string" && n.img.trim().length ? n.img : undefined;
+  const src = fromScreenshot ?? fromImg;
+
+  if (src) {
+    return {
+      src,
+      isFallback: false,
+    };
+  }
+
+  const fallback = resolveDefaultNotiImage(n);
+  return { src: fallback, isFallback: Boolean(fallback) };
+};
 
 const ringClass = (n: Noti) => {
   const t = (n.type || "").toLowerCase();
@@ -51,10 +61,25 @@ const bag = (n: any) =>
     .join(" | ");
 
 const normalizeEventKey = (n: any): EventKey => {
+  const key = String(n?.titleKey || '').toLowerCase();
   const s = bag(n);
+  if (key === "notis.motiondetected") return "motion";
+  if (key === "notis.falldetected") return "fall";
   if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (/\bmotion\b/.test(s) || s.includes("motion detected") || s.includes("ตรวจจับการเคลื่อนไหว") || s.includes("ตรวจพบการเคลื่อนไหว")) return "motion";
-  if (/\bfall\b/.test(s) || s.includes("ตรวจพบคนล้ม")) return "fall";
+  if (
+    /\bmotion\b/.test(s) ||
+    s.includes("motion detected") ||
+    s.includes("notis.motiondetected") ||
+    s.includes("ตรวจพบการเคลื่อนไหว") ||
+    s.includes("ตรวจจับการเคลื่อนไหว")
+  )
+    return "motion";
+  if (
+    /\bfall\b/.test(s) ||
+    s.includes("ตรวจพบคนล้ม") ||
+    s.includes("notis.falldetected")
+  )
+    return "fall";
   if (
     /notis\.(camera|device)offline/.test(s) ||
     /(?:camera|device)\s*offline/.test(s) ||
@@ -174,7 +199,8 @@ export default function Content({ statItems }: Props) {
     return listForEvent
       .map((n) => {
         const pic = getPic(n);
-        return pic ? { ringColor: ringClass(n), imgSrc: pic } : null;
+        if (!pic.src) return null;
+        return { ringColor: ringClass(n), imgSrc: pic.src, isFallback: pic.isFallback };
       })
       .filter(Boolean)
       .slice(0, 3) as CameraItem[];
@@ -247,6 +273,7 @@ export default function Content({ statItems }: Props) {
                 key={i}
                 ringColor={c.ringColor}
                 imgSrc={c.imgSrc}
+                isFallbackImg={c.isFallback}
                 alt={`event-${i + 1}`}
                 className="flex-1 max-w-[346px]"
               />

@@ -39,6 +39,7 @@
     "platePicture": "LICENSE PLATES PICTURE",
     "plateText": "LICENSE PLATES TEXT",
     "province": "PROVINCE",
+    "site": "SITE",
     "confidence": "CONFIDENCE",
     "cameraName": "CAMERA NAME",
     "timestamp": "TIMESTAMP"

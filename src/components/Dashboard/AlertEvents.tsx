@@ -39,7 +39,8 @@ const getEventKey = (n: Noti): EventKey | null => {
     /\bfall\b/.test(s) ||
     s.includes("ตรวจพบคนล้ม") ||
     s.includes("ตรวจพบการล้ม") ||
-    s.includes("fall detected")
+    s.includes("fall detected") ||
+    s.includes("notis.falldetected")
   )
     return "fall";
 
@@ -155,10 +156,12 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                 >
                   <NotiCard
                     type={n.type as any}
+                    titleKey={n.titleKey as string | undefined}
                     title={title}
                     site={site}
                     date={dateText}
                     img={n.img as any}
+                    forceDefaultImage
                   />
                 </div>
               );
