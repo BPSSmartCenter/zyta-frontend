@@ -219,15 +219,16 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
 
   // ไปหน้า Alert (รักษา site context ถ้ามี)
 
-  const isImageUrl = (url?: string) => {
-    if (!url) return false;
-    const u = url.toLowerCase();
-    return (
+const isImageUrl = (url?: string) => {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return (
+      u.startsWith("data:image/") ||
       /\.(png|jpe?g|gif|webp|bmp|avif)(\?.*)?$/.test(u) ||
       u.includes("googleusercontent.com") ||
       u.includes("=iv1")
-    );
-  };
+  );
+};
 
   // helper: ถ้าเป็น googleusercontent และยังไม่มีพารามิเตอร์ ให้ต่อ "=w600-h600-iv1"
   // หรือถ้ามีแล้วแต่ไม่มี -iv1 ให้เติม -iv1 เข้าไป
