@@ -21,6 +21,7 @@ import {
   toDateKey,
   decorateNotiForDisplay,
   resolveDefaultNotiImage,
+  buildNotiKeywordBag,
 } from "../utils/notis";
 import { alertImage } from "../assets";
 
@@ -63,22 +64,6 @@ const EXCLUDED_KEYWORDS = [
   "device offline",
   "ออฟไลน์",
 ];
-
-const buildNotiKeywordBag = (n: Noti): string =>
-  [
-    n.titleKey,
-    n.title,
-    (n as any)?.detail,
-    n.type,
-    n.severity,
-    (n.meta as any)?.category,
-    (n.meta as any)?.event,
-    (n.meta as any)?.label,
-    JSON.stringify(n.meta ?? {}),
-  ]
-    .filter(Boolean)
-    .map((v) => String(v).toLowerCase())
-    .join(" ");
 
 const includesAny = (text: string, keywords: string[]) =>
   keywords.some((kw) => text.includes(kw));

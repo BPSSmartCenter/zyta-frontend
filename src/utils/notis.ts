@@ -109,6 +109,155 @@ export const matchesSite = (
   siteCode?: string | null
 ): boolean => matchesSiteInfo(n as Record<string, any>, siteCode);
 
+const lowered = (value?: any) =>
+  typeof value === "string" ? value.toLowerCase() : String(value ?? "").toLowerCase();
+
+export const buildNotiKeywordBag = (
+  n: Partial<Noti> | Record<string, any>
+): string =>
+  [
+    (n as any)?.titleKey,
+    (n as any)?.title,
+    (n as any)?.detail,
+    (n as any)?.type,
+    (n as any)?.subtype,
+    (n as any)?.category,
+    (n as any)?.event,
+    (n as any)?.label,
+    (n as any)?.severity,
+    (n as any)?.meta?.eventKey,
+    (n as any)?.meta?.event,
+    (n as any)?.meta?.category,
+    (n as any)?.meta?.label,
+    JSON.stringify((n as any)?.meta ?? {}),
+  ]
+    .filter(Boolean)
+    .map((v) => lowered(v))
+    .join(" ");
+
+export type AlertEventKey =
+  | "fire"
+  | "motion"
+  | "offline"
+  | "fall"
+  | "sleep";
+
+const FIRE_KEYWORDS = [
+  "notis.firedetected",
+  "ไฟ",
+  "ไฟไหม้",
+  "เพลิง",
+  "fire",
+];
+const MOTION_KEYWORDS = [
+  "notis.motiondetected",
+  "motion",
+  "movement",
+  "เคลื่อนไหว",
+  "ตรวจพบการเคลื่อนไหว",
+];
+const OFFLINE_KEYWORDS = [
+  "notis.cameraoffline",
+  "notis.deviceoffline",
+  "camera offline",
+  "device offline",
+  "offline",
+  "ออฟไลน์",
+];
+const FALL_KEYWORDS = [
+  "notis.falldetected",
+  "fall",
+  "ตก",
+  "ล้ม",
+  "ตรวจพบคนล้ม",
+];
+const SLEEP_KEYWORDS = [
+  "notis.sleepinglong",
+  "sleep",
+  "sleeping",
+  "นอน",
+  "หลับ",
+  "ตรวจพบคนหลับ",
+];
+
+const containsKeyword = (text: string, keywords: string[]) => {
+  if (!text) return false;
+  return keywords.some((kw) => text.includes(kw));
+};
+
+const DIRECT_EVENT_MAP: Record<string, AlertEventKey> = {
+  "notis.firedetected": "fire",
+  "fire": "fire",
+  "ไฟไหม้": "fire",
+  "เพลิงไหม้": "fire",
+  "เพลิง": "fire",
+  "blaze": "fire",
+  "notis.motiondetected": "motion",
+  "motion": "motion",
+  "ตรวจพบการเคลื่อนไหว": "motion",
+  "ตรวจจับการเคลื่อนไหว": "motion",
+  "movement": "motion",
+  "notis.cameraoffline": "offline",
+  "notis.deviceoffline": "offline",
+  "camera offline": "offline",
+  "device offline": "offline",
+  "offline": "offline",
+  "กล้องออฟไลน์": "offline",
+  "ออฟไลน์": "offline",
+  "notis.falldetected": "fall",
+  "fall": "fall",
+  "ตก": "fall",
+  "ล้ม": "fall",
+  "ตรวจพบคนล้ม": "fall",
+  "ตรวจพบการล้ม": "fall",
+  "notis.sleepinglong": "sleep",
+  "sleep": "sleep",
+  "sleeping": "sleep",
+  "นอนหลับ": "sleep",
+  "หลับ": "sleep",
+  "ตรวจพบคนหลับนานกว่าปกติ": "sleep",
+};
+
+export const resolveAlertEventKey = (
+  n: Partial<Noti> | Record<string, any>
+): AlertEventKey | null => {
+  const meta = (n as any)?.meta ?? {};
+  const directCandidates = [
+    (n as any)?.event,
+    (n as any)?.titleKey,
+    (n as any)?.title,
+    meta?.eventKey,
+    meta?.event,
+    meta?.category,
+    meta?.label,
+    (n as any)?.category,
+    (n as any)?.type,
+    (n as any)?.subtype,
+  ]
+    .filter(Boolean)
+    .map((val) => lowered(val));
+
+  for (const candidate of directCandidates) {
+    if (!candidate) continue;
+    const mapped = DIRECT_EVENT_MAP[candidate];
+    if (mapped) return mapped;
+  }
+
+  const bag = buildNotiKeywordBag(n);
+  const texts = [...directCandidates, bag];
+
+  for (const text of texts) {
+    if (!text) continue;
+    if (containsKeyword(text, FIRE_KEYWORDS)) return "fire";
+    if (containsKeyword(text, OFFLINE_KEYWORDS)) return "offline";
+    if (containsKeyword(text, FALL_KEYWORDS)) return "fall";
+    if (containsKeyword(text, SLEEP_KEYWORDS)) return "sleep";
+    if (containsKeyword(text, MOTION_KEYWORDS)) return "motion";
+  }
+
+  return null;
+};
+
 export const notiSeverity = (n: Noti): Severity => {
   const s = (n.severity || "").toLowerCase();
   if (s === "medium" || s === "critical") return s as Severity;

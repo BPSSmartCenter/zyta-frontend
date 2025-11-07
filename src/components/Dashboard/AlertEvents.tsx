@@ -5,58 +5,13 @@ import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
 import React from "react";
 import { useUserPath } from "../../routes/useUserPath";
+import { resolveAlertEventKey, type AlertEventKey, buildNotiKeywordBag } from "../../utils/notis";
 
 type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: Noti[];
 };
-
-/* ---------------- helpers: map noti -> event key ---------------- */
-type EventKey = "fire" | "motion" | "offline" | "fall" | "sleep";
-
-const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title, n?.type, n?.subtype, n?.category, n?.key]
-    .filter(Boolean)
-    .map((x: any) => String(x).toLowerCase().trim())
-    .join(" | ");
-
-const getEventKey = (n: Noti): EventKey | null => {
-  const s = bag(n);
-
-  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-
-  if (
-    /notis\.(camera|device)offline/.test(s) ||
-    /(?:camera|device)\s*offline/.test(s) ||
-    /\boffline\b/.test(s) ||
-    /ออฟ.?ไลน์/.test(s)
-  )
-    return "offline";
-
-  // ✅ ให้ fall มาก่อน motion
-  if (
-    /\bfall\b/.test(s) ||
-    s.includes("ตรวจพบคนล้ม") ||
-    s.includes("ตรวจพบการล้ม") ||
-    s.includes("fall detected") ||
-    s.includes("notis.falldetected")
-  )
-    return "fall";
-
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
-    return "sleep";
-
-  if (
-    /\bmotion\b/.test(s) ||
-    s.includes("motion detected") ||
-    s.includes("ตรวจจับการเคลื่อนไหว")
-  )
-    return "motion";
-
-  return null;
-};
-/* ---------------------------------------------------------------- */
 
 export default function AlertEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
@@ -75,7 +30,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
     });
   };
 
-  const navigateToEvent = (ev: EventKey | null) => {
+  const navigateToEvent = (ev: AlertEventKey | null) => {
     if (!ev) return;
     navigate(abs(`/alert?event=${ev}`));
   };
@@ -94,11 +49,11 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
     // ใช้ bag() + site + date ให้ค้นหาทั้ง alert + wellbeing ได้
     return sorted.filter((n: any) => {
       const hay = [
-        bag(n), // event/titleKey/title (รองรับ i18n key เดิม)
-        n?.site, // ชื่อไซต์
-        n?.title, // ชื่อเรื่อง plain
-        n?.type, // ประเภท เช่น motion/offline/...
-        n?.date, // string วันที่
+        buildNotiKeywordBag(n),
+        n?.site,
+        n?.title,
+        n?.type,
+        n?.date,
       ]
         .filter(Boolean)
         .join(" ")
@@ -135,7 +90,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
-              const eventKey = getEventKey(n);
+              const eventKey = resolveAlertEventKey(n);
               const isNavigable = Boolean(eventKey);
 
               return (

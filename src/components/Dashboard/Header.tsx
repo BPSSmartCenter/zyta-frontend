@@ -7,7 +7,7 @@ import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import { useNotisFeed } from "../../context/NotisContext";
-import { resolveDefaultNotiImage } from "../../utils/notis";
+import { resolveDefaultNotiImage, resolveAlertEventKey, type AlertEventKey } from "../../utils/notis";
 import { isFaceRecNoti } from "../../utils/notis";
 
 /* ---------- types ---------- */
@@ -27,6 +27,7 @@ type CameraItem = {
   embedUrl?: string;
   embedTitle?: string;
   isFallback?: boolean;
+  eventKey?: AlertEventKey | null;
 };
 
 type Props = {
@@ -99,57 +100,11 @@ const ringClass = (n: Noti) => {
   return "ring-[#AFEAFF]";
 };
 
-// รวมข้อความจาก noti ไว้ใช้ตรวจประเภท
-const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title]
-    .filter(Boolean)
-    .map((x: any) => String(x).toLowerCase().trim())
-    .join(" | ");
-
-// noti -> คีย์กลาง (รองรับ EN/TH + titleKey พิเศษ)
-// noti -> คีย์กลาง (รองรับ EN/TH + titleKey พิเศษ)
 const normalizeEventKey = (n: any): EventKey => {
-  const s = bag(n);
-
-  // 1) fire
-  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-
-  // 2) offline (ครบ ๆ)
-  if (
-    /notis\.(camera|device)offline/.test(s) ||
-    /(?:camera|device)\s*offline/.test(s) ||
-    /\boffline\b/.test(s) ||
-    /ออฟ.?ไลน์/.test(s)
-  )
-    return "offline";
-
-  // 3) fall (ให้มาก่อน motion)
-  if (
-    /\bfall\b/.test(s) ||
-    s.includes("ตรวจพบคนล้ม") ||
-    s.includes("ตรวจพบการล้ม") ||
-    s.includes("fall detected") ||
-    s.includes("notis.falldetected")
-  )
-    return "fall";
-
-  // 4) sleep
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
-    return "sleep";
-
-  // 5) motion (สุดท้าย)
-  if (
-    /\bmotion\b/.test(s) ||
-    s.includes("motion detected") ||
-    s.includes("notis.motiondetected") ||
-    s.includes("ตรวจจับการเคลื่อนไหว") ||
-    s.includes("ตรวจพบการเคลื่อนไหว")
-  )
-    return "motion";
-
-  return "other";
+  const key = resolveAlertEventKey(n);
+  if (!key) return "other";
+  return key as EventKey;
 };
-
 // คีย์บนการ์ด (ภาษาไทย/อังกฤษ) -> คีย์กลาง
 const normalizeStatKey = (k: string): EventKey => {
   const raw = (k || "").toLowerCase();
@@ -253,10 +208,12 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
       .slice(0, MAX_HEADER_IMAGES)
       .map<CameraItem>((n) => {
         const pic = getPic(n);
+        const eventKey = resolveAlertEventKey(n);
         return {
           imgSrc: pic.src,
           ringColor: ringClass(n),
           isFallback: pic.isFallback,
+          eventKey: eventKey ?? undefined,
         };
       })
       .filter((tile) => !!tile.imgSrc);
@@ -284,12 +241,19 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
   }, [source, cameraItems]);
 
   // กดการ์ด -> ไป /alert?event=<keyชัดเจน> (รักษา site context)
-  const handleStatChange = (ids: string[]) => {
-    const id = (ids[0] ?? "") as EventKey;
-    setSelectedStat(id || null);
-    if (!id) return;
-    const sc = selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
-    navigate(absSite(`/alert?event=${id}`, sc));
+const handleStatChange = (ids: string[]) => {
+  const id = (ids[0] ?? "") as EventKey;
+  setSelectedStat(id || null);
+  if (!id) return;
+  const sc = selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+  navigate(absSite(`/alert?event=${id}`, sc));
+};
+
+  const handleCameraTileClick = (eventKey?: AlertEventKey | null) => {
+    if (!eventKey) return;
+    const sc =
+      selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+    navigate(absSite(`/alert?event=${eventKey}`, sc));
   };
 
   // ===== Mobile carousel helpers =====
@@ -365,8 +329,7 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
               className="flex-none w-full snap-center px-6"
               style={{ scrollSnapAlign: "center" }}
             >
-              <div className="w-full max-w-[500px] mx-auto">
-                {/* ⬇️ ฝังหน้ากล้องจาก MONITOR_URL แบบชั่วคราวผ่าน iframe */}
+              <div className="w-full max-w-[500px] mx-auto relative">
                 <CameraTile
                   ringColor={c.ringColor}
                   imgSrc={c.imgSrc}
@@ -375,6 +338,17 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
                   isFallbackImg={c.isFallback}
                   className="w-full"
                 />
+                {c.eventKey && (
+                  <button
+                    type="button"
+                    onClick={() => handleCameraTileClick(c.eventKey)}
+                    className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
+                    aria-label={t("alerts.goToEvent", {
+                      event: c.eventKey,
+                      defaultValue: `View ${c.eventKey} alerts`,
+                    })}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -430,15 +404,27 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
       {computedCamera.length > 0 && (
         <div className="hidden lg-1024:flex justify-around flex-5 gap-5 px-6 mt-4">
           {computedCamera.map((c, i) => (
-                <CameraTile
-                  key={i}
-                  ringColor={c.ringColor}
-                  imgSrc={c.imgSrc}
-                  embedUrl={c.embedUrl}
-                  embedTitle={c.embedTitle}
-                  isFallbackImg={c.isFallback}
-                  className="p-1!"
+            <div key={i} className="relative">
+              <CameraTile
+                ringColor={c.ringColor}
+                imgSrc={c.imgSrc}
+                embedUrl={c.embedUrl}
+                embedTitle={c.embedTitle}
+                isFallbackImg={c.isFallback}
+                className="p-1!"
+              />
+              {c.eventKey && (
+                <button
+                  type="button"
+                  onClick={() => handleCameraTileClick(c.eventKey)}
+                  className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
+                  aria-label={t("alerts.goToEvent", {
+                    event: c.eventKey,
+                    defaultValue: `View ${c.eventKey} alerts`,
+                  })}
                 />
+              )}
+            </div>
           ))}
         </div>
       )}
