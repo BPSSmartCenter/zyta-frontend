@@ -14,12 +14,25 @@ import { statItems } from "../components/Dashboard/dashboard.constants";
 import { useFilters } from "../context/FiltersContext";
 import { useNotisFeed } from "../context/NotisContext";
 import type { Noti } from "../data/Dashboard/notis";
-import { matchesSite, sortByNewest, toDateKey, decorateNotiForDisplay } from "../utils/notis";
+import {
+  matchesSite,
+  sortByNewest,
+  toDateKey,
+  decorateNotiForDisplay,
+  resolveDefaultNotiImage,
+} from "../utils/notis";
+import { alertImage } from "../assets";
 
 // keep master key seeded in backend; not used for dashboard gating
 
 type Site = { id?: string; code?: string; name?: string; province_code?: string };
 type SiteOption = { label: string; value: string; i18nKey?: string };
+
+const isDefaultEventCategory = (n: Noti): boolean => {
+  const img = resolveDefaultNotiImage(n);
+  if (!img) return false;
+  return img !== alertImage;
+};
 
 export default function Dashboard() {
   const faceRec = useFaceRec();
@@ -120,6 +133,7 @@ export default function Dashboard() {
 
   const wellBeingSource = React.useMemo(() => {
     return dateScopedNotis.filter((n) => {
+      if (!isDefaultEventCategory(n)) return false;
       const type = (n.type || "").toLowerCase();
       const severity = (n.severity || "").toLowerCase();
       return (
