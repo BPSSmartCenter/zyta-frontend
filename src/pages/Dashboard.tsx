@@ -16,6 +16,7 @@ import { useNotisFeed } from "../context/NotisContext";
 import type { Noti } from "../data/Dashboard/notis";
 import {
   matchesSite,
+  matchesSiteInfo,
   sortByNewest,
   toDateKey,
   decorateNotiForDisplay,
@@ -26,12 +27,67 @@ import { alertImage } from "../assets";
 // keep master key seeded in backend; not used for dashboard gating
 
 type Site = { id?: string; code?: string; name?: string; province_code?: string };
-type SiteOption = { label: string; value: string; i18nKey?: string };
 
 const isDefaultEventCategory = (n: Noti): boolean => {
   const img = resolveDefaultNotiImage(n);
   if (!img) return false;
   return img !== alertImage;
+};
+
+const FALL_KEYWORDS = [
+  "notis.falldetected",
+  "fall",
+  "fall detected",
+  "ตรวจพบคนล้ม",
+  "คนล้ม",
+];
+const SLEEP_KEYWORDS = [
+  "notis.sleepinglong",
+  "sleep",
+  "sleeping",
+  "ตรวจพบคนหลับ",
+  "หลับ",
+  "นอนหลับ",
+];
+const EXCLUDED_KEYWORDS = [
+  "notis.firedetected",
+  "fire",
+  "ไฟไหม้",
+  "เพลิง",
+  "notis.motiondetected",
+  "motion",
+  "เคลื่อนไหว",
+  "ตรวจพบการเคลื่อนไหว",
+  "offline",
+  "camera offline",
+  "device offline",
+  "ออฟไลน์",
+];
+
+const buildNotiKeywordBag = (n: Noti): string =>
+  [
+    n.titleKey,
+    n.title,
+    (n as any)?.detail,
+    n.type,
+    n.severity,
+    (n.meta as any)?.category,
+    (n.meta as any)?.event,
+    (n.meta as any)?.label,
+    JSON.stringify(n.meta ?? {}),
+  ]
+    .filter(Boolean)
+    .map((v) => String(v).toLowerCase())
+    .join(" ");
+
+const includesAny = (text: string, keywords: string[]) =>
+  keywords.some((kw) => text.includes(kw));
+
+const isWellBeingNoti = (n: Noti): boolean => {
+  const bag = buildNotiKeywordBag(n);
+  if (!bag) return false;
+  if (includesAny(bag, EXCLUDED_KEYWORDS)) return false;
+  return includesAny(bag, FALL_KEYWORDS) || includesAny(bag, SLEEP_KEYWORDS);
 };
 
 export default function Dashboard() {
@@ -40,13 +96,15 @@ export default function Dashboard() {
   const { items: liveNotis } = useNotisFeed();
 
   // Navbar state
-  const [searchSite, setSearchSite] = React.useState("");
-  const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
-    { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
-  ]);
-  const [selectedSite, setSelectedSite] = React.useState("all");
-  // Use global FiltersContext date so Navbar/MiniFiltersBar drive filtering
-  const { date: globalDate, setDate: setGlobalDate } = useFilters();
+  const {
+    date: globalDate,
+    setDate: setGlobalDate,
+    selectedSite,
+    setSelectedSite,
+    siteOptions,
+    searchSite,
+    setSearchSite,
+  } = useFilters();
   // Role + sites for ContentLayout behavior similar to original
   const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(null);
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
@@ -60,20 +118,6 @@ export default function Dashboard() {
         const items = Array.isArray(resp?.items) ? resp.items : Array.isArray(resp) ? resp : [];
         const sites = items as any[];
         setAccessibleSites(sites as any);
-        // build dropdown options
-        const baseOptions: SiteOption[] = sites.map((s: any) => ({ label: s.name, value: s.code }));
-        const includeAllOption = myRole === "admin";
-        setSiteOptions(
-          includeAllOption
-            ? [{ label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" }, ...baseOptions]
-            : baseOptions
-        );
-        // Auto-focus first accessible site for non-admin on first load
-        setSelectedSite((prev) => {
-          if (includeAllOption) return "all";
-          if (prev && prev !== "all") return prev;
-          return baseOptions[0]?.value ?? prev ?? "all";
-        });
       } catch {
         setRole((r) => r ?? "user");
         setAccessibleSites([]);
@@ -134,6 +178,7 @@ export default function Dashboard() {
   const wellBeingSource = React.useMemo(() => {
     return dateScopedNotis.filter((n) => {
       if (!isDefaultEventCategory(n)) return false;
+      if (!isWellBeingNoti(n)) return false;
       const type = (n.type || "").toLowerCase();
       const severity = (n.severity || "").toLowerCase();
       return (
@@ -162,25 +207,28 @@ export default function Dashboard() {
 
   const faceRecognizeItems = React.useMemo(() => {
     const rows = Array.isArray(faceRec?.faceRows) ? faceRec.faceRows : [];
-    return rows.map((row: any) => {
-      const occurredAt = row?.timeInISO || row?.timeOutISO || row?.timestamp || row?.date || new Date().toISOString();
+    const scopedRows = rows.filter((row: any) => matchesSiteInfo(row ?? {}, selectedSite));
+    return scopedRows.map((row: any) => {
+      const occurredAt =
+        row?.timeInISO || row?.timeOutISO || row?.timestamp || row?.date || new Date().toISOString();
       return {
         id: row?.id,
         type: "info",
         titleKey: "notis.faceDetected",
         title: row?.fullName || "Face detected",
         detail: row?.cameraName || undefined,
-        site: row?.province || "-",
+        site: row?.siteName || row?.siteCode || row?.province || "-",
         date: occurredAt,
         occurredAt,
         img: row?.picture || row?.fullFrame,
         meta: {
           kind: "face",
           rawId: row?.id || row?.fullName || occurredAt,
+          siteCode: row?.siteCode,
         },
       };
     });
-  }, [faceRec?.faceRows]);
+  }, [faceRec?.faceRows, selectedSite]);
 
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();

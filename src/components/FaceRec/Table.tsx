@@ -4,7 +4,7 @@ import SearchInput from "../SearchInput";
 import { FACE_REC_ROWS, type LicensePlateRow } from "./faceRec.constant";
 import { useFaceRec } from "../../context/FaceRecContext";
 import { useFilters } from "../../context/FiltersContext";
-import { toDateKey } from "../../utils/notis";
+import { toDateKey, matchesSiteInfo } from "../../utils/notis";
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
@@ -17,7 +17,7 @@ const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
 export default function Table() {
   const faceRec = useFaceRec();
   const { t } = useTranslation("facerec");
-  const { date: globalDate, dateTouched } = useFilters();
+  const { date: globalDate, dateTouched, selectedSite } = useFilters();
 
   const [q, setQ] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -28,6 +28,10 @@ export default function Table() {
     faceRec?.plateRows && faceRec.plateRows.length > 0
       ? (faceRec.plateRows as any)
       : (FACE_REC_ROWS as any);
+  const rowsBySite = React.useMemo(
+    () => allRows.filter((r) => matchesSiteInfo(r ?? {}, selectedSite)),
+    [allRows, selectedSite]
+  );
 
   const selectedDateKey = React.useMemo(
     () => (dateTouched ? toDateKey(globalDate) : null),
@@ -35,7 +39,7 @@ export default function Table() {
   );
 
   const rowsFiltered: LicensePlateRow[] = React.useMemo(() => {
-    return allRows
+    return rowsBySite
       .filter((r) => {
         if (!selectedDateKey) return true;
         return toDateKey(r.timestamp) === selectedDateKey;
@@ -45,7 +49,7 @@ export default function Table() {
         const haystack = `${r.plateText} ${r.province} ${r.cameraName}`.toLowerCase();
         return haystack.includes(q.toLowerCase());
       });
-  }, [allRows, selectedDateKey, q]);
+  }, [rowsBySite, selectedDateKey, q]);
 
   React.useEffect(() => setPage(1), [q, selectedDateKey]);
 

@@ -9,7 +9,7 @@ import TableFaceScan from "./TableFace";
 import Table from "./Table";
 import { useFaceRec } from "../../context/FaceRecContext";
 import { useFilters } from "../../context/FiltersContext";
-import { toDateKey } from "../../utils/notis";
+import { toDateKey, matchesSiteInfo } from "../../utils/notis";
 
 // no static placeholder; show latest preview image instead
 
@@ -25,7 +25,7 @@ const Content: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation("facerec");
   const faceRec = useFaceRec();
-  const { date: globalDate, dateTouched } = useFilters();
+  const { date: globalDate, dateTouched, selectedSite } = useFilters();
 
   const selectedDateKey = React.useMemo(
     () => (dateTouched ? toDateKey(globalDate) : null),
@@ -40,15 +40,20 @@ const Content: React.FC<Props> = ({
     [selectedDateKey]
   );
 
+  const matchSite = React.useCallback(
+    (info: any) => matchesSiteInfo(info ?? {}, selectedSite),
+    [selectedSite]
+  );
+
   const filteredFaceRows = React.useMemo(() => {
     const rows = (faceRec?.faceRows as any[]) || [];
-    return rows.filter((r) => matchDate(r.timeInISO));
-  }, [faceRec?.faceRows?.length, matchDate]);
+    return rows.filter((r) => matchDate(r.timeInISO)).filter(matchSite);
+  }, [faceRec?.faceRows?.length, matchDate, matchSite]);
 
   const filteredPlateRows = React.useMemo(() => {
     const rows = (faceRec?.plateRows as any[]) || [];
-    return rows.filter((r) => matchDate(r.timestamp));
-  }, [faceRec?.plateRows?.length, matchDate]);
+    return rows.filter((r) => matchDate(r.timestamp)).filter(matchSite);
+  }, [faceRec?.plateRows?.length, matchDate, matchSite]);
 
   // ถ้าไม่ส่ง stats มา ใช้ข้อความจาก i18n
   const defaultStats = stats ?? [

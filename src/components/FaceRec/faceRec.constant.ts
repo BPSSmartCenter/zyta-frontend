@@ -19,6 +19,9 @@ export type LicensePlateRow = {
   confidenceHeader: string[];
   cameraName: string;
   timestamp: string; // ISO
+  siteCode?: string;
+  siteName?: string;
+  siteId?: string;
 };
 
 export type plateListType = {
@@ -120,6 +123,9 @@ export type FaceScanRow = {
   timeInISO: string;
   timeOutISO: string;
   cameraName?: string;
+  siteCode?: string;
+  siteName?: string;
+  siteId?: string;
 };
 
 // รายการฝั่งขวาใน FaceScanPanel (5 แถว + มี gender บรรทัดกลาง)

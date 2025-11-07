@@ -4,7 +4,7 @@ import { useFilters } from "../../context/FiltersContext";
 import SearchInput from "../SearchInput";
 import { FACE_SCAN_ROWS, type FaceScanRow } from "./faceRec.constant";
 import { useFaceRec } from "../../context/FaceRecContext";
-import { toDateKey } from "../../utils/notis";
+import { toDateKey, matchesSiteInfo } from "../../utils/notis";
 
 const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
   const now = Date.now();
@@ -17,7 +17,7 @@ const relHours = (fromISO: string, t: (k: string, o?: any) => string) => {
 export default function TableFaceScan() {
   const faceRec = useFaceRec();
   const { t } = useTranslation("facerec");
-  const { date: globalDate, dateTouched } = useFilters();
+  const { date: globalDate, dateTouched, selectedSite } = useFilters();
 
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [nameQ, setNameQ] = React.useState("");
@@ -28,6 +28,10 @@ export default function TableFaceScan() {
     faceRec?.faceRows && faceRec.faceRows.length > 0
       ? (faceRec.faceRows as any)
       : (FACE_SCAN_ROWS as any);
+  const rowsBySite = React.useMemo(
+    () => allRows.filter((r) => matchesSiteInfo(r ?? {}, selectedSite)),
+    [allRows, selectedSite]
+  );
 
   const selectedDateKey = React.useMemo(
     () => (dateTouched ? toDateKey(globalDate) : null),
@@ -35,7 +39,7 @@ export default function TableFaceScan() {
   );
 
   const rowsFiltered: FaceScanRow[] = React.useMemo(() => {
-    return allRows
+    return rowsBySite
       .filter((r) => {
         if (!selectedDateKey) return true;
         return toDateKey(r.timeInISO) === selectedDateKey;
@@ -44,7 +48,7 @@ export default function TableFaceScan() {
         if (!nameQ.trim()) return true;
         return r.fullName.toLowerCase().includes(nameQ.toLowerCase());
       });
-  }, [allRows, selectedDateKey, nameQ]);
+  }, [rowsBySite, selectedDateKey, nameQ]);
 
   React.useEffect(() => setPage(1), [nameQ, selectedDateKey]);
 

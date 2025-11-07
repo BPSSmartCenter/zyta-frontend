@@ -8,6 +8,11 @@ export type FaceRecWebhookPayload = {
   gender: "MALE" | "FEMALE" | string;
   province: string;
   dateTimestamp: string; // ISO
+  siteCode?: string;
+  site?: string;
+  siteName?: string;
+  siteId?: string;
+  cameraName?: string;
 };
 
 export type PlateWebhookPayload = {
@@ -19,6 +24,10 @@ export type PlateWebhookPayload = {
   confidenceHeader?: string[];
   cameraName?: string;
   dateTimestamp: string; // ISO
+  siteCode?: string;
+  site?: string;
+  siteName?: string;
+  siteId?: string;
 };
 
 export async function listFaceRecEvents(): Promise<{ items: any[]; plateItems?: any[] }> {

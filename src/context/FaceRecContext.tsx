@@ -1,6 +1,6 @@
 ﻿// src/context/FaceRecContext.tsx
 import React from "react";
-import { listFaceRecEvents, faceRecStreamUrl, type FaceRecWebhookPayload } from "../api/facerec";
+import { listFaceRecEvents, faceRecStreamUrl, type FaceRecWebhookPayload, type PlateWebhookPayload } from "../api/facerec";
 import type { Noti } from "../data/Dashboard/notis";
 import { useNotisFeed } from "./NotisContext";
 import { sortByNewest } from "../utils/notis";
@@ -22,6 +22,9 @@ function toFaceRow(raw: FaceRecWebhookPayload): FaceScanRow {
   const crop = dataUrl((raw as any)?.cropPicture) || full || GREEN_BOX_SVG;
   const iso = new Date(raw.dateTimestamp || Date.now()).toISOString();
   const gender = (String(raw.gender || "MALE").toUpperCase() as any) === "FEMALE" ? "FEMALE" : "MALE";
+  const siteCode = (raw as any)?.siteCode ?? (raw as any)?.site ?? undefined;
+  const siteName = (raw as any)?.siteName ?? (raw as any)?.site ?? undefined;
+  const siteId = (raw as any)?.siteId ?? (raw as any)?.site_id ?? undefined;
   return {
     id: raw.id,
     picture: crop || full,
@@ -29,6 +32,9 @@ function toFaceRow(raw: FaceRecWebhookPayload): FaceScanRow {
     fullName: raw.fullName || "-",
     gender,
     province: raw.province || "-",
+    siteCode: siteCode || raw.province || undefined,
+    siteName: siteName || raw.province || undefined,
+    siteId: siteId ? String(siteId) : undefined,
     inout: "IN",
     timeInISO: iso,
     timeOutISO: iso,
@@ -42,15 +48,22 @@ function toFaceNoti(raw: FaceRecWebhookPayload): Noti & { img?: string } {
   const img = crop || frame;
   const iso = new Date(raw.dateTimestamp || Date.now()).toISOString();
   const dateOnly = iso.slice(0, 10);
+  const siteCode = (raw as any)?.siteCode ?? (raw as any)?.site ?? raw.province;
+  const siteId = (raw as any)?.siteId ?? (raw as any)?.site_id;
+  const siteName = (raw as any)?.siteName ?? (raw as any)?.site;
   return {
     type: "normal",
     img,
     titleKey: "notis.faceDetected",
     title: "Face detected",
-    site: raw.province || "-",
+    site: siteCode || raw.province || "-",
     meta: {
       kind: "face",
       rawId: raw.id ?? raw.fullName ?? dateOnly,
+      siteCode: siteCode ?? null,
+      siteId: siteId ?? null,
+      siteName: siteName ?? null,
+      province: raw.province ?? null,
       faceCropImg: crop || img || null,
       faceFullImg: frame || crop || img || null,
     },
@@ -59,16 +72,22 @@ function toFaceNoti(raw: FaceRecWebhookPayload): Noti & { img?: string } {
   } as any;
 }
 
-function toPlateRow(raw: any): LicensePlateRow {
+function toPlateRow(raw: PlateWebhookPayload | (PlateWebhookPayload & { timestamp?: string }) | any): LicensePlateRow {
   const img = dataUrl(raw?.picture) || GREEN_BOX_SVG;
   const plateImg = dataUrl(raw?.platePicture) || img;
   const iso = new Date(raw?.dateTimestamp || raw?.timestamp || Date.now()).toISOString();
+  const siteCode = raw?.siteCode ?? raw?.site ?? undefined;
+  const siteName = raw?.siteName ?? raw?.site ?? undefined;
+  const siteId = raw?.siteId ?? raw?.site_id ?? undefined;
   return {
     id: raw?.id ?? String(Math.random()),
     picture: img,
     platePicture: plateImg,
     plateText: raw?.plateText ?? "-",
     province: raw?.province ?? "-",
+    siteCode: siteCode || raw?.province || undefined,
+    siteName: siteName || raw?.province || undefined,
+    siteId: siteId ? String(siteId) : undefined,
     confidenceHeader: Array.isArray(raw?.confidenceHeader) && raw.confidenceHeader.length ? raw.confidenceHeader : ["-","-","-","-","-","-"],
     cameraName: raw?.cameraName ?? "-",
     timestamp: iso,
@@ -81,10 +100,14 @@ function toPlateNoti(row: LicensePlateRow): Noti & { img?: string } {
     img: row.platePicture || row.picture,
     titleKey: "notis.plateDetected",
     title: "License plate detected",
-    site: row.province,
+    site: row.siteCode || row.province,
     meta: {
       kind: "plate",
       rawId: row.id ?? row.plateText ?? row.timestamp,
+      siteCode: row.siteCode ?? null,
+      siteId: row.siteId ?? null,
+      siteName: row.siteName ?? null,
+      province: row.province ?? null,
     },
     occurredAt: row.timestamp,
     date: row.timestamp.slice(0, 10),
@@ -249,6 +272,27 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
           GREEN_BOX_SVG;
         const cropImg = pickFaceCropImage(meta) || frameImg;
         const avatarImg = cropImg || frameImg || GREEN_BOX_SVG;
+        const siteCode =
+          meta?.siteCode ??
+          meta?.site_code ??
+          meta?.site?.code ??
+          n.siteCode ??
+          n.site ??
+          undefined;
+        const siteName =
+          meta?.siteName ??
+          meta?.site_name ??
+          meta?.site?.name ??
+          n.siteName ??
+          n.site ??
+          undefined;
+        const siteId =
+          meta?.siteId ??
+          meta?.site_id ??
+          meta?.site?.id ??
+          n.siteId ??
+          (n as any)?.site_id ??
+          undefined;
         const row: FaceScanRow = {
           id,
           picture: avatarImg,
@@ -256,6 +300,9 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
           fullName: person.fullName ?? n.title ?? "-",
           gender: genderRaw === "FEMALE" ? "FEMALE" : "MALE",
           province: meta?.province ?? n.site ?? "-",
+          siteCode: siteCode ?? meta?.province ?? n.site ?? undefined,
+          siteName: siteName ?? meta?.province ?? n.site ?? undefined,
+          siteId: siteId ? String(siteId) : undefined,
           inout: meta?.inout ?? "IN",
           timeInISO: occurred,
           timeOutISO: occurred,
@@ -266,6 +313,9 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
           meta && typeof meta === "object" && !Array.isArray(meta) ? { ...meta } : { ...(meta ?? {}) };
         metaClone.faceCropImg = avatarImg;
         metaClone.faceFullImg = frameImg;
+        if (!metaClone.siteCode) metaClone.siteCode = siteCode ?? null;
+        if (!metaClone.siteName) metaClone.siteName = siteName ?? null;
+        if (!metaClone.siteId) metaClone.siteId = siteId ?? null;
         faceNotis.push({
           ...n,
           img: avatarImg,
@@ -285,12 +335,36 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
         const confidenceHeader = Array.isArray(meta?.confidenceHeader) && meta.confidenceHeader.length
           ? meta.confidenceHeader
           : ["-","-","-","-","-","-"];
+        const siteCode =
+          meta?.siteCode ??
+          meta?.site_code ??
+          meta?.site?.code ??
+          n.siteCode ??
+          n.site ??
+          undefined;
+        const siteName =
+          meta?.siteName ??
+          meta?.site_name ??
+          meta?.site?.name ??
+          n.siteName ??
+          n.site ??
+          undefined;
+        const siteId =
+          meta?.siteId ??
+          meta?.site_id ??
+          meta?.site?.id ??
+          n.siteId ??
+          (n as any)?.site_id ??
+          undefined;
         const row: LicensePlateRow = {
           id,
           picture: meta?.picture || (n.img as string) || GREEN_BOX_SVG,
           platePicture: meta?.platePicture || meta?.picture || (n.img as string) || GREEN_BOX_SVG,
           plateText: meta?.plateText ?? meta?.plate ?? n.title ?? "-",
           province: meta?.province ?? n.site ?? "-",
+          siteCode: siteCode ?? meta?.province ?? n.site ?? undefined,
+          siteName: siteName ?? meta?.province ?? n.site ?? undefined,
+          siteId: siteId ? String(siteId) : undefined,
           confidenceHeader,
           cameraName: meta?.cameraName ?? meta?.camera ?? "-",
           timestamp: occurred,

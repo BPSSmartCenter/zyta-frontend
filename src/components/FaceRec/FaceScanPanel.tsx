@@ -3,23 +3,27 @@ import { faceDetail as FACE_DETAIL_CONST } from "./faceRec.constant";
 import { useTranslation } from "react-i18next";
 import { useFaceRec } from "../../context/FaceRecContext";
 import { useFilters } from "../../context/FiltersContext";
-import { toDateKey } from "../../utils/notis";
+import { toDateKey, matchesSiteInfo } from "../../utils/notis";
 
 export default function FaceScanPanel() {
   const { t } = useTranslation("facerec");
   const faceRec = useFaceRec();
-  const { date: globalDate, dateTouched } = useFilters();
+  const { date: globalDate, dateTouched, selectedSite } = useFilters();
   const [selectedIdx, setSelectedIdx] = React.useState(0);
 
   const allRows = (faceRec?.faceRows as any[]) || [];
+  const rowsBySite = React.useMemo(
+    () => allRows.filter((r: any) => matchesSiteInfo(r ?? {}, selectedSite)),
+    [allRows, selectedSite]
+  );
   const selectedDateKey = React.useMemo(
     () => (dateTouched ? toDateKey(globalDate) : null),
     [dateTouched, globalDate]
   );
   const rows = React.useMemo(() => {
-    if (!selectedDateKey) return allRows;
-    return allRows.filter((r: any) => toDateKey(r?.timeInISO) === selectedDateKey);
-  }, [allRows, selectedDateKey]);
+    if (!selectedDateKey) return rowsBySite;
+    return rowsBySite.filter((r: any) => toDateKey(r?.timeInISO) === selectedDateKey);
+  }, [rowsBySite, selectedDateKey]);
 
   const visibleRows = React.useMemo(() => rows.slice(0, 5), [rows]);
 

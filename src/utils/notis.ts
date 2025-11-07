@@ -48,36 +48,66 @@ export const toDateKey = (input: DateKeyInput): string | null => {
   return null;
 };
 
-export const collectSiteKeys = (n: Noti): string[] => {
+const collectSiteHints = (input: any): string[] => {
   const raw = [
-    n.site,
-    n.siteId,
-    (n as any).site_id,
-    n.siteCode,
-    (n as any).site_code,
-    n.siteName,
-    (n as any).site_name,
-    (n as any)?.site?.id,
-    (n as any)?.site?.code,
-    (n as any)?.site?.name,
+    input?.site,
+    input?.siteId,
+    input?.site_id,
+    input?.siteCode,
+    input?.site_code,
+    input?.siteName,
+    input?.site_name,
+    input?.siteLabel,
+    input?.site_label,
+    input?.province,
+    input?.province_code,
+    input?.provinceCode,
+    input?.cameraSite,
+    input?.group,
+    input?.group_code,
+    input?.groupCode,
+    input?.groupName,
+    input?.location,
+    input?.location_code,
+    input?.locationCode,
+    input?.locationName,
+    input?.site?.id,
+    input?.site?.code,
+    input?.site?.name,
+    input?.meta?.siteCode,
+    input?.meta?.site,
+    input?.meta?.site_id,
+    input?.meta?.site_code,
+    input?.meta?.siteName,
+    input?.meta?.location,
   ];
   return Array.from(
     new Set(
       raw
-        .filter(Boolean)
-        .map((val) => String(val).trim())
-        .filter(Boolean)
+        .filter((val) => typeof val === "string" && val.trim().length)
+        .map((val) => val.trim())
     )
   );
 };
 
-export const matchesSite = (n: Noti, siteCode?: string | null): boolean => {
+export const collectSiteKeys = (n: Noti | Record<string, any>): string[] =>
+  collectSiteHints(n);
+
+export const matchesSiteInfo = (
+  info: Record<string, any>,
+  siteCode?: string | null
+): boolean => {
   if (!siteCode || siteCode === "all") return true;
   const code = String(siteCode).toLowerCase();
-  return collectSiteKeys(n)
+  return collectSiteHints(info)
     .map((k) => k.toLowerCase())
     .includes(code);
 };
+
+export const matchesSite = (
+  n: Noti,
+  siteCode?: string | null
+): boolean => matchesSiteInfo(n as Record<string, any>, siteCode);
 
 export const notiSeverity = (n: Noti): Severity => {
   const s = (n.severity || "").toLowerCase();
