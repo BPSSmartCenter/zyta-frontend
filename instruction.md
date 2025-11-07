@@ -218,7 +218,9 @@ curl -X POST http://localhost:3000/webhooks/notis \
         "fullName": "Somchai Jaruk",
         "gender": "MALE"
       },
-      "rawId": "face-001"
+      "rawId": "face-001",
+      "cropImg": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+      "fullFrame": "https://example.com/full-frame.jpg"
     }
   }'
 ```

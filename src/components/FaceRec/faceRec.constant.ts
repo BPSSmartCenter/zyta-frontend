@@ -111,7 +111,8 @@ export const FACE_REC_ROWS: LicensePlateRow[] = [
 /* ---------- Face Scan: Panel + Table ---------- */
 export type FaceScanRow = {
   id: string;
-  picture: string; // avatar
+  picture: string; // cropped avatar
+  fullFrame?: string; // full screenshot
   fullName: string;
   gender: "MALE" | "FEMALE";
   province: string;

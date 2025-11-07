@@ -46,14 +46,38 @@ const MONITOR_URL =
 const USE_MOCK_CAMERA = false;
 
 /* ---------- helpers ---------- */
+const pickMetaImage = (meta: any): string | undefined => {
+  if (!meta || typeof meta !== "object") return undefined;
+  const candidates = [
+    meta.screenshot,
+    meta.screenShot,
+    meta.thumbnail,
+    meta.img,
+    meta.image,
+    meta.picture,
+    meta.faceCropImg,
+    meta.faceFullImg,
+    meta.cropImg,
+    meta.crop,
+    meta.face?.cropImg,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length) {
+      return candidate.trim();
+    }
+  }
+  return undefined;
+};
+
 const getPic = (n: any): { src?: string; isFallback: boolean } => {
+  const metaImg = pickMetaImage(n?.meta);
   const fromScreenshot =
     typeof n?.screenshot === "string" && n.screenshot.trim().length
-      ? n.screenshot
+      ? n.screenshot.trim()
       : undefined;
   const fromImg =
-    typeof n?.img === "string" && n.img.trim().length ? n.img : undefined;
-  const src = fromScreenshot ?? fromImg;
+    typeof n?.img === "string" && n.img.trim().length ? n.img.trim() : undefined;
+  const src = fromScreenshot ?? fromImg ?? metaImg;
 
   if (src) {
     return {

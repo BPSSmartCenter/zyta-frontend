@@ -46,7 +46,7 @@ export default function FaceScanPanel() {
         timeOut: new Date(selRow.timeOutISO).toLocaleString(),
       }
     : fallbackDetail;
-  const mainImg = selRow?.picture || "";
+  const mainImg = selRow?.fullFrame || selRow?.picture || "";
   const mainCamera = selRow?.cameraName || "-";
   const mainTime = selRow?.timeInISO ? new Date(selRow.timeInISO).toLocaleString() : "-";
 

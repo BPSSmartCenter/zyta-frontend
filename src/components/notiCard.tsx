@@ -146,6 +146,8 @@ const fallbackImgFor = (
   return alertImage;
 };
 
+const overrideTypes = new Set<NotiType>(["alert", "warning"]);
+
 const NotiCard: React.FC<NotiCardProps> = ({
   type,
   title,
@@ -166,7 +168,12 @@ const NotiCard: React.FC<NotiCardProps> = ({
     [img]
   );
   const displayImg = React.useMemo(() => {
-    if (forceDefaultImage) {
+    const useProvided =
+      typeof normalizedImg === "string" &&
+      normalizedImg.length > 0 &&
+      overrideTypes.has(type);
+
+    if (forceDefaultImage && !useProvided) {
       return fallbackImgFor(type, title, titleKey, true);
     }
     if (normalizedImg.length) {

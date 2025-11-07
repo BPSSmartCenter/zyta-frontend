@@ -18,12 +18,14 @@ function dataUrl(b64?: string) {
 }
 
 function toFaceRow(raw: FaceRecWebhookPayload): FaceScanRow {
-  const img = dataUrl(raw.picture) || GREEN_BOX_SVG;
+  const full = dataUrl((raw as any)?.fullFrame) || dataUrl(raw.picture) || GREEN_BOX_SVG;
+  const crop = dataUrl((raw as any)?.cropPicture) || full || GREEN_BOX_SVG;
   const iso = new Date(raw.dateTimestamp || Date.now()).toISOString();
   const gender = (String(raw.gender || "MALE").toUpperCase() as any) === "FEMALE" ? "FEMALE" : "MALE";
   return {
     id: raw.id,
-    picture: img,
+    picture: crop || full,
+    fullFrame: full || crop,
     fullName: raw.fullName || "-",
     gender,
     province: raw.province || "-",
@@ -35,7 +37,9 @@ function toFaceRow(raw: FaceRecWebhookPayload): FaceScanRow {
 }
 
 function toFaceNoti(raw: FaceRecWebhookPayload): Noti & { img?: string } {
-  const img = dataUrl(raw.picture);
+  const frame = dataUrl((raw as any)?.fullFrame) || dataUrl(raw.picture);
+  const crop = dataUrl((raw as any)?.cropPicture) || frame;
+  const img = crop || frame;
   const iso = new Date(raw.dateTimestamp || Date.now()).toISOString();
   const dateOnly = iso.slice(0, 10);
   return {
@@ -44,6 +48,10 @@ function toFaceNoti(raw: FaceRecWebhookPayload): Noti & { img?: string } {
     titleKey: "notis.faceDetected",
     title: "Face detected",
     site: raw.province || "-",
+    meta: {
+      faceCropImg: crop || img || null,
+      faceFullImg: frame || crop || img || null,
+    },
     date: dateOnly,
   } as any;
 }
@@ -74,6 +82,66 @@ function toPlateNoti(row: LicensePlateRow): Noti & { img?: string } {
     date: row.timestamp.slice(0, 10),
   } as any;
 }
+
+const cleanImage = (val?: string | null): string | undefined => {
+  if (typeof val !== "string") return undefined;
+  const trimmed = val.trim();
+  return trimmed.length ? trimmed : undefined;
+};
+
+const pickFaceCropImage = (meta: any): string | undefined => {
+  const candidates = [
+    meta?.faceCropImg,
+    meta?.cropImg,
+    meta?.crop,
+    meta?.face?.cropImg,
+    meta?.face?.crop,
+    meta?.faceRow?.cropImg,
+    meta?.faceRow?.cropPicture,
+    meta?.faceRow?.crop,
+  ];
+  for (const candidate of candidates) {
+    const img = cleanImage(candidate);
+    if (img) return img;
+  }
+  return undefined;
+};
+
+const pickFaceFrameImage = (meta: any, fallback?: string): string | undefined => {
+  const candidates = [
+    meta?.faceFullImg,
+    meta?.fullFrame,
+    meta?.frameImg,
+    meta?.picture,
+    meta?.faceRow?.fullFrame,
+    meta?.faceRow?.frame,
+    fallback,
+  ];
+  for (const candidate of candidates) {
+    const img = cleanImage(candidate);
+    if (img) return img;
+  }
+  return undefined;
+};
+
+const sortFaceRowsDesc = (rows: ReadonlyArray<FaceScanRow>) =>
+  [...rows].sort(
+    (a, b) =>
+      new Date(b.timeInISO).getTime() - new Date(a.timeInISO).getTime()
+  );
+
+const sortPlateRowsDesc = (rows: ReadonlyArray<LicensePlateRow>) =>
+  [...rows].sort(
+    (a, b) =>
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
+const sortNotisDesc = (list: ReadonlyArray<Noti & { img?: string }>) =>
+  [...list].sort(
+    (a, b) =>
+      new Date((b as any).occurredAt ?? b.date).getTime() -
+      new Date((a as any).occurredAt ?? a.date).getTime()
+  );
 
 export type FaceRecState = {
   dashboardNotis: ReadonlyArray<Noti & { img?: string }>;
@@ -123,9 +191,15 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
           n.id;
         const id = String(rawId ?? occurred);
         const genderRaw = String(person.gender || "").toUpperCase();
+        const frameImg =
+          pickFaceFrameImage(meta, cleanImage(n.img as string) || cleanImage(meta?.picture)) ||
+          GREEN_BOX_SVG;
+        const cropImg = pickFaceCropImage(meta) || frameImg;
+        const avatarImg = cropImg || frameImg || GREEN_BOX_SVG;
         const row: FaceScanRow = {
           id,
-          picture: (n.img as string) || meta?.picture || GREEN_BOX_SVG,
+          picture: avatarImg,
+          fullFrame: frameImg || avatarImg,
           fullName: person.fullName ?? n.title ?? "-",
           gender: genderRaw === "FEMALE" ? "FEMALE" : "MALE",
           province: meta?.province ?? n.site ?? "-",
@@ -135,10 +209,15 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
           cameraName: meta?.cameraName ?? meta?.camera ?? undefined,
         };
         faces.push(row);
+        const metaClone =
+          meta && typeof meta === "object" && !Array.isArray(meta) ? { ...meta } : { ...(meta ?? {}) };
+        metaClone.faceCropImg = avatarImg;
+        metaClone.faceFullImg = frameImg;
         faceNotis.push({
           ...n,
-          img: (n.img as string) || meta?.picture,
+          img: avatarImg,
           type: n.type,
+          meta: metaClone,
           occurredAt: occurred,
         } as any);
       } else if (kind === "plate") {
@@ -179,18 +258,6 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
       plateDashboard: plateNotis,
     };
   }, [notisItems]);
-
-  const mergeById = <T,>(
-    base: ReadonlyArray<T>,
-    extra: ReadonlyArray<T>,
-    getId: (item: T) => string,
-    getTime: (item: T) => number
-  ): T[] => {
-    const map = new Map<string, T>();
-    base.forEach((item) => map.set(getId(item), item));
-    extra.forEach((item) => map.set(getId(item), item));
-    return Array.from(map.values()).sort((a, b) => getTime(b) - getTime(a));
-  };
 
   React.useEffect(() => {
     let es: EventSource | null = null;
@@ -276,36 +343,27 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const combinedFaceRows = React.useMemo(
-    () =>
-      mergeById(
-        state.faceRows,
-        derivedFromNotis.faceRows,
-        (r) => r.id,
-        (r) => new Date(r.timeInISO).getTime()
-      ),
+    () => sortFaceRowsDesc([...derivedFromNotis.faceRows, ...state.faceRows]),
     [state.faceRows, derivedFromNotis.faceRows]
   );
 
   const combinedPlateRows = React.useMemo(
-    () =>
-      mergeById(
-        state.plateRows,
-        derivedFromNotis.plateRows,
-        (r) => r.id,
-        (r) => new Date(r.timestamp).getTime()
-      ),
+    () => sortPlateRowsDesc([...derivedFromNotis.plateRows, ...state.plateRows]),
     [state.plateRows, derivedFromNotis.plateRows]
   );
 
   const combinedDashboardNotis = React.useMemo(
     () =>
-      mergeById(
-        state.dashboardNotis,
-        [...derivedFromNotis.faceDashboard, ...derivedFromNotis.plateDashboard],
-        (n) => String(n.id ?? `${n.site}-${n.date}-${n.titleKey ?? n.title}`),
-        (n) => new Date((n as any).occurredAt ?? n.date).getTime()
-      ),
-    [state.dashboardNotis, derivedFromNotis.faceDashboard, derivedFromNotis.plateDashboard]
+      sortNotisDesc([
+        ...state.dashboardNotis,
+        ...derivedFromNotis.faceDashboard,
+        ...derivedFromNotis.plateDashboard,
+      ]),
+    [
+      state.dashboardNotis,
+      derivedFromNotis.faceDashboard,
+      derivedFromNotis.plateDashboard,
+    ]
   );
 
   const faceList = React.useMemo(
