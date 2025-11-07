@@ -3,6 +3,7 @@ import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import { resolveFaceRecKind } from "../../utils/notis";
 
 type FR = {
   type: any;
@@ -12,6 +13,7 @@ type FR = {
   detail?: string;
   site: string;
   date: string;
+  meta?: Record<string, unknown>;
 };
 
 type Props = {
@@ -24,6 +26,13 @@ const USE_MOCK_REDIRECT = false;
 const OPEN_IN_NEW_TAB = false;
 const MOCK_FACEREC_URL =
   "https://bpstech.online/d/dbb32996-2e79-4e04-9963-48e62e2c885d/21062885-26cd-5e06-a9b8-67c449dc0cfb?orgId=1&from=1710928419213&to=1774000419213";
+
+const resolveDefaultTab = (n: FR): "licensePlates" | "faceScan" => {
+  const kind = resolveFaceRecKind(n as any);
+  if (kind === "face") return "faceScan";
+  if (kind === "plate") return "licensePlates";
+  return "licensePlates";
+};
 
 export default function FaceRecognize({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
@@ -53,7 +62,8 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
     }
 
     // เส้นทางเดิม — พร้อมสลับกลับเมื่อไหร่ก็แค่ปิด USE_MOCK_REDIRECT
-    navigate(abs("/facerec"), { state: { noti: n } });
+    const defaultActive = resolveDefaultTab(n);
+    navigate(abs("/facerec"), { state: { noti: n, defaultActive } });
   };
   return (
     <form className="flex flex-col justify-center py-2 px-3 gap-3">

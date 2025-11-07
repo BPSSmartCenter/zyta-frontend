@@ -160,15 +160,34 @@ export default function Dashboard() {
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
   }, [searchWB, matchGlobalDate, wellBeingSource]);
 
+  const faceRecognizeItems = React.useMemo(() => {
+    const rows = Array.isArray(faceRec?.faceRows) ? faceRec.faceRows : [];
+    return rows.map((row: any) => {
+      const occurredAt = row?.timeInISO || row?.timeOutISO || row?.timestamp || row?.date || new Date().toISOString();
+      return {
+        id: row?.id,
+        type: "info",
+        titleKey: "notis.faceDetected",
+        title: row?.fullName || "Face detected",
+        detail: row?.cameraName || undefined,
+        site: row?.province || "-",
+        date: occurredAt,
+        occurredAt,
+        img: row?.picture || row?.fullFrame,
+        meta: {
+          kind: "face",
+          rawId: row?.id || row?.fullName || occurredAt,
+        },
+      };
+    });
+  }, [faceRec?.faceRows]);
+
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();
-    const dynamic = ((faceRec?.dashboardNotis ?? []) as unknown as any[]).filter(
-      (n: any) => String(n?.type || "").toLowerCase() === "info"
-    );
-    return dynamic
+    return faceRecognizeItems
       .filter((n) => matchGlobalDate(n?.date))
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchFR, matchGlobalDate, JSON.stringify(faceRec?.dashboardNotis)]);
+  }, [searchFR, matchGlobalDate, faceRecognizeItems]);
   const filterZYTA = React.useMemo(() => {
     const q = searchZYTA.toLowerCase().trim();
     const src = ZYTA_NOTIS as unknown as any[];

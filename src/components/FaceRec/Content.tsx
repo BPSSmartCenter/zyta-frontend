@@ -62,6 +62,11 @@ const Content: React.FC<Props> = ({
   const faceImg = latestFace?.picture || "";
 
   const [active, setActive] = React.useState<string>(defaultActive);
+  React.useEffect(() => {
+    if (defaultActive) {
+      setActive(defaultActive);
+    }
+  }, [defaultActive]);
 
   const navTitle =
     active === "faceScan" ? t("nav.faceRecognize") : t("nav.licensePlates");

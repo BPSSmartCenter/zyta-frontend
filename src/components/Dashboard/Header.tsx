@@ -141,6 +141,7 @@ const normalizeEventKey = (n: any): EventKey => {
   if (
     /\bmotion\b/.test(s) ||
     s.includes("motion detected") ||
+    s.includes("notis.motiondetected") ||
     s.includes("ตรวจจับการเคลื่อนไหว") ||
     s.includes("ตรวจพบการเคลื่อนไหว")
   )
@@ -219,18 +220,7 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
 
   // ไปหน้า Alert (รักษา site context ถ้ามี)
 
-const isImageUrl = (url?: string) => {
-  if (!url) return false;
-  const u = url.toLowerCase();
-  return (
-      u.startsWith("data:image/") ||
-      /\.(png|jpe?g|gif|webp|bmp|avif)(\?.*)?$/.test(u) ||
-      u.includes("googleusercontent.com") ||
-      u.includes("=iv1")
-  );
-};
-
-  // helper: ถ้าเป็น googleusercontent และยังไม่มีพารามิเตอร์ ให้ต่อ "=w600-h600-iv1"
+// helper: ถ้าเป็น googleusercontent และยังไม่มีพารามิเตอร์ ให้ต่อ "=w600-h600-iv1"
   // หรือถ้ามีแล้วแต่ไม่มี -iv1 ให้เติม -iv1 เข้าไป
   const normalizeGoogleImg = (u?: string) => {
     if (!u) return u;
@@ -280,14 +270,14 @@ const isImageUrl = (url?: string) => {
       ? tiles
       : (cameraItems ?? []).slice(0, MAX_HEADER_IMAGES);
 
-    // **สำคัญ**: ไม่เติม MONITOR_URL โดยอัตโนมัติ
     return fallback.map<CameraItem>((tile) => {
       const candidateImg = normalizeGoogleImg(tile.imgSrc);
-      const showAsImg = isImageUrl(candidateImg);
+      const hasImage =
+        typeof candidateImg === "string" && candidateImg.trim().length > 0;
       return {
         ...tile,
-        imgSrc: showAsImg ? candidateImg : undefined,
-        embedUrl: showAsImg ? undefined : tile.embedUrl, // ใช้เฉพาะที่มีมาจริง
+        imgSrc: hasImage ? candidateImg : undefined,
+        embedUrl: hasImage ? undefined : tile.embedUrl,
         embedTitle: tile.embedTitle ?? "Camera monitor",
       };
     });

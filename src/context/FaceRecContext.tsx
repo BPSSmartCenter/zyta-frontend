@@ -49,9 +49,12 @@ function toFaceNoti(raw: FaceRecWebhookPayload): Noti & { img?: string } {
     title: "Face detected",
     site: raw.province || "-",
     meta: {
+      kind: "face",
+      rawId: raw.id ?? raw.fullName ?? dateOnly,
       faceCropImg: crop || img || null,
       faceFullImg: frame || crop || img || null,
     },
+    occurredAt: iso,
     date: dateOnly,
   } as any;
 }
@@ -79,6 +82,11 @@ function toPlateNoti(row: LicensePlateRow): Noti & { img?: string } {
     titleKey: "notis.plateDetected",
     title: "License plate detected",
     site: row.province,
+    meta: {
+      kind: "plate",
+      rawId: row.id ?? row.plateText ?? row.timestamp,
+    },
+    occurredAt: row.timestamp,
     date: row.timestamp.slice(0, 10),
   } as any;
 }
@@ -142,6 +150,51 @@ const sortNotisDesc = (list: ReadonlyArray<Noti & { img?: string }>) =>
       new Date((b as any).occurredAt ?? b.date).getTime() -
       new Date((a as any).occurredAt ?? a.date).getTime()
   );
+
+const dedupeItems = <T,>(items: ReadonlyArray<T>, makeKey: (item: T) => string): T[] => {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  items.forEach((item) => {
+    const key = makeKey(item) || "";
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(item);
+  });
+  return result;
+};
+
+const faceRowKey = (row: FaceScanRow) =>
+  [
+    "face",
+    row?.id ?? "",
+    row?.fullName ?? "",
+    row?.timeInISO ?? "",
+    row?.cameraName ?? "",
+  ]
+    .map((part) => String(part).trim())
+    .join("|");
+
+const plateRowKey = (row: LicensePlateRow) =>
+  [
+    "plate",
+    row?.id ?? "",
+    row?.plateText ?? "",
+    row?.timestamp ?? "",
+    row?.cameraName ?? "",
+  ]
+    .map((part) => String(part).trim())
+    .join("|");
+
+const notiKey = (n: Noti & { img?: string }) =>
+  [
+    "noti",
+    (n as any)?.meta?.rawId ?? (n as any)?.id ?? "",
+    (n as any)?.occurredAt ?? n.date ?? "",
+    (n as any)?.titleKey ?? (n as any)?.title ?? "",
+    typeof n.img === "string" ? n.img.slice(0, 64) : "",
+  ]
+    .map((part) => String(part).trim())
+    .join("|");
 
 export type FaceRecState = {
   dashboardNotis: ReadonlyArray<Noti & { img?: string }>;
@@ -342,29 +395,28 @@ export function FaceRecProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const combinedFaceRows = React.useMemo(
-    () => sortFaceRowsDesc([...derivedFromNotis.faceRows, ...state.faceRows]),
-    [state.faceRows, derivedFromNotis.faceRows]
-  );
+  const combinedFaceRows = React.useMemo(() => {
+    const merged = [...derivedFromNotis.faceRows, ...state.faceRows];
+    return sortFaceRowsDesc(dedupeItems(merged, faceRowKey));
+  }, [state.faceRows, derivedFromNotis.faceRows]);
 
-  const combinedPlateRows = React.useMemo(
-    () => sortPlateRowsDesc([...derivedFromNotis.plateRows, ...state.plateRows]),
-    [state.plateRows, derivedFromNotis.plateRows]
-  );
+  const combinedPlateRows = React.useMemo(() => {
+    const merged = [...derivedFromNotis.plateRows, ...state.plateRows];
+    return sortPlateRowsDesc(dedupeItems(merged, plateRowKey));
+  }, [state.plateRows, derivedFromNotis.plateRows]);
 
-  const combinedDashboardNotis = React.useMemo(
-    () =>
-      sortNotisDesc([
-        ...state.dashboardNotis,
-        ...derivedFromNotis.faceDashboard,
-        ...derivedFromNotis.plateDashboard,
-      ]),
-    [
-      state.dashboardNotis,
-      derivedFromNotis.faceDashboard,
-      derivedFromNotis.plateDashboard,
-    ]
-  );
+  const combinedDashboardNotis = React.useMemo(() => {
+    const merged = [
+      ...state.dashboardNotis,
+      ...derivedFromNotis.faceDashboard,
+      ...derivedFromNotis.plateDashboard,
+    ];
+    return sortNotisDesc(dedupeItems(merged, notiKey));
+  }, [
+    state.dashboardNotis,
+    derivedFromNotis.faceDashboard,
+    derivedFromNotis.plateDashboard,
+  ]);
 
   const faceList = React.useMemo(
     () =>

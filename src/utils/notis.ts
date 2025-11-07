@@ -111,6 +111,54 @@ const matchBag = (n: Noti): string => {
 const containsAny = (haystack: string, needles: string[]) =>
   needles.some((needle) => haystack.includes(needle));
 
+export type FaceRecKind = "face" | "plate";
+
+export const resolveFaceRecKind = (
+  n: Partial<Noti> | null | undefined
+): FaceRecKind | null => {
+  if (!n) return null;
+
+  const explicitKind = (
+    ((n as any)?.meta?.kind ?? (n as any)?.kind ?? "") as string
+  )
+    .toString()
+    .toLowerCase()
+    .trim();
+
+  if (explicitKind === "face") return "face";
+  if (
+    explicitKind === "plate" ||
+    explicitKind === "license" ||
+    explicitKind === "licenseplate"
+  ) {
+    return "plate";
+  }
+
+  const bag = [
+    matchBag(n as Noti),
+    JSON.stringify(((n as any)?.meta ?? {}) as any),
+  ]
+    .filter(Boolean)
+    .map((part) => String(part).toLowerCase())
+    .join(" ");
+
+  if (containsAny(bag, ["notis.facedetected", "face", "เนเธเธซเธเนเธฒ"])) {
+    return "face";
+  }
+  if (
+    containsAny(bag, [
+      "notis.platedetected",
+      "plate",
+      "license",
+      "เธ—เธฐเน€เธเธตเธขเธ",
+    ])
+  ) {
+    return "plate";
+  }
+
+  return null;
+};
+
 export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   const key = String(n.titleKey || "").toLowerCase();
   const title = String(n.title || "").toLowerCase();
@@ -195,18 +243,8 @@ export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   return alertImage;
 };
 
-export const isFaceRecNoti = (n: Noti): boolean => {
-  const key = String(n.titleKey || "").toLowerCase();
-  const title = String(n.title || "").toLowerCase();
-  const kind = String((n.meta as any)?.kind || "").toLowerCase();
-  const bag = matchBag(n);
-
-  if (kind === "face" || kind === "plate") return true;
-  if (containsAny(key, ["notis.facedetected", "notis.platedetected"]))
-    return true;
-  if (containsAny(title, ["face", "plate", "ใบหน้า", "ทะเบียน"])) return true;
-  return containsAny(bag, ["face", "plate", "ใบหน้า", "ทะเบียน"]);
-};
+export const isFaceRecNoti = (n: Noti): boolean =>
+  resolveFaceRecKind(n) !== null;
 
 export const decorateNotiForDisplay = (n: Noti): Noti => {
   if ((n as any).__prepared) return n;
