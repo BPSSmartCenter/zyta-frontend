@@ -27,6 +27,8 @@ import windImage from "./wind-sign.png";
 import windSelected from "./wind-signSelected.png";
 import waterTapImage from "./water-tap.png";
 import waterTapSelected from "./water-tapSelected.png";
+import facerecImage from "./facerec.png";
+import facerecSelected from "./facerecSelected.png";
 
 import faceImage from "./face.png";
 import plateImage from "./plate.png";
@@ -98,4 +100,6 @@ export {
   cloudyDay1,
   alertCyan,
   userIcon,
+  facerecImage,
+  facerecSelected,
 };

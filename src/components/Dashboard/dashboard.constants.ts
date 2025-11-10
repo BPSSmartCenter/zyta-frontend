@@ -14,6 +14,8 @@ import {
   sleepCamera,
   offlineDeviceCamera,
   fallCamera,
+  facerecImage,
+  facerecSelected,
 } from "../../assets/index";
 import { TH_PROVINCES } from "../../data/Dashboard/notis";
 import type L from "leaflet";
@@ -95,6 +97,13 @@ export const statItems = [
     val: 13,
     img: sleepImage,
     activeImg: sleepImageSelected,
+  },
+  {
+    key: "face",
+    label: "Face/Plate Recognize",
+    val: 0,
+    img: facerecImage,
+    activeImg: facerecSelected,
   },
 ];
 

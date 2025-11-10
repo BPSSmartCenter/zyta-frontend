@@ -5,7 +5,12 @@ import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
 import React from "react";
 import { useUserPath } from "../../routes/useUserPath";
-import { resolveAlertEventKey, type AlertEventKey, buildNotiKeywordBag } from "../../utils/notis";
+import {
+  resolveAlertEventKey,
+  type AlertEventKey,
+  buildNotiKeywordBag,
+  isFaceRecNoti,
+} from "../../utils/notis";
 
 type Props = {
   search: string;
@@ -48,13 +53,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
 
     // ใช้ bag() + site + date ให้ค้นหาทั้ง alert + wellbeing ได้
     return sorted.filter((n: any) => {
-      const hay = [
-        buildNotiKeywordBag(n),
-        n?.site,
-        n?.title,
-        n?.type,
-        n?.date,
-      ]
+      const hay = [buildNotiKeywordBag(n), n?.site, n?.title, n?.type, n?.date]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -77,7 +76,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
         disableMenu
       />
 
-      <div className="lg:h-[590px] h-[350px] overflow-y-auto px-2">
+      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2">
         <div className="space-y-2">
           {list.length === 0 ? (
             <div className="rounded-md px-3 py-2 text-sm text-gray-500">
@@ -93,31 +92,41 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
               const eventKey = resolveAlertEventKey(n);
               const isNavigable = Boolean(eventKey);
 
+              const handleClick = (n: any, eventKey: AlertEventKey | null) => {
+                if (isFaceRecNoti(n)) {
+                  // default เปิดแท็บตาม kind ได้ถ้าอยาก (faceScan/licensePlates)
+                  navigate(abs("/facerec"), { state: { noti: n } });
+                  return;
+                }
+                if (eventKey) navigateToEvent(eventKey);
+              };
+
               return (
                 <div
                   key={i}
                   role={isNavigable ? "button" : "presentation"}
                   tabIndex={isNavigable ? 0 : -1}
-                  onClick={() => {
-                    if (isNavigable) navigateToEvent(eventKey);
-                  }}
+                  onClick={() => handleClick(n, eventKey)}
                   onKeyDown={(e) => {
                     if (!isNavigable) return;
                     if (e.key === "Enter" || e.key === " ") {
                       navigateToEvent(eventKey);
                     }
                   }}
-                  className={`${isNavigable ? "cursor-pointer" : "cursor-default"} outline-none select-none`}
+                  className={`${
+                    isNavigable ? "cursor-pointer" : "cursor-default"
+                  } outline-none select-none`}
                 >
-                  <NotiCard
-                    type={n.type as any}
-                    titleKey={n.titleKey as string | undefined}
-                    title={title}
-                    site={site}
-                    date={dateText}
-                    img={n.img as any}
-                    forceDefaultImage
-                  />
+              <NotiCard
+                type={n.type as any}
+                titleKey={n.titleKey as string | undefined}
+                title={title}
+                site={site}
+                date={dateText}
+                img={n.img as any}
+                meta={(n as any)?.meta ?? undefined}
+                forceDefaultImage={eventKey !== "face" && eventKey !== "plate"}
+              />
                 </div>
               );
             })

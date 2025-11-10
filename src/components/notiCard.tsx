@@ -6,6 +6,9 @@ import deviceNoti from "../assets/devicenoti.svg";
 import fallingNoti from "../assets/fallingnoti.svg";
 import sleepingNoti from "../assets/sleepingnoti.svg";
 import alertImage from "../assets/alert.png";
+import faceImage from "../assets/face.png";
+import plateImage from "../assets/plate.png";
+import { resolveAlertEventKey } from "../utils/notis";
 
 type NotiType = "alert" | "warning" | "offline" | "normal" | "success" | "info";
 
@@ -13,6 +16,7 @@ type NotiCardProps = {
   type: NotiType;
   title: string;
   titleKey?: string;
+  eventHint?: string;
   site?: string;
   date?: string | number | Date;
   detail?: string;
@@ -20,6 +24,7 @@ type NotiCardProps = {
   icon?: React.ReactNode;
   forceDefaultImage?: boolean;
   forceImageOnly?: boolean;
+  meta?: Record<string, unknown> | null;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   className?: string;
 };
@@ -83,7 +88,7 @@ const palette: Record<
   normal: {
     root: "bg-[#F8FBFE]",
     border: "border-none",
-    iconBg: "",
+    iconBg: "bg-[#00bcff]",
     title: "text-[#181D27]",
     meta: "text-[#B8B8B8]",
   },
@@ -103,11 +108,33 @@ const fallbackImgFor = (
   type: NotiType,
   title: string,
   titleKey?: string,
-  strictDefaults = false
+  strictDefaults = false,
+  meta?: Record<string, unknown> | null,
+  detail?: string,
+  eventHint?: string
 ) => {
   const normalizedKey = (titleKey || "").toLowerCase();
   const normalizedTitle = (title || "").toLowerCase();
-  const blob = `${type} ${normalizedKey} ${normalizedTitle}`;
+  const normalizedDetail = (detail || "").toLowerCase();
+  const blob = `${type} ${normalizedKey} ${normalizedTitle} ${normalizedDetail}`;
+
+  const detectedEvent = resolveAlertEventKey({
+    titleKey,
+    title,
+    detail,
+    type,
+    event: eventHint,
+    meta: meta ?? undefined,
+  } as any);
+  if (detectedEvent) {
+    if (detectedEvent === "fire") return fireNoti;
+    if (detectedEvent === "motion") return motionNoti;
+    if (detectedEvent === "offline") return deviceNoti;
+    if (detectedEvent === "fall") return fallingNoti;
+    if (detectedEvent === "sleep") return sleepingNoti;
+    if (detectedEvent === "face") return faceImage;
+    if (detectedEvent === "plate") return plateImage;
+  }
 
   if (
     normalizedKey.includes("deviceoffline") ||
@@ -116,26 +143,29 @@ const fallbackImgFor = (
     return deviceNoti;
   }
 
-  if (
-    hasKeyword(blob, ["fall", "ล้ม", "notis.falldetected"])
-  )
+  if (hasKeyword(blob, ["fall", "ล้ม", "notis.falldetected"]))
     return fallingNoti;
+  if (hasKeyword(blob, ["face", "notis.facedetected", "จดจำใบหน้า"]))
+    return faceImage;
   if (
-    hasKeyword(blob, ["sleep", "หลับ", "notis.sleepinglong"])
+    hasKeyword(blob, ["plate", "license", "notis.platedetected", "ทะเบียน"])
   )
+    return plateImage;
+  if (hasKeyword(blob, ["sleep", "หลับ", "notis.sleepinglong"]))
     return sleepingNoti;
   if (
-    hasKeyword(blob, ["offline", "ออฟ", "อุปกรณ์ออฟไลน์", "notis.deviceoffline", "notis.cameraoffline"])
+    hasKeyword(blob, [
+      "offline",
+      "ออฟ",
+      "อุปกรณ์ออฟไลน์",
+      "notis.deviceoffline",
+      "notis.cameraoffline",
+    ])
   )
     return deviceNoti;
-  if (
-    hasKeyword(blob, ["motion", "เคลื่อนไหว", "notis.motiondetected"])
-  )
+  if (hasKeyword(blob, ["motion", "เคลื่อนไหว", "notis.motiondetected"]))
     return motionNoti;
-  if (
-    hasKeyword(blob, ["fire", "ไฟ", "notis.firedetected"])
-  )
-    return fireNoti;
+  if (hasKeyword(blob, ["fire", "ไฟ", "notis.firedetected"])) return fireNoti;
 
   if (!strictDefaults) {
     if (type === "offline") return deviceNoti;
@@ -152,6 +182,7 @@ const NotiCard: React.FC<NotiCardProps> = ({
   type,
   title,
   titleKey,
+  eventHint,
   site,
   date,
   detail,
@@ -159,6 +190,7 @@ const NotiCard: React.FC<NotiCardProps> = ({
   icon,
   forceDefaultImage,
   forceImageOnly,
+  meta,
   onClick,
   className,
 }) => {
@@ -174,20 +206,47 @@ const NotiCard: React.FC<NotiCardProps> = ({
       overrideTypes.has(type);
 
     if (forceDefaultImage && !useProvided) {
-      return fallbackImgFor(type, title, titleKey, true);
+      return fallbackImgFor(
+        type,
+        title,
+        titleKey,
+        true,
+        meta ?? undefined,
+        detail,
+        eventHint
+      );
     }
     if (normalizedImg.length) {
       return normalizedImg;
     }
     if (forceImageOnly) return undefined;
-    return fallbackImgFor(type, title, titleKey);
-  }, [forceDefaultImage, forceImageOnly, normalizedImg, type, title, titleKey]);
+    return fallbackImgFor(
+      type,
+      title,
+      titleKey,
+      false,
+      meta ?? undefined,
+      detail,
+      eventHint
+    );
+  }, [
+    forceDefaultImage,
+    forceImageOnly,
+    normalizedImg,
+    type,
+    title,
+    titleKey,
+    meta,
+    detail,
+    eventHint,
+  ]);
 
   const metaPieces = [
     detail && String(detail).trim(),
     site && String(site).trim(),
-    date && formatDate(date),
   ].filter(Boolean) as string[];
+
+  const formattedDate = date ? formatDate(date) : "";
 
   return (
     <div
@@ -203,7 +262,7 @@ const NotiCard: React.FC<NotiCardProps> = ({
       <div
         className={cn(
           "flex h-12 w-12 items-center justify-center rounded-md",
-          type !== "normal" && p.iconBg
+          p.iconBg
         )}
       >
         {icon ? (
@@ -215,21 +274,28 @@ const NotiCard: React.FC<NotiCardProps> = ({
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div className="flex min-w-0 flex-1 flex-col gap-0">
         <div
           className={cn("truncate text-[13px] font-bold leading-5", p.title)}
         >
           {title}
         </div>
-
         {metaPieces.length > 0 && (
           <div
             className={cn(
-              "truncate text-[12px] font-semibold leading-4",
+              "truncate text-[12px] font-semibold leading-4 mt-1",
               p.meta
             )}
           >
             {metaPieces.join(" - ")}
+          </div>
+        )}
+
+        {formattedDate && (
+          <div
+            className={cn("truncate text-[12px] font-medium leading-3", p.meta)}
+          >
+            {formattedDate}
           </div>
         )}
       </div>

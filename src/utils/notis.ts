@@ -7,6 +7,8 @@ import {
   deviceNoti,
   motionNoti,
   alertImage,
+  faceImage,
+  plateImage,
 } from "../assets/index";
 
 type DateValueLike = { y: number; m: number; d: number };
@@ -18,11 +20,15 @@ export type DateKeyInput = string | Date | DateValueLike | null | undefined;
 export const toDateKey = (input: DateKeyInput): string | null => {
   if (input == null) return null;
 
-  if (input instanceof Date) {
-    if (Number.isNaN(input.getTime())) return null;
-    return `${input.getFullYear()}-${pad2(input.getMonth() + 1)}-${pad2(
-      input.getDate()
+  const fromDate = (value: Date) => {
+    if (Number.isNaN(value.getTime())) return null;
+    return `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(
+      value.getDate()
     )}`;
+  };
+
+  if (input instanceof Date) {
+    return fromDate(input);
   }
 
   if (
@@ -35,16 +41,19 @@ export const toDateKey = (input: DateKeyInput): string | null => {
     return `${y}-${pad2(m)}-${pad2(d)}`;
   }
 
-  const str = String(input);
+  const str = String(input).trim();
+  if (!str) return null;
+
+  // parse string first so ISO timestamps (UTC) ถูกตีความเป็นเวลา local ก่อน
+  const parsed = new Date(str);
+  if (!Number.isNaN(parsed.getTime())) {
+    const localKey = fromDate(parsed);
+    if (localKey) return localKey;
+  }
+
   const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (match) return `${match[1]}-${match[2]}-${match[3]}`;
 
-  const parsed = new Date(str);
-  if (!Number.isNaN(parsed.getTime())) {
-    return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(
-      parsed.getDate()
-    )}`;
-  }
   return null;
 };
 
@@ -129,6 +138,8 @@ export const buildNotiKeywordBag = (
     (n as any)?.meta?.event,
     (n as any)?.meta?.category,
     (n as any)?.meta?.label,
+    (n as any)?.meta?.kind,
+    (n as any)?.meta?.alertType,
     JSON.stringify((n as any)?.meta ?? {}),
   ]
     .filter(Boolean)
@@ -140,18 +151,22 @@ export type AlertEventKey =
   | "motion"
   | "offline"
   | "fall"
-  | "sleep";
+  | "sleep"
+  | "face"
+  | "plate";
 
 const FIRE_KEYWORDS = [
   "notis.firedetected",
+  "fire",
+  "fire detected",
   "ไฟ",
   "ไฟไหม้",
   "เพลิง",
-  "fire",
 ];
 const MOTION_KEYWORDS = [
   "notis.motiondetected",
   "motion",
+  "motion detected",
   "movement",
   "เคลื่อนไหว",
   "ตรวจพบการเคลื่อนไหว",
@@ -173,11 +188,26 @@ const FALL_KEYWORDS = [
 ];
 const SLEEP_KEYWORDS = [
   "notis.sleepinglong",
+  "notis.sleepdetected",
+  "sleepdetected",
+  "sleep detected",
   "sleep",
   "sleeping",
   "นอน",
   "หลับ",
   "ตรวจพบคนหลับ",
+];
+const FACE_KEYWORDS = [
+  "notis.facedetected",
+  "face",
+  "ใบหน้า",
+  "จดจำใบหน้า",
+];
+const PLATE_KEYWORDS = [
+  "notis.platedetected",
+  "plate",
+  "license",
+  "ทะเบียน",
 ];
 
 const containsKeyword = (text: string, keywords: string[]) => {
@@ -187,35 +217,47 @@ const containsKeyword = (text: string, keywords: string[]) => {
 
 const DIRECT_EVENT_MAP: Record<string, AlertEventKey> = {
   "notis.firedetected": "fire",
+  "notis.fireDetected": "fire",
   "fire": "fire",
   "ไฟไหม้": "fire",
   "เพลิงไหม้": "fire",
   "เพลิง": "fire",
   "blaze": "fire",
   "notis.motiondetected": "motion",
+  "notis.motionDetected": "motion",
   "motion": "motion",
   "ตรวจพบการเคลื่อนไหว": "motion",
   "ตรวจจับการเคลื่อนไหว": "motion",
   "movement": "motion",
   "notis.cameraoffline": "offline",
   "notis.deviceoffline": "offline",
+  "notis.cameraOffline": "offline",
+  "notis.deviceOffline": "offline",
   "camera offline": "offline",
   "device offline": "offline",
   "offline": "offline",
   "กล้องออฟไลน์": "offline",
   "ออฟไลน์": "offline",
   "notis.falldetected": "fall",
+  "notis.fallDetected": "fall",
   "fall": "fall",
   "ตก": "fall",
   "ล้ม": "fall",
   "ตรวจพบคนล้ม": "fall",
   "ตรวจพบการล้ม": "fall",
   "notis.sleepinglong": "sleep",
+  "notis.sleepDetected": "sleep",
+  "notis.sleepdetected": "sleep",
+  "sleepdetected": "sleep",
   "sleep": "sleep",
   "sleeping": "sleep",
   "นอนหลับ": "sleep",
   "หลับ": "sleep",
   "ตรวจพบคนหลับนานกว่าปกติ": "sleep",
+  "notis.facedetected": "face",
+  "notis.platedetected": "plate",
+  "face": "face",
+  "plate": "plate",
 };
 
 export const resolveAlertEventKey = (
@@ -230,6 +272,8 @@ export const resolveAlertEventKey = (
     meta?.event,
     meta?.category,
     meta?.label,
+    meta?.kind,
+    meta?.alertType,
     (n as any)?.category,
     (n as any)?.type,
     (n as any)?.subtype,
@@ -252,6 +296,8 @@ export const resolveAlertEventKey = (
     if (containsKeyword(text, OFFLINE_KEYWORDS)) return "offline";
     if (containsKeyword(text, FALL_KEYWORDS)) return "fall";
     if (containsKeyword(text, SLEEP_KEYWORDS)) return "sleep";
+    if (containsKeyword(text, FACE_KEYWORDS)) return "face";
+    if (containsKeyword(text, PLATE_KEYWORDS)) return "plate";
     if (containsKeyword(text, MOTION_KEYWORDS)) return "motion";
   }
 
@@ -339,13 +385,26 @@ export const resolveFaceRecKind = (
 };
 
 export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
+  const eventKey = resolveAlertEventKey(n);
+  if (eventKey === "fire") return fireNoti;
+  if (eventKey === "motion") return motionNoti;
+  if (eventKey === "offline") return deviceNoti;
+  if (eventKey === "fall") return fallingNoti;
+  if (eventKey === "sleep") return sleepingNoti;
+  if (eventKey === "face") return faceImage;
+  if (eventKey === "plate") return plateImage;
+
   const key = String(n.titleKey || "").toLowerCase();
   const title = String(n.title || "").toLowerCase();
   const bag = matchBag(n);
   const type = String(n.type || "").toLowerCase();
   const metaText = JSON.stringify(n.meta ?? {}).toLowerCase();
 
-  if (title.includes("ตรวจพบอุปกรณ์ออฟไลน์") || key.includes("deviceoffline")) {
+  if (
+    title.includes("ตรวจพบอุปกรณ์ออฟไลน์") ||
+    key.includes("deviceoffline") ||
+    key.includes("cameraoffline")
+  ) {
     return deviceNoti;
   }
 
@@ -367,7 +426,7 @@ export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
     return fallingNoti;
   }
 
-  const sleepNeedles = ["sleep", "หลับ", "notis.sleepinglong"];
+  const sleepNeedles = ["sleep", "หลับ", "notis.sleepinglong", "notis.sleepdetected"];
   if (
     containsAny(key, sleepNeedles) ||
     containsAny(title, sleepNeedles) ||
@@ -422,8 +481,17 @@ export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   return alertImage;
 };
 
-export const isFaceRecNoti = (n: Noti): boolean =>
-  resolveFaceRecKind(n) !== null;
+export function isFaceRecNoti(n: any): boolean {
+  const key = String(n?.titleKey || n?.title || "").toLowerCase();
+  // รองรับทั้ง faceDetected และ plateDetected
+  if (key === "notis.facedetected" || key === "notis.platedetected") return true;
+
+  // บางระบบอาจแท็ก category/type เพิ่มไว้
+  const cat = String(n?.category || "").toLowerCase();
+  if (cat === "facerec" || cat === "faceplate") return true;
+
+  return false;
+}
 
 export const decorateNotiForDisplay = (n: Noti): Noti => {
   if ((n as any).__prepared) return n;

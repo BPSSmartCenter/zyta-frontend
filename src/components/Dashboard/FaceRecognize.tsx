@@ -80,7 +80,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
         disableMenu
       />
 
-      <div className="lg-1399:h-[500px] lg:h-full h-[350px] overflow-y-auto px-2">
+      <div className="h-[350px] lg-1399:h-[500px] overflow-y-auto px-2">
         <div className="space-y-2">
           {items.length === 0 ? (
             <div className="rounded-md px-3 py-2 text-sm text-gray-500">
@@ -105,16 +105,16 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
                   }}
                   className="cursor-pointer outline-none select-none"
                 >
-                  <NotiCard
-                    type={n.type}
-                    titleKey={n.titleKey}
-                    img={n.img}
-                    title={title}
-                    detail={n.detail}
-                    site={site}
-                    date={dateText}
-                    forceImageOnly
-                  />
+              <NotiCard
+                type={n.type}
+                titleKey={n.titleKey}
+                img={n.img}
+                title={title}
+                site={site}
+                date={dateText}
+                meta={(n as any)?.meta ?? undefined}
+                forceImageOnly
+              />
                 </div>
               );
             })

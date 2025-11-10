@@ -4,6 +4,7 @@ import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
+import { resolveAlertEventKey } from "../../utils/notis";
 
 /* ----- types ----- */
 type WB = {
@@ -13,6 +14,7 @@ type WB = {
   date: string;
   img?: string;
   titleKey?: string;
+  meta?: Record<string, unknown> | null;
 };
 type Props = {
   search: string;
@@ -23,32 +25,9 @@ type Props = {
 /* ----- helpers: map noti -> event key ----- */
 type EventKey = "fire" | "motion" | "offline" | "fall" | "sleep";
 
-const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title]
-    .filter(Boolean)
-    .map((x: any) => String(x).toLowerCase().trim())
-    .join(" | ");
-
 const getEventKey = (n: WB): EventKey | null => {
-  const s = bag(n);
-  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (/\bmotion\b/.test(s) || s.includes("motion detected")) return "motion";
-  if (
-    /\bfall\b/.test(s) ||
-    s.includes("ตรวจพบคนล้ม") ||
-    s.includes("notis.falldetected")
-  )
-    return "fall";
-  if (
-    /notis\.(camera|device)offline/.test(s) ||
-    /(?:camera|device)\s*offline/.test(s) ||
-    /\boffline\b/.test(s) ||
-    /ออฟ.?ไลน์/.test(s)
-  )
-    return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
-    return "sleep";
-  return null;
+  const key = resolveAlertEventKey(n as any);
+  return (key as EventKey | null) ?? null;
 };
 /* ------------------------------------------ */
 
@@ -101,10 +80,10 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
         className="font-poppins"
         disableMenu
       />
-      <div className="lg-1399:h-[375px] h-[350px] lg:h	full overflow-y-auto px-2">
+      <div className="h-[340px] lg-1399:h-[490px] overflow-y-auto px-2">
         <div className="space-y-2">
           {list.length === 0 ? (
-            <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
               {t("common.noResults")}
             </div>
           ) : (
@@ -138,6 +117,7 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
                   titleKey={n.titleKey}
                   title={title}
                   img={n.img as any}
+                  meta={(n as any)?.meta ?? undefined}
                   site={site}
                   date={dateText}
                   forceDefaultImage

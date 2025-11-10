@@ -8,6 +8,8 @@ import { niceUp, EVENT_OPTIONS } from "./Dashboard/dashboard.constants";
 
 import Dropdown from "./Dropdown";
 import { useTranslation } from "react-i18next";
+import { useNotisFeed } from "../context/NotisContext";
+import type { Noti } from "../data/Dashboard/notis";
 
 /* ============================ Types & Utils ============================ */
 
@@ -111,6 +113,156 @@ function useMonthShortLabels(locale: string) {
   );
 }
 
+const DAILY_BUCKETS = [
+  { label: "00:00", startHour: 0, endHour: 4 },
+  { label: "04:00", startHour: 4, endHour: 8 },
+  { label: "08:00", startHour: 8, endHour: 12 },
+  { label: "12:00", startHour: 12, endHour: 16 },
+  { label: "16:00", startHour: 16, endHour: 20 },
+  { label: "20:00", startHour: 20, endHour: 24 },
+];
+
+type ShiftDefinition = {
+  labelKey: string;
+  defaultLabel: string;
+  startHour: number;
+  endHour: number;
+};
+
+const SHIFT_DEFINITIONS: ShiftDefinition[] = [
+  {
+    labelKey: "chart.legend.shift1",
+    defaultLabel: "08:00 - 16:00",
+    startHour: 8,
+    endHour: 16,
+  },
+  {
+    labelKey: "chart.legend.shift2",
+    defaultLabel: "16:00 - 24:00",
+    startHour: 16,
+    endHour: 24,
+  },
+  {
+    labelKey: "chart.legend.shift3",
+    defaultLabel: "24:00 - 08:00",
+    startHour: 0,
+    endHour: 8,
+  },
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+
+type Period = "daily" | "weekly" | "monthly";
+
+const PERIOD_LENGTHS: Record<Period, number> = {
+  daily: DAILY_BUCKETS.length,
+  weekly: 7,
+  monthly: 12,
+};
+
+type SnapshotSeriesMap = Record<Period, Series[]>;
+
+function useDailyTimeLabels() {
+  return React.useMemo(() => DAILY_BUCKETS.map((bucket) => bucket.label), []);
+}
+
+function getShiftIndex(minuteOfDay: number): number {
+  for (let idx = 0; idx < SHIFT_DEFINITIONS.length; idx++) {
+    const def = SHIFT_DEFINITIONS[idx];
+    const start = def.startHour * 60;
+    const end = def.endHour * 60;
+    if (minuteOfDay >= start && minuteOfDay < end) {
+      return idx;
+    }
+  }
+  return -1;
+}
+
+function getDailyBucketIndex(minuteOfDay: number): number {
+  for (let idx = 0; idx < DAILY_BUCKETS.length; idx++) {
+    const bucket = DAILY_BUCKETS[idx];
+    const start = bucket.startHour * 60;
+    const end = bucket.endHour * 60;
+    if (minuteOfDay >= start && minuteOfDay < end) {
+      return idx;
+    }
+  }
+  return -1;
+}
+
+function parseNotiDate(noti: Noti): Date | null {
+  const raw = noti.occurredAt ?? noti.date;
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function buildSnapshotSeries(items: Noti[], shiftLabels: string[]): SnapshotSeriesMap {
+  const shiftCount = SHIFT_DEFINITIONS.length;
+  const dailyCounts = Array.from({ length: shiftCount }, () =>
+    Array(PERIOD_LENGTHS.daily).fill(0)
+  );
+  const weeklyCounts = Array.from({ length: shiftCount }, () =>
+    Array(PERIOD_LENGTHS.weekly).fill(0)
+  );
+  const monthlyCounts = Array.from({ length: shiftCount }, () =>
+    Array(PERIOD_LENGTHS.monthly).fill(0)
+  );
+
+  const now = Date.now();
+  const dailyBoundary = now - DAY_MS;
+  const weeklyBoundary = now - WEEK_MS;
+  const yearlyBoundary = now - YEAR_MS;
+
+  for (const noti of items ?? []) {
+    const dt = parseNotiDate(noti);
+    if (!dt) continue;
+    const ts = dt.getTime();
+    const minuteOfDay = dt.getHours() * 60 + dt.getMinutes();
+    const shiftIdx = getShiftIndex(minuteOfDay);
+    if (shiftIdx < 0) continue;
+
+    if (ts >= dailyBoundary) {
+      const bucket = getDailyBucketIndex(minuteOfDay);
+      if (bucket >= 0) {
+        dailyCounts[shiftIdx][bucket] += 1;
+      }
+    }
+
+    if (ts >= weeklyBoundary) {
+      const weekday = ((dt.getDay() + 6) % 7);
+      weeklyCounts[shiftIdx][weekday] += 1;
+    }
+
+    if (ts >= yearlyBoundary) {
+      const month = dt.getMonth();
+      monthlyCounts[shiftIdx][month] += 1;
+    }
+  }
+
+  const mapSeries = (counts: number[][]): Series[] =>
+    counts.map((data, idx) => ({
+      name: shiftLabels[idx] ?? SHIFT_DEFINITIONS[idx].defaultLabel,
+      data,
+    }));
+
+  return {
+    daily: mapSeries(dailyCounts),
+    weekly: mapSeries(weeklyCounts),
+    monthly: mapSeries(monthlyCounts),
+  };
+}
+
+function getEmptySeries(period: Period, shiftLabels: string[]): Series[] {
+  return SHIFT_DEFINITIONS.map((shift, idx) => ({
+    name: shiftLabels[idx] ?? shift.defaultLabel,
+    data: Array(PERIOD_LENGTHS[period]).fill(0),
+  }));
+}
+
 /* ============================ DEFAULT (เดิม) — ห้ามแตะ ============================ */
 
 export default function Chart({
@@ -120,6 +272,8 @@ export default function Chart({
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const locale = useLocaleFromI18n(i18n.language);
+  const { t: tDash } = useTranslation(["dashboard"]);
+  const { items: liveNotis } = useNotisFeed();
 
   // Align event multi-select label with MapPanel behavior
   const multiEventLabel = React.useMemo(() => {
@@ -138,6 +292,17 @@ export default function Chart({
     return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
   }, [selectedEvents, t]);
   const labelForButton = multiEventLabel || buttonLabel;
+  const shiftLabels = React.useMemo(
+    () =>
+      SHIFT_DEFINITIONS.map((shift) =>
+        tDash(shift.labelKey, { defaultValue: shift.defaultLabel })
+      ),
+    [tDash]
+  );
+  const snapshotSeries = React.useMemo(
+    () => buildSnapshotSeries(liveNotis, shiftLabels),
+    [liveNotis, shiftLabels]
+  );
 
   // เปลี่ยนช่วงเวลา (Daily ใช้ข้อมูลเดียวกับ Weekly)
   const [period, setPeriod] = React.useState<"daily" | "weekly" | "monthly">(
@@ -149,21 +314,19 @@ export default function Chart({
   // ป้ายแกน X ตามภาษา
   const dayLabels = useWeekdayShortLabels(locale);
   const monthLabels = useMonthShortLabels(locale);
-  const categories = React.useMemo<string[]>(
-    () => (period === "monthly" ? monthLabels : dayLabels),
-    [period, dayLabels, monthLabels]
-  );
+  const dailyTimeLabels = useDailyTimeLabels();
+  const categories = React.useMemo<string[]>(() => {
+    if (period === "monthly") return monthLabels;
+    if (period === "daily") return dailyTimeLabels;
+    return dayLabels;
+  }, [period, dayLabels, monthLabels, dailyTimeLabels]);
 
-  // เลือกชุดข้อมูลตามช่วงเวลา (mock 0 ทุกรายการ; daily ใช้ความยาวเดียวกับ weekly)
+  // เลือกชุดข้อมูลตามช่วงเวลา (อิงจาก notis จริง; fallback เป็น 0 เมื่อยังไม่มีข้อมูล)
   const raw = React.useMemo<Series[]>(() => {
-    const len = period === "monthly" ? 12 : 7;
-    const z = Array.from({ length: len }, () => 0);
-    return [
-      { name: "08:00 - 16:00", data: z.slice() },
-      { name: "16:00 - 24:00", data: z.slice() },
-      { name: "24:00 - 08:00", data: z.slice() },
-    ];
-  }, [period]);
+    const next = snapshotSeries[period];
+    if (Array.isArray(next) && next.length) return next;
+    return getEmptySeries(period, shiftLabels);
+  }, [period, snapshotSeries, shiftLabels]);
 
   // ทำให้ series สอดคล้องกับจำนวน category และกัน mutate
   const series = React.useMemo<Series[]>(
@@ -298,7 +461,6 @@ export default function Chart({
       "disabled:opacity-50 disabled:pointer-events-none",
     ].join(" ");
 
-  const { t: tDash } = useTranslation(["dashboard"]);
   const getEventLabel = (val: string, fallback: string) =>
     tDash(`events.${val}`, { defaultValue: fallback });
 

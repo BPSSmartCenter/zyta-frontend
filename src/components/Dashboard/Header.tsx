@@ -7,11 +7,23 @@ import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import { useNotisFeed } from "../../context/NotisContext";
-import { resolveDefaultNotiImage, resolveAlertEventKey, type AlertEventKey } from "../../utils/notis";
-import { isFaceRecNoti } from "../../utils/notis";
+import {
+  resolveDefaultNotiImage,
+  resolveAlertEventKey,
+  resolveFaceRecKind,
+  type AlertEventKey,
+} from "../../utils/notis";
 
 /* ---------- types ---------- */
-type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
+type EventKey =
+  | "motion"
+  | "fall"
+  | "fire"
+  | "offline"
+  | "sleep"
+  | "face"
+  | "plate"
+  | "other";
 
 type StatItem = {
   key: string; // อาจเป็นข้อความไทย เช่น "จำนวนกล้องออฟไลน์ / ออนไลน์"
@@ -28,6 +40,7 @@ type CameraItem = {
   embedTitle?: string;
   isFallback?: boolean;
   eventKey?: AlertEventKey | null;
+  noti?: Noti;
 };
 
 type Props = {
@@ -110,6 +123,7 @@ const normalizeStatKey = (k: string): EventKey => {
   const raw = (k || "").toLowerCase();
   const collapsed = raw.replace(/[\s/_()\-|]+/g, "");
   if (raw.includes("motion")) return "motion";
+  if (raw.includes("face")) return "face";
   if (raw.includes("fall")) return "fall";
   if (raw.includes("fire")) return "fire";
   if (
@@ -157,9 +171,18 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
       fire: 0,
       offline: 0,
       sleep: 0,
+      face: 0,
+      plate: 0,
       other: 0,
     };
-    for (const n of source) c[normalizeEventKey(n)]++;
+    for (const n of source) {
+      const key = normalizeEventKey(n);
+      if (key === "plate") {
+        c.face++;
+        continue;
+      }
+      c[key] = (c[key] ?? 0) + 1;
+    }
     return c;
   }, [source]);
 
@@ -197,16 +220,9 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
       return Array.from({ length: MAX_HEADER_IMAGES }, () => mock);
     }
 
-    // โหมดจริง: คัดเฉพาะ noti ที่มีรูป
     const tiles: CameraItem[] = source
-      .filter((n) => !isFaceRecNoti(n))
-      .sort(
-        (a, b) =>
-          new Date((b as any).date).getTime() -
-          new Date((a as any).date).getTime()
-      )
       .slice(0, MAX_HEADER_IMAGES)
-      .map<CameraItem>((n) => {
+      .map((n) => {
         const pic = getPic(n);
         const eventKey = resolveAlertEventKey(n);
         return {
@@ -214,9 +230,10 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
           ringColor: ringClass(n),
           isFallback: pic.isFallback,
           eventKey: eventKey ?? undefined,
+          noti: n,
         };
       })
-      .filter((tile) => !!tile.imgSrc);
+      .filter((tile) => Boolean(tile.imgSrc));
 
     // ถ้าไม่เจอรูปจาก notis และไม่มี cameraItems ให้ "ไม่แสดงอะไรเลย"
     if (tiles.length === 0 && !(cameraItems && cameraItems.length)) {
@@ -246,13 +263,28 @@ const handleStatChange = (ids: string[]) => {
   setSelectedStat(id || null);
   if (!id) return;
   const sc = selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+  if (id === "face") {
+    navigate(absSite("/facerec", sc));
+    return;
+  }
   navigate(absSite(`/alert?event=${id}`, sc));
 };
 
-  const handleCameraTileClick = (eventKey?: AlertEventKey | null) => {
-    if (!eventKey) return;
-    const sc =
-      selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+const handleCameraTileClick = (
+  eventKey?: AlertEventKey | null,
+  noti?: Noti | null
+) => {
+  if (!eventKey) return;
+  const sc =
+    selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
+  if (eventKey === "face" || eventKey === "plate") {
+    const kind = resolveFaceRecKind(noti ?? undefined);
+    const defaultActive = kind === "face" ? "faceScan" : "licensePlates";
+    navigate(absSite("/facerec", sc), {
+      state: { noti, defaultActive },
+    });
+    return;
+  }
     navigate(absSite(`/alert?event=${eventKey}`, sc));
   };
 
@@ -311,8 +343,6 @@ const handleStatChange = (ids: string[]) => {
             />
           );
         })}
-        {/* placeholder card */}
-        <StatCard className="w-full lg-1024:flex-1" />
       </StatCardGroup>
 
       {/* ===== Mobile carousel (<= 1024px) — จำกัดความกว้างรูปไม่เกิน 500px ตามเดิม ===== */}
@@ -341,7 +371,7 @@ const handleStatChange = (ids: string[]) => {
                 {c.eventKey && (
                   <button
                     type="button"
-                    onClick={() => handleCameraTileClick(c.eventKey)}
+                    onClick={() => handleCameraTileClick(c.eventKey, c.noti)}
                     className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
                     aria-label={t("alerts.goToEvent", {
                       event: c.eventKey,
@@ -416,7 +446,7 @@ const handleStatChange = (ids: string[]) => {
               {c.eventKey && (
                 <button
                   type="button"
-                  onClick={() => handleCameraTileClick(c.eventKey)}
+                  onClick={() => handleCameraTileClick(c.eventKey, c.noti)}
                   className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
                   aria-label={t("alerts.goToEvent", {
                     event: c.eventKey,

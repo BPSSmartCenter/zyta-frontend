@@ -24,10 +24,10 @@
   "stats": {
     "fire": "Fire detected",
     "motion": "Motion detected",
-    "offline": "Offline / Online cameras",
+    "offline": "Offline cameras",
     "fall": "Fall detected",
     "sleep": "Sleep detected",
-    "addEvent": "+ Add Event"
+    "face": "Face/Plate Recognize"
   },
 
   "map": {
@@ -117,7 +117,9 @@
     "fireDetected": "Fire detected",
     "motionDetected": "Motion detected",
     "cameraOffline": "Camera offline",
+    "deviceOffline": "Device offline",
     "sleepingLong": "Sleeping longer than usual",
+    "sleepDetected": "Sleep detected",
     "fallDetected": "Fall detected",
     "faceDetected": "Face detected",
     "plateDetected": "License plate detected"

@@ -1,17 +1,11 @@
 import React from "react";
-import Dropdown from "../Dropdown";
-import DatePicker from "../DateInput";
 import SearchInput from "../SearchInput";
 import { useTranslation } from "react-i18next";
 import { useSearchParams, useParams } from "react-router-dom";
-import {
-  CAMERA_OPTIONS,
-  EVENT_OPTIONS,
-  type AlertRow,
-} from "./totalAlert.constant";
+import { type AlertRow } from "./totalAlert.constant";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useNotisFeed } from "../../context/NotisContext";
-import { matchesSite, toDateKey } from "../../utils/notis";
+import { matchesSite, toDateKey, resolveAlertEventKey } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
 
 /* ---------- utils ---------- */
@@ -37,28 +31,6 @@ const useSiteLabel = () => {
     return label.toString().trim();
   };
 };
-const isAllOption = (
-  opt: { value?: string; label?: string } | undefined,
-  kind: "camera" | "event"
-) => {
-  if (!opt) return false;
-  const v = String(opt.value ?? "")
-    .toLowerCase()
-    .trim();
-  const l = String(opt.label ?? "")
-    .toLowerCase()
-    .trim();
-  if (v === "all") return true;
-  if (kind === "camera")
-    return (
-      (l.includes("all") && (l.includes("camera") || l.includes("site"))) ||
-      l.includes("กล้องทั้งหมด") ||
-      l.includes("ไซต์ทั้งหมด")
-    );
-  return (
-    (l.includes("all") && l.includes("event")) || l.includes("เหตุการณ์ทั้งหมด")
-  );
-};
 const getPic = (n: any) =>
   n?.screenshot ??
   n?.screenShot ??
@@ -70,56 +42,28 @@ const getPic = (n: any) =>
   "";
 
 /* ---------- event mapping ---------- */
-type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
+type EventKey =
+  | "motion"
+  | "fall"
+  | "fire"
+  | "offline"
+  | "sleep"
+  | "face"
+  | "other";
 type PrimaryEvent = Exclude<EventKey, "other">;
 const isPrimaryEvent = (ev: EventKey): ev is PrimaryEvent =>
-  ["motion", "fall", "fire", "offline", "sleep"].includes(ev as any);
-
-const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title]
-    .filter(Boolean)
-    .map((x: any) => String(x).toLowerCase().trim())
-    .join(" | ");
-
-const normalizeEventKey = (n: Noti): EventKey => {
-  const key = String(n?.titleKey || "").toLowerCase();
-  const s = bag(n);
-  if (key === "notis.motiondetected") return "motion";
-  if (key === "notis.falldetected") return "fall";
-  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (
-    /\bmotion\b/.test(s) ||
-    s.includes("motion detected") ||
-    s.includes("notis.motiondetected") ||
-    s.includes("ตรวจพบการเคลื่อนไหว") ||
-    s.includes("ตรวจจับการเคลื่อนไหว")
-  )
-    return "motion";
-  if (
-    /\bfall\b/.test(s) ||
-    s.includes("ตรวจพบคนล้ม") ||
-    s.includes("notis.falldetected")
-  )
-    return "fall";
-  if (
-    /notis\.(camera|device)offline/.test(s) ||
-    /(?:camera|device)\s*offline/.test(s) ||
-    /\boffline\b/.test(s) ||
-    /ออฟ.?ไลน์/.test(s)
-  )
-    return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
-    return "sleep";
-  return "other";
-};
+  ["motion", "fall", "fire", "offline", "sleep", "face"].includes(ev as any);
 
 const parseForcedEvent = (s?: string | null): PrimaryEvent => {
   const v = String(s ?? "motion").toLowerCase();
-  return (["motion", "fall", "fire", "offline", "sleep"] as const).includes(
-    v as any
-  )
-    ? (v as PrimaryEvent)
-    : "motion";
+  const normalized = v === "plate" ? "face" : v;
+  return (
+    (["motion", "fall", "fire", "offline", "sleep", "face"] as const).includes(
+      normalized as any
+    )
+      ? (normalized as PrimaryEvent)
+      : "motion"
+  );
 };
 
 /* ---------- noti -> row ---------- */
@@ -169,7 +113,7 @@ export default function Table() {
   const [searchParams] = useSearchParams();
   const params = useParams();
   const { items: liveNotis } = useNotisFeed();
-  const { date: globalDate, setDate: setGlobalDate, selectedSite } = useFilters();
+  const { date: globalDate, selectedSite } = useFilters();
   const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
   const routeSite = params.siteCode ? String(params.siteCode) : null;
   const contextSite =
@@ -189,38 +133,34 @@ export default function Table() {
 
   const forcedEvent = parseForcedEvent(searchParams.get("event"));
 
-  const notisForTable = React.useMemo(() => {
-    const allowed: ReadonlyArray<PrimaryEvent> = [forcedEvent];
-    return allNotis
-      .filter((n) => {
-        const ev = normalizeEventKey(n);
-        return isPrimaryEvent(ev) && allowed.includes(ev);
-      })
-      .sort(
-        (a, b) =>
-          new Date((b as any).date).getTime() -
-          new Date((a as any).date).getTime()
-      );
-  }, [forcedEvent, allNotis]);
+  const notisForTable = React.useMemo(
+    () =>
+      allNotis
+        .map((noti) => {
+          const ev = resolveAlertEventKey(noti);
+          return {
+            noti,
+            event: ev && isPrimaryEvent(ev as EventKey) ? (ev as PrimaryEvent) : null,
+          };
+        })
+        .filter((item) => item.event && item.event === forcedEvent)
+        .map((item) => item as { noti: Noti; event: PrimaryEvent })
+        .sort(
+          (a, b) =>
+            new Date((b.noti as any).date).getTime() -
+            new Date((a.noti as any).date).getTime()
+        ),
+    [allNotis, forcedEvent]
+  );
 
   const rowsAll = React.useMemo<AlertRow[]>(
-    () => notisForTable.map((n, i) => toRow(n, i, forcedEvent)),
-    [notisForTable, forcedEvent]
+    () => notisForTable.map((entry, i) => toRow(entry.noti, i, entry.event)),
+    [notisForTable]
   );
 
   /* -------- filters -------- */
-  const [cameraFilter, setCameraFilter] = React.useState("all");
-  const [eventFilter, setEventFilter] = React.useState("all");
   const [q, setQ] = React.useState("");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
-
-  // sync dropdown เมื่อเปลี่ยนหมวด
-  React.useEffect(() => {
-    const match = EVENT_OPTIONS.find(
-      (o) => String(o.value ?? "").toLowerCase() === forcedEvent
-    );
-    if (match && typeof match.value === "string") setEventFilter(match.value);
-  }, [forcedEvent]);
 
   /* -------- pagination & data -------- */
   const [page, setPage] = React.useState(1);
@@ -228,10 +168,6 @@ export default function Table() {
 
   const rowsFiltered: AlertRow[] = React.useMemo(() => {
     return rowsAll
-      .filter((r) => (eventFilter === "all" ? true : r.event === eventFilter))
-      .filter((r) =>
-        cameraFilter === "all" ? true : r.cameraLabel === cameraFilter
-      )
       .filter((r) => {
         if (!globalDate) return true;
         const d = new Date(r.timestamp);
@@ -245,7 +181,7 @@ export default function Table() {
               .includes(q.toLowerCase())
           : true
       );
-  }, [rowsAll, cameraFilter, eventFilter, globalDate, q]);
+  }, [rowsAll, globalDate, q]);
 
   const pageCount = Math.max(1, Math.ceil(rowsFiltered.length / pageSize));
   const clampedPage = Math.min(page, pageCount);
@@ -256,7 +192,7 @@ export default function Table() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [cameraFilter, eventFilter, globalDate, q, forcedEvent]);
+  }, [globalDate, q, forcedEvent]);
 
   return (
     <div className="p-6">
@@ -271,145 +207,7 @@ export default function Table() {
 
       {/* Filters */}
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Camera */}
-          <Dropdown
-            options={CAMERA_OPTIONS}
-            value={cameraFilter}
-            onChange={setCameraFilter}
-          >
-            {({
-              open,
-              selected,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-              options,
-            }) => {
-              const selectedLabel = isAllOption(selected, "camera")
-                ? t("filters.cameraAll", { defaultValue: "All Sites" })
-                : formatSiteLabel(selected?.label);
-              return (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "h-[40px] min-w-[130px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2",
-                    })}
-                  >
-                    <span className="truncate">
-                      {selectedLabel ||
-                        t("filters.cameraAll", { defaultValue: "All Sites" })}
-                    </span>
-                    <i className="material-icons leading-none">
-                      {open ? "arrow_drop_up" : "arrow_drop_down"}
-                    </i>
-                  </button>
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg ",
-                      })}
-                    >
-                      {options.map((opt) => {
-                        const label = isAllOption(opt, "camera")
-                          ? t("filters.cameraAll", {
-                              defaultValue: "All Sites",
-                            })
-                          : formatSiteLabel(opt.label);
-                        return (
-                          <button
-                            key={String(opt.value ?? opt.label)}
-                            {...getItemProps(opt, {
-                              className:
-                                "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
-                            })}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-          </Dropdown>
-
-          {/* Event */}
-          <Dropdown
-            options={EVENT_OPTIONS}
-            value={eventFilter}
-            onChange={setEventFilter}
-          >
-            {({
-              open,
-              selected,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-              options,
-            }) => {
-              const { t } = useTranslation("alert");
-              const selectedLabel = isAllOption(selected, "event")
-                ? t("filters.eventAll", { defaultValue: "All Event" })
-                : t(`events.${String(selected?.label ?? "").toLowerCase()}`, {
-                    defaultValue: String(selected?.label ?? ""),
-                  });
-              return (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "h-[40px] min-w-[130px] rounded-md border border-gray-300 bg-white px-3 font-semibold text-[14px] text-gray-800 flex items-center justify-between gap-2",
-                    })}
-                  >
-                    <span className="truncate">
-                      {selectedLabel ||
-                        t("filters.eventAll", { defaultValue: "All Event" })}
-                    </span>
-                    <i className="material-icons leading-none">
-                      {open ? "arrow_drop_up" : "arrow_drop_down"}
-                    </i>
-                  </button>
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg",
-                      })}
-                    >
-                      {options.map((opt) => {
-                        const label = isAllOption(opt, "event")
-                          ? t("filters.eventAll", { defaultValue: "All Event" })
-                          : t(
-                              `events.${String(opt.label ?? "").toLowerCase()}`,
-                              { defaultValue: String(opt.label ?? "") }
-                            );
-                        return (
-                          <button
-                            key={String(opt.value ?? opt.label)}
-                            {...getItemProps(opt, {
-                              className:
-                                "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
-                            })}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-          </Dropdown>
-
-          {/* Date */}
-          <DatePicker value={globalDate} onChange={setGlobalDate} />
-        </div>
-
+        <div className="flex flex-wrap items-center gap-3" />
         {/* Search */}
         <SearchInput
           value={q}

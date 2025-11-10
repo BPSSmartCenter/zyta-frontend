@@ -69,6 +69,7 @@ type Props = {
   counting?: number | string;
   val?: number | string;
   label?: string;
+  labelClassName?: string;
   img?: string;
   activeImg?: string;
   inactiveBg?: string;
@@ -94,6 +95,7 @@ const StatCard: React.FC<Props> = ({
   counting,
   val,
   label,
+  labelClassName,
   img,
   activeImg,
   inactiveBg = "bg-white",
@@ -237,9 +239,14 @@ const StatCard: React.FC<Props> = ({
               "font-inter flex flex-col items-start justify-center",
             ].join(" ")}
           >
-            <div className="text-[11px] font-semibold mt-[-7px]">
-              {displayLabel}
-            </div>
+          <div
+            className={[
+              "font-semibold mt-[-7px]",
+              labelClassName ?? "text-[11px]",
+            ].join(" ")}
+          >
+            {displayLabel}
+          </div>
             <div className="text-[24px] font-bold">{displayVal}</div>
           </div>
           <div>
@@ -258,7 +265,12 @@ const StatCard: React.FC<Props> = ({
             ].join(" ")}
           >
             <div className="text-[24px] font-bold">{displayVal}</div>
-            <div className="text-[11px] font-semibold mt-[-7px]">
+            <div
+              className={[
+                "font-semibold mt-[-7px]",
+                labelClassName ?? "text-[11px]",
+              ].join(" ")}
+            >
               {displayLabel}
             </div>
           </div>

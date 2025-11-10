@@ -20,12 +20,13 @@ import { useUserPath } from "../../routes/useUserPath";
 import { me as apiMe } from "../../api/user";
 
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
+const USE_COMBINED_ALERT_WELLBEING_CARD = false; // set true to restore the previous single-card layout
 
 type Props = {
   // left column
   searchEvent: string;
   setSearchEvent: (v: string) => void;
-  filteredNotis: ReadonlyArray<any>;
+  alertEvents: ReadonlyArray<any>;
   searchWB: string;
   setSearchWB: (v: string) => void;
   filteredWellBeginNotis: ReadonlyArray<any>;
@@ -62,7 +63,7 @@ export default function ContentLayout(props: Props) {
     // left
     searchEvent,
     setSearchEvent,
-    filteredNotis,
+    alertEvents,
     searchWB,
     setSearchWB,
     filteredWellBeginNotis,
@@ -97,16 +98,21 @@ export default function ContentLayout(props: Props) {
   }, []);
 
   const { abs } = useUserPath();
+
+  const sortedAlertEvents = React.useMemo(
+    () =>
+      [...(alertEvents ?? [])].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
+    [alertEvents]
+  );
+
   const allItems = React.useMemo(() => {
-    const map = new Map<string, any>();
-    [...filteredNotis, ...filteredWellBeginNotis].forEach((n: any) => {
-      const key = n?.id ?? `${n?.site}-${n?.date}-${n?.title}`;
-      if (!map.has(key)) map.set(key, n);
-    });
-    return Array.from(map.values()).sort(
+    const combined = [...sortedAlertEvents, ...filteredWellBeginNotis];
+    return combined.sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [filteredNotis, filteredWellBeginNotis]);
+  }, [sortedAlertEvents, filteredWellBeginNotis]);
 
   const bag = (n: any) =>
     [n?.event, n?.titleKey, n?.title, n?.site, n?.type, n?.date]
@@ -251,23 +257,42 @@ export default function ContentLayout(props: Props) {
           lg:[grid-template-columns:370px_minmax(0,1fr)_370px]
         "
       >
-        {/* LEFT: All-time Alerts + Well-being (ซ้อนกันในกล่องเดียว) */}
-        <div className="p-6 w-full flex-col lg:flex-col md:flex-row md:grid-cols-2 sm:grid-cols-1 rounded-xl flex  gap-3 bg-white">
-          <div className="w-full rounded-xl bg-white">
-            <AlertEvents
-              search={searchEvent}
-              setSearch={setSearchEvent}
-              items={allItems as any[]}
-            />
+        {/* LEFT: All-time Alerts + Well-being */}
+        {USE_COMBINED_ALERT_WELLBEING_CARD ? (
+          <div className="p-6 w-full flex-col lg:flex-col md:flex-row md:grid-cols-2 sm:grid-cols-1 rounded-xl flex gap-3 bg-white">
+            <div className="w-full rounded-xl bg-white">
+              <AlertEvents
+                search={searchEvent}
+                setSearch={setSearchEvent}
+                items={sortedAlertEvents as any[]}
+              />
+            </div>
+            <div className="w-full rounded-xl bg-white">
+              <WellBeingEvents
+                search={searchWB}
+                setSearch={setSearchWB}
+                items={filteredWellBeginNotis as any[]}
+              />
+            </div>
           </div>
-          <div className="w-full rounded-xl bg-white">
-            <WellBeingEvents
-              search={searchWB}
-              setSearch={setSearchWB}
-              items={filteredWellBeginNotis as any[]}
-            />
+        ) : (
+          <div className="flex flex-col gap-3 md:flex-row lg:flex-col">
+            <div className="p-6 w-full rounded-xl bg-white">
+              <AlertEvents
+                search={searchEvent}
+                setSearch={setSearchEvent}
+                items={sortedAlertEvents as any[]}
+              />
+            </div>
+            <div className="p-6 w-full rounded-xl bg-white">
+              <WellBeingEvents
+                search={searchWB}
+                setSearch={setSearchWB}
+                items={filteredWellBeginNotis as any[]}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* MIDDLE: Map ด้านบน + แถวล่าง UserManagement & Devices */}
         <div className="flex flex-col gap-3 md:col-span-1">

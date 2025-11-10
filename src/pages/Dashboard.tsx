@@ -9,14 +9,12 @@ import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
 import { notis as mockNotis, ZYTA_NOTIS } from "../data/Dashboard/notis";
-import { useFaceRec } from "../context/FaceRecContext";
 import { statItems } from "../components/Dashboard/dashboard.constants";
 import { useFilters } from "../context/FiltersContext";
 import { useNotisFeed } from "../context/NotisContext";
 import type { Noti } from "../data/Dashboard/notis";
 import {
   matchesSite,
-  matchesSiteInfo,
   sortByNewest,
   toDateKey,
   decorateNotiForDisplay,
@@ -27,7 +25,12 @@ import { alertImage } from "../assets";
 
 // keep master key seeded in backend; not used for dashboard gating
 
-type Site = { id?: string; code?: string; name?: string; province_code?: string };
+type Site = {
+  id?: string;
+  code?: string;
+  name?: string;
+  province_code?: string;
+};
 
 const isDefaultEventCategory = (n: Noti): boolean => {
   const img = resolveDefaultNotiImage(n);
@@ -76,7 +79,6 @@ const isWellBeingNoti = (n: Noti): boolean => {
 };
 
 export default function Dashboard() {
-  const faceRec = useFaceRec();
   const { t } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
 
@@ -91,16 +93,23 @@ export default function Dashboard() {
     setSearchSite,
   } = useFilters();
   // Role + sites for ContentLayout behavior similar to original
-  const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(null);
+  const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(
+    null
+  );
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
   React.useEffect(() => {
     (async () => {
       try {
         const me = await apiMe();
-        const myRole = (String(me?.role || "user").toLowerCase() as any) ?? "user";
+        const myRole =
+          (String(me?.role || "user").toLowerCase() as any) ?? "user";
         setRole(myRole);
         const resp = await listSites();
-        const items = Array.isArray(resp?.items) ? resp.items : Array.isArray(resp) ? resp : [];
+        const items = Array.isArray(resp?.items)
+          ? resp.items
+          : Array.isArray(resp)
+          ? resp
+          : [];
         const sites = items as any[];
         setAccessibleSites(sites as any);
       } catch {
@@ -116,19 +125,27 @@ export default function Dashboard() {
   const [searchFR, setSearchFR] = React.useState("");
   const [searchZYTA, setSearchZYTA] = React.useState("");
   const [selectedEvents, setSelectedEvents] = React.useState<string[]>(["all"]);
-  const buttonLabel = React.useMemo(() => (selectedEvents.includes("all") ? "all" : selectedEvents.join(", ")), [selectedEvents]);
+  const buttonLabel = React.useMemo(
+    () => (selectedEvents.includes("all") ? "all" : selectedEvents.join(", ")),
+    [selectedEvents]
+  );
   const toggleEvent = React.useCallback((v: string) => {
     setSelectedEvents((prev) => {
-      if (v === "all") return ["all"]; 
+      if (v === "all") return ["all"];
       const has = prev.includes(v);
-      const next = has ? prev.filter((x) => x !== v) : [...prev.filter((x) => x !== "all"), v];
+      const next = has
+        ? prev.filter((x) => x !== v)
+        : [...prev.filter((x) => x !== "all"), v];
       return next.length === 0 ? ["all"] : next;
     });
   }, []);
   const [mapSeverity, setMapSeverity] = React.useState("all");
   const [province, setProvince] = React.useState("all");
 
-  const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
+  const selectedDateKey = React.useMemo(
+    () => toDateKey(globalDate),
+    [globalDate]
+  );
 
   const matchGlobalDate = React.useCallback(
     (value: string) => {
@@ -153,12 +170,61 @@ export default function Dashboard() {
     [siteScopedNotis, matchGlobalDate]
   );
 
-  const alertEventSource = React.useMemo(() => {
-    const allow = new Set(["alert", "warning", "normal", "offline"]);
-    return dateScopedNotis.filter((n) =>
-      allow.has(String(n.type || "").toLowerCase())
-    );
+  const faceRecognizeItems = React.useMemo(() => {
+    const normalize = (value?: any) =>
+      value === undefined || value === null ? undefined : String(value);
+
+    const toFacePlateItem = (n: Noti): Noti => {
+      const meta = (n.meta ?? {}) as any;
+      const key = String(n.titleKey || n.title || "").toLowerCase();
+      const isFace = key.includes("facedetected");
+      const isPlate = key.includes("platedetected");
+      const occurredAt = n.occurredAt ?? n.date ?? new Date().toISOString();
+      const rawId =
+        normalize(meta?.rawId) ||
+        normalize(meta?.row?.id) ||
+        normalize(meta?.faceRow?.id) ||
+        n.id ||
+        occurredAt;
+      const cameraName =
+        meta?.cameraName ?? meta?.device?.name ?? meta?.deviceHeaders?.deviceKey;
+      const siteLabel = n.site ?? meta?.siteName ?? meta?.siteCode ?? "-";
+      const title = isFace
+        ? meta?.person?.fullName ?? n.title ?? "Face detected"
+        : meta?.plateText ?? n.title ?? "License plate detected";
+      const img = isFace
+        ? meta?.faceCropImg ?? meta?.faceFullImg ?? meta?.picture ?? n.img
+        : meta?.platePicture ?? meta?.picture ?? n.img;
+      const enhancedMeta = {
+        ...meta,
+        kind: isPlate ? "plate" : "face",
+        rawId,
+        cameraName,
+      };
+      return {
+        ...n,
+        id: rawId ?? n.id ?? occurredAt,
+        title,
+        site: siteLabel,
+        occurredAt,
+        date: occurredAt,
+        img,
+        meta: enhancedMeta,
+      };
+    };
+
+    return dateScopedNotis
+      .filter((n) => {
+        const key = String(n.titleKey || "").toLowerCase();
+        return key === "notis.facedetected" || key === "notis.platedetected";
+      })
+      .map(toFacePlateItem);
   }, [dateScopedNotis]);
+
+  const alertEventSource = React.useMemo(
+    () => sortByNewest(dateScopedNotis),
+    [dateScopedNotis]
+  );
 
   const wellBeingSource = React.useMemo(() => {
     return dateScopedNotis.filter((n) => {
@@ -175,13 +241,15 @@ export default function Dashboard() {
     });
   }, [dateScopedNotis]);
 
-  const filteredNotis = React.useMemo(() => {
-    const q = searchEvent.toLowerCase().trim();
-    const src = alertEventSource;
-    return src
-      .filter((n) => matchGlobalDate(n?.date))
-      .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchEvent, matchGlobalDate, alertEventSource]);
+  const rawAlertEvents = alertEventSource;
+
+  React.useEffect(() => {
+    console.group("rawAlertEvents");
+    rawAlertEvents.forEach((item) =>
+      console.log(item.titleKey, item.site, item.occurredAt, (item.meta as any)?.rawId, item.id)
+    );
+    console.groupEnd();
+  }, [rawAlertEvents]);
 
   const filteredWellBeginNotis = React.useMemo(() => {
     const q = searchWB.toLowerCase().trim();
@@ -190,48 +258,25 @@ export default function Dashboard() {
       .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
   }, [searchWB, matchGlobalDate, wellBeingSource]);
 
-  const faceRecognizeItems = React.useMemo(() => {
-    const rows = Array.isArray(faceRec?.faceRows) ? faceRec.faceRows : [];
-    const scopedRows = rows.filter((row: any) => matchesSiteInfo(row ?? {}, selectedSite));
-    return scopedRows.map((row: any) => {
-      const occurredAt =
-        row?.timeInISO || row?.timeOutISO || row?.timestamp || row?.date || new Date().toISOString();
-      return {
-        id: row?.id,
-        type: "info",
-        titleKey: "notis.faceDetected",
-        title: row?.fullName || "Face detected",
-        detail: row?.cameraName || undefined,
-        site: row?.siteName || row?.siteCode || row?.province || "-",
-        date: occurredAt,
-        occurredAt,
-        img: row?.picture || row?.fullFrame,
-        meta: {
-          kind: "face",
-          rawId: row?.id || row?.fullName || occurredAt,
-          siteCode: row?.siteCode,
-        },
-      };
-    });
-  }, [faceRec?.faceRows, selectedSite]);
-
   const filteredRecognize = React.useMemo(() => {
     const q = searchFR.toLowerCase().trim();
-    return faceRecognizeItems
-      .filter((n) => matchGlobalDate(n?.date))
-      .filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
-  }, [searchFR, matchGlobalDate, faceRecognizeItems]);
+    return faceRecognizeItems.filter((n) =>
+      q ? JSON.stringify(n).toLowerCase().includes(q) : true
+    );
+  }, [searchFR, faceRecognizeItems]);
   const filterZYTA = React.useMemo(() => {
     const q = searchZYTA.toLowerCase().trim();
     const src = ZYTA_NOTIS as unknown as any[];
-    return src.filter((n) => (q ? JSON.stringify(n).toLowerCase().includes(q) : true));
+    return src.filter((n) =>
+      q ? JSON.stringify(n).toLowerCase().includes(q) : true
+    );
   }, [searchZYTA]);
 
   const contentLayoutProps = React.useMemo(
     () => ({
       searchEvent,
       setSearchEvent,
-      filteredNotis,
+      alertEvents: rawAlertEvents,
       searchWB,
       setSearchWB,
       filteredWellBeginNotis,
@@ -243,13 +288,9 @@ export default function Dashboard() {
       province,
       setProvince,
       mapNotis: ((): any[] => {
-        const map = new Map<string, Noti>();
-        const all = [...filteredNotis, ...filteredWellBeginNotis];
-        all.forEach((n) => {
-          const key = n.id ?? `${n.site}-${n.date}-${n.title}`;
-          if (!map.has(key)) map.set(key, n);
-        });
-        return Array.from(map.values());
+        return [...rawAlertEvents, ...filteredWellBeginNotis].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
       })(),
       searchFR,
       setSearchFR,
@@ -264,7 +305,7 @@ export default function Dashboard() {
     [
       searchEvent,
       searchWB,
-      filteredNotis,
+      rawAlertEvents,
       filteredWellBeginNotis,
       selectedEvents,
       buttonLabel,
@@ -310,14 +351,3 @@ export default function Dashboard() {
     </Sidebar>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

@@ -10,25 +10,13 @@ import { useEffect, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { me } from "../../data/Dashboard/auth";
 import { useNotisFeed } from "../../context/NotisContext";
-import { notiSeverity } from "../../utils/notis";
+import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
 
 /* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {
-  const k = n.titleKey || "";
-  if (k.includes("fireDetected")) return "fire";
-  if (k.includes("motionDetected")) return "motion";
-  if (k.includes("cameraOffline") || k.includes("deviceOffline"))
-    return "offline";
-  if (k.includes("fallDetected")) return "fall";
-  if (k.includes("sleepDetected") || k.includes("sleepingLong"))
-    return "sleeping";
-  const t = (n.title || "").toLowerCase();
-  if (t.includes("fire")) return "fire";
-  if (t.includes("motion")) return "motion";
-  if (t.includes("offline")) return "offline";
-  if (t.includes("fall")) return "fall";
-  if (t.includes("sleep")) return "sleeping";
-  return "unknown";
+  const detected = resolveAlertEventKey(n);
+  if (!detected) return "unknown";
+  return detected === "sleep" ? "sleeping" : detected;
 };
 
 type WithGroup = Noti & { _group: "notis" | "wellbeing" };

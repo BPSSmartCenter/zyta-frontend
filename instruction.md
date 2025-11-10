@@ -209,18 +209,18 @@ curl -X POST http://localhost:3000/webhooks/notis \
   -H "X-Device-Key: CAM-3078-ENTRANCE" \
   -d '{
     "type": "info",
-    "titleKey": "notis.faceDetected",
     "severity": "low",
-    "occurredAt": "2025-02-11T03:25:00+07:00",
+    "titleKey": "notis.faceDetected",
+    "title": "ตรวจพบใบหน้า",
+    "img": null,
+    "occurredAt": "2025-11-10T11:16:15Z",
     "meta": {
       "kind": "face",
-      "person": {
-        "fullName": "Somchai Jaruk",
-        "gender": "MALE"
-      },
       "rawId": "face-001",
-      "cropImg": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
-      "fullFrame": "https://example.com/full-frame.jpg"
+      "person": {
+        "fullName": "Somchai Raaruk",
+        "gender": "MALE"
+      }
     }
   }'
 ```
@@ -234,7 +234,9 @@ curl -X POST http://localhost:3000/webhooks/notis \
     "type": "info",
     "titleKey": "notis.plateDetected",
     "severity": "low",
-    "occurredAt": "2025-02-11T03:27:00+07:00",
+    "title": "ตรวจพบป้ายทะเบียน",
+    "img": null,
+    "occurredAt": "2025-11-10T13:15:15Z",
     "meta": {
       "kind": "plate",
       "rawId": "plate-001",
@@ -254,12 +256,13 @@ curl -X POST http://localhost:3000/webhooks/notis \
   -H "Content-Type: application/json" \
   -d '{ 
     "type": "normal",
-    "title": "ตรวจพบอุปกรณ์ออฟไลน์",
-    "siteId": "3078000",
-    "deviceId": "device-uuid-here",
+    "severity": "low",
+    "titleKey": "notis.deviceOffline",
+    "title": "อุปกรณ์ออฟไลน์",
+    "img": null,
+    "occurredAt": "2025-11-07T10:11:00+07:00",
     "meta": {
-      "status": "offline",
-      "lastOnline": "2025-02-11T02:58:00Z"
+      "status": "active"
     }
   }'
 ```

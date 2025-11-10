@@ -8,6 +8,7 @@ import UserManagement from "./UserManagement";
 import VerifyEmail from "./VerifyEmail";
 import Forgot from "./Forgot";
 import Reset from "./Reset";
+import ElectricMeter from "./ElectricMeter";
 
 export {
   Dashboard,
@@ -20,4 +21,5 @@ export {
   VerifyEmail,
   Forgot,
   Reset,
+  ElectricMeter,
 };

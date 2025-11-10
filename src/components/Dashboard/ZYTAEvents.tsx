@@ -69,6 +69,7 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
                   title={title}
                   site={site}
                   date={dateText}
+                  meta={(n as any)?.meta ?? undefined}
                 />
               );
             })

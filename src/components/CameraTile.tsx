@@ -28,7 +28,19 @@ const CameraTile: React.FC<CameraTileProps> = ({
   isFallbackImg = false,
 }) => {
   const title = embedTitle || alt;
-  const frameBg = isFallbackImg ? "bg-[#FEE4E8]" : "bg-white";
+  const fallbackColor = React.useMemo(() => {
+    const match = ringColor.match(/#([0-9a-fA-F]{6})/);
+    if (match) {
+      const hex = match[0];
+      return `${hex}55`; // ~33% opacity over white
+    }
+    if (ringColor.includes("ring-red") || ringColor.includes("ring-[#FB3F3F]")) return "#FB3F3F33";
+    if (ringColor.includes("ring-[#FE9927]") || ringColor.includes("ring-orange")) return "#FE992733";
+    if (ringColor.includes("ring-[#AFEAFF]") || ringColor.includes("ring-blue")) return "#39B1FF33";
+    return "#F5F6FA";
+  }, [ringColor]);
+
+  const frameBg = isFallbackImg ? "" : "bg-white";
 
   return (
     // Keep the original aspect ratio wrapper so existing layouts stay intact
@@ -40,7 +52,12 @@ const CameraTile: React.FC<CameraTileProps> = ({
       ].join(" ")}
     >
       {/* Inner frame with rounded corners and white background */}
-      <div className={`absolute inset-1 rounded-xl overflow-hidden ${frameBg}`}>
+      <div
+        className={`absolute inset-1 rounded-xl overflow-hidden ${
+          frameBg || ""
+        }`}
+        style={isFallbackImg ? { backgroundColor: fallbackColor } : undefined}
+      >
         {embedUrl ? (
           <div className="h-full w-full overflow-hidden">
             <iframe
@@ -54,13 +71,25 @@ const CameraTile: React.FC<CameraTileProps> = ({
             />
           </div>
         ) : imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={alt}
-            className="h-full w-full object-cover select-none"
-            draggable={false}
-            loading="lazy"
-          />
+          isFallbackImg ? (
+            <div className="flex h-full w-full items-center justify-center p-1">
+              <img
+                src={imgSrc}
+                alt={alt}
+                className="max-h-[98%] max-w-[98%] object-contain select-none"
+                draggable={false}
+                loading="lazy"
+              />
+            </div>
+          ) : (
+            <img
+              src={imgSrc}
+              alt={alt}
+              className="h-full w-full object-cover select-none"
+              draggable={false}
+              loading="lazy"
+            />
+          )
         ) : imgSrc ? (
           <img
             src={imgSrc}

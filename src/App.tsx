@@ -12,6 +12,7 @@ import {
   VerifyEmail,
   Forgot,
   Reset,
+  // ElectricMeter,
 } from "./pages";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
@@ -29,47 +30,51 @@ function App() {
   return (
     <BrowserRouter>
       <DeviceInventoryProvider>
-      <NotisProvider>
-      <FaceRecProvider>
-      <FiltersProvider>
-        <ScrollToTop smooth={true} />
-        <ScrollUnlocker />
-        <LanguageSwitcher />
-        <Routes>
-        {/* public */}
-        <Route path="/" element={<RootLoginOrDashboard />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/forgot" element={<Forgot />} />
-        <Route path="/reset" element={<Reset />} />
+        <NotisProvider>
+          <FaceRecProvider>
+            <FiltersProvider>
+              <ScrollToTop smooth={true} />
+              <ScrollUnlocker />
+              <LanguageSwitcher />
+              <Routes>
+                {/* public */}
+                <Route path="/" element={<RootLoginOrDashboard />} />
+                {/* <Route path="/" element={<ElectricMeter />} /> */}
+                <Route path="/register" element={<Register />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/forgot" element={<Forgot />} />
+                <Route path="/reset" element={<Reset />} />
 
-        {/* legacy path: redirect เนเธ /u/:uid/dashboard */}
-        <Route path="/dashboard" element={<LegacyDashboardRedirect />} />
+                {/* legacy path: redirect เนเธ /u/:uid/dashboard */}
+                <Route
+                  path="/dashboard"
+                  element={<LegacyDashboardRedirect />}
+                />
 
-        {/* protected */}
-        <Route element={<RequireAuth />}>
-          <Route path="/u/:uid">
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="alert" element={<TotalAlert />} />
-            <Route path="facerec" element={<FaceRecognize />} />
-            <Route path="devices" element={<Devices />} />
-            <Route path="usermanage" element={<UserManagement />} />
-            {/* site-scoped routes */}
-            <Route path="site/:siteCode">
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="alert" element={<TotalAlert />} />
-              <Route path="devices" element={<Devices />} />
-              <Route path="facerec" element={<FaceRecognize />} />
-            </Route>
-          </Route>
-        </Route>
+                {/* protected */}
+                <Route element={<RequireAuth />}>
+                  <Route path="/u/:uid">
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="alert" element={<TotalAlert />} />
+                    <Route path="facerec" element={<FaceRecognize />} />
+                    <Route path="devices" element={<Devices />} />
+                    <Route path="usermanage" element={<UserManagement />} />
+                    {/* site-scoped routes */}
+                    <Route path="site/:siteCode">
+                      <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="alert" element={<TotalAlert />} />
+                      <Route path="devices" element={<Devices />} />
+                      <Route path="facerec" element={<FaceRecognize />} />
+                    </Route>
+                  </Route>
+                </Route>
 
-        {/* catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      </FiltersProvider>
-      </FaceRecProvider>
-      </NotisProvider>
+                {/* catch-all */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </FiltersProvider>
+          </FaceRecProvider>
+        </NotisProvider>
       </DeviceInventoryProvider>
     </BrowserRouter>
   );
@@ -115,5 +120,3 @@ function RootLoginOrDashboard() {
   return <Navigate to={to} replace />;
 }
 export default App;
-
-

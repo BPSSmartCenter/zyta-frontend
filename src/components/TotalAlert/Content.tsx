@@ -9,11 +9,23 @@ import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import { useNotisFeed } from "../../context/NotisContext";
-import { matchesSite, toDateKey, resolveDefaultNotiImage } from "../../utils/notis";
+import {
+  matchesSite,
+  toDateKey,
+  resolveDefaultNotiImage,
+  resolveAlertEventKey,
+} from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
 
 /* ---------- types ---------- */
-type EventKey = "motion" | "fall" | "fire" | "offline" | "sleep" | "other";
+type EventKey =
+  | "motion"
+  | "fall"
+  | "fire"
+  | "offline"
+  | "sleep"
+  | "face"
+  | "other";
 type StatItem = {
   key: string;
   label: string;
@@ -54,42 +66,11 @@ const ringClass = (n: Noti) => {
   return "ring-[#AFEAFF]";
 };
 
-const bag = (n: any) =>
-  [n?.event, n?.titleKey, n?.title]
-    .filter(Boolean)
-    .map((x: any) => String(x).toLowerCase().trim())
-    .join(" | ");
-
-const normalizeEventKey = (n: any): EventKey => {
-  const key = String(n?.titleKey || '').toLowerCase();
-  const s = bag(n);
-  if (key === "notis.motiondetected") return "motion";
-  if (key === "notis.falldetected") return "fall";
-  if (/\bfire\b/.test(s) || s.includes("fire detected")) return "fire";
-  if (
-    /\bmotion\b/.test(s) ||
-    s.includes("motion detected") ||
-    s.includes("notis.motiondetected") ||
-    s.includes("ตรวจพบการเคลื่อนไหว") ||
-    s.includes("ตรวจจับการเคลื่อนไหว")
-  )
-    return "motion";
-  if (
-    /\bfall\b/.test(s) ||
-    s.includes("ตรวจพบคนล้ม") ||
-    s.includes("notis.falldetected")
-  )
-    return "fall";
-  if (
-    /notis\.(camera|device)offline/.test(s) ||
-    /(?:camera|device)\s*offline/.test(s) ||
-    /\boffline\b/.test(s) ||
-    /ออฟ.?ไลน์/.test(s)
-  )
-    return "offline";
-  if (/\bsleep\b/.test(s) || s.includes("ตรวจพบคนหลับนานกว่าปกติ"))
-    return "sleep";
-  return "other";
+const toEventKey = (n: Noti): EventKey => {
+  const detected = resolveAlertEventKey(n);
+  if (!detected) return "other";
+  if (detected === "plate") return "face";
+  return detected as EventKey;
 };
 
 const normalizeStatKey = (k: string): EventKey => {
@@ -98,6 +79,7 @@ const normalizeStatKey = (k: string): EventKey => {
   if (raw.includes("motion")) return "motion";
   if (raw.includes("fall")) return "fall";
   if (raw.includes("fire")) return "fire";
+  if (raw.includes("face") || raw.includes("plate")) return "face";
   if (
     raw.includes("offline") ||
     /ออฟ.?ไลน์/.test(raw) ||
@@ -111,10 +93,10 @@ const normalizeStatKey = (k: string): EventKey => {
 
 const parseEventFromUrl = (s?: string | null): EventKey => {
   const v = String(s ?? "motion").toLowerCase();
-  return (["motion", "fall", "fire", "offline", "sleep"] as const).includes(
-    v as any
-  )
-    ? (v as EventKey)
+  const normalized = v === "plate" ? "face" : v;
+  const allowed = ["motion", "fall", "fire", "offline", "sleep", "face"] as const;
+  return allowed.includes(normalized as any)
+    ? (normalized as EventKey)
     : "motion";
 };
 
@@ -155,9 +137,13 @@ export default function Content({ statItems }: Props) {
       fire: 0,
       offline: 0,
       sleep: 0,
+      face: 0,
       other: 0,
     };
-    for (const n of allEvents) c[normalizeEventKey(n)]++;
+    for (const n of allEvents) {
+      const key = toEventKey(n);
+      c[key] = (c[key] ?? 0) + 1;
+    }
     return c;
   }, [allEvents]);
 
@@ -166,7 +152,13 @@ export default function Content({ statItems }: Props) {
     () =>
       (statItems ?? []).map((it) => {
         const idNorm = normalizeStatKey(it.key || it.label);
-        return { ...it, val: counts[idNorm] ?? 0, key: idNorm };
+        return {
+          ...it,
+          val: counts[idNorm] ?? 0,
+          key: idNorm,
+          labelClassName:
+            idNorm === "face" ? "text-[10px] whitespace-nowrap" : undefined,
+        };
       }),
     [statItems, counts]
   );
@@ -186,7 +178,7 @@ export default function Content({ statItems }: Props) {
   // notis ของหมวดที่เลือก (เรียงใหม่->เก่า)
   const listForEvent = React.useMemo(() => {
     return allEvents
-      .filter((n) => normalizeEventKey(n) === eventKey)
+      .filter((n) => toEventKey(n) === eventKey)
       .sort(
         (a, b) =>
           new Date((b as any).date).getTime() -
@@ -215,6 +207,10 @@ export default function Content({ statItems }: Props) {
       return;
     }
     setSelectedStat(next);
+    if (next === "face") {
+      navigate(absSite("/facerec"));
+      return;
+    }
     navigate(absSite(`/alert?event=${next}`));
   };
 
@@ -256,6 +252,7 @@ export default function Content({ statItems }: Props) {
               id={it.key} // id เป็นคีย์กลาง (motion/fall/fire/offline/sleep)
               label={t(`stats.${it.key}`, { defaultValue: it.label })}
               val={it.val}
+              labelClassName={it.labelClassName}
               img={it.img}
               activeImg={it.activeImg}
               inactiveBg="bg-white"
