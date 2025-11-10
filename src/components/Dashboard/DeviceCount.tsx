@@ -56,6 +56,8 @@ export default function DeviceCount({
   const labelAir = t("devices.air", { defaultValue: "Air" });
   // const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
 
+  const CCTV_DISABLED = true;
+
   const goDevices = (type: string) => {
     if (siteCode) return navigate(absSite(`/devices?type=${type}`, siteCode));
     return navigate(abs(`/devices?type=${type}`));
@@ -167,7 +169,10 @@ export default function DeviceCount({
             className={`w-full min-h-[56px] flex items-center gap-4 ${
               isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass
             }`}
-            onClick={() => !isZero(mergedCounts.cameras) && goDevices("cctv")}
+            onClick={() => {
+              if (CCTV_DISABLED) return;
+              if (!isZero(mergedCounts.cameras)) goDevices("cctv");
+            }}
           >
             <img src={cctvImage} alt="" width={36} />
             <span className="flex flex-col leading-tight text-left min-w-0">
@@ -180,7 +185,6 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {/* {statusByType.cameras.on} */}
                   {mergedCounts.cameras}
                 </span>
                 <span className="text-gray-500">/</span>
@@ -245,7 +249,8 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {statusByType.waterMeter.on}
+                  {/* {statusByType.waterMeter.on} */}
+                   {mergedCounts.waterMeter}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">
@@ -321,7 +326,8 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {statusByType.airSensor.on}
+                  {/* {statusByType.airSensor.on} */}
+                  {mergedCounts.airSensor}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">

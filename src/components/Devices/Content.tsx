@@ -33,6 +33,9 @@ const ID_TO_TYPE: Record<string, string> = Object.entries(TYPE_TO_ID).reduce(
   {} as Record<string, string>
 );
 
+const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>(["cctv"]);
+const DEFAULT_DEVICE_TYPE: keyof typeof TYPE_TO_ID = "watermeter";
+
 export default function Content({}: Props) {
   const { t: tDevices } = useTranslation("devices");
   const { t } = useTranslation("dashboard");
@@ -50,18 +53,24 @@ export default function Content({}: Props) {
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();
-    return q && TYPE_TO_ID[q] ? q : "cctv"; // default: cctv
+    const candidate =
+      q && TYPE_TO_ID[q as keyof typeof TYPE_TO_ID] ? (q as keyof typeof TYPE_TO_ID) : DEFAULT_DEVICE_TYPE;
+    return DISABLED_DEVICE_TYPES.has(candidate) ? DEFAULT_DEVICE_TYPE : candidate;
   }, [location.search]);
 
   // If current URL points to a zero-count type and there exists any available type, redirect to the first available
   const selectedId = useMemo(() => TYPE_TO_ID[urlType], [urlType]);
   const availableTypes = (Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>).filter(
-    (k) => getCountForType(inventoryCounts as any, k as any) > 0
+    (k) =>
+      !DISABLED_DEVICE_TYPES.has(k) &&
+      getCountForType(inventoryCounts as any, k as any) > 0
   );
+  const selectedCount = getCountForType(inventoryCounts as any, urlType as any);
 
   if (typeof window !== "undefined") {
-    const isZero = getCountForType(inventoryCounts as any, urlType as any) <= 0;
-    if (isZero && availableTypes.length > 0) {
+    const isDisabledType = DISABLED_DEVICE_TYPES.has(urlType);
+    const isZero = selectedCount <= 0;
+    if ((isDisabledType || isZero) && availableTypes.length > 0) {
       const nextType = availableTypes[0];
       const params = new URLSearchParams(location.search);
       params.set("type", nextType);
@@ -84,6 +93,7 @@ export default function Content({}: Props) {
     const nextId = ids[0];
     const nextType = nextId ? ID_TO_TYPE[nextId] : undefined;
     if (!nextType || nextType === urlType) return;
+    if (DISABLED_DEVICE_TYPES.has(nextType as keyof typeof TYPE_TO_ID)) return;
 
     // ใช้ search แทนการประกอบสตริงเอง เผื่ออนาคตมีพารามอื่น
     const params = new URLSearchParams(location.search);
@@ -128,7 +138,11 @@ export default function Content({}: Props) {
       {/* กลุ่มการ์ด: single select */}
       <StatCardGroup
         selectionMode="single"
-        activeIds={getCountForType(inventoryCounts as any, urlType as any) > 0 ? [selectedId] : []}
+        activeIds={
+          selectedId && !DISABLED_DEVICE_TYPES.has(urlType) && selectedCount > 0
+            ? [selectedId]
+            : []
+        }
         onChange={handleChange}
         className="mt-5"
       >
@@ -136,7 +150,8 @@ export default function Content({}: Props) {
           {DEVICE_CARDS.map((c) => {
             const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
             const countVal = type ? getCountForType(inventoryCounts as any, type as any) : 0;
-            const disabled = !type || countVal <= 0;
+            const typeDisabled = type ? DISABLED_DEVICE_TYPES.has(type) : false;
+            const disabled = typeDisabled || !type || countVal <= 0;
             return (
               <li key={c.id}>
                 <StatCard
@@ -156,9 +171,10 @@ export default function Content({}: Props) {
 
       {/* Panel/Table ตาม selectedId (คอมโพเนนต์คงตัว ไม่รี-mount จาก key/state) */}
       {selectedId === "cctv-1" ? (
-        <div className="flex flex-col gap-3">
-          <CCTVPanel />
-          <CCTVTable />
+        <div className="mt-6 rounded-xl bg-white p-8 text-center text-gray-500 border border-dashed border-gray-300">
+          {tDevices("cctvDisabled", {
+            defaultValue: "CCTV view is temporarily unavailable.",
+          })}
         </div>
       ) : selectedId === "intercom-1" ? (
         <div className="flex flex-col gap-3">
@@ -167,7 +183,7 @@ export default function Content({}: Props) {
         </div>
       ) : selectedId === "water-1" ? (
         <div className="flex flex-col gap-3">
-          <WaterMeterPanel />
+          <WaterMeterPanel siteCode={siteCode} />
           <CCTVTable />
         </div>
       ) : selectedId === "electric-1" ? (
@@ -177,7 +193,7 @@ export default function Content({}: Props) {
         </div>
       ) : selectedId === "air-1" ? (
         <div className="mt-6">
-          <AirPanel />
+          <AirPanel siteCode={siteCode} />
           <CCTVTable />
         </div>
       ) : (

@@ -3,6 +3,7 @@
     "title": "Devices",
     "subTitle": "Track, manage and forecast your customers and orders. "
   },
+  "cctvDisabled": "CCTV view is temporarily unavailable.",
   "header": {
     "cctvCard": "CCTV Cameras",
     "intercomeCard": "Red box",
@@ -63,6 +64,19 @@
       "waterToday": "Today's water",
       "monthUsage": "Water usage this month",
       "literUnit": "L",
+      "drinkingToday": "Drinking water today",
+      "drinkingMonth": "Drinking water this month",
+      "drinkingYear": "Drinking water this year",
+      "domesticToday": "Domestic water today",
+      "domesticMonth": "Domestic water this month",
+      "domesticYear": "Domestic water this year",
+      "series1": "Series 1",
+      "series2": "Series 2",
+      "series3": "Series 3",
+      "fetchError": "Unable to load water meter data",
+      "noData": "No water meter data for this site yet",
+      "loading": "Loading water data...",
+      "updated": "Updated {{value}}",
       "chart": {
         "title": "Water vol.",
         "yTitle": "Water vol."
@@ -93,6 +107,32 @@
         "unitKwh": "kWh"
       },
       "noData": "No data"
+    },
+    "air": {
+      "selectTime": "Select time",
+      "to": "TO",
+      "status": {
+        "good": "Good",
+        "medium": "Medium",
+        "high": "High",
+        "na": "No data"
+      },
+      "cards": {
+        "pm25": "PM 2.5",
+        "pm10": "PM 10",
+        "humidity": "Humidity",
+        "temperature": "Temperature"
+      },
+      "units": {
+        "ugm3": "µg/m³"
+      },
+      "thermostat": {
+        "temperatureLabel": "{{value}}°C"
+      },
+      "updated": "Updated {{value}}",
+      "fetchError": "Unable to load air sensor data",
+      "loading": "Loading air data...",
+      "outOfRange": "No data in the selected range"
     }
   }
 }

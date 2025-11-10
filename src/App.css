@@ -96,7 +96,7 @@ body {
   border-radius: 4px;
 }
 
-.hs-leaflet.leaflet-container a.leaflet-popup-close-button {
+.hs-leaflet.leaflet-container a.leaflet-popup-`se-button {
   top: -10px;
   right: -10px;
   border-radius: 9999px;

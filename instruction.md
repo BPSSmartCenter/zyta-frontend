@@ -23,7 +23,12 @@ Copy the `token` (or `accessToken`) from the response and pass it in the `Author
 
 ## 2. Device Registration Webhooks
 
-Both registration APIs accept either a site UUID or site code in the path (`:siteId`). They update existing records when a matching device is found, otherwise they create a new one and refresh site counters.
+All manual registration APIs accept either a site UUID or site code in the path (`:siteId`). They update existing records when a matching device is found, otherwise they create a new one and refresh site counters. The supported device families are:
+
+1. Electric (SolarEdge integration fallback)
+2. CCTV (camera)
+3. Water Meter
+4. Air Sensor
 
 ### 2.1 Register / Update an Electric Device
 
@@ -135,6 +140,280 @@ Response:
   }
 }
 ```
+
+### 2.3 Register / Update a Water Meter Device
+
+- **Method / URL**: `POST /site/:siteId/water/devices/register`
+- **Auth**: `Authorization: Bearer <token>`
+- **Headers**: `Content-Type: application/json`
+- **Body Fields**
+  | Field        | Type   | Required | Notes                                                                 |
+  |--------------|--------|----------|-----------------------------------------------------------------------|
+  | `deviceKey`  | string | yes      | Unique identifier for the meter (asset code, model, etc.).            |
+  | `sn`         | string | no       | Optional serial number; saved in metadata.                            |
+  | `ipAddress`  | string | no       | Optional IP address.                                                  |
+  | `status`     | string | no       | Defaults to `online`. Accepted values: `online`, `offline`, `maintenance`. |
+  | `name`       | string | no       | Friendly display name.                                                |
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/site/3078000/water/devices/register \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceKey": "WATER-3078-A01",
+    "sn": "WM-0001",
+    "ipAddress": "10.1.0.21",
+    "status": "online",
+    "name": "Main Water Meter"
+  }'
+```
+
+### 2.4 Register / Update an Air Sensor Device
+
+- **Method / URL**: `POST /site/:siteId/air/devices/register`
+- **Auth**: `Authorization: Bearer <token>`
+- **Headers**: `Content-Type: application/json`
+- **Body Fields**
+  | Field        | Type   | Required | Notes                                                                 |
+  |--------------|--------|----------|-----------------------------------------------------------------------|
+  | `deviceKey`  | string | yes      | Unique identity for the sensor (model or hardware code).              |
+  | `sn`         | string | no       | Optional serial number.                                               |
+  | `ipAddress`  | string | no       | Optional IP address.                                                  |
+  | `status`     | string | no       | Defaults to `online`. Accepted values: `online`, `offline`, `maintenance`. |
+  | `name`       | string | no       | Friendly display name.                                                |
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/site/3078000/air/devices/register \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceKey": "AIR-3078-S01",
+    "sn": "AS-0009",
+    "ipAddress": "10.1.0.31",
+    "status": "maintenance",
+    "name": "Warehouse Air Sensor"
+  }'
+```
+
+### 2.5 Update Air Sensor Telemetry (Webhook)
+
+Use this webhook when the external IoT gateway pushes live air-quality readings. Each successful call updates the device's `meta.air.lastReading`, which the dashboard reads via `GET /site/:siteId/air/devices`.
+
+- **Method / URL**: `POST /webhooks/air-sensors`
+- **Auth**: none (place behind your own gateway if required)
+- **Headers** *(optional)*:
+  - `X-Device-Key`, `X-Device-SN`, `X-Device-IP` — used to resolve the device if `siteId`/`deviceId` are omitted
+- **Body Fields**
+  | Field        | Required | Notes |
+  |--------------|----------|-------|
+  | `siteId` / `siteCode` | No | Provide if you do not send device headers. |
+  | `deviceId` / `deviceKey` / `sn` | No | At least one identifier or header must be present. |
+  | `timestamp`  | No | ISO string. Defaults to server receive time. |
+  | `source`     | No | Friendly sensor/source name. |
+  | `metrics`    | Yes | Object containing any of `pm25`, `pm10`, `humidity`, `temperature`, `co2`, `tvoc`, `pressure`, `aqiUs`, `aqiTh`. At least one metric is required. |
+
+Example payload:
+
+```bash
+curl -X POST http://localhost:3000/webhooks/air-sensors \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: AIR-3078-S01" \
+  -d '{
+    "siteCode": "3078000",
+    "deviceKey": "AIR-3078-S01",
+    "timestamp": "2025-11-11T04:05:00Z",
+    "source": "iaq-node-1",
+    "metrics": {
+      "pm25": 32.4,
+      "pm10": 58.1,
+      "humidity": 62.3,
+      "temperature": 26.4
+    }
+  }'
+```
+
+Status thresholds (used to color the dashboard ThermostatAir):
+
+- **PM 2.5** – Medium at ≥25 µg/m³, High at ≥50 µg/m³.
+- **PM 10** – Medium at ≥50 µg/m³, High at ≥120 µg/m³.
+
+Response:
+
+```json
+{
+  "ok": true,
+  "device": {
+    "id": "uuid",
+    "site_id": "3078000",
+    "model": "AIR-3078-S01"
+  },
+  "reading": {
+    "pm25": 32.4,
+    "pm10": 58.1,
+    "humidity": 62.3,
+    "temperature": 26.4,
+    "status": {
+      "pm25": "medium",
+      "pm10": "medium"
+    },
+    "capturedAt": "2025-11-11T04:05:00.000Z",
+    "updatedAt": "2025-11-11T04:05:01.102Z",
+    "source": "iaq-node-1"
+  }
+}
+```
+
+The UI consumes these readings via `GET /site/:siteId/air/devices` (JWT required), which returns every registered air sensor plus its latest `meta.air.lastReading`.
+
+### 2.6 Update Water Meter Telemetry (Webhook)
+
+This webhook mirrors the air-sensor flow but writes into `device.meta.water`. The Devices page (`devices?type=watermeter`) reads these fields to hydrate the Thermostat widgets, KPI cards, and the three ApexCharts (`WaterStackedChart`, `WaterMultiRadial`, `WaterAreaStackedChart`).
+
+- **Method / URL**: `POST /webhooks/water-meters`
+- **Auth**: none (protect the endpoint at the gateway/reverse proxy)
+- **Headers** (same contract as `/webhooks/air-sensors`; supply at least `X-Device-Key` so the server can resolve the device/site automatically):
+  - `X-Device-Key` — resolves `devices.model`
+  - `X-Device-SN`
+  - `X-Device-IP`
+- **Body Fields**
+
+  | Field | Type | Required | Notes |
+  |-------|------|----------|-------|
+  | `siteId` | string | no | Optional fallback only when header/device lookup fails (same behavior as the air webhook). |
+  | `deviceId` / `deviceKey` / `sn` | string | conditional | Provide only if you cannot send headers (the server still prefers `X-Device-Key`). |
+  | `timestamp` | ISO string | no | When the readings were sampled. Defaults to server time. |
+  | `domestic` | object | yes | Instant values for **น้ำอุปโภค** (feeds the left Thermostat + KPI cards). |
+  | `drinking` | object | yes | Instant values for **น้ำบริโภค** (feeds the right Thermostat + KPI cards). |
+  | `totals` | object | yes | Daily / monthly / yearly liters for both domestic & drinking cards on the sidebar. |
+  | `stackedSeries` | object | no | Data source for `WaterStackedChart` (12 categories + up to 3 series). |
+  | `radial` | object | no | Data source for `WaterMultiRadial` (total + 3-lane split). |
+  | `usageTimeline` | array | no | Array of Apex series for `WaterAreaStackedChart` (stacked area view). |
+
+  **`domestic` / `drinking` object fields**
+
+  | Field | Type | Required | Notes |
+  |-------|------|----------|-------|
+  | `ph` | number | yes | Latest pH value (displayed on KPI tile + Thermostat label). |
+  | `flowRateLpm` | number | required for `domestic` | Liters per minute (goes to the left KPI card). Not needed for `drinking`. |
+  | `tdsPpm` | number | required for `drinking` | Dissolved solids in ppm (right KPI). Optional for `domestic`. |
+  | `consumptionLiters` | number | yes | Current aggregate consumption for the active window (FE defaults to `12:00 AM → 11:30 PM` until live scheduling is wired). Used as the Thermostat `initialValue`. |
+  | `maxLitersLabel` | string | no | Overrides the Thermostat `maxLabel` (defaults to `devices.waterMeter.ofMl`). |
+
+  **`totals` object**
+
+  ```json
+  {
+    "domestic": { "today": 0, "month": 0, "year": 0 },
+    "drinking": { "today": 0, "month": 0, "year": 0 }
+  }
+  ```
+
+  Each value is in liters and maps 1:1 to the six sidebar cards (บริโภค today/month/year, อุปโภค today/month/year).
+
+  **`stackedSeries` object**
+
+  ```json
+  {
+    "categories": ["Jan","Feb",...,"Dec"],
+    "series": [
+      { "name": "Domestic", "data": [/* 12 monthly totals */] },
+      { "name": "Drinking", "data": [/* 12 values */] },
+      { "name": "Reclaimed", "data": [/* optional */] }
+    ]
+  }
+  ```
+
+  Values feed directly into the `<WaterStackedChart categories={} series={} />` props.
+
+  **`radial` object**
+
+  ```json
+  {
+    "totalLiters": 0,
+    "labels": ["Domestic","Drinking","Reclaimed"],
+    "values": [300, 120, 40]
+  }
+  ```
+
+  `totalLiters` becomes the center number, while `labels` + `values` populate `WaterMultiRadial`.
+
+  **`usageTimeline` array**
+
+  Provide an array compatible with Apex stacked area series (the same shape already used in `WaterAreaStackedChart`):
+
+  ```json
+  [
+    { "name": "Domestic", "data": [60, 90, ...] },
+    { "name": "Drinking", "data": [40, 70, ...] },
+    { "name": "Reclaimed", "data": [20, 30, ...] }
+  ]
+  ```
+
+  Categories default to months, but you can send an optional `timelineCategories` array to override the X-axis labels if you later extend the chart props.
+
+Example webhook call:
+
+```bash
+curl -X POST http://localhost:3000/webhooks/water-meters \
+  -H "Content-Type: application/json" \
+  -H "X-Device-Key: WATER-3078-A01" \
+  -d '{
+    "deviceKey": "WATER-3078-A01",
+    "timestamp": "2025-11-11T04:05:00Z",
+    "domestic": { "ph": 7.2, "flowRateLpm": 38.5, "consumptionLiters": 960 },
+    "drinking": { "ph": 6.8, "tdsPpm": 118, "consumptionLiters": 420 },
+    "totals": {
+      "domestic": { "today": 960, "month": 18640, "year": 104800 },
+      "drinking": { "today": 420, "month": 8200, "year": 50210 }
+    },
+    "stackedSeries": {
+      "categories": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+      "series": [
+        { "name": "Domestic", "data": [820,910,960,880,1020,990,1040,980,950,970,1010,960] },
+        { "name": "Drinking", "data": [350,370,420,380,430,410,460,420,415,430,440,420] },
+        { "name": "Reclaimed", "data": [70,60,55,62,58,60,65,63,61,59,57,54] }
+      ]
+    },
+    "radial": {
+      "totalLiters": 1380,
+      "labels": ["Domestic","Drinking","Reclaimed"],
+      "values": [960, 420, 0]
+    },
+    "usageTimeline": [
+      { "name": "Domestic", "data": [60,90,120,140,250,300,260,340,360,320,380,460] },
+      { "name": "Drinking", "data": [360,380,420,430,450,470,440,500,520,510,530,560] },
+      { "name": "Reclaimed", "data": [540,560,590,600,650,700,660,740,780,760,800,840] }
+    ]
+  }'
+```
+
+On success the handler should upsert the target device and persist:
+
+```json
+{
+  "meta": {
+    "water": {
+      "lastReading": {
+        "timestamp": "2025-11-11T04:05:00Z",
+        "domestic": { "ph": 7.2, "flowRateLpm": 38.5, "consumptionLiters": 960 },
+        "drinking": { "ph": 6.8, "tdsPpm": 118, "consumptionLiters": 420 }
+      },
+      "totals": { ... },
+      "charts": {
+        "stackedSeries": { ... },
+        "radial": { ... },
+        "usageTimeline": [ ... ]
+      }
+    }
+  }
+}
+```
+
+The future `GET /site/:siteId/water/devices` (JWT) will mirror `getAirDevices`: it should return every water meter device with its `meta.water` payload so the FE can hydrate without additional joins.
 
 ---
 
