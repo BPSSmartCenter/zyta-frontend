@@ -1,5 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { useMatch } from "react-router-dom";
 import type { DateValue } from "../components/DateInput";
 import { today as defaultToday } from "../components/Dashboard/dashboard.constants";
 import { me as apiMe } from "../api/user";
@@ -27,6 +28,9 @@ const FiltersContext = React.createContext<FiltersState | undefined>(undefined);
 
 export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation(["dashboard"]);
+  const matchScopedUid = useMatch("/u/:uid/*");
+  const matchRootUid = useMatch("/u/:uid");
+  const activeUid = matchScopedUid?.params?.uid ?? matchRootUid?.params?.uid ?? null;
 
   const [date, setDateState] = React.useState<DateValue>(defaultToday);
   const [dateTouched, setDateTouched] = React.useState<boolean>(false);
@@ -73,6 +77,14 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch role + sites to build dropdown options; include "All" for admin
   React.useEffect(() => {
+    if (!activeUid) {
+      setSiteOptions([
+        { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
+      ]);
+      setSelectedSite("all");
+      return;
+    }
+
     (async () => {
       try {
         const currentUser = await apiMe();
@@ -140,7 +152,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, i18n.language, fetchSitesFromApi, normalizeSiteToOption]);
+  }, [t, i18n.language, fetchSitesFromApi, normalizeSiteToOption, activeUid]);
 
   const value = React.useMemo<FiltersState>(
     () => ({
