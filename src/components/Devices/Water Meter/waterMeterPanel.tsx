@@ -373,9 +373,12 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   });
 
   useEffect(() => {
-    let cancelled = false;
+    if (!siteTargets.length) return;
 
-    (async () => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const fetchDevices = async () => {
       try {
         const aggregated: WaterDeviceRecord[] = [];
 
@@ -413,13 +416,22 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       } catch (err) {
         if (cancelled) return;
         console.error("[WaterMeterPanel] failed to load water devices", err);
+      } finally {
+        if (!cancelled) {
+          timer = window.setTimeout(fetchDevices, 5000);
+        }
       }
-    })();
+    };
+
+    fetchDevices();
 
     return () => {
       cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
+      }
     };
-  }, [siteTargets]);
+  }, [siteTargetsKey]);
 
   useEffect(() => {
     if (!snapshot) {
