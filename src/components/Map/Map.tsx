@@ -76,6 +76,7 @@ export default function Map({
   // Guard to avoid resetting view on container resize
   const resizingGuardRef = useRef(false);
 
+  const [mapReady, setMapReady] = useState(false);
   const [canZoomOut, setCanZoomOut] = useState(false);
 
   const zoomOutWrapRef = useRef<HTMLDivElement | null>(null);
@@ -703,6 +704,7 @@ export default function Map({
     });
 
     mapRef.current = map;
+    setMapReady(true);
 
     ensureGrayscaleCss();
 
@@ -858,6 +860,7 @@ export default function Map({
       map.remove();
 
       mapRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
@@ -1181,7 +1184,7 @@ export default function Map({
         isDrillingRef.current = false;
       });
     }
-  }, [focusProvince]);
+  }, [focusProvince, focusSiteCenter, mapReady]);
 
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1190,21 +1193,22 @@ export default function Map({
   };
 
   useEffect(() => {
-    if (!focusSiteCenter) return;
+    if (!mapReady || !focusSiteCenter) return;
     // ใช้ zoomToLatLng เพื่อให้พฤติกรรมเหมือนคลิกที่ marker:
     // - ถอดชั้นจังหวัด/อำเภอ/ตำบล
     // - ปิด dim/mask ตามตรรกะเดิม
     const ll = L.latLng(focusSiteCenter.lat, focusSiteCenter.lng);
     zoomToLatLng(ll);
-  }, [focusSiteCenter]);
+  }, [focusSiteCenter, mapReady]);
 
   // เมื่อยกเลิก focusSiteCenter (เช่น เลือก "ทั้งหมด") ให้กู้คืนชั้น overlay กลับเป็นมุมมองประเทศเสมอ
   useEffect(() => {
+    if (!mapReady) return;
     if (focusSiteCenter) return;
     // Skip auto-reset while resizing
     if (resizingGuardRef.current) return;
     resetToCountry(true);
-  }, [focusSiteCenter]);
+  }, [focusSiteCenter, mapReady]);
 
   /* lockZoomOut -> minZoom guard */
   useEffect(() => {
@@ -1217,7 +1221,7 @@ export default function Map({
       // restore global min
       map.setMinZoom(2);
     }
-  }, [lockZoomOut]);
+  }, [lockZoomOut, mapReady]);
 
   return (
     <div

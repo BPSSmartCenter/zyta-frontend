@@ -10,6 +10,8 @@ import { useUserPath } from "../routes/useUserPath";
 import { logout as apiLogout } from "../api/auth";
 import { me as apiMe } from "../api/user";
 import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
+
+const DISABLED_DEVICE_TYPES = new Set<string>(["cctv"]);
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
 
 /** breakpoint hook */
@@ -533,22 +535,24 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       <ul className="pt-1 ps-7 space-y-1">
                         {matched.map((it) => {
                           const zero = getCountForType(inventoryCounts as any, it.key as any) <= 0;
+                          const hardDisabled = DISABLED_DEVICE_TYPES.has(it.key);
+                          const disabled = zero || hardDisabled;
                           return (
                             <li key={it.key}>
                               <a
-                                aria-disabled={zero}
+                                aria-disabled={disabled}
                                 onClick={() => {
-                                  if (zero) return;
+                                  if (disabled) return;
                                   goSiteOrGlobal(`/devices?type=${it.key}`);
                                 }}
                                 className={cx(
                                   "block py-2 px-2.5 text-sm rounded-lg",
-                                  zero
+                                  disabled
                                     ? "opacity-40 cursor-not-allowed pointer-events-none"
                                     : "cursor-pointer",
                                   active.devicesType(it.key)
                                     ? "bg-gray-100 text-gray-900"
-                                    : zero
+                                    : disabled
                                     ? ""
                                     : "hover:bg-gray-100"
                                 )}
