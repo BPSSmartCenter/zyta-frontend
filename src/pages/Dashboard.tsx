@@ -243,14 +243,6 @@ export default function Dashboard() {
 
   const rawAlertEvents = alertEventSource;
 
-  React.useEffect(() => {
-    console.group("rawAlertEvents");
-    rawAlertEvents.forEach((item) =>
-      console.log(item.titleKey, item.site, item.occurredAt, (item.meta as any)?.rawId, item.id)
-    );
-    console.groupEnd();
-  }, [rawAlertEvents]);
-
   const filteredWellBeginNotis = React.useMemo(() => {
     const q = searchWB.toLowerCase().trim();
     return wellBeingSource
