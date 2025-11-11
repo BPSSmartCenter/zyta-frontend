@@ -36,6 +36,32 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   ]);
   const [searchSite, setSearchSite] = React.useState("");
 
+  const normalizeSiteToOption = React.useCallback((site: any): SiteOption | null => {
+    if (!site || typeof site !== "object") return null;
+    const rawLabel = site.name ?? site.code ?? site.id ?? "";
+    const rawValue = site.code ?? site.id ?? site.name ?? "";
+    const label = rawLabel ? String(rawLabel).trim() : "";
+    const value = rawValue ? String(rawValue).trim() : "";
+    if (!value) return null;
+    return { label: label || value, value };
+  }, []);
+
+  const fetchSitesFromApi = React.useCallback(async (): Promise<SiteOption[]> => {
+    try {
+      const sitesResp = await listSites();
+      const items = Array.isArray(sitesResp?.items)
+        ? sitesResp.items
+        : Array.isArray(sitesResp)
+        ? sitesResp
+        : [];
+      return items
+        .map((s: any) => normalizeSiteToOption(s))
+        .filter((opt: SiteOption | null): opt is SiteOption => Boolean(opt));
+    } catch {
+      return [];
+    }
+  }, [normalizeSiteToOption]);
+
   const setDate = React.useCallback((v: DateValue) => {
     setDateState(v);
     setDateTouched(true);
@@ -50,25 +76,34 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const currentUser = await apiMe();
-        let sitesResp: any = null;
-        try {
-          sitesResp = await listSites();
-        } catch (e) {
-          sitesResp = null;
-        }
-
-        const items = Array.isArray(sitesResp?.items)
-          ? sitesResp.items
-          : Array.isArray(sitesResp)
-          ? sitesResp
+        const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
+        const assignedOptions = Array.isArray(currentUser?.sites)
+          ? currentUser.sites
+              .map((s: any) => normalizeSiteToOption(s))
+              .filter((opt: SiteOption | null): opt is SiteOption => Boolean(opt))
           : [];
 
-        const baseOptions: SiteOption[] = items.map((s: any) => ({
-          label: String(s?.name ?? s?.code ?? ""),
-          value: String(s?.code ?? s?.id ?? s?.name ?? ""),
-        }));
+        let baseOptions: SiteOption[] = [];
+        if (isAdmin) {
+          baseOptions = await fetchSitesFromApi();
+        } else if (assignedOptions.length > 0) {
+          baseOptions = assignedOptions;
+        } else {
+          baseOptions = await fetchSitesFromApi();
+        }
 
-        const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
+        const uniqueOptions = (() => {
+          const seen = new Set<string>();
+          const list: SiteOption[] = [];
+          for (const opt of baseOptions) {
+            const key = opt.value.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            list.push(opt);
+          }
+          return list;
+        })();
+
         const opts: SiteOption[] = isAdmin
           ? [
               {
@@ -76,22 +111,25 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
                 value: "all",
                 i18nKey: "navbar.allSites",
               },
-              ...baseOptions,
+              ...uniqueOptions,
             ]
-          : baseOptions;
+          : uniqueOptions;
 
         setSiteOptions(opts);
 
         // Default selected site: admin → all, others → first available
         setSelectedSite((prev) => {
           if (isAdmin) return "all";
+          if (!uniqueOptions.length) {
+            return prev && prev !== "all" ? prev : "";
+          }
           if (!prev || prev === "all") {
-            return baseOptions[0]?.value ?? prev;
+            return uniqueOptions[0]?.value ?? prev;
           }
           // keep previous if still exists
-          return baseOptions.some((o) => o.value === prev)
+          return uniqueOptions.some((o) => o.value === prev)
             ? prev
-            : baseOptions[0]?.value ?? prev;
+            : uniqueOptions[0]?.value ?? prev;
         });
       } catch (e) {
         // fallback to only "all" if any failure
@@ -102,7 +140,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, i18n.language]);
+  }, [t, i18n.language, fetchSitesFromApi, normalizeSiteToOption]);
 
   const value = React.useMemo<FiltersState>(
     () => ({

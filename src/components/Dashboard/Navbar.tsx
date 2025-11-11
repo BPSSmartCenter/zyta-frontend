@@ -55,9 +55,23 @@ export default function Navbar({
     [t, i18n.language]
   );
 
+  const canFilterSites = siteOptions.length > 1;
+  const activeSiteOption = React.useMemo(
+    () =>
+      siteOptions.find((opt) => opt.value === selectedSite) ??
+      siteOptions[0] ??
+      null,
+    [siteOptions, selectedSite]
+  );
+  const lockedSiteLabel = React.useMemo(
+    () =>
+      activeSiteOption ? getSiteLabel(activeSiteOption) : t("navbar.allSites"),
+    [activeSiteOption, getSiteLabel, t]
+  );
+
   const filteredSiteMenu = React.useMemo(() => {
     const q = (searchSite || "").toLowerCase().trim();
-    if (!q) return [];
+    if (!q || !canFilterSites) return [];
     // แปลงเป็นเมนู: label แสดงชื่อ, value เก็บตัว value จริง
     return siteOptions
       .filter(
@@ -66,7 +80,7 @@ export default function Navbar({
       )
       .slice(0, 50) // กันยาวเกิน
       .map((s) => ({ label: s.label, value: s.value }));
-  }, [searchSite, siteOptions]);
+  }, [searchSite, siteOptions, canFilterSites]);
 
   return (
     <div className="bg-[#FFFFFF] w-full rounded-lg border-b border-none">
@@ -86,95 +100,102 @@ export default function Navbar({
 
         {/* Desktop controls */}
         <div className="hidden lg-1024:flex items-center gap-6">
-          <SearchInput
-            value={searchSite}
-            placeholder={t("navbar.searchPlaceholder")}
-            onChange={setSearchSite}
-            className="min-w-[140px]"
-            resultMenu={filteredSiteMenu}
-            onSelect={(item) => {
-              // เมื่อเลือกจากเมนู → setSelectedSite และเติมค่าในช่องค้นหาให้สวยๆ
-              const label = typeof item === "string" ? item : item.label;
-              const val =
-                typeof item === "string"
-                  ? item
-                  : String(item.value ?? item.label);
-              setSelectedSite(val);
-              setSearchSite(label);
-            }}
-          />
-          <Dropdown
-            options={siteOptions as any}
-            value={selectedSite}
-            onChange={setSelectedSite}
-          >
-            {({
-              open,
-              selected,
-              options,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-            }) => {
-              const siteOptionList = options as SiteOption[];
-              const fallbackOption =
-                selected ??
-                siteOptionList.find((opt) => opt.value === selectedSite) ??
-                siteOptionList[0];
-              const selectedLabel = fallbackOption
-                ? getSiteLabel(fallbackOption)
-                : t("navbar.allSites");
+          {canFilterSites ? (
+            <>
+              <SearchInput
+                value={searchSite}
+                placeholder={t("navbar.searchPlaceholder")}
+                onChange={setSearchSite}
+                className="min-w-[140px]"
+                resultMenu={filteredSiteMenu}
+                onSelect={(item) => {
+                  const label = typeof item === "string" ? item : item.label;
+                  const val =
+                    typeof item === "string"
+                      ? item
+                      : String(item.value ?? item.label);
+                  setSelectedSite(val);
+                  setSearchSite(label);
+                }}
+              />
+              <Dropdown
+                options={siteOptions as any}
+                value={selectedSite}
+                onChange={setSelectedSite}
+              >
+                {({
+                  open,
+                  selected,
+                  options,
+                  getButtonProps,
+                  getMenuProps,
+                  getItemProps,
+                }) => {
+                  const siteOptionList = options as SiteOption[];
+                  const fallbackOption =
+                    selected ??
+                    siteOptionList.find((opt) => opt.value === selectedSite) ??
+                    siteOptionList[0];
+                  const selectedLabel = fallbackOption
+                    ? getSiteLabel(fallbackOption)
+                    : t("navbar.allSites");
 
-              return (
-                <>
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "inline-flex h-10 min-w-[105px] items-center justify-around rounded-md border border-gray-300 px-1 text-sm hover:cursor-pointer focus:bg-gray-50",
-                    })}
-                  >
-                    <span className="truncate">{selectedLabel}</span>
-                    <i className="material-icons leading-none">
-                      {open ? "arrow_drop_up" : "arrow_drop_down"}
-                    </i>
-                  </button>
+                  return (
+                    <>
+                      <button
+                        {...getButtonProps({
+                          className:
+                            "inline-flex h-10 min-w-[105px] items-center justify-around rounded-md border border-gray-300 px-1 text-sm hover:cursor-pointer focus:bg-gray-50",
+                        })}
+                      >
+                        <span className="truncate">{selectedLabel}</span>
+                        <i className="material-icons leading-none">
+                          {open ? "arrow_drop_up" : "arrow_drop_down"}
+                        </i>
+                      </button>
 
-                  <div
-                    {...getMenuProps({
-                      className: [
-                        "absolute z-10 mt-12 min-w-[200px] rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap",
-                        "transition-all duration-150",
-                        open
-                          ? "opacity-100 translate-y-0 pointer-events-auto"
-                          : "opacity-0 -translate-y-1 pointer-events-none",
-                        "max-h-80 overflow-y-auto",
-                      ].join(" "),
-                    })}
-                  >
-                    {siteOptionList.map((opt) => {
-                      const active =
-                        opt.value === (selected?.value ?? selectedSite);
-                      return (
-                        <button
-                          key={opt.value}
-                          {...getItemProps(opt, {
-                            className: [
-                              "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                              active
-                                ? "bg-gray-100 text-gray-900 font-medium"
-                                : "text-gray-800",
-                            ].join(" "),
-                          })}
-                        >
-                          {getSiteLabel(opt)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              );
-            }}
-          </Dropdown>
+                      <div
+                        {...getMenuProps({
+                          className: [
+                            "absolute z-10 mt-12 min-w-[200px] rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap",
+                            "transition-all duration-150",
+                            open
+                              ? "opacity-100 translate-y-0 pointer-events-auto"
+                              : "opacity-0 -translate-y-1 pointer-events-none",
+                            "max-h-80 overflow-y-auto",
+                          ].join(" "),
+                        })}
+                      >
+                        {siteOptionList.map((opt) => {
+                          const active =
+                            opt.value === (selected?.value ?? selectedSite);
+                          return (
+                            <button
+                              key={opt.value}
+                              {...getItemProps(opt, {
+                                className: [
+                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
+                                  active
+                                    ? "bg-gray-100 text-gray-900 font-medium"
+                                    : "text-gray-800",
+                                ].join(" "),
+                              })}
+                            >
+                              {getSiteLabel(opt)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                }}
+              </Dropdown>
+            </>
+          ) : (
+            <div className="min-w-[160px] rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
+              {lockedSiteLabel}
+            </div>
+          )}
 
           <DatePicker value={date} onChange={setDate} />
 
@@ -248,104 +269,110 @@ export default function Navbar({
           <div className="px-4 pb-4">
             <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Search */}
-                <div className="col-span-1">
-                  <SearchInput
-                    value={searchSite}
-                    placeholder={t("navbar.searchPlaceholder")}
-                    onChange={setSearchSite}
-                    className="min-w-[140px]"
-                    resultMenu={filteredSiteMenu}
-                    onSelect={(item) => {
-                      // เมื่อเลือกจากเมนู → setSelectedSite และเติมค่าในช่องค้นหาให้สวยๆ
-                      const label =
-                        typeof item === "string" ? item : item.label;
-                      const val =
-                        typeof item === "string"
-                          ? item
-                          : String(item.value ?? item.label);
-                      setSelectedSite(val);
-                      setSearchSite(label);
-                    }}
-                  />
-                </div>
+                {canFilterSites ? (
+                  <>
+                    {/* Search */}
+                    <div className="col-span-1">
+                      <SearchInput
+                        value={searchSite}
+                        placeholder={t("navbar.searchPlaceholder")}
+                        onChange={setSearchSite}
+                        className="min-w-[140px]"
+                        resultMenu={filteredSiteMenu}
+                        onSelect={(item) => {
+                          const label = typeof item === "string" ? item : item.label;
+                          const val =
+                            typeof item === "string"
+                              ? item
+                              : String(item.value ?? item.label);
+                          setSelectedSite(val);
+                          setSearchSite(label);
+                        }}
+                      />
+                    </div>
 
-                {/* Site dropdown */}
-                <div className="col-span-1">
-                  <Dropdown
-                    options={siteOptions as any}
-                    value={selectedSite}
-                    onChange={setSelectedSite}
-                  >
-                    {({
-                      open,
-                      selected,
-                      options,
-                      getButtonProps,
-                      getMenuProps,
-                      getItemProps,
-                    }) => {
-                      const siteOptionList = options as SiteOption[];
-                      const fallbackOption =
-                        selected ??
-                        siteOptionList.find(
-                          (opt) => opt.value === selectedSite
-                        ) ??
-                        siteOptionList[0];
-                      const selectedLabel = fallbackOption
-                        ? getSiteLabel(fallbackOption)
-                        : t("navbar.allSites");
-                      return (
-                        <div className="relative inline-block w-full">
-                          <button
-                            {...getButtonProps({
-                              className:
-                                "inline-flex h-10 min-w-[105px] items-center justify-between rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50",
-                            })}
-                          >
-                            <span className="truncate">{selectedLabel}</span>
-                            <i className="material-icons leading-none">
-                              {open ? "arrow_drop_up" : "arrow_drop_down"}
-                            </i>
-                          </button>
+                    {/* Site dropdown */}
+                    <div className="col-span-1">
+                      <Dropdown
+                        options={siteOptions as any}
+                        value={selectedSite}
+                        onChange={setSelectedSite}
+                      >
+                        {({
+                          open,
+                          selected,
+                          options,
+                          getButtonProps,
+                          getMenuProps,
+                          getItemProps,
+                        }) => {
+                          const siteOptionList = options as SiteOption[];
+                          const fallbackOption =
+                            selected ??
+                            siteOptionList.find((opt) => opt.value === selectedSite) ??
+                            siteOptionList[0];
+                          const selectedLabel = fallbackOption
+                            ? getSiteLabel(fallbackOption)
+                            : t("navbar.allSites");
+                          return (
+                            <div className="relative inline-block w-full">
+                              <button
+                                {...getButtonProps({
+                                  className:
+                                    "inline-flex h-10 min-w-[105px] items-center justify-between rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50",
+                                })}
+                              >
+                                <span className="truncate">{selectedLabel}</span>
+                                <i className="material-icons leading-none">
+                                  {open ? "arrow_drop_up" : "arrow_drop_down"}
+                                </i>
+                              </button>
 
-                          <div
-                            {...getMenuProps({
-                              className: [
-                                "absolute z-50 mt-2 min-w-[200px] whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md",
-                                "transition-all duration-150",
-                                open
-                                  ? "opacity-100 translate-y-0 pointer-events-auto"
-                                  : "opacity-0 -translate-y-1 pointer-events-none",
-                                "max-h-80 overflow-y-auto",
-                              ].join(" "),
-                            })}
-                          >
-                            {siteOptionList.map((opt) => {
-                              const active =
-                                opt.value === (selected?.value ?? selectedSite);
-                              return (
-                                <button
-                                  key={opt.value}
-                                  {...getItemProps(opt, {
-                                    className: [
-                                      "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                                      active
-                                        ? "bg-gray-100 text-gray-900 font-medium"
-                                        : "text-gray-800",
-                                    ].join(" "),
-                                  })}
-                                >
-                                  {getSiteLabel(opt)}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  </Dropdown>
-                </div>
+                              <div
+                                {...getMenuProps({
+                                  className: [
+                                    "absolute z-50 mt-2 min-w-[200px] whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md",
+                                    "transition-all duration-150",
+                                    open
+                                      ? "opacity-100 translate-y-0 pointer-events-auto"
+                                      : "opacity-0 -translate-y-1 pointer-events-none",
+                                    "max-h-80 overflow-y-auto",
+                                  ].join(" "),
+                                })}
+                              >
+                                {siteOptionList.map((opt) => {
+                                  const active =
+                                    opt.value === (selected?.value ?? selectedSite);
+                                  return (
+                                    <button
+                                      key={opt.value}
+                                      {...getItemProps(opt, {
+                                        className: [
+                                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
+                                          active
+                                            ? "bg-gray-100 text-gray-900 font-medium"
+                                            : "text-gray-800",
+                                        ].join(" "),
+                                      })}
+                                    >
+                                      {getSiteLabel(opt)}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }}
+                      </Dropdown>
+                    </div>
+                  </>
+                ) : (
+                  <div className="col-span-1 md:col-span-2">
+                    <div className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-medium text-gray-700">
+                      {lockedSiteLabel}
+                    </div>
+                  </div>
+                )}
 
                 {/* Date picker */}
                 <div className="col-span-1 w-full">
