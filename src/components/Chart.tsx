@@ -2,6 +2,7 @@
 import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
+import type { AxisSeries } from "../types/apexSeries";
 
 // ดึง helpers + data series
 import { niceUp, EVENT_OPTIONS } from "./Dashboard/dashboard.constants";
@@ -635,7 +636,7 @@ export default function Chart({
 // ── 1) Stacked Columns (เดิม)
 export type WaterStackedProps = {
   categories?: string[];
-  series?: ApexAxisChartSeries;
+  series?: AxisSeries;
   height?: number | string;
   title?: string;
 };
@@ -661,7 +662,7 @@ export function WaterStackedChart({
     "Dec",
   ];
 
-  const data: ApexAxisChartSeries = series ?? [
+  const data: AxisSeries = series ?? [
     {
       name: "Series 1",
       data: [340, 400, 280, 300, 360, 390, 350, 360, 340, 380, 420, 320],
@@ -759,7 +760,7 @@ export function WaterStackedChart({
 /* ── 2) NEW: Stacked Area Chart (สำหรับ Water) */
 export type WaterAreaStackedProps = {
   categories?: string[];
-  series?: ApexAxisChartSeries;
+  series?: AxisSeries;
   height?: number | string;
   yTitle?: string;
   xTitle?: string;
@@ -788,7 +789,7 @@ export function WaterAreaStackedChart({
   ];
 
   // mock ใกล้เคียงภาพ: เส้นเข้มล่างสุด ไล่โทนอ่อนไปด้านบน
-  const data: ApexAxisChartSeries = series ?? [
+  const data: AxisSeries = series ?? [
     {
       name: "Series 1",
       data: [60, 90, 120, 140, 250, 300, 260, 340, 360, 320, 380, 460],
@@ -906,7 +907,7 @@ export function WaterAreaStackedChart({
 /** Basic Line Chart สำหรับ Electric (2 เส้น, โทนฟ้า/เขียว, smooth, grid จาง) */
 export type ElectricLineBasicProps = {
   categories?: string[];
-  series?: ApexAxisChartSeries;
+  series?: AxisSeries;
   height?: number | string;
 };
 
@@ -927,7 +928,7 @@ export function ElectricLineBasicChart({
     "17:22",
   ];
 
-  const data: ApexAxisChartSeries = series ?? [
+  const data: AxisSeries = series ?? [
     {
       name: "Traffic",
       data: [120, 60, 140, 80, 180, 40, 170, 90, 160],
@@ -994,7 +995,107 @@ export function ElectricLineBasicChart({
   );
 }
 
+/* ── 3) Billing Monthly line (single-series smooth line) */
+export type MonthlyChartProps = {
+  categories?: string[];
+  series?: AxisSeries;
+  height?: number | string;
+};
+
+export function MonthlyChart({
+  categories,
+  series,
+  height = 240,
+}: MonthlyChartProps) {
+  const cats =
+    categories ??
+    ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
+
+  const data: AxisSeries =
+    series ??
+    [
+      {
+        name: "Energy",
+        data: [9, 12, 8, 14, 7, 15, 9, 11, 7, 10, 9, 11],
+      },
+    ];
+
+  const values = data.flatMap((s) =>
+    s.data.map((v) => (typeof v === "number" ? v : 0))
+  );
+  const maxVal = niceUp(Math.max(...values) * 1.1, 5);
+
+  const options: ApexOptions = {
+    chart: {
+      type: "line",
+      toolbar: { show: false },
+      animations: { enabled: true },
+      fontFamily: "Inter, ui-sans-serif, system-ui",
+    },
+    colors: ["#3B82F6"],
+    stroke: { curve: "smooth", width: 3 },
+    markers: {
+      size: 5,
+      strokeColors: "#ffffff",
+      strokeWidth: 2,
+      hover: { sizeOffset: 2 },
+    },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.7,
+        opacityTo: 0.7,
+        stops: [0, 0, 0],
+      },
+    },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories: cats,
+      axisTicks: { show: false },
+      axisBorder: { show: false },
+      labels: { style: { colors: "#94A3B8", fontSize: "12px" } },
+    },
+    yaxis: {
+      min: 0,
+      max: maxVal,
+      tickAmount: 5,
+      labels: { style: { colors: "#94A3B8", fontSize: "12px" } },
+    },
+    grid: {
+      borderColor: "rgba(0,0,0,0.08)",
+      strokeDashArray: 3,
+      yaxis: { lines: { show: true } },
+      xaxis: { lines: { show: false } },
+      padding: { left: 10, right: 10 },
+    },
+    tooltip: {
+      theme: "light",
+      shared: false,
+      custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+        const month = w.globals.categoryLabels[dataPointIndex];
+        const value = series[seriesIndex][dataPointIndex];
+        const cost = (value * 4.39).toFixed(2);
+        return `<div style="padding:8px 12px;font-size:12px;color:#0f172a">${month}<br/>${value.toFixed(
+          1
+        )} kWh<br/>${cost} THB</div>`;
+      },
+    },
+    legend: { show: false },
+  };
+
+  return (
+    <ReactApexChart
+      type="line"
+      height={height}
+      options={options}
+      series={data}
+    />
+  );
+}
+
 /* ============================ Notes ============================
 - DEFAULT export (Chart) ไม่ถูกแก้ไข เพื่อกันกระทบ Snapshot เดิม
 - เพิ่ม named export: WaterStackedChart, WaterAreaStackedChart สำหรับ Water
+  และ MonthlyChart สำหรับ Billing overview
 ================================================================ */

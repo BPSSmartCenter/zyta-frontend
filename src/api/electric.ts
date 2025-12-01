@@ -35,3 +35,19 @@ export async function getElectricSeries(
   const { data } = await api.get(`/site/${encodeURIComponent(siteCode)}/electric/series?${params.toString()}`);
   return data;
 }
+
+export type RegisterElectricInput = {
+  siteId: string;
+  category: "METER" | "INVERTER" | "GATEWAY" | "SENSOR";
+  sn: string;
+  ipAddress?: string;
+  status?: "online" | "offline" | "maintenance";
+  name?: string;
+};
+
+export async function registerElectricDevice(input: RegisterElectricInput) {
+  const { siteId, ...payload } = input;
+  const url = `/site/${encodeURIComponent(siteId)}/electric/devices/register`;
+  const { data } = await api.post(url, payload);
+  return data;
+}

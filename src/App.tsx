@@ -9,10 +9,14 @@ import {
   FaceRecognize,
   Devices,
   UserManagement,
+  SiteManagement,
   VerifyEmail,
   Forgot,
   Reset,
-  // ElectricMeter,
+  ElectricMeter,
+  BillingOverview,
+  GenerateBillForm,
+  BillPdfPreview,
 } from "./pages";
 import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
@@ -39,7 +43,6 @@ function App() {
               <Routes>
                 {/* public */}
                 <Route path="/" element={<RootLoginOrDashboard />} />
-                {/* <Route path="/" element={<ElectricMeter />} /> */}
                 <Route path="/register" element={<Register />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot" element={<Forgot />} />
@@ -55,13 +58,22 @@ function App() {
                 <Route element={<RequireAuth />}>
                   <Route path="/u/:uid">
                     <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="electric" element={<BillingOverview />} />
+                    <Route path="electric/meter" element={<ElectricMeter />} />
+                    <Route path="electric/generate-bill" element={<GenerateBillForm />} />
+                    <Route path="electric/generate-bill/preview" element={<BillPdfPreview />} />
                     <Route path="alert" element={<TotalAlert />} />
                     <Route path="facerec" element={<FaceRecognize />} />
                     <Route path="devices" element={<Devices />} />
                     <Route path="usermanage" element={<UserManagement />} />
+                    <Route path="sitemanage" element={<SiteManagement />} />
                     {/* site-scoped routes */}
                     <Route path="site/:siteCode">
                       <Route path="dashboard" element={<Dashboard />} />
+                      <Route path="electric" element={<BillingOverview />} />
+                      <Route path="electric/meter" element={<ElectricMeter />} />
+                      <Route path="electric/generate-bill" element={<GenerateBillForm />} />
+                      <Route path="electric/generate-bill/preview" element={<BillPdfPreview />} />
                       <Route path="alert" element={<TotalAlert />} />
                       <Route path="devices" element={<Devices />} />
                       <Route path="facerec" element={<FaceRecognize />} />

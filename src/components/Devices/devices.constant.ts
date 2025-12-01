@@ -10,6 +10,7 @@ import {
   windImage,
   windSelected,
 } from "../../assets";
+import type { AxisSeries } from "../../types/apexSeries";
 
 export const GREEN_BOX_SVG =
   "data:image/svg+xml;utf8," +
@@ -110,7 +111,7 @@ export const ELECTRIC_CONVERSIONS_LIST: number[] = ELECTRIC_DAYS.map(
 );
 
 /** ซีรีส์กราฟเส้นของแต่ละวัน (ตัวอย่าง mock) */
-export const ELECTRIC_DAY_SERIES: Record<ElectricDay, ApexAxisChartSeries> = {
+export const ELECTRIC_DAY_SERIES: Record<ElectricDay, AxisSeries> = {
   Sun: [
     { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },
     { name: "Payment", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },

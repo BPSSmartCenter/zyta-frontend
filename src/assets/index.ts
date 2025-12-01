@@ -55,8 +55,20 @@ import thunderDay1 from "./thunderDay1.svg";
 import alertCyan from "./alertCyan.png";
 
 import userIcon from "./user.png";
+import cyanBolt from "./cyanBolt.png";
+import whiteBolt from "./whiteBolt.png";
+import cyanBaht from "./CyanBaht.png";
+import whiteBaht from "./whiteBaht.png";
+import cyanTrend from "./cyanTrend.png";
+import whiteTrend from "./whiteTrend.png";
 
 export {
+  cyanTrend,
+  whiteTrend,
+  cyanBaht,
+  cyanBolt,
+  whiteBaht,
+  whiteBolt,
   brandImage,
   exportImage,
   fireImage,

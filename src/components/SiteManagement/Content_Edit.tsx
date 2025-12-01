@@ -1,0 +1,462 @@
+import React from "react";
+import type { SiteRow } from "./site.constant";
+import { lookupThaiAddress } from "../../api/thaiAddress";
+import Dropdown from "../Dropdown";
+
+type UpdatePayload = {
+  name?: string;
+  code?: string;
+  lat?: number;
+  lng?: number;
+  zipcode?: string;
+  addressProvince?: string;
+  addressDistrict?: string;
+  addressSubDistrict?: string;
+  addressLine?: string;
+};
+
+type Props = {
+  site: SiteRow;
+  loading?: boolean;
+  onSave: (payload: UpdatePayload) => Promise<void>;
+  onCancel: () => void;
+};
+
+export default function ContentEdit({
+  site,
+  loading = false,
+  onSave,
+  onCancel,
+}: Props) {
+  const [form, setForm] = React.useState({
+    name: site.name ?? "",
+    code: site.code ?? "",
+    lat: site.lat ?? undefined,
+    lng: site.lng ?? undefined,
+    zipcode: site.zipcode ?? "",
+    addressProvince: site.addressProvince ?? site.provinceLabel ?? "",
+    addressDistrict: site.addressDistrict ?? "",
+    addressSubDistrict: site.addressSubDistrict ?? "",
+    addressLine: site.addressLine ?? "",
+  });
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [districtOptions, setDistrictOptions] = React.useState<string[]>(() =>
+    site.addressDistrict ? [site.addressDistrict] : []
+  );
+  const [subDistrictOptions, setSubDistrictOptions] = React.useState<string[]>(
+    () => (site.addressSubDistrict ? [site.addressSubDistrict] : [])
+  );
+  const [zipStatus, setZipStatus] = React.useState<
+    "idle" | "loading" | "error" | "success"
+  >("idle");
+  const [zipMessage, setZipMessage] = React.useState<string>("");
+  const lastLookupRef = React.useRef<string>("");
+  const districtDropdownOptions = React.useMemo(() => {
+    if (!districtOptions.length) return [];
+    const list = districtOptions.map((value) => ({ value, label: value }));
+    const current = form.addressDistrict?.trim();
+    if (current && !list.some((opt) => opt.value === current)) {
+      list.unshift({ value: current, label: current });
+    }
+    return list;
+  }, [districtOptions, form.addressDistrict]);
+
+  const subDistrictDropdownOptions = React.useMemo(() => {
+    if (!subDistrictOptions.length) return [];
+    const list = subDistrictOptions.map((value) => ({ value, label: value }));
+    const current = form.addressSubDistrict?.trim();
+    if (current && !list.some((opt) => opt.value === current)) {
+      list.unshift({ value: current, label: current });
+    }
+    return list;
+  }, [subDistrictOptions, form.addressSubDistrict]);
+
+  const handleChange = (
+    field:
+      | "name"
+      | "code"
+      | "zipcode"
+      | "addressProvince"
+      | "addressDistrict"
+      | "addressSubDistrict"
+      | "addressLine",
+    value: string
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleNumber = (field: "lat" | "lng", value: string) => {
+    const trimmed = value.trim();
+    const num = trimmed === "" ? undefined : Number(trimmed);
+    const nextValue =
+      typeof num === "number" && Number.isFinite(num) ? num : undefined;
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nextErrors: Record<string, string> = {};
+    if (!form.name?.trim()) nextErrors.name = "กรุณากรอกชื่อไซต์";
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+    await onSave({
+      name: form.name.trim(),
+      code: form.code?.trim() || undefined,
+      lat: form.lat,
+      lng: form.lng,
+      zipcode: form.zipcode?.trim() || undefined,
+      addressProvince: form.addressProvince?.trim() || undefined,
+      addressDistrict: form.addressDistrict?.trim() || undefined,
+      addressSubDistrict: form.addressSubDistrict?.trim() || undefined,
+      addressLine: form.addressLine?.trim() || undefined,
+    });
+  };
+
+  React.useEffect(() => {
+    const zip = form.zipcode?.trim() ?? "";
+    if (!zip) {
+      setZipStatus("idle");
+      setZipMessage("");
+      return;
+    }
+    if (/^\d{5}$/.test(zip) && zip !== lastLookupRef.current) {
+      lastLookupRef.current = zip;
+      setZipStatus("loading");
+      setZipMessage("กำลังดึงข้อมูล...");
+      lookupThaiAddress(zip)
+        .then((resp) => {
+          const payload = resp?.data;
+          if (!payload) {
+            setZipStatus("error");
+            setZipMessage("ไม่พบรหัสไปรษณีย์นี้");
+            setDistrictOptions([]);
+            setSubDistrictOptions([]);
+            return;
+          }
+          setZipStatus("success");
+          setZipMessage(
+            `พบข้อมูลจังหวัด ${payload.province?.th ?? "-"} จำนวน ${
+              payload.combinations.length
+            } ตำบล`
+          );
+          const districts = payload.districts.map((d) => d.th);
+          const subDistricts = payload.subDistricts.map((s) => s.th);
+          setDistrictOptions(districts);
+          setSubDistrictOptions(subDistricts);
+          setForm((prev) => ({
+            ...prev,
+            addressProvince: payload.province?.th ?? prev.addressProvince,
+            addressDistrict:
+              prev.addressDistrict && districts.includes(prev.addressDistrict)
+                ? prev.addressDistrict
+                : districts[0] ?? prev.addressDistrict,
+            addressSubDistrict:
+              prev.addressSubDistrict &&
+              subDistricts.includes(prev.addressSubDistrict)
+                ? prev.addressSubDistrict
+                : subDistricts[0] ?? prev.addressSubDistrict,
+          }));
+        })
+        .catch(() => {
+          setZipStatus("error");
+          setZipMessage("ดึงข้อมูลรหัสไปรษณีย์ไม่สำเร็จ");
+          setDistrictOptions([]);
+          setSubDistrictOptions([]);
+        });
+    }
+  }, [form.zipcode]);
+
+  return (
+    <div className="mt-6 p-6 bg-white rounded-lg">
+      <div className="flex items-center gap-3 pb-4 border-b">
+        <button
+          type="button"
+          className="text-gray-500 hover:text-gray-700"
+          onClick={onCancel}
+        >
+          <i className="material-icons-outlined">arrow_back</i>
+        </button>
+        <div>
+          <h2 className="text-xl font-semibold">Edit site</h2>
+          <p className="text-sm text-gray-500">{site.name}</p>
+        </div>
+      </div>
+
+      <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            Site name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => handleChange("name", e.target.value)}
+            className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+            placeholder="เช่น Bangkok HQ"
+          />
+          {errors.name && (
+            <p className="text-xs text-red-500 mt-1">{errors.name}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">Site code</label>
+          <input
+            type="text"
+            value={form.code}
+            onChange={(e) => handleChange("code", e.target.value)}
+            className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+            placeholder="รหัสภายใน"
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="font-semibold text-sm block mb-2">Latitude</label>
+            <input
+              type="number"
+              step="0.0001"
+              value={form.lat ?? ""}
+              onChange={(e) => handleNumber("lat", e.target.value)}
+              className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+              placeholder="13.7563"
+            />
+          </div>
+          <div>
+            <label className="font-semibold text-sm block mb-2">
+              Longitude
+            </label>
+            <input
+              type="number"
+              step="0.0001"
+              value={form.lng ?? ""}
+              onChange={(e) => handleNumber("lng", e.target.value)}
+              className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+              placeholder="100.5018"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            Address detail
+          </label>
+          <textarea
+            value={form.addressLine ?? ""}
+            onChange={(e) => handleChange("addressLine", e.target.value)}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+            rows={3}
+            placeholder="บ้านเลขที่ / อาคาร / ถนน ฯลฯ"
+          />
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            Zipcode (ดึงที่อยู่)
+          </label>
+          <input
+            type="text"
+            value={form.zipcode ?? ""}
+            onChange={(e) => handleChange("zipcode", e.target.value)}
+            maxLength={5}
+            className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+            placeholder="เช่น 10100"
+          />
+          {zipMessage && (
+            <p
+              className={`text-xs mt-1 ${
+                zipStatus === "error" ? "text-red-500" : "text-gray-500"
+              }`}
+            >
+              {zipMessage}
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+          <div>
+            <label className="font-semibold text-sm block mb-2">
+              Province
+            </label>
+            <input
+              type="text"
+              value={form.addressProvince ?? ""}
+              onChange={(e) => handleChange("addressProvince", e.target.value)}
+              className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+              placeholder="จังหวัด"
+            />
+          </div>
+          <div>
+            <label className="font-semibold text-sm block mb-2">
+              District
+            </label>
+            <Dropdown
+              options={districtDropdownOptions}
+              value={form.addressDistrict ?? ""}
+              onChange={(value) => handleChange("addressDistrict", value)}
+            >
+              {({
+                open,
+                selected,
+                getButtonProps,
+                getMenuProps,
+                getItemProps,
+                options,
+              }) => {
+                const disabled = options.length === 0;
+                return (
+                  <div className="relative w-full">
+                    <button
+                      {...getButtonProps({
+                        disabled,
+                        className: [
+                          "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50",
+                          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                        ].join(" "),
+                      })}
+                    >
+                      <span className="truncate">
+                        {selected?.label ??
+                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกอำเภอ")}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-slate-500 transition ${
+                          open ? "rotate-180" : ""
+                        }`}
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 8l4 4 4-4" />
+                      </svg>
+                    </button>
+                    {open && !disabled && (
+                      <div
+                        {...getMenuProps({
+                          className:
+                            "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                        })}
+                      >
+                        {options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            {...getItemProps(opt, {
+                              className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                                opt.value === form.addressDistrict
+                                  ? "text-cyan-600 font-semibold"
+                                  : "text-slate-700"
+                              } hover:bg-slate-50 cursor-pointer`,
+                            })}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            </Dropdown>
+          </div>
+          <div>
+            <label className="font-semibold text-sm block mb-2">
+              Sub-district
+            </label>
+            <Dropdown
+              options={subDistrictDropdownOptions}
+              value={form.addressSubDistrict ?? ""}
+              onChange={(value) =>
+                handleChange("addressSubDistrict", value)
+              }
+            >
+              {({
+                open,
+                selected,
+                getButtonProps,
+                getMenuProps,
+                getItemProps,
+                options,
+              }) => {
+                const disabled = options.length === 0;
+                return (
+                  <div className="relative w-full">
+                    <button
+                      {...getButtonProps({
+                        disabled,
+                        className: [
+                          "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50",
+                          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                        ].join(" "),
+                      })}
+                    >
+                      <span className="truncate">
+                        {selected?.label ??
+                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกตำบล")}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-slate-500 transition ${
+                          open ? "rotate-180" : ""
+                        }`}
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 8l4 4 4-4" />
+                      </svg>
+                    </button>
+                    {open && !disabled && (
+                      <div
+                        {...getMenuProps({
+                          className:
+                            "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                        })}
+                      >
+                        {options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            {...getItemProps(opt, {
+                              className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                                opt.value === form.addressSubDistrict
+                                  ? "text-cyan-600 font-semibold"
+                                  : "text-slate-700"
+                              } hover:bg-slate-50 cursor-pointer`,
+                            })}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            </Dropdown>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500">
+          ปรับแก้ได้ทั้งจากรหัสไปรษณีย์หรือกรอกเอง
+        </p>
+
+        <div className="flex flex-col gap-3 md:flex-row md:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60"
+          >
+            {loading ? "Saving..." : "Save changes"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}

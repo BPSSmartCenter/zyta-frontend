@@ -1,18 +1,40 @@
 // src/pages/ElectricMeter.tsx
 import React from "react";
+import ReactApexChart from "react-apexcharts";
+import type { ApexOptions } from "apexcharts";
+import type { AxisSeries } from "../types/apexSeries";
+import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
-import Table from "../components/TotalAlert/Table";
+import RingRunner from "../components/RingRunner";
+import MeterDetail from "../components/ElectricMeterDashboard/MeterDetail";
+import BillingHistoryTable from "../components/ElectricMeterDashboard/BillingHistoryTable";
+import Modal from "../components/Modal";
+import { useUserPath } from "../routes/useUserPath";
+import type { MeterOption } from "../types/meter";
+import { getElectricDevices } from "../api/electric";
+import { getMeterDashboard, type MeterDashboard } from "../api/meter";
+import { downloadBillPdf } from "../api/billing";
+import { saveBlobAsFile } from "../utils/download";
 
 const C = {
-  cardBg: "#01162b",
+  cardBg: "#05172c",
+  cardBorder: "#093054",
   num: "#01faf8",
   headFactory: "#0bb1f4",
   thisMonth: "#18d1ad",
   lastMonth: "#51707f",
   energyCost: "#eec824",
 };
+
+const ENERGY_USAGE_CATEGORIES = Array.from({ length: 24 }, (_, idx) =>
+  String(idx + 1)
+);
+const DEFAULT_ENERGY_DATA = [
+  420, 460, 510, 430, 480, 520, 610, 720, 640, 590, 980, 1180, 760, 600, 540,
+  580, 620, 560, 610, 640, 670, 690, 620, 580,
+];
 
 export const ElectricMeter: React.FC = () => {
   const {
@@ -24,55 +46,329 @@ export const ElectricMeter: React.FC = () => {
     date,
     setDate,
   } = useFilters();
+  const location = useLocation();
+  const searchParams = React.useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search]
+  );
+  const meterIdParam = searchParams.get("meterId");
+  const [meterOptions, setMeterOptions] = React.useState<MeterOption[]>([]);
+  const [selectedMeter, setSelectedMeter] = React.useState<MeterOption | null>(null);
+  const [dashboard, setDashboard] = React.useState<MeterDashboard | null>(null);
+  const [loadingMeter, setLoadingMeter] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [siteGuardOpen, setSiteGuardOpen] = React.useState(false);
+  const [downloadingHistoryId, setDownloadingHistoryId] = React.useState<string | null>(null);
+  const navigate = useNavigate();
+  const { abs } = useUserPath();
+
+  React.useEffect(() => {
+    if (!meterOptions.length) {
+      setSelectedMeter(null);
+      setDashboard(null);
+      return;
+    }
+    const found =
+      meterIdParam && meterIdParam.trim().length > 0
+        ? meterOptions.find((opt) => opt.id === meterIdParam)
+        : meterOptions[0];
+    setSelectedMeter(found ?? meterOptions[0] ?? null);
+  }, [meterOptions, meterIdParam]);
+
+  const normalizedSite = (selectedSite ?? "").trim();
+  const requiresSiteSelection =
+    !normalizedSite || normalizedSite === "all";
+
+  React.useEffect(() => {
+    setSiteGuardOpen(requiresSiteSelection);
+  }, [requiresSiteSelection]);
+
+  const loadMeterDashboard = React.useCallback(async (deviceId: string) => {
+    setLoadingMeter(true);
+    try {
+      setError(null);
+      const data = await getMeterDashboard(deviceId);
+      setDashboard(data);
+    } catch (err) {
+      console.error("[ElectricMeter] dashboard failed", err);
+      setDashboard(null);
+      setError("ไม่สามารถโหลดข้อมูลมิเตอร์ได้");
+    } finally {
+      setLoadingMeter(false);
+    }
+  }, []);
+
+  const handleDownloadHistoryPdf = React.useCallback(async (billId: string) => {
+    setDownloadingHistoryId(billId);
+    try {
+      const blob = await downloadBillPdf(billId);
+      saveBlobAsFile(blob, `bill-${billId}.pdf`);
+    } catch (err) {
+      console.error("[ElectricMeter] download bill history failed", err);
+      alert("ไม่สามารถดาวน์โหลดไฟล์ PDF สำหรับบิลนี้ได้");
+    } finally {
+      setDownloadingHistoryId(null);
+    }
+  }, []);
+
+  const loadMeterOptions = React.useCallback(async () => {
+    if (!normalizedSite || normalizedSite === "all") return;
+    try {
+      setError(null);
+      const resp = await getElectricDevices(normalizedSite);
+      const items =
+        ((resp as any)?.items as any[]) ??
+        ((resp as any)?.data?.items as any[]) ??
+        ((resp as any)?.data as any[]) ??
+        [];
+      const siteLabel =
+        siteOptions.find((opt) => opt.value === normalizedSite)?.label ??
+        "Site";
+      const mapped = items.map((item: any) =>
+        mapDeviceToMeterOption(item, siteLabel)
+      );
+      setMeterOptions(mapped);
+    } catch (err) {
+      console.error("[ElectricMeter] load meters failed", err);
+      setError("ไม่สามารถโหลดรายการมิเตอร์ได้");
+      setMeterOptions([]);
+    }
+  }, [normalizedSite, siteOptions]);
+
+  React.useEffect(() => {
+    if (requiresSiteSelection) return;
+    loadMeterOptions();
+  }, [requiresSiteSelection, loadMeterOptions]);
+
+  React.useEffect(() => {
+    if (!selectedMeter) {
+      setDashboard(null);
+      return;
+    }
+    loadMeterDashboard(selectedMeter.id);
+  }, [selectedMeter, loadMeterDashboard]);
+
+  const handleSiteGuardClose = React.useCallback(() => {
+    setSiteGuardOpen(false);
+    navigate(abs("/dashboard"), { replace: true });
+  }, [navigate, abs]);
+
+  const meterDetailData = React.useMemo(() => {
+    if (!selectedMeter) return null;
+    if (!dashboard) return selectedMeter;
+    const lastReadingText = dashboard.lastReading
+      ? `${dashboard.lastReading.value.toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        })} kWh`
+      : selectedMeter.lastReading ?? "-";
+    const lastSyncText = dashboard.lastReading
+      ? formatDateTime(dashboard.lastReading.timestamp)
+      : selectedMeter.lastSync ?? "-";
+    return {
+      ...selectedMeter,
+      todayKwh: dashboard.totals.todayKwh || dashboard.totals.energyUsageKwh,
+      lastReading: lastReadingText,
+      lastSync: lastSyncText,
+      billingStatus: dashboard.device.billingStatus ?? selectedMeter.billingStatus,
+    };
+  }, [selectedMeter, dashboard]);
+
+  const heroTitle = meterDetailData
+    ? `${meterDetailData.siteName} - ${meterDetailData.name}`
+    : "กรุณาเลือกมิเตอร์";
+  const heroUsageValue = dashboard?.totals.energyUsageKwh ?? 0;
+  const trendDirection = dashboard
+    ? heroUsageValue >= (dashboard.totals.todayKwh ?? 0)
+      ? "up"
+      : "down"
+    : "up";
+  const totalCostValue = dashboard?.cost.totalCost ?? 0;
+  const onPeakValue = dashboard?.totals.onPeakKwh ?? 0;
+  const offPeakValue = dashboard?.totals.offPeakKwh ?? 0;
+  const onPeakCostValue = dashboard?.cost.onPeakCost ?? 0;
+  const offPeakCostValue = dashboard?.cost.offPeakCost ?? 0;
+  const isTrendUp = trendDirection === "up";
+  const trendColor = isTrendUp ? "#EC0357" : C.thisMonth;
+
+  const trendArrowIcon = (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={trendColor}
+      strokeWidth="2"
+    >
+      {isTrendUp ? (
+        <>
+          <path d="M12 19V5" />
+          <path d="M5 12l7-7 7 7" />
+        </>
+      ) : (
+        <>
+          <path d="M12 5v14" />
+          <path d="M5 12l7 7 7-7" />
+        </>
+      )}
+    </svg>
+  );
+
+  const energyCategories =
+    dashboard?.chart.categories ?? ENERGY_USAGE_CATEGORIES;
+  const currentEnergyData = React.useMemo<number[]>(
+    () => [...(dashboard?.chart.current ?? DEFAULT_ENERGY_DATA)],
+    [dashboard]
+  );
+  const lastMonthEnergyData = React.useMemo<number[]>(
+    () =>
+      dashboard?.chart.previous
+        ? [...dashboard.chart.previous]
+        : currentEnergyData.map((value, idx) => {
+            const variance = (idx % 4) * 8;
+            return Math.max(200, Math.round(value * 0.88 + variance));
+          }),
+    [dashboard, currentEnergyData]
+  );
+
+  const energySeries = React.useMemo<AxisSeries>(
+    () => [
+      {
+        name: "เดือนนี้",
+        data: currentEnergyData,
+      },
+      {
+        name: "เดือนที่แล้ว",
+        data: lastMonthEnergyData,
+      },
+    ],
+    [currentEnergyData, lastMonthEnergyData]
+  );
+
+  const energyChartOptions = React.useMemo<ApexOptions>(
+    () => ({
+      chart: {
+        type: "line",
+        toolbar: { show: false },
+        background: "transparent",
+        animations: { enabled: true, easing: "easeinout", speed: 600 },
+        fontFamily: "Inter, ui-sans-serif, system-ui",
+      },
+      colors: ["#158bb6", "#0b3b56"],
+      stroke: { width: 3, curve: "smooth" },
+      markers: { size: 0 },
+      dataLabels: { enabled: false },
+      fill: {
+        type: "solid",
+        opacity: [1, 1],
+      },
+      grid: {
+        borderColor: "rgba(255,255,255,0.08)",
+        yaxis: { lines: { show: true } },
+        xaxis: { lines: { show: false } },
+        padding: { left: 20, right: 20, top: 10, bottom: 0 },
+      },
+      xaxis: {
+        categories: energyCategories,
+        axisTicks: { show: false },
+        axisBorder: { show: false },
+        labels: {
+          style: { colors: "#7EAEDA", fontSize: "11px", fontWeight: 500 },
+        },
+        tooltip: { enabled: false },
+      },
+      yaxis: {
+        min: 400,
+        max: 1200,
+        tickAmount: 4,
+        labels: {
+          style: { colors: "#7EAEDA", fontSize: "11px" },
+          formatter: (value) =>
+            value.toLocaleString("en-US", { maximumFractionDigits: 0 }),
+        },
+      },
+      tooltip: {
+        theme: "dark",
+        y: {
+          formatter: (val: number) => `${val.toLocaleString()} kWh`,
+        },
+      },
+      legend: {
+        show: true,
+        labels: { colors: ["#fff"] },
+        markers: { size: 10 },
+      },
+    }),
+    [energyCategories]
+  );
 
   return (
-    <Sidebar>
-      <div className="min-h-screen bg-[#F8FBFE]">
-        {/* NAVBAR */}
-        <Navbar
-          searchSite={searchSite}
-          setSearchSite={setSearchSite}
-          siteOptions={siteOptions}
+    <>
+      <Sidebar>
+        <div className="min-h-screen bg-[#eef6ff]">
+          <Navbar
+            searchSite={searchSite}
+            setSearchSite={setSearchSite}
+            siteOptions={siteOptions}
           selectedSite={selectedSite}
           setSelectedSite={setSelectedSite}
           date={date as any}
           setDate={setDate as any}
         />
 
-        {/* MAIN CONTAINER */}
-        <div className="mx-auto w-full max-w-[1240px] px-6">
-          {/* TITLE */}
-          <h2 className="mt-4 mb-4 text-[18px] font-semibold text-[#0F172A]">
-            Electric Meter Dashboard
-          </h2>
+        <div className="mx-auto w-full max-w-[1300px] px-6 pb-16">
+          <div className="mt-6 mb-5 flex flex-wrap items-center gap-3">
+            <h2 className="text-[20px] font-semibold text-[#0F172A]">
+              Electric Meter Dashboard
+            </h2>
+            {meterDetailData && (
+              <span className="inline-flex items-center rounded-full border border-[#1b3c58] px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-[#1b3c58]">
+                {meterDetailData.name}
+              </span>
+            )}
+          </div>
 
-          {/* ===== TOP SUMMARY (2 CARDS) ===== */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* TOTAL ENERGY USAGE */}
+          {error && (
+            <div className="mb-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {loadingMeter && (
+            <div className="mb-4 text-sm text-[#0F172A] opacity-70">
+              กำลังโหลดข้อมูลมิเตอร์...
+            </div>
+          )}
+
+          <MeterDetail
+            meter={meterDetailData}
+            onChange={() => navigate(abs("/electric"))}
+          />
+
+          <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div
-              className="relative flex h-[138px] rounded-xl px-7 py-6 text-white"
+              className="relative flex min-h-[160px] items-center justify-between gap-6 overflow-hidden rounded-[28px] border border-[#1b3c58] px-8 py-7 text-white shadow-[0_15px_30px_rgba(2,12,27,0.45)]"
               style={{ backgroundColor: C.cardBg }}
             >
-              <div className="flex flex-col justify-between">
-                <div className="text-[12px] uppercase opacity-80 tracking-wide">
+              <div className="flex flex-col justify-between gap-4">
+                <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
                   TOTAL ENERGY USAGE
                 </div>
-
-                {/* number row */}
                 <div className="flex items-end gap-3">
                   <div
-                    className="font-extrabold leading-[1]"
+                    className="font-semibold leading-[1]"
                     style={{ color: C.num, fontSize: "56px" }}
                   >
-                    3,472
+                    {formatNumber(heroUsageValue)}
                   </div>
-                  <div className="pb-[6px] text-[22px] opacity-85">kWh</div>
+                  <div className="pb-[6px] text-[22px] text-[#24c2e5] opacity-85">
+                    kWh
+                  </div>
                 </div>
-
-                {/* footer row */}
-                <div className="flex items-center gap-3 text-[13px]">
-                  <span className="inline-flex items-center gap-1" style={{ color: C.thisMonth }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.thisMonth} strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <div className="flex items-center gap-3 text-[17px] font-semibold">
+                  <span
+                    className="inline-flex items-center gap-1"
+                    style={{ color: trendColor }}
+                  >
+                    {trendArrowIcon}
                     This Month
                   </span>
                   <span className="opacity-60">vs</span>
@@ -82,14 +378,19 @@ export const ElectricMeter: React.FC = () => {
                 </div>
               </div>
 
-              {/* icon right */}
-              <div className="ml-auto grid place-items-center">
-                <div className="size-[82px] rounded-full border border-[#2b4d66] grid place-items-center">
+              <RingRunner
+                className="ml-auto hidden shrink-0 md:block"
+                size={140}
+                color="#01faf8"
+                ringThickness={2}
+                innerGap={14}
+                durationSec={10}
+                icon={
                   <svg
-                    width="38"
-                    height="38"
+                    width="40"
+                    height="40"
                     viewBox="0 0 24 24"
-                    fill="none"
+                    fill="#01faf8"
                     stroke={C.num}
                     strokeWidth="2"
                     strokeLinecap="round"
@@ -97,33 +398,36 @@ export const ElectricMeter: React.FC = () => {
                   >
                     <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8z" />
                   </svg>
-                </div>
-              </div>
+                }
+              />
             </div>
 
-            {/* TOTAL COST */}
             <div
-              className="relative flex h-[138px] rounded-xl px-7 py-6 text-white"
+              className="relative flex min-h-[160px] items-center justify-between gap-6 rounded-[28px] border border-[#1b3c58] px-8 py-7 text-white shadow-[0_15px_30px_rgba(2,12,27,0.45)]"
               style={{ backgroundColor: C.cardBg }}
             >
-              <div className="flex flex-col justify-between">
-                <div className="text-[12px] uppercase opacity-80 tracking-wide">
+              <div className="flex flex-col justify-between gap-3">
+                <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
                   TOTAL COST
                 </div>
-
                 <div className="flex items-end gap-3">
-                  <div className="text-[32px] leading-[1] font-bold">฿</div>
+                  <div className="text-[32px]  leading-[1] font-bold">฿</div>
                   <div
-                    className="font-extrabold leading-[1]"
+                    className="font-semibold leading-[1]"
                     style={{ color: C.num, fontSize: "56px" }}
                   >
-                    12,150
+                    {totalCostValue.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3 text-[13px]">
-                  <span className="inline-flex items-center gap-1" style={{ color: C.thisMonth }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.thisMonth} strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <div className="flex items-center gap-3 text-[17px] font-semibold">
+                  <span
+                    className="inline-flex items-center gap-1"
+                    style={{ color: trendColor }}
+                  >
+                    {trendArrowIcon}
                     This Month
                   </span>
                   <span className="opacity-60">vs</span>
@@ -133,67 +437,90 @@ export const ElectricMeter: React.FC = () => {
                 </div>
               </div>
 
-              {/* warning icon + badge */}
-              <div className="ml-auto grid place-items-center gap-3">
-                <div className="size-[82px] rounded-full border border-[#2b4d66] grid place-items-center">
-                  <svg
-                    width="40"
-                    height="40"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={C.energyCost}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
+              {isTrendUp && (
+                <div className="relative flex w-[80px] items-center justify-end md:w-[190px] md:justify-center">
+                  <div className="absolute right-1 top-1 flex md:hidden">
+                    <svg
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={C.energyCost}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  </div>
+                  <div className="hidden w-full flex-col items-center justify-center rounded-[22px] px-4 py-5 text-center md:flex">
+                    <div className="grid place-items-center rounded-full">
+                      <svg
+                        width="80"
+                        height="80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={C.energyCost}
+                        strokeWidth="1"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                    </div>
+                    <p
+                      className="mt-3 text-[14px] font-semibold uppercase leading-relaxed tracking-wide"
+                      style={{ color: C.energyCost }}
+                    >
+                      ENERGY COST
+                      <br />
+                      EXCEEDED THRESHOLD
+                    </p>
+                  </div>
                 </div>
-                <div
-                  className="text-[12px] font-semibold leading-none"
-                  style={{ color: C.energyCost }}
-                >
-                  ENERGY COST
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* ===== FACTORY CARD ===== */}
           <div className="mt-6">
             <div
-              className="rounded-xl px-7 py-6 text-white"
+              className="rounded-[32px] border border-[#1b3c58] px-8 py-8 text-white shadow-[0_20px_35px_rgba(2,12,27,0.45)]"
               style={{ backgroundColor: C.cardBg }}
             >
               <div
-                className="text-[22px] font-bold"
+                className="text-[26px] font-semibold tracking-wide"
                 style={{ color: C.headFactory }}
               >
-                Factory-1
+                {heroTitle}
               </div>
 
-              <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-10">
-                {/* Left: ENERGY USAGE */}
-                <div className="md:col-span-2">
-                  <div className="text-[12px] uppercase opacity-80 tracking-wide">
+              {/* Block-1 */}
+              <div className="items-center grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1.1fr_1.1fr]">
+                <div className="flex flex-col justify-center gap-0 h-full mb-[50px]">
+                  <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
                     ENERGY USAGE
                   </div>
 
-                  <div className="mt-2 flex items-end gap-3">
+                  <div className="flex items-end gap-3">
                     <div
-                      className="font-extrabold leading-[1]"
-                      style={{ color: C.num, fontSize: "60px" }}
+                      className="font-semibold leading-[1]"
+                      style={{ color: C.num, fontSize: "56px" }}
                     >
-                      920
+                      {heroUsageValue.toLocaleString()}
                     </div>
-                    <div className="pb-[8px] text-[22px] opacity-85">kWh</div>
+                    <div className="pb-[8px] text-[22px] text-[#24c2e5] opacity-85">kWh</div>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-3 text-[13px]">
-                    <span className="inline-flex items-center gap-1" style={{ color: C.thisMonth }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.thisMonth} strokeWidth="2"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                  <div className="mt-4 flex items-center gap-3 text-[17px] font-semibold">
+                    <span
+                      className="inline-flex items-center gap-1"
+                      style={{ color: trendColor }}
+                    >
+                      {trendArrowIcon}
                       This Month
                     </span>
                     <span className="opacity-60">vs</span>
@@ -201,57 +528,94 @@ export const ElectricMeter: React.FC = () => {
                       Last Month
                     </span>
                   </div>
+                </div>
 
-                  {/* barcode-ish line */}
-                  <div className="mt-6 h-[2px] w-full bg-[#163651] opacity-60" />
-                  <div className="mt-2 text-[12px] tracking-[0.4em] opacity-70 select-none">
-                    0123456789
+                {/*Blcok-2*/}
+                <div className="flex flex-col justify-center gap-4 h-full">
+                  <div>
+                    <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
+                      ON PEAK (kWh)
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <div
+                        className="font-semibold leading-[1]"
+                        style={{ color: C.num, fontSize: "56px" }}
+                      >
+                        {formatNumber(onPeakValue)}
+                      </div>
+                      <div className="pb-[6px] text-[20px] text-[#24c2e5] opacity-85">
+                        kWh
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-[16px] bg-gradient-to-r from-[#0c243a] to-[#08192a] p-4 shadow-inner">
+                    <p className="text-sm font-semibold text-white/70">
+                      OFF PEAK (kWh)
+                    </p>
+                    <div className="mt-1 flex items-end gap-2">
+                      <span
+                        className="text-[36px] font-semibold"
+                        style={{ color: C.headFactory }}
+                      >
+                        {formatNumber(offPeakValue)}
+                      </span>
+                      <span className="text-[16px] text-white/70 pb-[4px]">
+                        kWh
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Right: POWER block */}
-                <div className="md:col-span-1 flex flex-col items-end">
-                  <div className="text-[12px] uppercase opacity-80 tracking-wide">
-                    POWER
-                  </div>
-
-                  <div className="mt-2 flex items-end gap-3">
+                {/*Blcok-3*/}
+                <div className="w-full rounded-[24px] mt-[-25px] text-white">
+                  <div className="flex flex-col items-center h-full gap-3">
                     <div
-                      className="font-extrabold leading-[1]"
-                      style={{ color: C.num, fontSize: "60px" }}
+                      className="grid size-[120px] place-items-center rounded-full border-3 border-[#01faf8]"
+                      style={{
+                        boxShadow:
+                          "0 0 12px rgba(1,250,248,0.6), 0 0 32px rgba(1,250,248,0.4), 0 0 48px rgba(1,250,248,0.25)",
+                      }}
                     >
-                      136,5
-                    </div>
-                    <div className="pb-[8px] text-[22px] opacity-85">kW</div>
-                  </div>
-
-                  <div className="mt-4 size-[92px] rounded-full border border-[#2b4d66] grid place-items-center">
-                    <svg
-                      width="44"
-                      height="44"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke={C.num}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8z" />
-                    </svg>
-                  </div>
-
-                  <div className="mt-4 text-right">
-                    <div className="text-[12px] uppercase opacity-80 tracking-wide">
-                      POWER
-                    </div>
-                    <div className="mt-1 flex items-end gap-2 justify-end">
-                      <div
-                        className="font-extrabold leading-[1]"
-                        style={{ color: C.num, fontSize: "34px" }}
+                      <svg
+                        width="38"
+                        height="38"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={C.num}
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        136,5
-                      </div>
-                      <div className="pb-[3px] text-[16px] opacity-85">kW</div>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 2v2" />
+                        <path d="M12 20v2" />
+                        <path d="m4.93 4.93 1.41 1.41" />
+                        <path d="m17.66 17.66 1.41 1.41" />
+                        <path d="M2 12h2" />
+                        <path d="M20 12h2" />
+                      </svg>
+                    </div>
+                    <div className="text-center text-[15px] font-semibold uppercase tracking-[0.25em] text-white">
+                      COST BREAKDOWN
+                    </div>
+                    <div className="text-3xl font-semibold" style={{ color: C.num }}>
+                      ฿{" "}
+                      {totalCostValue.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-xs text-white/70">
+                      On Peak: ฿{" "}
+                      {onPeakCostValue.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      / Off Peak: ฿{" "}
+                      {offPeakCostValue.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </div>
                   </div>
                 </div>
@@ -259,45 +623,105 @@ export const ElectricMeter: React.FC = () => {
             </div>
           </div>
 
-          {/* ===== ENERGY USAGE CHART (placeholder) ===== */}
           <div className="mt-6">
             <div
-              className="rounded-xl p-6 text-white"
+              className="rounded-[28px] border border-[#1b3c58] px-6 py-5 text-white shadow-[0_18px_28px_rgba(2,12,27,0.4)]"
               style={{ backgroundColor: C.cardBg }}
             >
-              <div className="text-[12px] uppercase opacity-80 tracking-wide">
+              <div className="text-[12px] font-semibold tracking-[0.2em] text-white/70">
                 ENERGY USAGE
               </div>
-              <div className="mt-4 h-[240px] w-full rounded-md bg-gradient-to-b from-[#072136] to-[#061728] overflow-hidden">
-                <svg viewBox="0 0 100 30" className="w-full h-full">
-                  <polyline
-                    fill="none"
-                    stroke={C.num}
-                    strokeWidth="1.6"
-                    points="0,20 5,18 10,22 15,14 20,19 25,16 30,21 35,17 40,19 45,16 50,18 55,17 60,19 65,18 70,20 75,19 80,21 85,20 90,22 95,21 100,22"
-                  />
-                </svg>
-              </div>
-              <div className="mt-3 flex justify-between text-[11px] tracking-wide text-white/60">
-                <span>1</span><span>5</span><span>10</span><span>15</span>
-                <span>20</span><span>23</span>
+              <div className="mt-4 rounded-[20px] border border-[#14334d] bg-gradient-to-b from-[#071f35] to-[#051627] px-2 py-3">
+                <ReactApexChart
+                  type="line"
+                  height={200}
+                  options={energyChartOptions}
+                  series={energySeries}
+                />
               </div>
             </div>
           </div>
 
-          {/* ===== CONSOLIDATED ALERT LOG ===== */}
-          <div className="mt-8 mb-12">
-            <h3 className="text-[16px] font-semibold mb-3">
-              ตารางการแจ้งเตือนแบบรวม (Consolidated Alert Log)
+          <div className="mt-10">
+            <h3 className="mb-3 text-[16px] font-semibold text-[#0F172A]">
+              Billing History
             </h3>
-            <div className="rounded-xl border border-gray-200 bg-white">
-              <Table />
-            </div>
+            <BillingHistoryTable
+              rows={dashboard?.billingHistory ?? []}
+              loading={loadingMeter}
+              onDownload={handleDownloadHistoryPdf}
+              downloadingId={downloadingHistoryId}
+            />
           </div>
         </div>
       </div>
-    </Sidebar>
+      </Sidebar>
+      <Modal
+        open={siteGuardOpen}
+        id="electric-site-required"
+        icon="cancel"
+        title="กรุณาเลือก Site ก่อนใช้งาน"
+        message="โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานเมนูการคำนวณค่าไฟ"
+        closeLabel="โอเค"
+        onClose={handleSiteGuardClose}
+      />
+    </>
   );
 };
 
 export default ElectricMeter;
+
+function mapDeviceToMeterOption(device: any, siteLabel: string): MeterOption {
+  const meta = (device?.meta ?? {}) as Record<string, any>;
+  const details = (meta?.details ?? {}) as Record<string, any>;
+  const statusRaw = String(device?.status ?? "offline").toLowerCase();
+  const status: MeterOption["status"] =
+    statusRaw === "online"
+      ? "online"
+      : statusRaw === "maintenance"
+      ? "warning"
+      : "offline";
+
+  return {
+    id: device?.id ?? device?.model ?? "",
+    name:
+      details?.name ??
+      (typeof device?.model === "string"
+        ? device.model.split(":").pop()
+        : "Meter"),
+    siteName: siteLabel,
+    isOverall: false,
+    description: details?.description ?? meta?.description ?? undefined,
+    status,
+    lastReading: "-",
+    lastSync: device?.last_seen
+      ? formatDateTime(device.last_seen)
+      : "-",
+    todayKwh: 0,
+    location: details?.location ?? "-",
+    billingMonth: new Date().toLocaleString("th-TH", {
+      month: "long",
+      year: "numeric",
+    }),
+    billingStatus: (meta?.billingStatus as any) ?? "pending",
+    billingOutstandingMonth:
+      meta?.billingOutstandingMonth ?? "เดือนก่อนหน้า",
+    billingDueDate: undefined,
+    trendDirection: "up",
+  };
+}
+
+function formatDateTime(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function formatNumber(value: number) {
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  });
+}

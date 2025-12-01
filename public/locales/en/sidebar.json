@@ -7,6 +7,7 @@
   },
   "menu": {
     "home": "Home",
+    "energy_calc": "Electric Cost",
     "notification": "Notification",
     "facerec": "Face Regconize",
     "devices": "Devices",

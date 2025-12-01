@@ -23,6 +23,7 @@ type Props = {
   max?: DateValue;
   className?: string;
   placeholder?: string;
+  displayMode?: "full" | "monthYear";
 };
 
 export default function DatePicker({
@@ -32,6 +33,7 @@ export default function DatePicker({
   max,
   className = "",
   placeholder,
+  displayMode = "full",
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
@@ -152,15 +154,18 @@ export default function DatePicker({
   const toDisplayLabel = (v?: DateValue) => {
     if (!v) return "";
     const d = toDate(v);
-    return d.toLocaleDateString(locale, {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    const baseOptions: Intl.DateTimeFormatOptions =
+      displayMode === "monthYear"
+        ? { month: "short", year: "numeric" }
+        : { day: "2-digit", month: "short", year: "numeric" };
+    return d.toLocaleDateString(locale, baseOptions);
   };
 
   const placeholderText =
-    placeholder ?? t("date.placeholder", { defaultValue: "YYYY-MM-DD" });
+    placeholder ??
+    (displayMode === "monthYear"
+      ? "MM/YYYY"
+      : t("date.placeholder", { defaultValue: "YYYY-MM-DD" }));
 
   return (
     <div ref={wrapRef} className={`relative inline-block`}>

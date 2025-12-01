@@ -199,6 +199,116 @@ curl -X POST http://localhost:3000/site/3078000/air/devices/register \
   }'
 ```
 
+---
+
+## 3. อัปเดต Flow การทำ Billing (มิ.ย. 2025)
+
+ส่วน Billing ใช้ข้อมูลจาก 4 ตารางหลัก (`devices`, `meter_readings`, `meter_bills`, `billing_cycles`) ดังนั้นการทดสอบจะมี 3 ช่วงคือ เพิ่มมิเตอร์ → ยิง readings → สร้างบิล + PDF
+
+### 3.1 เพิ่มมิเตอร์ผ่าน Site Management หรือ API
+
+1. **ผ่านหน้า Site Management**
+   - เลือกไซต์จาก Navbar → เข้าเมนู *Site Management*
+   - กด `Edit` ในแถบ Devices → ปุ่ม `Register Device`
+   - ชนิดอุปกรณ์เลือก **Electric** และกำหนด `Device Type = Meter`
+   - กรอก Serial Number, Display Name, Model ให้ครบ แล้วกด Save
+   - หน้านี้ใช้ API `POST /site/:siteId/electric/devices/register` ของข้อ 2.1 เอง ดังนั้นหากต้องการทำผ่าน Postman ให้เรียก endpoint เดียวกันโดยตั้ง `category: "METER"`
+
+   ```bash
+   curl -X POST http://localhost:3000/site/3078000/electric/devices/register \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "category": "METER",
+       "sn": "METER-78BC-A3",
+       "name": "SUB METER",
+       "status": "online"
+     }'
+   ```
+
+2. **ตรวจสอบ / หา deviceId**
+   - หลังบันทึกแล้ว เปิด DevTools → แท็บ Network → ดู response ของ `GET /site/:siteId/electric/devices` หรือ `PUT /site/.../devices/:id` จะเจอฟิลด์ `id`
+   - หรือเรียก `GET http://localhost:3000/site/:siteId/electric/devices` (JWT) แล้วค้นหา Serial ที่ต้องการ
+   - ค่าที่ส่งต่อให้ API readings คือ `id` (ไม่ใช่ serial)
+
+### 3.2 ยิงข้อมูล Reading ให้ Billing มีตัวเลข
+
+- **Method/URL**: `POST /devices/:deviceId/readings`
+- **Headers**: `Authorization: Bearer <token>`, `Content-Type: application/json`
+- **Body**: ใส่จำนวน record ได้หลายตัวในครั้งเดียว ตัวอย่าง
+
+```bash
+curl -X POST http://localhost:3000/devices/8d6d1e94-.../readings \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "records": [
+      {
+        "timestamp": "2025-11-19T00:00:00+07:00",
+        "kwhTotal": 125.5,
+        "kwhOnPeak": 90.2,
+        "kwhOffPeak": 35.3,
+        "irradiance": 820,
+        "ambientTemp": 32,
+        "moduleTemp": 40
+      }
+    ]
+  }'
+```
+
+เมื่อ API ตอบ `{ "ok": true, "inserted": 1 }` ข้อมูลจะถูกใช้บนหน้า BillingOverview, Electric Meter Dashboard และป้อนเป็น default ให้ Generate Bill Form
+
+### 3.3 สร้างบิลด้วย Manual Billing API
+
+หน้า GenerateBillForm เรียก endpoint ต่อไปนี้ (สามารถยิงเองได้จาก Postman):
+
+- **Method/URL**: `POST /site/:siteId/billing/bills`
+- **Body**
+  | Field | Type | หมายเหตุ |
+  |-------|------|-----------|
+  | `meterId` | string | `id` ของ device |
+  | `meterLabel` | string | ถ้าไม่ส่งจะใช้ชื่อมิเตอร์ |
+  | `meterSerial` | string | optional – ใช้แสดงบน PDF |
+  | `billingMonth` / `billingYear` | string | ฟอร์แมต `MM` / `YYYY` |
+  | `ereOnPeak` / `ereOffPeak` | string/number | kWh จากมิเตอร์ |
+  | `baseOnPeak` / `baseOffPeak` | string/number | ราคาต่อหน่วย (บาท) |
+  | `notes` | string | optional |
+
+```bash
+curl -X POST http://localhost:3000/site/3078000/billing/bills \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "meterId": "8d6d1e94-...",
+    "meterLabel": "SUB METER",
+    "meterSerial": "78BC44D5-A3",
+    "billingMonth": "08",
+    "billingYear": "2025",
+    "ereOnPeak": "90.2",
+    "ereOffPeak": "35.3",
+    "baseOnPeak": "4.1839",
+    "baseOffPeak": "2.6037"
+  }'
+```
+
+Response จะคืน `{ "bill": { "billId": "..." } }` ใช้ต่อกับหน้า Preview PDF ได้
+
+### 3.4 การ Export / ดาวน์โหลด PDF
+
+- **ดูรายละเอียดบิล**: `GET /billing/bills/:billId`
+- **อัปโหลดไฟล์ PDF ที่สร้างจากหน้า Preview**: `POST /billing/bills/:billId/pdf` พร้อม body `{ "pdfBase64": "<base64 string>" }`
+- **ดาวน์โหลดไฟล์ที่บันทึกไว้**: `GET /billing/bills/:billId/pdf` (จะได้ `application/pdf`)
+
+เมื่อบันทึกไฟล์แล้ว ปุ่ม “ดู PDF” ใน Billing Overview และ Electric Meter Dashboard จะเปิดหน้า Preview พร้อมโหลดไฟล์จริงจาก endpoint นี้
+
+### 3.5 สรุปขั้นตอนทดสอบแบบย่อ
+
+1. ลงทะเบียนมิเตอร์ → ดึง `deviceId`
+2. ยิง readings ด้วย `POST /devices/:deviceId/readings`
+3. สร้างบิลด้วย `POST /site/:siteId/billing/bills`
+4. เปิดหน้า Preview → Export จะเรียก `POST /billing/bills/:id/pdf`
+5. ตรวจสอบ History/Monthly Trend → ปุ่ม “ดู PDF” จะพาไปหน้า Preview พร้อมดาวน์โหลดไฟล์ย้อนหลังได้
+
 ### 2.5 Update Air Sensor Telemetry (Webhook)
 
 Use this webhook when the external IoT gateway pushes live air-quality readings. Each successful call updates the device's `meta.air.lastReading`, which the dashboard reads via `GET /site/:siteId/air/devices`.
