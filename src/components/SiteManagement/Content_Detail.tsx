@@ -224,6 +224,39 @@ export default function ContentDetail({
 
   const siteIdentifier = siteInfo.id || site.id || site.code || "";
 
+  const handleShowDeviceId = React.useCallback(
+    async (device: DeviceEntry) => {
+      if (!device?.id) return;
+      try {
+        if (
+          typeof navigator !== "undefined" &&
+          navigator.clipboard?.writeText
+        ) {
+          await navigator.clipboard.writeText(device.id);
+        }
+        show({
+          variant: "info",
+          message: (
+            <span className="font-semibold text-gray-900">
+              Copy ID: {device.id}
+            </span>
+          ),
+        });
+      } catch (err) {
+        console.error("[SiteDetail] copy device id failed", err);
+        show({
+          variant: "error",
+          message: (
+            <span className="text-white font-semibold">
+              ไม่สามารถคัดลอก Device ID ได้
+            </span>
+          ),
+        });
+      }
+    },
+    [show]
+  );
+
   const handleBillingToggle = async (type: BillingType, next: boolean) => {
     if (!siteIdentifier) return;
     setBillingPrefs((prev) => ({ ...prev, [type]: next }));
@@ -513,6 +546,16 @@ export default function ContentDetail({
                                   delete
                                 </i>
                                 Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShowDeviceId(item)}
+                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50 cursor-pointer"
+                              >
+                                <i className="material-icons-outlined text-xs">
+                                  info
+                                </i>
+                                Copy ID
                               </button>
                             </div>
                           </td>
