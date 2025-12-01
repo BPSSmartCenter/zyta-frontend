@@ -57,7 +57,7 @@ import alertCyan from "./alertCyan.png";
 import userIcon from "./user.png";
 import cyanBolt from "./CyanBolt.png";
 import whiteBolt from "./WhiteBolt.png";
-import cyanBaht from "./CyanBaht.png";
+import cyanBaht from "./Cyanbaht.png";
 import whiteBaht from "./Whitebaht.png";
 import cyanTrend from "./Cyantrend.png";
 import whiteTrend from "./Whitetrend.png";
