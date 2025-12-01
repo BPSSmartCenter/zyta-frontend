@@ -1,5 +1,5 @@
 // src/components/Devices/Content.tsx
-import { useMemo } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
 import StatCard, { StatCardGroup } from "../StatCard";
@@ -15,6 +15,9 @@ import { useFilters } from "../../context/FiltersContext";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import { useDeviceInventory, getCountForType } from "../../context/DeviceInventoryContext";
+import Modal from "../Modal";
+import { getSiteBillingAccess } from "../../api/sites";
+import type { BillingType, SiteBillingAccess } from "../../types/billing";
 
 type Props = {};
 
@@ -35,10 +38,18 @@ const ID_TO_TYPE: Record<string, string> = Object.entries(TYPE_TO_ID).reduce(
 
 const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>(["cctv"]);
 const DEFAULT_DEVICE_TYPE: keyof typeof TYPE_TO_ID = "watermeter";
+const BILLING_TYPE_BY_URL: Partial<Record<string, BillingType>> = {
+  electricmeter: "electric",
+  watermeter: "water",
+};
+const BILLING_FIELD_BY_TYPE: Record<BillingType, keyof SiteBillingAccess> = {
+  electric: "allowElectricBilling",
+  water: "allowWaterBilling",
+};
 
 export default function Content({}: Props) {
   const { t: tDevices } = useTranslation("devices");
-  const { t } = useTranslation("dashboard");
+  const { t: tSidebar } = useTranslation("sidebar");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -111,6 +122,66 @@ export default function Content({}: Props) {
     }
   };
 
+  const effectiveSiteCode =
+    siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : undefined);
+  const currentBillingType = BILLING_TYPE_BY_URL[urlType] ?? null;
+  const [billingGuardOpen, setBillingGuardOpen] = useState(false);
+  const [billingDisabledOpen, setBillingDisabledOpen] = useState(false);
+  const [billingAllowed, setBillingAllowed] = useState(false);
+  const [billingAccess, setBillingAccess] = useState<SiteBillingAccess | null>(null);
+  const [billingAccessLoading, setBillingAccessLoading] = useState(false);
+
+  useEffect(() => {
+    if (!effectiveSiteCode || !currentBillingType) {
+      setBillingAccess(null);
+      setBillingAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    setBillingAccessLoading(true);
+    getSiteBillingAccess(effectiveSiteCode)
+      .then((data) => {
+        if (cancelled) return;
+        setBillingAccess(data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBillingAccess(null);
+        setBillingAllowed(false);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setBillingAccessLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSiteCode, currentBillingType]);
+
+  useEffect(() => {
+    if (!currentBillingType || !effectiveSiteCode) {
+      setBillingAllowed(false);
+      return;
+    }
+    const field = BILLING_FIELD_BY_TYPE[currentBillingType];
+    setBillingAllowed(Boolean(billingAccess?.[field]));
+  }, [billingAccess, currentBillingType, effectiveSiteCode]);
+
+  const handleBillingClick = useCallback(() => {
+    if (!effectiveSiteCode) {
+      setBillingGuardOpen(true);
+      return;
+    }
+    if (!billingAllowed) {
+      setBillingDisabledOpen(true);
+      return;
+    }
+    navigate(absSite("/electric", effectiveSiteCode));
+  }, [effectiveSiteCode, billingAllowed, absSite, navigate]);
+  const showBillingButton = Boolean(currentBillingType);
+  const billingButtonDisabled =
+    billingAccessLoading || !billingAllowed || !effectiveSiteCode;
+
   return (
     <>
       <nav className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6">
@@ -120,18 +191,26 @@ export default function Content({}: Props) {
 
         <div className="gap-2 flex flex-wrap items-center">
           <MiniFiltersBar page="devices" />
-          <button className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50">
-            <span className="truncate flex items-center gap-2">
-              <img src={exportImage} alt="" />
-              <span className="hidden sm:inline">{t("navbar.import")}</span>
-            </span>
-          </button>
-          <button className="inline-flex h-10 items-center justify-center rounded-md px-3 bg-cyan text-white text-sm text-[#414651] font-inter font-bold hover:cursor-pointer">
-            <span className="flex w-full justify-center items-center gap-2">
-              <i className="material-icons w-[24px]">add_2</i>
-              <p className="hidden sm:block">{t("navbar.add")}</p>
-            </span>
-          </button>
+          {showBillingButton && (
+            <button
+              type="button"
+              onClick={handleBillingClick}
+              disabled={billingButtonDisabled}
+              className={[
+                "inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold",
+                billingButtonDisabled
+                  ? "opacity-60 cursor-not-allowed"
+                  : "hover:cursor-pointer focus:bg-gray-50",
+              ].join(" ")}
+            >
+              <span className="truncate flex items-center gap-2">
+                <img src={exportImage} alt="" />
+                <span className="hidden sm:inline">
+                  {tSidebar("menu.billing", { defaultValue: "Billing" })}
+                </span>
+              </span>
+            </button>
+          )}
         </div>
       </nav>
 
@@ -199,6 +278,31 @@ export default function Content({}: Props) {
       ) : (
         <div className="mt-6" />
       )}
+
+      <Modal
+        open={billingGuardOpen}
+        id="devices-billing-site-required"
+        icon="cancel"
+        title="กรุณาเลือก Site ก่อนใช้งาน"
+        message="โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อเปิดหน้า Billing"
+        closeLabel="โอเค"
+        onClose={() => setBillingGuardOpen(false)}
+      />
+      <Modal
+        open={billingDisabledOpen}
+        id="devices-billing-disabled"
+        icon="warning"
+        title="ยังไม่เปิดใช้ Billing"
+        message={
+          currentBillingType === "water"
+            ? "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของมิเตอร์น้ำก่อน"
+            : currentBillingType === "electric"
+            ? "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของมิเตอร์ไฟก่อน"
+            : "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของไซต์นี้ก่อน"
+        }
+        closeLabel="รับทราบ"
+        onClose={() => setBillingDisabledOpen(false)}
+      />
     </>
   );
 }

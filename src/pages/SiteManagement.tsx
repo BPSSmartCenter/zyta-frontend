@@ -78,6 +78,12 @@ function SiteManagementInner() {
       devicesTotal: site.devices_total ?? site.devicesTotal ?? 0,
       usersCount: site.users_count ?? site.usersCount ?? 0,
       updatedAt: site.updated_at ?? site.updatedAt ?? null,
+      allowElectricBilling: Boolean(
+        site.allowElectricBilling ?? site.allow_electric_billing
+      ),
+      allowWaterBilling: Boolean(
+        site.allowWaterBilling ?? site.allow_water_billing
+      ),
     };
   }, []);
 

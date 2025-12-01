@@ -10,7 +10,6 @@ import { useUserPath } from "../routes/useUserPath";
 import { logout as apiLogout } from "../api/auth";
 import { me as apiMe } from "../api/user";
 import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
-import { useFilters } from "../context/FiltersContext";
 
 const DISABLED_DEVICE_TYPES = new Set<string>(["cctv"]);
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
@@ -42,8 +41,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const { abs, base, absSite } = useUserPath();
-  const { selectedSite } = useFilters();
-  const hasSelectedSite = Boolean(selectedSite && selectedSite !== "all");
   const goSiteOrGlobal = (path: string) => {
     const scMatch = location.pathname.match(/\/site\/([^\/]+)/);
     const sc = scMatch?.[1];
@@ -339,61 +336,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                           >
                             <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
                             <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                          </svg>
-                          <span>{label}</span>
-                        </button>
-                      </li>
-                    );
-                  })()}
-
-                  {/* ===== Billing ===== */}
-                  {(() => {
-                    const label = t("menu.billing", { defaultValue: "Billing" });
-                    const q = searchQ.trim().toLowerCase();
-                    const show = !q || label.toLowerCase().includes(q);
-                    if (!show) return null;
-                    const disabled = !hasSelectedSite;
-                    return (
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (disabled) {
-                              setSiteAlertOpen(true);
-                              return;
-                            }
-                            go("/electric");
-                          }}
-                          className={cx(
-                            "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
-                            disabled
-                              ? "cursor-not-allowed bg-gray-50 text-gray-400 opacity-60 border border-dashed border-gray-200"
-                              : active.billing
-                              ? "bg-gray-100 text-gray-900"
-                              : "text-gray-800 hover:bg-gray-100"
-                          )}
-                          aria-disabled={disabled}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="19"
-                            height="19"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="lucide lucide-calculator"
-                          >
-                            <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-                            <path d="M8 6h8" />
-                            <path d="M9 14h.01" />
-                            <path d="M12 14h.01" />
-                            <path d="M15 14h.01" />
-                            <path d="M9 17h.01" />
-                            <path d="M12 17h.01" />
-                            <path d="M15 17h.01" />
                           </svg>
                           <span>{label}</span>
                         </button>

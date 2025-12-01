@@ -1,5 +1,6 @@
 // src/api/sites.ts
 import { api } from "./axios";
+import type { SiteBillingAccess } from "../types/billing";
 
 export async function listSites() {
   const { data } = await api.get("/sites");
@@ -97,4 +98,22 @@ export async function updateSite(siteId: string, input: UpdateSiteInput) {
 export async function deleteSite(siteId: string) {
   const { data } = await api.delete(`/site/${encodeURIComponent(siteId)}`);
   return data;
+}
+
+export async function getSiteBillingAccess(siteIdOrCode: string): Promise<SiteBillingAccess> {
+  const { data } = await api.get<{ ok: boolean; data: SiteBillingAccess }>(
+    `/site/${encodeURIComponent(siteIdOrCode)}/billing-access`
+  );
+  return data.data;
+}
+
+export async function updateSiteBillingAccess(
+  siteIdOrCode: string,
+  payload: Partial<SiteBillingAccess>
+): Promise<SiteBillingAccess> {
+  const { data } = await api.patch<{ ok: boolean; data: SiteBillingAccess }>(
+    `/site/${encodeURIComponent(siteIdOrCode)}/billing-access`,
+    payload
+  );
+  return data.data;
 }

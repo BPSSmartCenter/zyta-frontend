@@ -1,10 +1,9 @@
 ﻿import React from "react";
-import { brandImage, exportImage } from "../../assets/index";
+import { brandImage } from "../../assets/index";
 import SearchInput from "../../components/SearchInput";
 import Dropdown from "../../components/Dropdown";
 import DatePicker from "../../components/DateInput";
 import type { DateValue } from "../../components/DateInput";
-import { exportFile } from "./dashboard.constants";
 import searchIcon from "../../assets/search.png";
 import { useTranslation } from "react-i18next";
 
@@ -198,56 +197,6 @@ export default function Navbar({
           )}
 
           <DatePicker value={date} onChange={setDate} />
-
-          <Dropdown options={exportFile}>
-            {({
-              open,
-              options,
-              getButtonProps,
-              getMenuProps,
-              getItemProps,
-            }) => (
-              <>
-                <button
-                  {...getButtonProps({
-                    className:
-                      "inline-flex h-10 w-[105px] items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50",
-                  })}
-                >
-                  <span className="truncate flex items-center gap-2">
-                    <img src={exportImage} alt="" /> {t("navbar.export")}
-                  </span>
-                </button>
-
-                <div
-                  {...getMenuProps({
-                    className: [
-                      "absolute z-10 mt-12 right-[-11px] min-w-[128px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
-                      "transition-all duration-150",
-                      open
-                        ? "opacity-100 translate-y-0 pointer-events-auto"
-                        : "opacity-0 -translate-y-1 pointer-events-none",
-                      "max-h-80 overflow-y-auto",
-                    ].join(" "),
-                  })}
-                >
-                  {options.map((opt) => (
-                    <button
-                      key={opt.value}
-                      {...getItemProps(opt, {
-                        className:
-                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-[14px] hover:bg-gray-100 hover:cursor-pointer",
-                      })}
-                    >
-                      {t(`navbar.exportOptions.${opt.value}`, {
-                        defaultValue: opt.label,
-                      })}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </Dropdown>
         </div>
 
         {/* Tablet/Mobile trigger */}
@@ -381,54 +330,6 @@ export default function Navbar({
 
                 {/* Export dropdown */}
                 <div className="col-span-1">
-                  <Dropdown options={exportFile}>
-                    {({
-                      open,
-                      options,
-                      getButtonProps,
-                      getMenuProps,
-                      getItemProps,
-                    }) => (
-                      <div className="relative inline-block w-full">
-                        <button
-                          {...getButtonProps({
-                            className:
-                              "inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold hover:cursor-pointer focus:bg-gray-50",
-                          })}
-                        >
-                          <img src={exportImage} alt="" className="w-4 h-4" />
-                          <span className="truncate">{t("navbar.export")}</span>
-                        </button>
-
-                        <div
-                          {...getMenuProps({
-                            className: [
-                              "absolute z-50 mt-2 min-w-[105px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
-                              "transition-all duration-150",
-                              open
-                                ? "opacity-100 translate-y-0 pointer-events-auto"
-                                : "opacity-0 -translate-y-1 pointer-events-none",
-                              "max-h-80 overflow-y-auto",
-                            ].join(" "),
-                          })}
-                        >
-                          {options.map((opt) => (
-                            <button
-                              key={opt.value}
-                              {...getItemProps(opt, {
-                                className:
-                                  "flex min-w-[120px] items-center rounded-lg px-3 py-2 text-left text-[14px] hover:bg-gray-100 hover:cursor-pointer",
-                              })}
-                            >
-                              {t(`navbar.exportOptions.${opt.value}`, {
-                                defaultValue: opt.label,
-                              })}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </Dropdown>
                 </div>
               </div>
 

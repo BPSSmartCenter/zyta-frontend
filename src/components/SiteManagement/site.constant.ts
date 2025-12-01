@@ -13,6 +13,8 @@ export type SiteRow = {
   devicesTotal: number;
   usersCount: number;
   updatedAt?: string | null;
+  allowElectricBilling?: boolean;
+  allowWaterBilling?: boolean;
 };
 
 export const SITE_ROWS: SiteRow[] = [];

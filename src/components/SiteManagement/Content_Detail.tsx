@@ -1,6 +1,6 @@
 import React from "react";
 import type { SiteRow } from "./site.constant";
-import { getSiteDetails } from "../../api/sites";
+import { getSiteDetails, updateSiteBillingAccess } from "../../api/sites";
 import { registerElectricDevice } from "../../api/electric";
 import {
   registerAirSensorDevice,
@@ -12,6 +12,7 @@ import {
   type DeviceTypeKey,
 } from "../../api/devices";
 import { useToast } from "../../hook/toastProvider";
+import type { BillingType } from "../../types/billing";
 
 type Props = {
   site: SiteRow;
@@ -35,11 +36,23 @@ type DeviceMap = Record<DeviceTypeKey, DeviceEntry[]>;
 
 const DEVICE_TYPES: DeviceTypeKey[] = ["electric", "water", "air", "camera"];
 
+const SECTION_BILLING_TYPE: Partial<Record<DeviceTypeKey, BillingType>> = {
+  electric: "electric",
+  water: "water",
+};
+
+const BILLING_FIELD_MAP: Record<BillingType, "allowElectricBilling" | "allowWaterBilling"> = {
+  electric: "allowElectricBilling",
+  water: "allowWaterBilling",
+};
+
 const STATUS_OPTIONS: Array<"online" | "offline" | "maintenance"> = [
   "online",
   "offline",
   "maintenance",
 ];
+const ELECTRIC_CATEGORIES = ["INVERTER", "METER", "GATEWAY", "SENSOR"] as const;
+type ElectricCategory = (typeof ELECTRIC_CATEGORIES)[number];
 
 function flattenItems(payload: any): any[] {
   if (!payload) return [];
@@ -49,10 +62,7 @@ function flattenItems(payload: any): any[] {
   return [];
 }
 
-function toDeviceEntries(
-  list: any[],
-  type: DeviceTypeKey
-): DeviceEntry[] {
+function toDeviceEntries(list: any[], type: DeviceTypeKey): DeviceEntry[] {
   return list.map((item, idx) => {
     const meta = (item?.meta ?? {}) as Record<string, any>;
     const details = (meta?.details ?? {}) as Record<string, any>;
@@ -77,10 +87,7 @@ function toDeviceEntries(
   });
 }
 
-const DEVICE_SECTIONS: Array<{
-  key: DeviceTypeKey;
-  label: string;
-}> = [
+const DEVICE_SECTIONS: Array<{ key: DeviceTypeKey; label: string }> = [
   { key: "electric", label: "Electric Devices" },
   { key: "water", label: "Water Meter Devices" },
   { key: "air", label: "Air Sensor Devices" },
@@ -114,6 +121,18 @@ export default function ContentDetail({
   const [error, setError] = React.useState<string>("");
   const [editor, setEditor] = React.useState<DeviceEditorState>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [billingPrefs, setBillingPrefs] = React.useState<
+    Record<BillingType, boolean>
+  >(() => ({
+    electric: Boolean(site.allowElectricBilling),
+    water: Boolean(site.allowWaterBilling),
+  }));
+  const [billingSaving, setBillingSaving] = React.useState<
+    Record<BillingType, boolean>
+  >({
+    electric: false,
+    water: false,
+  });
 
   const siteKey = siteInfo.id || site.id || site.code;
 
@@ -140,7 +159,8 @@ export default function ContentDetail({
           ...prev,
           name: s.name ?? prev.name,
           code: s.code ?? prev.code,
-          provinceLabel: s.address_province ?? s.province_code ?? prev.provinceLabel,
+          provinceLabel:
+            s.address_province ?? s.province_code ?? prev.provinceLabel,
           lat: typeof s.lat === "number" ? s.lat : prev.lat,
           lng: typeof s.lng === "number" ? s.lng : prev.lng,
           zipcode: s.zipcode ?? prev.zipcode,
@@ -150,7 +170,23 @@ export default function ContentDetail({
           addressLine: s.address_line ?? prev.addressLine,
           devicesTotal: payload?.counters?.devices_total ?? prev.devicesTotal,
           usersCount: payload?.counters?.users_count ?? prev.usersCount,
+          allowElectricBilling:
+            typeof s.allowElectricBilling === "boolean"
+              ? s.allowElectricBilling
+              : prev.allowElectricBilling,
+          allowWaterBilling:
+            typeof s.allowWaterBilling === "boolean"
+              ? s.allowWaterBilling
+              : prev.allowWaterBilling,
         }));
+        setBillingPrefs({
+          electric: Boolean(
+            s.allowElectricBilling ?? site.allowElectricBilling ?? false
+          ),
+          water: Boolean(
+            s.allowWaterBilling ?? site.allowWaterBilling ?? false
+          ),
+        });
       }
 
       const nextDevices: DeviceMap = {
@@ -188,6 +224,40 @@ export default function ContentDetail({
 
   const siteIdentifier = siteInfo.id || site.id || site.code || "";
 
+  const handleBillingToggle = async (type: BillingType, next: boolean) => {
+    if (!siteIdentifier) return;
+    setBillingPrefs((prev) => ({ ...prev, [type]: next }));
+    setBillingSaving((prev) => ({ ...prev, [type]: true }));
+    try {
+      const payloadKey = BILLING_FIELD_MAP[type];
+      const data = await updateSiteBillingAccess(siteIdentifier, {
+        [payloadKey]: next,
+      });
+      setBillingPrefs({
+        electric: Boolean(data.allowElectricBilling),
+        water: Boolean(data.allowWaterBilling),
+      });
+      setSiteInfo((prev) => ({
+        ...prev,
+        allowElectricBilling: Boolean(data.allowElectricBilling),
+        allowWaterBilling: Boolean(data.allowWaterBilling),
+      }));
+    } catch (err) {
+      console.error("[SiteDetail] billing toggle failed", err);
+      setBillingPrefs((prev) => ({ ...prev, [type]: !next }));
+      show({
+        variant: "error",
+        message: (
+          <span className="text-white font-semibold">
+            ปรับสถานะ Billing ไม่สำเร็จ
+          </span>
+        ),
+      });
+    } finally {
+      setBillingSaving((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
   const handleDeleteDevice = async (device: DeviceEntry) => {
     if (!siteIdentifier) return;
     const confirmed =
@@ -223,7 +293,12 @@ export default function ContentDetail({
     if (!siteIdentifier) return;
     setSubmitting(true);
     try {
-      await submitDeviceByType(type, values, siteIdentifier, editingDevice?.id ?? null);
+      await submitDeviceByType(
+        type,
+        values,
+        siteIdentifier,
+        editingDevice?.id ?? null
+      );
       show({
         variant: "success",
         message: (
@@ -325,7 +400,7 @@ export default function ContentDetail({
         </div>
       </div>
 
-  {error && (
+      {error && (
         <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
@@ -346,92 +421,114 @@ export default function ContentDetail({
       )}
 
       <div className="mt-8 space-y-8">
-        {DEVICE_SECTIONS.map((section) => (
-          <div key={section.key}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">{section.label}</h3>
-              <button
-                type="button"
-                onClick={() =>
-                  setEditor({ type: section.key, mode: "create" })
-                }
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-              >
-                <i className="material-icons-outlined text-sm">add</i>
-                Add device
-              </button>
-            </div>
-            {loading ? (
-              <div className="text-sm text-gray-500">กำลังโหลด...</div>
-            ) : devices[section.key]?.length ? (
-              <div className="overflow-x-auto rounded-lg border border-gray-100">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Device</th>
-                      <th className="px-4 py-2 text-left">Model</th>
-                      <th className="px-4 py-2 text-left">Serial</th>
-                      <th className="px-4 py-2 text-left">Status</th>
-                      <th className="px-4 py-2 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {devices[section.key].map((item) => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-2 font-medium text-gray-900">
-                          {item.name}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700">
-                          {item.model}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700">
-                          {item.serial}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700">
-                          {item.status}
-                        </td>
-                        <td className="px-4 py-2 text-gray-700">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEditor({
-                                  type: section.key,
-                                  mode: "edit",
-                                  device: item,
-                                })
-                              }
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                            >
-                              <i className="material-icons-outlined text-xs">
-                                edit
-                              </i>
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteDevice(item)}
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
-                            >
-                              <i className="material-icons-outlined text-xs">
-                                delete
-                              </i>
-                              Delete
-                            </button>
-                          </div>
-                        </td>
+        {DEVICE_SECTIONS.map((section) => {
+          const billingType = SECTION_BILLING_TYPE[section.key];
+          return (
+            <div key={section.key}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold">{section.label}</h3>
+                <div className="flex items-center gap-3">
+                  {billingType && (
+                    <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        checked={billingPrefs[billingType]}
+                        disabled={billingSaving[billingType]}
+                        onChange={(e) =>
+                          handleBillingToggle(
+                            billingType,
+                            e.target.checked
+                          )
+                        }
+                      />
+                      <span>Enable Billing</span>
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditor({ type: section.key, mode: "create" })
+                    }
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <i className="material-icons-outlined text-sm">add</i>
+                    Add device
+                  </button>
+                </div>
+              </div>
+              {loading ? (
+                <div className="text-sm text-gray-500">กำลังโหลด...</div>
+              ) : devices[section.key]?.length ? (
+                <div className="overflow-x-auto rounded-lg border border-gray-100">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Device</th>
+                        <th className="px-4 py-2 text-left">Model</th>
+                        <th className="px-4 py-2 text-left">Serial</th>
+                        <th className="px-4 py-2 text-left">Status</th>
+                        <th className="px-4 py-2 text-left">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">
-                ยังไม่มีอุปกรณ์ในหมวดนี้
-              </div>
-            )}
-          </div>
-        ))}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {devices[section.key].map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-4 py-2 font-medium text-gray-900">
+                            {item.name}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700">
+                            {item.model}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700">
+                            {item.serial}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700">
+                            {item.status}
+                          </td>
+                          <td className="px-4 py-2 text-gray-700">
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditor({
+                                    type: section.key,
+                                    mode: "edit",
+                                    device: item,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                              >
+                                <i className="material-icons-outlined text-xs">
+                                  edit
+                                </i>
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteDevice(item)}
+                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
+                              >
+                                <i className="material-icons-outlined text-xs">
+                                  delete
+                                </i>
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  ยังไม่มีอุปกรณ์ในหมวดนี้
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -453,6 +550,7 @@ async function submitDeviceByType(
     typeof values.name === "string" && values.name.trim().length > 0
       ? values.name.trim()
       : undefined;
+  const electricCategory = normalizeElectricCategory(values.category);
 
   if (editingDeviceId) {
     await updateSiteDevice(siteId, editingDeviceId, {
@@ -461,7 +559,7 @@ async function submitDeviceByType(
       ipAddress: normalizedIp,
       deviceKey: type === "electric" ? undefined : values.deviceKey?.trim(),
       sn: values.sn?.trim(),
-      category: type === "electric" ? ((values.category as any) ?? "INVERTER") : undefined,
+      category: type === "electric" ? electricCategory : undefined,
     });
     return;
   }
@@ -469,7 +567,7 @@ async function submitDeviceByType(
   if (type === "electric") {
     await registerElectricDevice({
       siteId,
-      category: (values.category as any) || "INVERTER",
+      category: electricCategory,
       sn: values.sn,
       ipAddress: normalizedIp ?? undefined,
       status,
@@ -512,8 +610,11 @@ function DeviceForm({
   onSubmit,
 }: DeviceFormProps) {
   const isElectric = type === "electric";
+  const defaultCategory = normalizeElectricCategory(
+    extractCategory(device?.model)
+  );
   const [form, setForm] = React.useState<Record<string, string>>({
-    category: isElectric ? extractCategory(device?.model) ?? "INVERTER" : "",
+    category: isElectric ? defaultCategory : "",
     sn: device?.serial ?? "",
     status: (device?.status as any) ?? "online",
     name: device?.name ?? "",
@@ -569,10 +670,11 @@ function DeviceForm({
               onChange={(e) => handleChange("category", e.target.value)}
               className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
             >
-              <option value="INVERTER">INVERTER</option>
-              <option value="METER">METER</option>
-              <option value="GATEWAY">GATEWAY</option>
-              <option value="SENSOR">SENSOR</option>
+              {ELECTRIC_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -599,9 +701,7 @@ function DeviceForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="text-sm font-semibold block mb-2">
-            Status
-          </label>
+          <label className="text-sm font-semibold block mb-2">Status</label>
           <select
             value={form.status}
             onChange={(e) => handleChange("status", e.target.value)}
@@ -659,10 +759,33 @@ function DeviceForm({
   );
 }
 
-function extractCategory(model?: string): string | undefined {
+function normalizeElectricCategory(value: unknown): ElectricCategory {
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (
+      normalized === "INVERTER" ||
+      normalized === "METER" ||
+      normalized === "GATEWAY" ||
+      normalized === "SENSOR"
+    ) {
+      return normalized as ElectricCategory;
+    }
+  }
+  return "INVERTER";
+}
+
+function extractCategory(model?: string): ElectricCategory | undefined {
   if (!model) return undefined;
-  const parts = model.split(":");
-  if (parts.length >= 2) return parts[0]?.toUpperCase();
+  const candidate = model.split(":")[0];
+  const normalized = candidate?.trim().toUpperCase();
+  if (
+    normalized === "INVERTER" ||
+    normalized === "METER" ||
+    normalized === "GATEWAY" ||
+    normalized === "SENSOR"
+  ) {
+    return normalized as ElectricCategory;
+  }
   return undefined;
 }
 
