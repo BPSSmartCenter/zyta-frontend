@@ -235,7 +235,7 @@ export default function ContentDetail({
           await navigator.clipboard.writeText(device.id);
         }
         show({
-          variant: "info",
+          variant: "normal",
           message: (
             <span className="font-semibold text-gray-900">
               Copy ID: {device.id}
