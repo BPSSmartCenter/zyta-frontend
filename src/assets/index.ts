@@ -61,8 +61,10 @@ import cyanBaht from "./Cyanbaht.png";
 import whiteBaht from "./Whitebaht.png";
 import cyanTrend from "./Cyantrend.png";
 import whiteTrend from "./Whitetrend.png";
+import meaLogo from "./MEALOGO.png";
 
 export {
+  meaLogo,
   cyanTrend,
   whiteTrend,
   cyanBaht,

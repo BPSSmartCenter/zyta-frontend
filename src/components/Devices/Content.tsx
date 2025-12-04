@@ -55,7 +55,7 @@ export default function Content({}: Props) {
 
   const { abs, absSite } = useUserPath();
   const { siteCode } = useParams();
-  const { counts: inventoryCounts } = useDeviceInventory();
+  const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
   const { selectedSite } = useFilters();
 
   useDeviceInventoryLoader({
@@ -126,6 +126,7 @@ export default function Content({}: Props) {
     siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : undefined);
   const currentBillingType = BILLING_TYPE_BY_URL[urlType] ?? null;
   const [billingGuardOpen, setBillingGuardOpen] = useState(false);
+  const [siteDeviceGuardOpen, setSiteDeviceGuardOpen] = useState(false);
   const [billingDisabledOpen, setBillingDisabledOpen] = useState(false);
   const [billingAllowed, setBillingAllowed] = useState(false);
   const [billingAccess, setBillingAccess] = useState<SiteBillingAccess | null>(null);
@@ -181,6 +182,28 @@ export default function Content({}: Props) {
   const showBillingButton = Boolean(currentBillingType);
   const billingButtonDisabled =
     billingAccessLoading || !billingAllowed || !effectiveSiteCode;
+  const hasSpecificSite = effectiveSiteCode && effectiveSiteCode !== "all";
+  const totalDeviceCount = useMemo(() => {
+    return Object.values(inventoryCounts ?? {}).reduce((sum, value) => {
+      const num = typeof value === "number" ? value : 0;
+      return sum + num;
+    }, 0);
+  }, [inventoryCounts]);
+  useEffect(() => {
+    if (hasSpecificSite && !inventoryLoading && totalDeviceCount <= 0) {
+      setSiteDeviceGuardOpen(true);
+    } else {
+      setSiteDeviceGuardOpen(false);
+    }
+  }, [hasSpecificSite, inventoryLoading, totalDeviceCount]);
+  const handleDeviceGuardClose = useCallback(() => {
+    setSiteDeviceGuardOpen(false);
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate(abs("/dashboard"), { replace: true });
+  }, [navigate, abs]);
 
   return (
     <>
@@ -279,6 +302,15 @@ export default function Content({}: Props) {
         <div className="mt-6" />
       )}
 
+      <Modal
+        open={siteDeviceGuardOpen}
+        id="devices-site-blocked"
+        icon="warning"
+        title="ไม่สามารถเข้าถึงหน้า Devices ได้"
+        message="Site นี้ยังไม่มีอุปกรณ์ในระบบ กรุณาเลือก Site อื่น"
+        closeLabel="ย้อนกลับ"
+        onClose={handleDeviceGuardClose}
+      />
       <Modal
         open={billingGuardOpen}
         id="devices-billing-site-required"

@@ -1,5 +1,6 @@
 import React from "react";
 import { lookupThaiAddress } from "../../api/thaiAddress";
+import Dropdown from "../Dropdown";
 
 type CreatePayload = {
   name: string;
@@ -11,6 +12,7 @@ type CreatePayload = {
   addressDistrict?: string;
   addressSubDistrict?: string;
   addressLine?: string;
+  brandingLogoDataUrl?: string;
 };
 
 type Props = {
@@ -28,6 +30,10 @@ export default function ContentCreate({
     name: "",
     code: "",
   });
+  const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
+  const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const logoInputRef = React.useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [districtOptions, setDistrictOptions] = React.useState<string[]>([]);
   const [subDistrictOptions, setSubDistrictOptions] = React.useState<string[]>(
@@ -38,8 +44,26 @@ export default function ContentCreate({
   >("idle");
   const [zipMessage, setZipMessage] = React.useState<string>("");
   const lastLookupRef = React.useRef<string>("");
-  const districtListId = React.useId();
-  const subDistrictListId = React.useId();
+
+  const districtDropdownOptions = React.useMemo(() => {
+    if (!districtOptions.length) return [];
+    const list = districtOptions.map((value) => ({ value, label: value }));
+    const current = form.addressDistrict?.trim();
+    if (current && !list.some((opt) => opt.value === current)) {
+      list.unshift({ value: current, label: current });
+    }
+    return list;
+  }, [districtOptions, form.addressDistrict]);
+
+  const subDistrictDropdownOptions = React.useMemo(() => {
+    if (!subDistrictOptions.length) return [];
+    const list = subDistrictOptions.map((value) => ({ value, label: value }));
+    const current = form.addressSubDistrict?.trim();
+    if (current && !list.some((opt) => opt.value === current)) {
+      list.unshift({ value: current, label: current });
+    }
+    return list;
+  }, [subDistrictOptions, form.addressSubDistrict]);
 
   const handleChange = (field: keyof CreatePayload, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -71,6 +95,7 @@ export default function ContentCreate({
       addressDistrict: form.addressDistrict?.trim() || undefined,
       addressSubDistrict: form.addressSubDistrict?.trim() || undefined,
       addressLine: form.addressLine?.trim() || undefined,
+      brandingLogoDataUrl: logoDataUrl ?? undefined,
     });
   };
 
@@ -130,6 +155,34 @@ export default function ContentCreate({
     }
   }, [form.zipcode]);
 
+  const handleLogoFile = async (file: File | null) => {
+    if (!file) {
+      setLogoDataUrl(null);
+      setLogoPreview(null);
+      setLogoError(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setLogoError("กรุณาเลือกไฟล์รูปภาพ");
+      return;
+    }
+    if (file.size > 2.5 * 1024 * 1024) {
+      setLogoError("ไฟล์ต้องไม่เกิน 2.5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      setLogoDataUrl(result);
+      setLogoPreview(result);
+      setLogoError(null);
+    };
+    reader.onerror = () => {
+      setLogoError("ไม่สามารถอ่านไฟล์ได้");
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="mt-6 p-6 bg-white rounded-lg">
       <div className="flex items-center gap-3 pb-4 border-b">
@@ -146,6 +199,7 @@ export default function ContentCreate({
             กรอกข้อมูลเบื้องต้นเพื่อเพิ่ม Site เข้าระบบ
           </p>
         </div>
+
       </div>
 
       <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
@@ -163,6 +217,53 @@ export default function ContentCreate({
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
           )}
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            Branding logo
+          </label>
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 flex flex-col gap-3">
+            {logoPreview ? (
+              <img
+                src={logoPreview}
+                alt="Site logo preview"
+                className="h-20 w-32 object-contain mx-auto"
+              />
+            ) : (
+              <p className="text-xs text-slate-500 text-center">
+                อัปโหลดโลโก้ที่จะใช้แสดงบนรายงาน (PNG / JPG / WEBP ไม่เกิน 2.5MB)
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold hover:bg-cyan-500 cursor-pointer"
+              >
+                {logoPreview ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+              </button>
+              {logoPreview && (
+                <button
+                  type="button"
+                  onClick={() => handleLogoFile(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-white cursor-pointer"
+                >
+                  ลบรูป
+                </button>
+              )}
+            </div>
+            {logoError && (
+              <p className="text-xs text-red-500 text-center">{logoError}</p>
+            )}
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            className="hidden"
+            onChange={(event) => handleLogoFile(event.target.files?.[0] ?? null)}
+          />
         </div>
 
         <div>
@@ -259,19 +360,72 @@ export default function ContentCreate({
             <label className="font-semibold text-sm block mb-2">
               District
             </label>
-            <input
-              type="text"
-              list={districtListId}
+            <Dropdown
+              options={districtDropdownOptions}
               value={form.addressDistrict ?? ""}
-              onChange={(e) => handleChange("addressDistrict", e.target.value)}
-              className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="อำเภอ"
-            />
-            <datalist id={districtListId}>
-              {districtOptions.map((opt) => (
-                <option key={opt} value={opt} />
-              ))}
-            </datalist>
+              onChange={(value) => handleChange("addressDistrict", value)}
+            >
+              {({
+                open,
+                selected,
+                getButtonProps,
+                getMenuProps,
+                getItemProps,
+                options,
+              }) => {
+                const disabled = options.length === 0;
+                return (
+                  <div className="relative w-full">
+                    <button
+                      {...getButtonProps({
+                        disabled,
+                        className: [
+                          "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50",
+                          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                        ].join(" "),
+                      })}
+                    >
+                      <span className="truncate">
+                        {selected?.label ??
+                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกอำเภอ")}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-slate-500 transition ${open ? "rotate-180" : ""}`}
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 8l4 4 4-4" />
+                      </svg>
+                    </button>
+                    {open && !disabled && (
+                      <div
+                        {...getMenuProps({
+                          className:
+                            "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                        })}
+                      >
+                        {options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            {...getItemProps(opt, {
+                              className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                                opt.value === form.addressDistrict
+                                  ? "text-cyan-600 font-semibold"
+                                  : "text-slate-700"
+                              } hover:bg-slate-50 cursor-pointer`,
+                            })}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            </Dropdown>
           </div>
         </div>
 
@@ -280,21 +434,72 @@ export default function ContentCreate({
             <label className="font-semibold text-sm block mb-2">
               Sub-district
             </label>
-            <input
-              type="text"
-              list={subDistrictListId}
+            <Dropdown
+              options={subDistrictDropdownOptions}
               value={form.addressSubDistrict ?? ""}
-              onChange={(e) =>
-                handleChange("addressSubDistrict", e.target.value)
-              }
-              className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="ตำบล"
-            />
-            <datalist id={subDistrictListId}>
-              {subDistrictOptions.map((opt) => (
-                <option key={opt} value={opt} />
-              ))}
-            </datalist>
+              onChange={(value) => handleChange("addressSubDistrict", value)}
+            >
+              {({
+                open,
+                selected,
+                getButtonProps,
+                getMenuProps,
+                getItemProps,
+                options,
+              }) => {
+                const disabled = options.length === 0;
+                return (
+                  <div className="relative w-full">
+                    <button
+                      {...getButtonProps({
+                        disabled,
+                        className: [
+                          "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50",
+                          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                        ].join(" "),
+                      })}
+                    >
+                      <span className="truncate">
+                        {selected?.label ??
+                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกตำบล")}
+                      </span>
+                      <svg
+                        className={`h-4 w-4 text-slate-500 transition ${open ? "rotate-180" : ""}`}
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M6 8l4 4 4-4" />
+                      </svg>
+                    </button>
+                    {open && !disabled && (
+                      <div
+                        {...getMenuProps({
+                          className:
+                            "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                        })}
+                      >
+                        {options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            {...getItemProps(opt, {
+                              className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                                opt.value === form.addressSubDistrict
+                                  ? "text-cyan-600 font-semibold"
+                                  : "text-slate-700"
+                              } hover:bg-slate-50 cursor-pointer`,
+                            })}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            </Dropdown>
           </div>
           <div className="flex flex-col justify-end">
             <p className="text-xs text-gray-500">

@@ -7,6 +7,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
+import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
+import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import RingRunner from "../components/RingRunner";
 import MeterDetail from "../components/ElectricMeterDashboard/MeterDetail";
 import BillingHistoryTable from "../components/ElectricMeterDashboard/BillingHistoryTable";
@@ -57,11 +59,12 @@ export const ElectricMeter: React.FC = () => {
   const [dashboard, setDashboard] = React.useState<MeterDashboard | null>(null);
   const [loadingMeter, setLoadingMeter] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [siteGuardOpen, setSiteGuardOpen] = React.useState(false);
+  const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
+  const [guardType, setGuardType] = React.useState<"none" | "select" | "blocked">("none");
   const [downloadingHistoryId, setDownloadingHistoryId] = React.useState<string | null>(null);
+  const [rangeLabel, setRangeLabel] = React.useState(() => computeFixedRange().label);
   const navigate = useNavigate();
   const { abs } = useUserPath();
-
   React.useEffect(() => {
     if (!meterOptions.length) {
       setSelectedMeter(null);
@@ -78,16 +81,30 @@ export const ElectricMeter: React.FC = () => {
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection =
     !normalizedSite || normalizedSite === "all";
+  useDeviceInventoryLoader({
+    selectedSiteCode: !requiresSiteSelection ? normalizedSite : undefined,
+    enabled: !requiresSiteSelection,
+  });
+  const electricDeviceCount = getCountForType(inventoryCounts as any, "electricmeter" as any);
+  const noElectricAccess =
+    !requiresSiteSelection &&
+    normalizedSite !== "all" &&
+    !inventoryLoading &&
+    electricDeviceCount <= 0;
 
   React.useEffect(() => {
-    setSiteGuardOpen(requiresSiteSelection);
-  }, [requiresSiteSelection]);
+    if (requiresSiteSelection) setGuardType("select");
+    else if (noElectricAccess) setGuardType("blocked");
+    else setGuardType("none");
+  }, [requiresSiteSelection, noElectricAccess]);
+  const siteGuardOpen = guardType !== "none";
 
-  const loadMeterDashboard = React.useCallback(async (deviceId: string) => {
+  const loadMeterDashboard = React.useCallback(
+    async (deviceId: string, params?: { startDate?: string; endDate?: string }) => {
     setLoadingMeter(true);
     try {
       setError(null);
-      const data = await getMeterDashboard(deviceId);
+      const data = await getMeterDashboard(deviceId, params);
       setDashboard(data);
     } catch (err) {
       console.error("[ElectricMeter] dashboard failed", err);
@@ -96,7 +113,9 @@ export const ElectricMeter: React.FC = () => {
     } finally {
       setLoadingMeter(false);
     }
-  }, []);
+    },
+    []
+  );
 
   const handleDownloadHistoryPdf = React.useCallback(async (billId: string) => {
     setDownloadingHistoryId(billId);
@@ -145,48 +164,106 @@ export const ElectricMeter: React.FC = () => {
       setDashboard(null);
       return;
     }
-    loadMeterDashboard(selectedMeter.id);
+    const fixedRange = computeFixedRange();
+    setRangeLabel(fixedRange.label);
+    loadMeterDashboard(selectedMeter.id, {
+      startDate: fixedRange.startIso,
+      endDate: fixedRange.endIso,
+    });
   }, [selectedMeter, loadMeterDashboard]);
 
   const handleSiteGuardClose = React.useCallback(() => {
-    setSiteGuardOpen(false);
+    setGuardType("none");
     navigate(abs("/dashboard"), { replace: true });
   }, [navigate, abs]);
+  const siteGuardConfig =
+    guardType === "blocked"
+      ? {
+          title: "ไม่สามารถใช้งาน Electric Dashboard ได้",
+          message: "Site นี้ยังไม่มีอุปกรณ์ไฟฟ้าที่รองรับ กรุณาเลือก Site อื่น",
+          closeLabel: "ย้อนกลับ",
+        }
+      : {
+          title: "กรุณาเลือก Site ก่อนใช้งาน",
+          message: "โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานฟีเจอร์ไฟฟ้า",
+          closeLabel: "โอเค",
+        };
+
+  const rangeOnPeakValue = dashboard?.totals.onPeakKwh ?? 0;
+  const rangeOffPeakValue = dashboard?.totals.offPeakKwh ?? 0;
+  const heroUsageValue =
+    dashboard?.totals.energyUsageKwh ??
+    rangeOnPeakValue +
+      rangeOffPeakValue;
+  const todayBaseKwh =
+    dashboard?.realtime?.totalKwh ?? dashboard?.totals.todayKwh ?? 0;
+  const realtimeOnPeakValue =
+    dashboard?.realtime?.onPeakKwh ??
+    dashboard?.totals.todayOnPeakKwh ??
+    0;
+  const realtimeOffPeakValue =
+    dashboard?.realtime?.offPeakKwh ??
+    dashboard?.totals.todayOffPeakKwh ??
+    Math.max(0, todayBaseKwh - realtimeOnPeakValue);
+  const realtimeTotalValue =
+    dashboard?.realtime?.totalKwh ??
+    realtimeOnPeakValue + realtimeOffPeakValue;
+  const realtimeVoltageValue =
+    dashboard?.realtime?.voltage ??
+    dashboard?.lastReading?.voltage ??
+    null;
+  const realtimeTimestamp =
+    dashboard?.realtime?.timestamp ??
+    dashboard?.lastReading?.timestamp ??
+    null;
+  const voltageDisplay =
+    typeof realtimeVoltageValue === "number" && Number.isFinite(realtimeVoltageValue)
+      ? `${realtimeVoltageValue.toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        })} V`
+      : "-";
 
   const meterDetailData = React.useMemo(() => {
     if (!selectedMeter) return null;
     if (!dashboard) return selectedMeter;
-    const lastReadingText = dashboard.lastReading
-      ? `${dashboard.lastReading.value.toLocaleString(undefined, {
-          maximumFractionDigits: 2,
-        })} kWh`
-      : selectedMeter.lastReading ?? "-";
+    const lastReadingValue = dashboard.lastReading
+      ? dashboard.lastReading.value ??
+        (dashboard.lastReading.onPeakKwh ?? 0) +
+          (dashboard.lastReading.offPeakKwh ?? 0)
+      : undefined;
+    const lastReadingText =
+      typeof lastReadingValue === "number"
+        ? `${lastReadingValue.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+          })} kWh`
+        : selectedMeter.lastReading ?? "-";
     const lastSyncText = dashboard.lastReading
       ? formatDateTime(dashboard.lastReading.timestamp)
       : selectedMeter.lastSync ?? "-";
+    const todayRealtimeValue = dashboard.realtime ? realtimeTotalValue : undefined;
     return {
       ...selectedMeter,
-      todayKwh: dashboard.totals.todayKwh || dashboard.totals.energyUsageKwh,
+      todayKwh:
+        todayRealtimeValue ??
+        dashboard.totals.todayKwh ??
+        heroUsageValue,
       lastReading: lastReadingText,
       lastSync: lastSyncText,
       billingStatus: dashboard.device.billingStatus ?? selectedMeter.billingStatus,
     };
-  }, [selectedMeter, dashboard]);
+  }, [selectedMeter, dashboard, realtimeTotalValue, heroUsageValue]);
 
   const heroTitle = meterDetailData
     ? `${meterDetailData.siteName} - ${meterDetailData.name}`
     : "กรุณาเลือกมิเตอร์";
-  const heroUsageValue = dashboard?.totals.energyUsageKwh ?? 0;
   const trendDirection = dashboard
-    ? heroUsageValue >= (dashboard.totals.todayKwh ?? 0)
+    ? heroUsageValue >= todayBaseKwh
       ? "up"
       : "down"
     : "up";
   const totalCostValue = dashboard?.cost.totalCost ?? 0;
-  const onPeakValue = dashboard?.totals.onPeakKwh ?? 0;
-  const offPeakValue = dashboard?.totals.offPeakKwh ?? 0;
-  const onPeakCostValue = dashboard?.cost.onPeakCost ?? 0;
-  const offPeakCostValue = dashboard?.cost.offPeakCost ?? 0;
+  const onPeakValue = realtimeOnPeakValue;
+  const offPeakValue = realtimeOffPeakValue;
   const isTrendUp = trendDirection === "up";
   const trendColor = isTrendUp ? "#EC0357" : C.thisMonth;
 
@@ -337,6 +414,12 @@ export const ElectricMeter: React.FC = () => {
               กำลังโหลดข้อมูลมิเตอร์...
             </div>
           )}
+
+          <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[#1b3c58] bg-[#05172c] px-5 py-3 text-white">
+            <span className="text-sm font-semibold text-white/80">
+              {rangeLabel}
+            </span>
+          </div>
 
           <MeterDetail
             meter={meterDetailData}
@@ -500,9 +583,9 @@ export const ElectricMeter: React.FC = () => {
 
               {/* Block-1 */}
               <div className="items-center grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1.1fr_1.1fr]">
-                <div className="flex flex-col justify-center gap-0 h-full mb-[50px]">
+                <div className="flex flex-col justify-center gap-3 h-full mb-[50px]">
                   <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
-                    ENERGY USAGE
+                    ENERGY USAGE (Realtime)
                   </div>
 
                   <div className="flex items-end gap-3">
@@ -510,23 +593,18 @@ export const ElectricMeter: React.FC = () => {
                       className="font-semibold leading-[1]"
                       style={{ color: C.num, fontSize: "56px" }}
                     >
-                      {heroUsageValue.toLocaleString()}
+                      {realtimeTotalValue.toLocaleString(undefined, {
+                        maximumFractionDigits: 3,
+                      })}
                     </div>
                     <div className="pb-[8px] text-[22px] text-[#24c2e5] opacity-85">kWh</div>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-3 text-[17px] font-semibold">
-                    <span
-                      className="inline-flex items-center gap-1"
-                      style={{ color: trendColor }}
-                    >
-                      {trendArrowIcon}
-                      This Month
-                    </span>
-                    <span className="opacity-60">vs</span>
-                    <span className="opacity-90" style={{ color: C.lastMonth }}>
-                      Last Month
-                    </span>
+                  <div className="text-sm font-medium text-white/70">
+                    อัปเดตล่าสุด:{" "}
+                    {realtimeTimestamp
+                      ? formatDateTime(realtimeTimestamp)
+                      : "ยังไม่มีข้อมูลวันนี้"}
                   </div>
                 </div>
 
@@ -577,8 +655,8 @@ export const ElectricMeter: React.FC = () => {
                       }}
                     >
                       <svg
-                        width="38"
-                        height="38"
+                        width="42"
+                        height="42"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke={C.num}
@@ -586,36 +664,25 @@ export const ElectricMeter: React.FC = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 2v2" />
-                        <path d="M12 20v2" />
-                        <path d="m4.93 4.93 1.41 1.41" />
-                        <path d="m17.66 17.66 1.41 1.41" />
-                        <path d="M2 12h2" />
-                        <path d="M20 12h2" />
+                        <path d="M12 2v4" />
+                        <path d="M12 18v4" />
+                        <path d="m4.93 4.93 2.83 2.83" />
+                        <path d="m16.24 16.24 2.83 2.83" />
+                        <path d="M2 12h4" />
+                        <path d="M18 12h4" />
+                        <circle cx="12" cy="12" r="5" />
                       </svg>
                     </div>
                     <div className="text-center text-[15px] font-semibold uppercase tracking-[0.25em] text-white">
-                      COST BREAKDOWN
+                      VOLT DISPLAY
                     </div>
                     <div className="text-3xl font-semibold" style={{ color: C.num }}>
-                      ฿{" "}
-                      {totalCostValue.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {voltageDisplay}
                     </div>
                     <div className="text-xs text-white/70">
-                      On Peak: ฿{" "}
-                      {onPeakCostValue.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      / Off Peak: ฿{" "}
-                      {offPeakCostValue.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                      {realtimeTimestamp
+                        ? `อัปเดต ${formatDateTime(realtimeTimestamp)}`
+                        : "รอข้อมูลแรงดันจากมิเตอร์"}
                     </div>
                   </div>
                 </div>
@@ -655,17 +722,17 @@ export const ElectricMeter: React.FC = () => {
           </div>
         </div>
       </div>
-      </Sidebar>
-      <Modal
-        open={siteGuardOpen}
-        id="electric-site-required"
-        icon="cancel"
-        title="กรุณาเลือก Site ก่อนใช้งาน"
-        message="โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานเมนูการคำนวณค่าไฟ"
-        closeLabel="โอเค"
-        onClose={handleSiteGuardClose}
-      />
-    </>
+    </Sidebar>
+    <Modal
+      open={siteGuardOpen}
+      id="electric-site-required"
+      icon="cancel"
+      title={siteGuardConfig.title}
+      message={siteGuardConfig.message}
+      closeLabel={siteGuardConfig.closeLabel}
+      onClose={handleSiteGuardClose}
+    />
+  </>
   );
 };
 
@@ -681,9 +748,11 @@ function mapDeviceToMeterOption(device: any, siteLabel: string): MeterOption {
       : statusRaw === "maintenance"
       ? "warning"
       : "offline";
+  const rawId = device?.id ?? device?.model ?? "";
+  const normalizedId = typeof rawId === "string" ? rawId : String(rawId);
 
   return {
-    id: device?.id ?? device?.model ?? "",
+    id: normalizedId,
     name:
       details?.name ??
       (typeof device?.model === "string"
@@ -723,5 +792,36 @@ function formatDateTime(value: string | Date) {
 function formatNumber(value: number) {
   return value.toLocaleString(undefined, {
     maximumFractionDigits: 2,
+  });
+}
+
+type FixedRangeInfo = {
+  startIso: string;
+  endIso: string;
+  label: string;
+};
+
+function computeFixedRange(): FixedRangeInfo {
+  const now = new Date();
+  const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  const endThisMonth = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+  const endLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  return {
+    startIso: startThisMonth.toISOString(),
+    endIso: endThisMonth.toISOString(),
+    label: `เดือนนี้: ${formatRangeDate(startThisMonth)} - ${formatRangeDate(
+      endThisMonth
+    )} (ปัจจุบัน) | เดือนก่อน: ${formatRangeDate(startLastMonth)} - ${formatRangeDate(
+      endLastMonth
+    )}`,
+  };
+}
+
+function formatRangeDate(date: Date) {
+  return date.toLocaleDateString("th-TH", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }

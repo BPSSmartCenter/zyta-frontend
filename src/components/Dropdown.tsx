@@ -34,6 +34,7 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
 
   id?: string;
+  className?: string;
   children: (ctx: RenderCtx) => React.ReactNode;
 };
 
@@ -44,6 +45,7 @@ function DropdownBase({
   isOpen,
   onOpenChange,
   id = "dropdown",
+  className,
   children,
 }: Props) {
   const [openUncontrolled, setOpenUncontrolled] = useState(false);
@@ -123,7 +125,10 @@ function DropdownBase({
   });
 
   return (
-    <div ref={rootRef} className="relative inline-flex">
+    <div
+      ref={rootRef}
+      className={className ?? "relative inline-flex"}
+    >
       {children({
         open,
         toggle,

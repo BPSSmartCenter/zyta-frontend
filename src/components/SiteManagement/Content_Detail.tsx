@@ -12,7 +12,8 @@ import {
   type DeviceTypeKey,
 } from "../../api/devices";
 import { useToast } from "../../hook/toastProvider";
-import type { BillingType } from "../../types/billing";
+import type { BillingType, SiteBillingAccess } from "../../types/billing";
+import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type Props = {
   site: SiteRow;
@@ -39,11 +40,6 @@ const DEVICE_TYPES: DeviceTypeKey[] = ["electric", "water", "air", "camera"];
 const SECTION_BILLING_TYPE: Partial<Record<DeviceTypeKey, BillingType>> = {
   electric: "electric",
   water: "water",
-};
-
-const BILLING_FIELD_MAP: Record<BillingType, "allowElectricBilling" | "allowWaterBilling"> = {
-  electric: "allowElectricBilling",
-  water: "allowWaterBilling",
 };
 
 const STATUS_OPTIONS: Array<"online" | "offline" | "maintenance"> = [
@@ -94,6 +90,25 @@ const DEVICE_SECTIONS: Array<{ key: DeviceTypeKey; label: string }> = [
   { key: "camera", label: "CCTV Devices" },
 ];
 
+const PAGE_SIZE = 10;
+
+type BillingRateState = {
+  baseOnPeak: string;
+  baseOffPeak: string;
+  discountRate: string;
+};
+
+function formatRateInput(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+}
+
+function formatDiscountPercent(value?: number | null) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(Number((value * 100).toFixed(4)));
+  }
+  return "";
+}
+
 type DeviceEditorState =
   | {
       type: DeviceTypeKey;
@@ -133,8 +148,64 @@ export default function ContentDetail({
     electric: false,
     water: false,
   });
+  const [billingRates, setBillingRates] = React.useState<BillingRateState>(() => ({
+    baseOnPeak: formatRateInput(site.billingOnPeakRate ?? null),
+    baseOffPeak: formatRateInput(site.billingOffPeakRate ?? null),
+    discountRate: formatDiscountPercent(site.billingDiscountRate ?? null),
+  }));
+  const [billingConfigSaving, setBillingConfigSaving] = React.useState(false);
+  const [activeDeviceType, setActiveDeviceType] = React.useState<DeviceTypeKey>(
+    DEVICE_SECTIONS[0]?.key ?? "electric"
+  );
+  const [deviceSearch, setDeviceSearch] = React.useState("");
+  const [devicePage, setDevicePage] = React.useState(1);
 
   const siteKey = siteInfo.id || site.id || site.code;
+  const activeDevices = React.useMemo(
+    () => devices[activeDeviceType] ?? [],
+    [devices, activeDeviceType]
+  );
+  const filteredDevices = React.useMemo(() => {
+    if (!deviceSearch.trim()) return activeDevices;
+    const term = deviceSearch.toLowerCase();
+    return activeDevices.filter((device) => {
+      return (
+        device.name.toLowerCase().includes(term) ||
+        device.model.toLowerCase().includes(term) ||
+        device.serial.toLowerCase().includes(term) ||
+        (device.ipAddress ?? "").toLowerCase().includes(term)
+      );
+    });
+  }, [activeDevices, deviceSearch]);
+  const totalPages = Math.max(
+    1,
+    Math.ceil(Math.max(filteredDevices.length, 1) / PAGE_SIZE)
+  );
+  React.useEffect(() => {
+    const nextMax = Math.max(
+      1,
+      Math.ceil(Math.max(filteredDevices.length, 1) / PAGE_SIZE)
+    );
+    if (devicePage > nextMax) {
+      setDevicePage(nextMax);
+    }
+  }, [filteredDevices.length, devicePage]);
+  const paginatedDevices = React.useMemo(() => {
+    const start = (devicePage - 1) * PAGE_SIZE;
+    return filteredDevices.slice(start, start + PAGE_SIZE);
+  }, [filteredDevices, devicePage]);
+  const paginationLabel =
+    filteredDevices.length === 0
+      ? "0 รายการ"
+      : `${(devicePage - 1) * PAGE_SIZE + 1}-${Math.min(
+          filteredDevices.length,
+          devicePage * PAGE_SIZE
+        )} จาก ${filteredDevices.length} รายการ`;
+  const activeBillingType = SECTION_BILLING_TYPE[activeDeviceType];
+  const brandingLogoSrc = React.useMemo(
+    () => buildBrandingLogoSrc(siteInfo.brandingLogoUrl ?? null),
+    [siteInfo.brandingLogoUrl]
+  );
 
   const loadDetail = React.useCallback(async () => {
     if (!siteKey) return;
@@ -178,6 +249,18 @@ export default function ContentDetail({
             typeof s.allowWaterBilling === "boolean"
               ? s.allowWaterBilling
               : prev.allowWaterBilling,
+          billingOnPeakRate:
+            typeof s.billingOnPeakRate === "number"
+              ? s.billingOnPeakRate
+              : prev.billingOnPeakRate,
+          billingOffPeakRate:
+            typeof s.billingOffPeakRate === "number"
+              ? s.billingOffPeakRate
+              : prev.billingOffPeakRate,
+          billingDiscountRate:
+            typeof s.billingDiscountRate === "number"
+              ? s.billingDiscountRate
+              : prev.billingDiscountRate,
         }));
         setBillingPrefs({
           electric: Boolean(
@@ -185,6 +268,17 @@ export default function ContentDetail({
           ),
           water: Boolean(
             s.allowWaterBilling ?? site.allowWaterBilling ?? false
+          ),
+        });
+        setBillingRates({
+          baseOnPeak: formatRateInput(
+            (s as any).billingOnPeakRate ?? site.billingOnPeakRate ?? null
+          ),
+          baseOffPeak: formatRateInput(
+            (s as any).billingOffPeakRate ?? site.billingOffPeakRate ?? null
+          ),
+          discountRate: formatDiscountPercent(
+            (s as any).billingDiscountRate ?? site.billingDiscountRate ?? null
           ),
         });
       }
@@ -257,24 +351,117 @@ export default function ContentDetail({
     [show]
   );
 
-  const handleBillingToggle = async (type: BillingType, next: boolean) => {
-    if (!siteIdentifier) return;
-    setBillingPrefs((prev) => ({ ...prev, [type]: next }));
-    setBillingSaving((prev) => ({ ...prev, [type]: true }));
-    try {
-      const payloadKey = BILLING_FIELD_MAP[type];
-      const data = await updateSiteBillingAccess(siteIdentifier, {
-        [payloadKey]: next,
-      });
+  const handleRateInputChange =
+    (key: keyof BillingRateState) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.target;
+      setBillingRates((prev) => ({ ...prev, [key]: value }));
+    };
+
+  const handleDeviceTabChange = (type: DeviceTypeKey) => {
+    setActiveDeviceType(type);
+    setDeviceSearch("");
+    setDevicePage(1);
+  };
+
+  const handleDeviceSearchChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setDeviceSearch(event.target.value);
+    setDevicePage(1);
+  };
+
+  const applyBillingResponse = React.useCallback(
+    (data: SiteBillingAccess) => {
       setBillingPrefs({
         electric: Boolean(data.allowElectricBilling),
         water: Boolean(data.allowWaterBilling),
+      });
+      setBillingRates({
+        baseOnPeak: formatRateInput(data.billingOnPeakRate),
+        baseOffPeak: formatRateInput(data.billingOffPeakRate),
+        discountRate: formatDiscountPercent(data.billingDiscountRate),
       });
       setSiteInfo((prev) => ({
         ...prev,
         allowElectricBilling: Boolean(data.allowElectricBilling),
         allowWaterBilling: Boolean(data.allowWaterBilling),
+        billingOnPeakRate: data.billingOnPeakRate,
+        billingOffPeakRate: data.billingOffPeakRate,
+        billingDiscountRate: data.billingDiscountRate,
       }));
+    },
+    []
+  );
+
+  const validateBillingRates = React.useCallback(() => {
+    const onPeak = Number(billingRates.baseOnPeak);
+    if (!Number.isFinite(onPeak) || onPeak <= 0) {
+      return { ok: false, message: "กรุณากรอก Base (On Peak) ให้มากกว่า 0" };
+    }
+    const offPeak = Number(billingRates.baseOffPeak);
+    if (!Number.isFinite(offPeak) || offPeak <= 0) {
+      return { ok: false, message: "กรุณากรอก Base (Off Peak) ให้มากกว่า 0" };
+    }
+    const discountPercent = Number(billingRates.discountRate);
+    if (
+      !Number.isFinite(discountPercent) ||
+      discountPercent < 0 ||
+      discountPercent > 100
+    ) {
+      return {
+        ok: false,
+        message: "Discount rate (%) ต้องอยู่ระหว่าง 0 - 100",
+      };
+    }
+    return {
+      ok: true,
+      values: {
+        billingOnPeakRate: Number(onPeak.toFixed(4)),
+        billingOffPeakRate: Number(offPeak.toFixed(4)),
+        billingDiscountRate: Number((discountPercent / 100).toFixed(4)),
+      },
+    };
+  }, [billingRates]);
+
+  const handleBillingToggle = async (type: BillingType, next: boolean) => {
+    if (!siteIdentifier) return;
+    let pendingElectricRates: {
+      billingOnPeakRate: number;
+      billingOffPeakRate: number;
+      billingDiscountRate: number;
+    } | null = null;
+    if (type === "electric" && next) {
+      const validation = validateBillingRates();
+      if (!validation.ok || !validation.values) {
+        setBillingPrefs((prev) => ({ ...prev, [type]: false }));
+        show({
+          variant: "error",
+          message: (
+            <span className="text-white font-semibold">
+              {validation.message ?? "กรุณากรอกอัตราค่าไฟให้ครบถ้วน"}
+            </span>
+          ),
+        });
+        return;
+      }
+      pendingElectricRates = validation.values;
+    }
+    setBillingPrefs((prev) => ({ ...prev, [type]: next }));
+    setBillingSaving((prev) => ({ ...prev, [type]: true }));
+    try {
+      let payload: Record<string, any> = {};
+      if (type === "electric") {
+        payload.allowElectricBilling = next;
+        if (next && pendingElectricRates) {
+          payload = { ...payload, ...pendingElectricRates };
+        }
+      } else if (type === "water") {
+        payload.allowWaterBilling = next;
+      }
+      if (Object.keys(payload).length === 0) return;
+      const data = await updateSiteBillingAccess(siteIdentifier, payload);
+      applyBillingResponse(data);
     } catch (err) {
       console.error("[SiteDetail] billing toggle failed", err);
       setBillingPrefs((prev) => ({ ...prev, [type]: !next }));
@@ -288,6 +475,47 @@ export default function ContentDetail({
       });
     } finally {
       setBillingSaving((prev) => ({ ...prev, [type]: false }));
+    }
+  };
+
+  const handleSaveBillingConfig = async () => {
+    if (!siteIdentifier) return;
+    const validation = validateBillingRates();
+    if (!validation.ok || !validation.values) {
+      show({
+        variant: "error",
+        message: (
+          <span className="text-white font-semibold">
+            {validation.message ?? "กรุณากรอกข้อมูลอัตราค่าไฟให้ครบ"}
+          </span>
+        ),
+      });
+      return;
+    }
+    setBillingConfigSaving(true);
+    try {
+      const data = await updateSiteBillingAccess(siteIdentifier, validation.values);
+      applyBillingResponse(data);
+      show({
+        variant: "success",
+        message: (
+          <span className="text-white font-semibold">
+            บันทึกอัตราค่าไฟเรียบร้อย
+          </span>
+        ),
+      });
+    } catch (err) {
+      console.error("[SiteDetail] save billing config failed", err);
+      show({
+        variant: "error",
+        message: (
+          <span className="text-white font-semibold">
+            บันทึกอัตราค่าไฟไม่สำเร็จ
+          </span>
+        ),
+      });
+    } finally {
+      setBillingConfigSaving(false);
     }
   };
 
@@ -401,6 +629,17 @@ export default function ContentDetail({
         <div>
           <h2 className="text-xl font-semibold">{siteInfo.name}</h2>
           <p className="text-sm text-gray-500">Code: {siteInfo.code}</p>
+          {brandingLogoSrc && (
+            <div className="mt-4 flex justify-start">
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+                <img
+                  src={brandingLogoSrc}
+                  alt="Site branding"
+                  className="h-20 w-32 object-contain"
+                />
+              </div>
+            </div>
+          )}
           <div className="mt-4 space-y-2 text-sm text-gray-700">
             <div>
               <span className="font-semibold">Address:</span>{" "}
@@ -453,125 +692,267 @@ export default function ContentDetail({
         </div>
       )}
 
-      <div className="mt-8 space-y-8">
-        {DEVICE_SECTIONS.map((section) => {
-          const billingType = SECTION_BILLING_TYPE[section.key];
-          return (
-            <div key={section.key}>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold">{section.label}</h3>
-                <div className="flex items-center gap-3">
-                  {billingType && (
-                    <label className="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={billingPrefs[billingType]}
-                        disabled={billingSaving[billingType]}
-                        onChange={(e) =>
-                          handleBillingToggle(
-                            billingType,
-                            e.target.checked
-                          )
-                        }
-                      />
-                      <span>Enable Billing</span>
-                    </label>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditor({ type: section.key, mode: "create" })
-                    }
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                  >
-                    <i className="material-icons-outlined text-sm">add</i>
-                    Add device
-                  </button>
-                </div>
+      <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {DEVICE_SECTIONS.map((section) => (
+            <button
+              key={section.key}
+              type="button"
+              onClick={() => handleDeviceTabChange(section.key)}
+              className={[
+                "rounded-full px-4 py-1.5 text-sm font-semibold transition",
+                activeDeviceType === section.key
+                  ? "bg-[#e0f6ff] text-[#006494]"
+                  : "bg-gray-100 text-gray-500 hover:bg-gray-200",
+              ].join(" ")}
+            >
+              {section.label}
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                {devices[section.key]?.length ?? 0}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-gray-200 px-3 py-2">
+            <i className="material-icons-outlined text-base text-gray-400">
+              search
+            </i>
+            <input
+              type="text"
+              placeholder="ค้นหาชื่อ Serial หรือ IP"
+              className="flex-1 border-none bg-transparent text-sm text-gray-700 outline-none"
+              value={deviceSearch}
+              onChange={handleDeviceSearchChange}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setEditor({ type: activeDeviceType, mode: "create" })
+            }
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+          >
+            <i className="material-icons-outlined text-base">add</i>
+            Add device
+          </button>
+        </div>
+
+        {activeBillingType === "electric" && (
+          <div className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-cyan-900">
+                  Electric Billing
+                </h4>
+                <p className="text-xs text-cyan-900/70">
+                  กรอกค่า base และ discount ก่อนเปิดใช้งาน
+                </p>
               </div>
-              {loading ? (
-                <div className="text-sm text-gray-500">กำลังโหลด...</div>
-              ) : devices[section.key]?.length ? (
-                <div className="overflow-x-auto rounded-lg border border-gray-100">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Device</th>
-                        <th className="px-4 py-2 text-left">Model</th>
-                        <th className="px-4 py-2 text-left">Serial</th>
-                        <th className="px-4 py-2 text-left">Status</th>
-                        <th className="px-4 py-2 text-left">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {devices[section.key].map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-2 font-medium text-gray-900">
-                            {item.name}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {item.model}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {item.serial}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {item.status}
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setEditor({
-                                    type: section.key,
-                                    mode: "edit",
-                                    device: item,
-                                  })
-                                }
-                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                              >
-                                <i className="material-icons-outlined text-xs">
-                                  edit
-                                </i>
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDevice(item)}
-                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-red-200 text-red-600 hover:bg-red-50 cursor-pointer"
-                              >
-                                <i className="material-icons-outlined text-xs">
-                                  delete
-                                </i>
-                                Delete
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShowDeviceId(item)}
-                                className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-md border border-blue-200 text-blue-600 hover:bg-blue-50 cursor-pointer"
-                              >
-                                <i className="material-icons-outlined text-xs">
-                                  info
-                                </i>
-                                Copy ID
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  ยังไม่มีอุปกรณ์ในหมวดนี้
-                </div>
-              )}
+              <label className="inline-flex items-center gap-2 text-sm text-cyan-900 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={billingPrefs.electric}
+                  disabled={billingSaving.electric}
+                  onChange={(e) =>
+                    handleBillingToggle("electric", e.target.checked)
+                  }
+                />
+                <span>Enable Billing</span>
+              </label>
             </div>
-          );
-        })}
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="text-xs font-semibold text-cyan-900">
+                Base (On Peak) บาท/หน่วย
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  value={billingRates.baseOnPeak}
+                  onChange={handleRateInputChange("baseOnPeak")}
+                />
+              </label>
+              <label className="text-xs font-semibold text-cyan-900">
+                Base (Off Peak) บาท/หน่วย
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  value={billingRates.baseOffPeak}
+                  onChange={handleRateInputChange("baseOffPeak")}
+                />
+              </label>
+              <label className="text-xs font-semibold text-cyan-900">
+                Discount rate (%) 0-100
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                  value={billingRates.discountRate}
+                  onChange={handleRateInputChange("discountRate")}
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-cyan-900/70">
+              <button
+                type="button"
+                onClick={handleSaveBillingConfig}
+                disabled={billingConfigSaving}
+                className={[
+                  "rounded-xl px-4 py-2 text-sm font-semibold text-white transition",
+                  billingConfigSaving
+                    ? "bg-cyan-200 cursor-not-allowed"
+                    : "bg-cyan-500 hover:bg-cyan-600",
+                ].join(" ")}
+              >
+                {billingConfigSaving ? "กำลังบันทึก..." : "บันทึกอัตรา"}
+              </button>
+              <span>ตัวอย่าง discount 30 = ลด 30%</span>
+            </div>
+          </div>
+        )}
+
+        {activeBillingType === "water" && (
+          <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/40 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-blue-900">
+                  Water Billing
+                </h4>
+                <p className="text-xs text-blue-900/70">
+                  ใช้สำหรับเปิด/ปิดการคิดค่าบริการน้ำ
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-blue-900 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={billingPrefs.water}
+                  disabled={billingSaving.water}
+                  onChange={(e) =>
+                    handleBillingToggle("water", e.target.checked)
+                  }
+                />
+                <span>Enable Billing</span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5 overflow-x-auto rounded-lg border border-gray-100">
+          {loading ? (
+            <div className="px-4 py-6 text-sm text-gray-500">กำลังโหลด...</div>
+          ) : paginatedDevices.length ? (
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2 text-left">Device</th>
+                  <th className="px-4 py-2 text-left">Model</th>
+                  <th className="px-4 py-2 text-left">Serial</th>
+                  <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-4 py-2 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {paginatedDevices.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-4 py-2 font-medium text-gray-900">
+                      {item.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-700">{item.model}</td>
+                    <td className="px-4 py-2 text-gray-700">{item.serial}</td>
+                    <td className="px-4 py-2 text-gray-700">{item.status}</td>
+                    <td className="px-4 py-2 text-gray-700">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditor({
+                              type: activeDeviceType,
+                              mode: "edit",
+                              device: item,
+                            })
+                          }
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1 text-xs transition hover:bg-gray-50"
+                        >
+                          <i className="material-icons-outlined text-xs">
+                            edit
+                          </i>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDevice(item)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1 text-xs text-red-600 transition hover:bg-red-50"
+                        >
+                          <i className="material-icons-outlined text-xs">
+                            delete
+                          </i>
+                          Delete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleShowDeviceId(item)}
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1 text-xs text-blue-600 transition hover:bg-blue-50"
+                        >
+                          <i className="material-icons-outlined text-xs">
+                            content_copy
+                          </i>
+                          Copy ID
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-4 py-6 text-sm text-gray-500">
+              ยังไม่มีอุปกรณ์ในหมวดนี้
+            </div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between text-xs text-gray-600">
+          <span>{paginationLabel}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setDevicePage((prev) => Math.max(1, prev - 1))
+              }
+              disabled={devicePage <= 1}
+              className={[
+                "rounded-md px-3 py-1 font-semibold transition",
+                devicePage <= 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300",
+              ].join(" ")}
+            >
+              ก่อนหน้า
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                setDevicePage((prev) => Math.min(totalPages, prev + 1))
+              }
+              disabled={devicePage >= totalPages}
+              className={[
+                "rounded-md px-3 py-1 font-semibold transition",
+                devicePage >= totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300",
+              ].join(" ")}
+            >
+              ถัดไป
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

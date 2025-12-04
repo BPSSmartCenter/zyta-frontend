@@ -10,11 +10,15 @@ export type SiteRow = {
   addressDistrict?: string | null;
   addressSubDistrict?: string | null;
   addressLine?: string | null;
+  brandingLogoUrl?: string | null;
   devicesTotal: number;
   usersCount: number;
   updatedAt?: string | null;
   allowElectricBilling?: boolean;
   allowWaterBilling?: boolean;
+  billingOnPeakRate?: number | null;
+  billingOffPeakRate?: number | null;
+  billingDiscountRate?: number | null;
 };
 
 export const SITE_ROWS: SiteRow[] = [];

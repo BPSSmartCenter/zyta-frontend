@@ -40,7 +40,6 @@ const BillingHistoryTable: React.FC<Props> = ({
               <th className="px-4 py-2 text-left">Month</th>
               <th className="px-4 py-2 text-left">Energy (kWh)</th>
               <th className="px-4 py-2 text-left">Cost (฿)</th>
-              <th className="px-4 py-2 text-left">Status</th>
               {showActions && <th className="px-4 py-2 text-left">ไฟล์ PDF</th>}
             </tr>
           </thead>
@@ -75,18 +74,6 @@ const BillingHistoryTable: React.FC<Props> = ({
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={[
-                        "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
-                        row.status === "paid"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700",
-                      ].join(" ")}
-                    >
-                      {row.status === "paid" ? "ชำระแล้ว" : "ค้างชำระ"}
-                    </span>
                   </td>
                   {showActions && (
                     <td className="px-4 py-3">

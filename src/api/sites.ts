@@ -34,6 +34,7 @@ export type RegisterSiteInput = {
   addressDistrict?: string;
   addressSubDistrict?: string;
   addressLine?: string;
+  brandingLogoDataUrl?: string;
 };
 
 export async function registerSite(input: RegisterSiteInput) {
@@ -49,6 +50,7 @@ export async function registerSite(input: RegisterSiteInput) {
   if (input.addressSubDistrict)
     payload.addressSubDistrict = input.addressSubDistrict;
   if (input.addressLine) payload.addressLine = input.addressLine;
+  if (input.brandingLogoDataUrl) payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
 
   const { data } = await api.post("/site/register", payload);
   return data;
@@ -64,6 +66,8 @@ export type UpdateSiteInput = {
   addressDistrict?: string;
   addressSubDistrict?: string;
   addressLine?: string;
+  brandingLogoDataUrl?: string;
+  removeBrandingLogo?: boolean;
 };
 
 function normalizeSitePayload(input: UpdateSiteInput) {
@@ -86,6 +90,10 @@ function normalizeSitePayload(input: UpdateSiteInput) {
   if (input.addressSubDistrict)
     payload.addressSubDistrict = input.addressSubDistrict;
   if (input.addressLine) payload.addressLine = input.addressLine;
+  if (input.brandingLogoDataUrl)
+    payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
+  if (typeof input.removeBrandingLogo === "boolean")
+    payload.removeBrandingLogo = input.removeBrandingLogo;
   return payload;
 }
 

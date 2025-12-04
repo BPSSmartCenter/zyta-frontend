@@ -75,6 +75,11 @@ function SiteManagementInner() {
       addressDistrict: site.address_district ?? null,
       addressSubDistrict: site.address_sub ?? null,
       addressLine: site.address_line ?? null,
+      brandingLogoUrl:
+        site.brandingLogoUrl ??
+        site.brand_logo_url ??
+        site.branding_logo_url ??
+        null,
       devicesTotal: site.devices_total ?? site.devicesTotal ?? 0,
       usersCount: site.users_count ?? site.usersCount ?? 0,
       updatedAt: site.updated_at ?? site.updatedAt ?? null,
@@ -131,6 +136,7 @@ function SiteManagementInner() {
       addressDistrict?: string;
       addressSubDistrict?: string;
       addressLine?: string;
+      brandingLogoDataUrl?: string;
     }) => {
       try {
         setLoading(true);
@@ -177,6 +183,8 @@ function SiteManagementInner() {
       addressDistrict?: string;
       addressSubDistrict?: string;
       addressLine?: string;
+      brandingLogoDataUrl?: string;
+      removeBrandingLogo?: boolean;
     }) => {
       if (!editing) return;
       try {

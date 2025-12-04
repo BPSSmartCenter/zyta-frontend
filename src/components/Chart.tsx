@@ -1000,12 +1000,14 @@ export type MonthlyChartProps = {
   categories?: string[];
   series?: AxisSeries;
   height?: number | string;
+  meta?: Array<{ month: string; cost?: number; usage?: number }>;
 };
 
 export function MonthlyChart({
   categories,
   series,
   height = 240,
+  meta,
 }: MonthlyChartProps) {
   const cats =
     categories ??
@@ -1025,6 +1027,7 @@ export function MonthlyChart({
   );
   const maxVal = niceUp(Math.max(...values) * 1.1, 5);
 
+  const costMeta = meta ?? [];
   const options: ApexOptions = {
     chart: {
       type: "line",
@@ -1075,10 +1078,24 @@ export function MonthlyChart({
       custom: ({ series, seriesIndex, dataPointIndex, w }) => {
         const month = w.globals.categoryLabels[dataPointIndex];
         const value = series[seriesIndex][dataPointIndex];
-        const cost = (value * 4.39).toFixed(2);
-        return `<div style="padding:8px 12px;font-size:12px;color:#0f172a">${month}<br/>${value.toFixed(
-          1
-        )} kWh<br/>${cost} THB</div>`;
+        const metaEntry = costMeta[dataPointIndex];
+        const costValue =
+          typeof metaEntry?.cost === "number" ? metaEntry.cost : null;
+        const usageLabel =
+          typeof value === "number"
+            ? `${value.toFixed(2)} kWh`
+            : "0 kWh";
+        const costLabel =
+          costValue !== null
+            ? `${costValue.toLocaleString("th-TH", {
+                style: "currency",
+                currency: "THB",
+                minimumFractionDigits: 2,
+              })}`
+            : "";
+        return `<div style="padding:8px 12px;font-size:12px;color:#0f172a">${month}<br/>${usageLabel}${
+          costLabel ? `<br/>${costLabel}` : ""
+        }</div>`;
       },
     },
     legend: { show: false },

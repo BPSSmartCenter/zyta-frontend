@@ -1,16 +1,28 @@
 // src/pages/GenerateBillForm.tsx
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import Modal from "../components/Modal";
-import Dropdown from "../components/Dropdown";
 import { useFilters } from "../context/FiltersContext";
+import {
+  useDeviceInventory,
+  getCountForType,
+} from "../context/DeviceInventoryContext";
+import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import { useUserPath } from "../routes/useUserPath";
 import { getElectricDevices } from "../api/electric";
 import { getSiteDetails } from "../api/sites";
-import { getMeterDashboard, type MeterDashboard } from "../api/meter";
+import {
+  getMeterDashboard,
+  getMeterSummary,
+  type MeterDashboard,
+} from "../api/meter";
 import { createBill } from "../api/billing";
+import Dropdown from "../components/Dropdown";
+import DatePicker, { type DateValue } from "../components/DateInput";
+import { buildBrandingLogoSrc } from "../utils/branding";
+import { brandImage } from "../assets";
 
 type ManualFormState = {
   meterId: string;
@@ -22,14 +34,12 @@ type ManualFormState = {
   billingYear: string;
 };
 
-const DEFAULT_FORM_STATE: ManualFormState = {
-  meterId: "",
-  ereOnPeak: "",
-  ereOffPeak: "",
-  baseOnPeak: "",
-  baseOffPeak: "",
-  billingMonth: "",
-  billingYear: "",
+type BillingMode = "monthly" | "daily";
+
+type SummaryTotals = {
+  onPeak: number;
+  offPeak: number;
+  total: number;
 };
 
 const MONTH_OPTIONS = [
@@ -47,6 +57,16 @@ const MONTH_OPTIONS = [
   { value: "12", label: "ธันวาคม" },
 ];
 
+const DEFAULT_FORM_STATE: ManualFormState = {
+  meterId: "",
+  ereOnPeak: "",
+  ereOffPeak: "",
+  baseOnPeak: "",
+  baseOffPeak: "",
+  billingMonth: "",
+  billingYear: "",
+};
+
 const GenerateBillForm: React.FC = () => {
   const {
     searchSite,
@@ -57,38 +77,170 @@ const GenerateBillForm: React.FC = () => {
     date,
     setDate,
   } = useFilters();
-  const [formState, setFormState] = React.useState<ManualFormState>(
-    DEFAULT_FORM_STATE
+  const defaultBillingPeriod = React.useMemo(
+    () => getDefaultBillingPeriod(),
+    []
   );
+  const YEAR_OPTIONS = React.useMemo(() => {
+    const current = new Date().getFullYear();
+    return Array.from({ length: 6 }, (_, idx) => {
+      const year = current - idx;
+      return { value: String(year), label: String(year + 543) };
+    });
+  }, []);
+  const [formState, setFormState] = React.useState<ManualFormState>(() => ({
+    ...DEFAULT_FORM_STATE,
+    billingMonth: defaultBillingPeriod.month,
+    billingYear: defaultBillingPeriod.year,
+  }));
   const [meterOptions, setMeterOptions] = React.useState<
-    Array<{ value: string; label: string; description?: string; serial?: string }>
+    Array<{
+      value: string;
+      label: string;
+      description?: string;
+      serial?: string;
+    }>
   >([]);
   const [siteInfo, setSiteInfo] = React.useState<{
     name?: string;
     address?: string;
+    brandingLogoUrl?: string | null;
   } | null>(null);
-  const [loadingOptions, setLoadingOptions] = React.useState(false);
+  const customLogoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [customLogoDataUrl, setCustomLogoDataUrl] = React.useState<string | null>(null);
+  const [customLogoError, setCustomLogoError] = React.useState<string | null>(null);
+  const [loadingOptions, setLoadingOptions] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-  const [meterDashboard, setMeterDashboard] = React.useState<MeterDashboard | null>(null);
+  const [meterDashboard, setMeterDashboard] =
+    React.useState<MeterDashboard | null>(null);
   const [loadingDashboard, setLoadingDashboard] = React.useState(false);
-  const [meterDashboardError, setMeterDashboardError] = React.useState<string | null>(null);
+  const [meterDashboardError, setMeterDashboardError] = React.useState<
+    string | null
+  >(null);
+  const discountPercentLabel =
+    typeof meterDashboard?.cost?.rates?.discountRate === "number"
+      ? `${(meterDashboard.cost.rates.discountRate * 100).toFixed(2)}%`
+      : null;
   const lastPrefillIdRef = React.useRef<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
-  const [siteGuardOpen, setSiteGuardOpen] = React.useState(false);
+  const { counts: inventoryCounts, loading: inventoryLoading } =
+    useDeviceInventory();
+  const [guardType, setGuardType] = React.useState<
+    "none" | "select" | "blocked"
+  >("none");
+  const [errorModalMessage, setErrorModalMessage] = React.useState<
+    string | null
+  >(null);
+  const [billingMode, setBillingMode] = React.useState<BillingMode>("monthly");
+  const billingModeRef = React.useRef<BillingMode>("monthly");
+  const switchBillingMode = React.useCallback((mode: BillingMode) => {
+    billingModeRef.current = mode;
+    setBillingMode(mode);
+  }, []);
+  const [dailyDate, setDailyDate] = React.useState<Date>(() => new Date());
+  const [summaryTotals, setSummaryTotals] = React.useState<SummaryTotals>({
+    onPeak: 0,
+    offPeak: 0,
+    total: 0,
+  });
+  const [summaryLoading, setSummaryLoading] = React.useState(false);
+  const [summaryError, setSummaryError] = React.useState<string | null>(null);
+  const [meterSearch, setMeterSearch] = React.useState("");
+  const summaryLabel =
+    billingMode === "monthly"
+      ? formatMonthYear(formState.billingMonth, formState.billingYear)
+      : formatDailyLabel(dailyDate);
+  const location = useLocation();
   const navigate = useNavigate();
   const { abs } = useUserPath();
+  const locationState = location.state as { meterId?: string | number } | null;
+  const prefillMeterIdFromState =
+    locationState?.meterId != null ? String(locationState.meterId) : null;
+  const prefillMeterIdFromQuery = React.useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("meterId");
+  }, [location.search]);
+  const prefillMeterIdRef = React.useRef<string>(
+    prefillMeterIdFromState ?? prefillMeterIdFromQuery ?? ""
+  );
+  React.useEffect(() => {
+    const next = prefillMeterIdFromState ?? prefillMeterIdFromQuery ?? "";
+    if (!next) return;
+    prefillMeterIdRef.current = next;
+    setFormState((prev) =>
+      prev.meterId === next ? prev : { ...prev, meterId: next }
+    );
+  }, [prefillMeterIdFromState, prefillMeterIdFromQuery]);
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
+  React.useEffect(() => {
+    setCustomLogoDataUrl(null);
+    setCustomLogoError(null);
+  }, [normalizedSite]);
+  useDeviceInventoryLoader({
+    selectedSiteCode: !requiresSiteSelection ? normalizedSite : undefined,
+    enabled: !requiresSiteSelection,
+  });
+  React.useEffect(() => {
+    setMeterSearch("");
+  }, [normalizedSite]);
+  const electricDeviceCount = getCountForType(
+    inventoryCounts as any,
+    "electricmeter" as any
+  );
+  const noElectricInventory =
+    !requiresSiteSelection &&
+    normalizedSite !== "all" &&
+    !inventoryLoading &&
+    electricDeviceCount <= 0;
+  const meterOptionMap = React.useMemo(() => {
+    const map = new Map<string, (typeof meterOptions)[number]>();
+    meterOptions.forEach((opt) => map.set(opt.value, opt));
+    return map;
+  }, [meterOptions]);
+  const filteredMeterOptions = React.useMemo(() => {
+    const term = meterSearch.trim().toLowerCase();
+    if (!term) return meterOptions;
+    return meterOptions.filter((opt) => {
+      return [opt.label, opt.description ?? "", opt.serial ?? ""].some((part) =>
+        part?.toLowerCase().includes(term)
+      );
+    });
+  }, [meterOptions, meterSearch]);
+  const meterDropdownOptions = React.useMemo(
+    () =>
+      filteredMeterOptions.map((opt) => ({
+        value: opt.value,
+        label: opt.label,
+      })),
+    [filteredMeterOptions]
+  );
+  const monthlyRequestRange = React.useMemo(
+    () =>
+      buildMonthRangeForRequest(formState.billingMonth, formState.billingYear),
+    [formState.billingMonth, formState.billingYear]
+  );
+  const meterId = formState.meterId;
+
+  const noMeterOptions =
+    !requiresSiteSelection && !loadingOptions && meterOptions.length === 0;
+  const meterSelectionDisabled = loadingOptions || meterOptions.length === 0;
 
   React.useEffect(() => {
-    setSiteGuardOpen(requiresSiteSelection);
-  }, [requiresSiteSelection]);
+    if (requiresSiteSelection) setGuardType("select");
+    else if (noElectricInventory || noMeterOptions) setGuardType("blocked");
+    else setGuardType("none");
+  }, [requiresSiteSelection, noElectricInventory, noMeterOptions]);
+  const siteGuardOpen = guardType !== "none";
 
   React.useEffect(() => {
     if (requiresSiteSelection) {
+      setLoadingOptions(false);
       setMeterOptions([]);
       setSiteInfo(null);
+      setCustomLogoDataUrl(null);
+      setCustomLogoError(null);
       setFormState((prev) => ({ ...prev, meterId: "" }));
       setMeterDashboard(null);
       setMeterDashboardError(null);
@@ -120,6 +272,9 @@ const GenerateBillForm: React.FC = () => {
           setSiteInfo({
             name: siteData.name ?? siteData.code ?? "",
             address: addressParts.join(", ") || undefined,
+            brandingLogoUrl: buildBrandingLogoSrc(
+              siteData.brandingLogoUrl ?? siteData.brand_logo_url ?? null
+            ),
           });
         } else {
           setSiteInfo(null);
@@ -132,12 +287,15 @@ const GenerateBillForm: React.FC = () => {
           devicesResp ??
           [];
         const mapped = (devicePayload as any[])
-          .filter((item) => item?.id)
+          .filter((item) => item?.id ?? item?.model)
           .map((item) => {
             const meta = (item?.meta ?? {}) as Record<string, any>;
             const details = (meta.details ?? {}) as Record<string, any>;
+            const rawId = item?.id ?? item?.model ?? "";
+            const normalizedId =
+              typeof rawId === "string" ? rawId : String(rawId);
             return {
-              value: item.id as string,
+              value: normalizedId,
               label:
                 details.name ??
                 (typeof item.model === "string"
@@ -153,18 +311,37 @@ const GenerateBillForm: React.FC = () => {
             };
           });
         setMeterOptions(mapped);
-        setFormState((prev) => ({
-          ...prev,
-          meterId: prev.meterId && mapped.some((m) => m.value === prev.meterId)
-            ? prev.meterId
-            : mapped[0]?.value ?? "",
-        }));
+        setFormState((prev) => {
+          const prefillCandidate = prefillMeterIdRef.current;
+          if (prefillCandidate) {
+            prefillMeterIdRef.current = "";
+            if (mapped.some((m) => m.value === prefillCandidate)) {
+              return { ...prev, meterId: prefillCandidate };
+            }
+            console.warn("[GenerateBillForm] prefill id not found in options", {
+              prefillCandidate,
+            });
+          }
+
+          if (prev.meterId && mapped.some((m) => m.value === prev.meterId)) {
+            return prev;
+          }
+
+          const fallback = mapped[0]?.value ?? "";
+          if (fallback) {
+            return { ...prev, meterId: fallback };
+          }
+
+          return { ...prev, meterId: "" };
+        });
       } catch (err) {
         console.error("[GenerateBillForm] load site/meter failed", err);
         if (!canceled) {
           setLoadError("ไม่สามารถโหลดข้อมูลมิเตอร์ของไซต์นี้ได้");
           setMeterOptions([]);
           setSiteInfo(null);
+          setCustomLogoDataUrl(null);
+          setCustomLogoError(null);
           setFormState((prev) => ({ ...prev, meterId: "" }));
         }
       } finally {
@@ -178,7 +355,7 @@ const GenerateBillForm: React.FC = () => {
   }, [requiresSiteSelection, normalizedSite]);
 
   React.useEffect(() => {
-    if (!formState.meterId) {
+    if (!meterId) {
       setMeterDashboard(null);
       setMeterDashboardError(null);
       return;
@@ -187,7 +364,17 @@ const GenerateBillForm: React.FC = () => {
     let canceled = false;
     setLoadingDashboard(true);
     setMeterDashboardError(null);
-    getMeterDashboard(formState.meterId)
+    let params: { startDate?: string; endDate?: string } | undefined;
+    if (billingMode === "monthly" && monthlyRequestRange) {
+      params = {
+        startDate: monthlyRequestRange.startIso,
+        endDate: monthlyRequestRange.endIso,
+      };
+    } else if (billingMode === "daily") {
+      const range = buildDailyRange(dailyDate);
+      params = { startDate: range.startDate, endDate: range.endDate };
+    }
+    getMeterDashboard(meterId, params)
       .then((data) => {
         if (canceled) return;
         setMeterDashboard(data);
@@ -205,84 +392,268 @@ const GenerateBillForm: React.FC = () => {
     return () => {
       canceled = true;
     };
-  }, [formState.meterId]);
+  }, [
+    meterId,
+    billingMode,
+    monthlyRequestRange?.startIso,
+    monthlyRequestRange?.endIso,
+    dailyDate,
+  ]);
 
   React.useEffect(() => {
     if (!meterDashboard) return;
     if (lastPrefillIdRef.current === meterDashboard.device.id) return;
     lastPrefillIdRef.current = meterDashboard.device.id;
+    const rateFormatter = (value?: number) => {
+      if (!Number.isFinite(value ?? NaN)) return "";
+      return Number(value).toFixed(4);
+    };
     setFormState((prev) => ({
       ...prev,
       meterId: prev.meterId || meterDashboard.device.id,
-      ereOnPeak: formatInputNumber(meterDashboard.totals.onPeakKwh),
-      ereOffPeak: formatInputNumber(meterDashboard.totals.offPeakKwh),
+      baseOnPeak: rateFormatter(meterDashboard.cost?.rates?.baseOnPeak),
+      baseOffPeak: rateFormatter(meterDashboard.cost?.rates?.baseOffPeak),
     }));
   }, [meterDashboard]);
 
+  React.useEffect(() => {
+    if (!meterId) {
+      setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
+      setSummaryError(null);
+      return;
+    }
+    let canceled = false;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    let summaryParams: {
+      startDate?: string;
+      endDate?: string;
+      month?: string;
+      year?: string;
+    } | null = null;
+    if (billingMode === "monthly") {
+      if (!formState.billingMonth || !formState.billingYear) {
+        setSummaryLoading(false);
+        return;
+      }
+      if (monthlyRequestRange) {
+        summaryParams = {
+          startDate: monthlyRequestRange.startIso,
+          endDate: monthlyRequestRange.endIso,
+        };
+      } else {
+        summaryParams = {
+          month: formState.billingMonth,
+          year: formState.billingYear,
+        };
+      }
+    } else {
+      const range = buildDailyRange(dailyDate);
+      summaryParams = range;
+    }
+    getMeterSummary(meterId, summaryParams ?? undefined)
+      .then((data) => {
+        if (canceled) return;
+        const onPeak = data.totals.energyOnPeakKwh;
+        const offPeak = data.totals.energyOffPeakKwh;
+        const total = data.totals.energyProductionKwh;
+        setSummaryTotals({ onPeak, offPeak, total });
+        setFormState((prev) => ({
+          ...prev,
+          ereOnPeak: formatInputNumber(onPeak),
+          ereOffPeak: formatInputNumber(offPeak),
+        }));
+      })
+      .catch((err) => {
+        console.error("[GenerateBillForm] load meter summary failed", err);
+        if (!canceled) {
+          setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
+          setSummaryError("ไม่สามารถโหลดสรุปข้อมูลไฟสำหรับช่วงนี้ได้");
+        }
+      })
+      .finally(() => {
+        if (!canceled) setSummaryLoading(false);
+      });
+    return () => {
+      canceled = true;
+    };
+  }, [
+    meterId,
+    billingMode,
+    formState.billingMonth,
+    formState.billingYear,
+    dailyDate,
+    monthlyRequestRange?.startIso,
+    monthlyRequestRange?.endIso,
+  ]);
+
   const handleSiteGuardClose = React.useCallback(() => {
-    setSiteGuardOpen(false);
+    setGuardType("none");
     navigate(abs("/dashboard"), { replace: true });
   }, [navigate, abs]);
+  const siteGuardConfig =
+    guardType === "blocked"
+      ? {
+          title: "Site นี้ยังไม่อนุญาตให้ใช้งาน Billing",
+          message:
+            "Site ที่คุณเลือกไม่ได้รับสิทธิ์เข้าถึงระบบ Billing กรุณาเปลี่ยนไปยัง Site ที่ได้รับอนุญาตหรือขอสิทธิ์ผ่านผู้ดูแล",
+          closeLabel: "ย้อนกลับ",
+        }
+      : {
+          title: "กรุณาเลือก Site ก่อนใช้งาน",
+          message:
+            "โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานฟีเจอร์สร้างบิล",
+          closeLabel: "โอเค",
+        };
 
-  const YEAR_OPTIONS = React.useMemo(() => {
-    const current = new Date().getFullYear();
-    return Array.from({ length: 11 }, (_, idx) => {
-      const year = current - idx;
-      return { value: String(year), label: String(year + 543) };
-    });
+  const siteBrandingLogo = siteInfo?.brandingLogoUrl ?? null;
+  const brandingPreviewSrc = React.useMemo(
+    () => customLogoDataUrl ?? siteBrandingLogo ?? brandImage,
+    [customLogoDataUrl, siteBrandingLogo]
+  );
+  const showBrandingPreview = Boolean(siteInfo || customLogoDataUrl);
+
+  const handleCustomLogoFile = React.useCallback((file: File | null) => {
+    if (!file) {
+      setCustomLogoDataUrl(null);
+      setCustomLogoError(null);
+      if (customLogoInputRef.current) {
+        customLogoInputRef.current.value = "";
+      }
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setCustomLogoError("กรุณาเลือกไฟล์รูปภาพ");
+      return;
+    }
+    if (file.size > 2.5 * 1024 * 1024) {
+      setCustomLogoError("ไฟล์ต้องไม่เกิน 2.5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      setCustomLogoDataUrl(result);
+      setCustomLogoError(null);
+    };
+    reader.onerror = () => {
+      setCustomLogoError("ไม่สามารถอ่านไฟล์ได้");
+    };
+    reader.readAsDataURL(file);
   }, []);
 
-  const handleInputChange = React.useCallback(
-    (field: keyof ManualFormState) =>
-      (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const value = event.target.value;
-        setFormState((prev) => ({ ...prev, [field]: value }));
-      },
-    []
-  );
+  const handleRemoveCustomLogo = React.useCallback(() => {
+    setCustomLogoDataUrl(null);
+    setCustomLogoError(null);
+    if (customLogoInputRef.current) {
+      customLogoInputRef.current.value = "";
+    }
+  }, []);
+
+  // const handleInputChange = React.useCallback(
+  //   (field: keyof ManualFormState) =>
+  //     (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  //       const value = event.target.value;
+  //       setFormState((prev) => ({ ...prev, [field]: value }));
+  //     },
+  //   []
+  // );
 
   const handleSubmit = React.useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (!formState.meterId) {
-        alert("กรุณาเลือกมิเตอร์ก่อนสร้างบิล");
+        setErrorModalMessage("กรุณาเลือกมิเตอร์ก่อนสร้างบิล");
         return;
       }
       if (requiresSiteSelection) {
-        alert("กรุณาเลือก Site ก่อนสร้างบิล");
+        setErrorModalMessage("กรุณาเลือก Site ก่อนสร้างบิล");
         return;
       }
       const selectedMeter = meterOptions.find(
         (m) => m.value === formState.meterId
       );
+      const previewSite = siteInfo
+        ? {
+            ...siteInfo,
+            brandingLogoUrl:
+              customLogoDataUrl ?? siteInfo.brandingLogoUrl ?? null,
+          }
+        : customLogoDataUrl
+        ? { brandingLogoUrl: customLogoDataUrl }
+        : undefined;
       setSubmitting(true);
       try {
+        const mode = billingModeRef.current;
+        const formPayload = {
+          ...formState,
+          billingMode: mode,
+          dailyDate: mode === "daily" ? dailyDate.toISOString() : undefined,
+          customLogoDataUrl: customLogoDataUrl ?? undefined,
+        };
         const payload = {
           ...formState,
           meterLabel: selectedMeter?.label,
           meterSerial: selectedMeter?.serial,
+          brandingLogoDataUrl: customLogoDataUrl ?? undefined,
         };
         const bill = await createBill(normalizedSite, payload);
         const billId = bill?.billId;
         if (!billId) {
           throw new Error("bill id missing");
         }
+        const params = new URLSearchParams();
+        params.set("billId", billId);
+        params.set("mode", mode);
+        if (mode === "daily") {
+          params.set("dailyDate", dailyDate.toISOString());
+        }
         navigate(
-          `${abs("/electric/generate-bill/preview")}?billId=${encodeURIComponent(
-            billId
-          )}`
+          `${abs("/electric/generate-bill/preview")}?${params.toString()}`,
+          {
+            state: {
+              preview: {
+                site: previewSite ?? undefined,
+                meter: {
+                  id: selectedMeter?.value ?? formState.meterId,
+                  name: selectedMeter?.label,
+                  description: selectedMeter?.description,
+                  serial: selectedMeter?.serial,
+                },
+                form: formPayload,
+                dashboard: meterDashboard ?? undefined,
+                siteCode: normalizedSite,
+                customLogoDataUrl: customLogoDataUrl ?? undefined,
+              },
+            },
+          }
         );
       } catch (err) {
         console.error("[GenerateBillForm] create bill failed", err);
-        alert("ไม่สามารถสร้างบิลได้ กรุณาลองใหม่");
+        setErrorModalMessage("ไม่สามารถสร้างบิลได้ กรุณาลองใหม่");
       } finally {
         setSubmitting(false);
       }
     },
-    [navigate, abs, formState, meterOptions, normalizedSite, requiresSiteSelection]
+    [
+      navigate,
+      abs,
+      formState,
+      meterOptions,
+      normalizedSite,
+      requiresSiteSelection,
+      dailyDate,
+      siteInfo,
+      meterDashboard,
+      customLogoDataUrl,
+    ]
   );
 
   const handleBack = React.useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
     navigate(abs("/electric?view=trend"));
   }, [navigate, abs]);
 
@@ -316,21 +687,66 @@ const GenerateBillForm: React.FC = () => {
             >
               <polyline points="15 18 9 12 15 6" />
             </svg>
-            กลับไปหน้าบิล
+            ย้อนกลับ
           </button>
 
           <div className="w-full rounded-[32px] bg-slate-50/90 p-8">
             <h1 className="text-center text-2xl font-semibold text-slate-900">
               คำนวณค่าไฟฟ้า
             </h1>
-            {siteInfo && (
+            {showBrandingPreview && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
-                <p className="font-semibold text-slate-900">
-                  {siteInfo.name ?? "Site"}
-                </p>
-                <p className="mt-1">
-                  ที่อยู่: {siteInfo.address ?? "ไม่ระบุ"}
-                </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3">
+                    <img
+                      src={brandingPreviewSrc}
+                      alt="Site branding preview"
+                      className="h-20 w-32 object-contain"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-900">
+                      {siteInfo?.name ?? "Site"}
+                    </p>
+                    <p className="mt-1">
+                      ที่อยู่: {siteInfo?.address ?? "ไม่ระบุ"}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => customLogoInputRef.current?.click()}
+                        className="rounded-xl bg-cyan px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 cursor-pointer"
+                      >
+                        {customLogoDataUrl
+                          ? "เปลี่ยนรูป"
+                          : "อัปโหลดรูป"}
+                      </button>
+                      {customLogoDataUrl && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveCustomLogo}
+                          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 cursor-pointer"
+                        >
+                          ล้างรูป
+                        </button>
+                      )}
+                    </div>
+                    {customLogoError && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {customLogoError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <input
+                  ref={customLogoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={(event) =>
+                    handleCustomLogoFile(event.target.files?.[0] ?? null)
+                  }
+                />
               </div>
             )}
             {loadError && (
@@ -350,209 +766,392 @@ const GenerateBillForm: React.FC = () => {
             )}
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                เลือกมิเตอร์ที่ต้องการสร้างบิล
-                <select
-                  value={formState.meterId}
-                  onChange={handleInputChange("meterId")}
-                  disabled={loadingOptions || meterOptions.length === 0}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-                >
-                  {loadingOptions && (
-                    <option value="">กำลังโหลดรายการมิเตอร์...</option>
-                  )}
-                  {!loadingOptions && meterOptions.length === 0 && (
-                    <option value="">ไม่พบมิเตอร์ในไซต์นี้</option>
-                  )}
-                  {meterOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                      {opt.description ? ` - ${opt.description}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                E<sub>RE</sub> (On Peak) จากมิเตอร์ (kWh)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formState.ereOnPeak}
-                  onChange={handleInputChange("ereOnPeak")}
-                  placeholder="0.00 kWh"
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                E<sub>RE</sub> (Off Peak) จากมิเตอร์ (kWh)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formState.ereOffPeak}
-                  onChange={handleInputChange("ereOffPeak")}
-                  placeholder="0.00 kWh"
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                Base (On Peak %Discount) ที่ผู้ใช้กรอก (บาท/หน่วย)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  value={formState.baseOnPeak}
-                  onChange={handleInputChange("baseOnPeak")}
-                  placeholder="0.0000 บาท/หน่วย"
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                Base (Off Peak %Discount) ที่ผู้ใช้กรอก (บาท/หน่วย)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  value={formState.baseOffPeak}
-                  onChange={handleInputChange("baseOffPeak")}
-                  placeholder="0.0000 บาท/หน่วย"
-                  className="rounded-2xl border border-slate-200 px-4 py-3 text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                เดือน / ปี ที่ต้องการสร้างบิล
-                <div className="grid w-full grid-cols-2 gap-3">
-                  <Dropdown
-                    options={MONTH_OPTIONS}
-                    value={formState.billingMonth}
-                    onChange={(value) =>
-                      setFormState((prev) => ({ ...prev, billingMonth: value }))
-                    }
+              <div className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                ประเภทบิล
+                <div className="inline-flex rounded-2xl border border-slate-200 p-1">
+                  <button
+                    type="button"
+                    onClick={() => switchBillingMode("monthly")}
+                    className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      billingMode === "monthly"
+                        ? "bg-cyan-500 text-white shadow"
+                        : "text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    }`}
                   >
-                    {({
-                      getButtonProps,
-                      getMenuProps,
-                      getItemProps,
-                      options,
-                      open,
-                      selected,
-                    }) => (
-                      <div className="relative w-full">
-                        <button
-                          {...getButtonProps({
-                            className:
-                              "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
-                          })}
-                        >
-                          <span>{selected?.label ?? "เลือกเดือน"}</span>
-                          <svg
-                            className={`h-4 w-4 text-slate-500 transition ${
-                              open ? "rotate-180" : ""
-                            }`}
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M6 8l4 4 4-4" />
-                          </svg>
-                        </button>
-                        {open && (
-                          <div
-                            {...getMenuProps({
+                    รายเดือน
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchBillingMode("daily")}
+                    className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      billingMode === "daily"
+                        ? "bg-cyan-500 text-white shadow"
+                        : "text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    }`}
+                  >
+                    รายวัน
+                  </button>
+                </div>
+              </div>
+
+              {billingMode === "monthly" ? (
+                <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                  เลือกเดือน/ปี ที่ต้องการออกรอบบิล
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <Dropdown
+                      options={MONTH_OPTIONS}
+                      value={formState.billingMonth}
+                      onChange={(value) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          billingMonth: value,
+                        }))
+                      }
+                    >
+                      {({
+                        open,
+                        selected,
+                        options,
+                        getButtonProps,
+                        getMenuProps,
+                        getItemProps,
+                      }) => (
+                        <div className="relative w-full">
+                          <button
+                            {...getButtonProps({
                               className:
-                                "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg",
+                                "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
                             })}
                           >
-                            {options.map((opt) => (
-                              <button
-                                key={opt.value}
-                                {...getItemProps(opt, {
+                            <span>{selected?.label ?? "เลือกเดือน"}</span>
+                            <svg
+                              className={`h-4 w-4 text-slate-500 transition ${
+                                open ? "rotate-180" : ""
+                              }`}
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M6 8l4 4 4-4" />
+                            </svg>
+                          </button>
+                          {open && (
+                            <div
+                              {...getMenuProps({
+                                className:
+                                  "absolute left-0 top-full mt-2 z-50 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                              })}
+                            >
+                              {options.map((opt) => {
+                                const props = getItemProps(opt, {
                                   className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
                                     opt.value === formState.billingMonth
                                       ? "text-cyan-600 font-semibold"
                                       : "text-slate-700"
                                   } hover:bg-slate-50 cursor-pointer`,
-                                })}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Dropdown>
+                                });
+                                return (
+                                  <button
+                                    key={opt.value}
+                                    type="button"
+                                    {...props}
+                                  >
+                                    {opt.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Dropdown>
 
+                    <Dropdown
+                      options={YEAR_OPTIONS}
+                      value={formState.billingYear}
+                      onChange={(value) =>
+                        setFormState((prev) => ({
+                          ...prev,
+                          billingYear: value,
+                        }))
+                      }
+                    >
+                      {({
+                        getButtonProps,
+                        open,
+                        selected,
+                        getMenuProps,
+                        options,
+                        getItemProps,
+                      }) => (
+                        <div className="relative w-full">
+                          <button
+                            {...getButtonProps({
+                              className:
+                                "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
+                            })}
+                          >
+                            <span>{selected?.label ?? "เลือกปี"}</span>
+                            <svg
+                              className={`h-4 w-4 text-slate-500 transition ${
+                                open ? "rotate-180" : ""
+                              }`}
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M6 8l4 4 4-4" />
+                            </svg>
+                          </button>
+                          {open && (
+                            <div
+                              {...getMenuProps({
+                                className:
+                                  "absolute left-0 top-full mt-2 z-50 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg max-h-64 overflow-y-auto",
+                              })}
+                            >
+                              {options.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  {...getItemProps(opt, {
+                                    className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
+                                      opt.value === formState.billingYear
+                                        ? "text-cyan-600 font-semibold"
+                                        : "text-slate-700"
+                                    } hover:bg-slate-50 cursor-pointer`,
+                                  })}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Dropdown>
+                  </div>
+                  <p className="mt-2 text-xs font-normal text-slate-500">
+                    รอบบิลที่จะสร้าง: เดือน {summaryLabel}
+                  </p>
+                </label>
+              ) : (
+                <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                  เลือกวันที่ต้องการออกรอบบิล
+                  <DatePicker
+                    value={dateToValue(dailyDate)}
+                    max={dateToValue(new Date())}
+                    onChange={(next) => {
+                      if (next)
+                        setDailyDate(dateValueToDate(next as DateValue));
+                    }}
+                  />
+                  <p className="mt-2 text-xs font-normal text-slate-500">
+                    ระบบจะคำนวณตั้งแต่ 00:00 ถึงชั่วโมงล่าสุดของวันที่เลือก
+                  </p>
+                </label>
+              )}
+
+              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                เลือกมิเตอร์
+                <div
+                  className={[
+                    "w-full rounded-2xl border border-slate-200 bg-white",
+                    meterSelectionDisabled
+                      ? "opacity-60 pointer-events-none"
+                      : "",
+                  ].join(" ")}
+                >
                   <Dropdown
-                    options={YEAR_OPTIONS}
-                    value={formState.billingYear}
+                    className="relative block w-full"
+                    options={meterDropdownOptions}
+                    value={formState.meterId}
                     onChange={(value) =>
-                      setFormState((prev) => ({ ...prev, billingYear: value }))
+                      setFormState((prev) => ({ ...prev, meterId: value }))
                     }
                   >
                     {({
                       getButtonProps,
-                      getMenuProps,
-                      getItemProps,
-                      options,
                       open,
-                      selected,
-                    }) => (
-                      <div className="relative w-full">
-                        <button
-                          {...getButtonProps({
-                            className:
-                              "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
-                          })}
-                        >
-                          <span>{selected?.label ?? "เลือกปี"}</span>
-                          <svg
-                            className={`h-4 w-4 text-slate-500 transition ${
-                              open ? "rotate-180" : ""
-                            }`}
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M6 8l4 4 4-4" />
-                          </svg>
-                        </button>
-                        {open && (
-                          <div
-                            {...getMenuProps({
+                      getMenuProps,
+                      options,
+                      getItemProps,
+                    }) => {
+                      const selectedMeta = formState.meterId
+                        ? meterOptionMap.get(formState.meterId)
+                        : undefined;
+                      return (
+                        <div className="relative w-full">
+                          <button
+                            {...getButtonProps({
                               className:
-                                "absolute bottom-full mb-2 w-full rounded-2xl border border-slate-100 bg-white py-2 shadow-lg",
+                                "flex w-full items-center justify-betwene rounded-2xl border-0 bg-transparent px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
                             })}
                           >
-                            {options.map((opt) => (
-                              <button
-                                key={opt.value}
-                                {...getItemProps(opt, {
-                                  className: `flex w-full items-center justify-between px-4 py-2 text-left text-sm ${
-                                    opt.value === formState.billingYear
-                                      ? "text-cyan-600 font-semibold"
-                                      : "text-slate-700"
-                                  } hover:bg-slate-50 cursor-pointer`,
-                                })}
-                              >
-                                {opt.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                            <div className="flex flex-1 flex-col text-left">
+                              <span className="text-base font-semibold text-slate-900">
+                                {selectedMeta?.label ?? "เลือกมิเตอร์"}
+                              </span>
+                              <span className="text-xs font-normal text-slate-500">
+                                {selectedMeta?.description ??
+                                  "เลือกมิเตอร์ที่ต้องการออกรอบบิล"}
+                              </span>
+                            </div>
+                            <svg
+                              className={`ml-3 h-4 w-4 shrink-0 text-slate-500 transition ${
+                                open ? "rotate-180" : ""
+                              }`}
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <path d="M6 8l4 4 4-4" />
+                            </svg>
+                          </button>
+                          {open && (
+                            <div
+                              {...getMenuProps({
+                                className:
+                                  "absolute left-0 top-full mt-2 z-50 w-full min-w-full rounded-2xl border border-slate-100 bg-white shadow-lg",
+                              })}
+                            >
+                              <div className="border-b border-slate-100 px-4 pb-3 pt-4">
+                                <input
+                                  type="text"
+                                  value={meterSearch}
+                                  onChange={(e) =>
+                                    setMeterSearch(e.target.value)
+                                  }
+                                  placeholder="ค้นหาชื่อหรือ Serial หมายเลขมิเตอร์..."
+                                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-200"
+                                />
+                              </div>
+                              <div className="max-h-64 overflow-y-auto py-2">
+                                {options.length === 0 ? (
+                                  <div className="px-4 py-3 text-sm text-slate-500">
+                                    ไม่พบมิเตอร์ที่ตรงกับคำค้นหา
+                                  </div>
+                                ) : (
+                                  options.map((opt) => {
+                                    const meta = meterOptionMap.get(opt.value);
+                                    const detailLine = [
+                                      meta?.description?.trim(),
+                                      meta?.serial
+                                        ? `SN: ${meta.serial}`
+                                        : null,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" • ");
+                                    return (
+                                      <button
+                                        key={opt.value}
+                                        type="button"
+                                        {...getItemProps(opt, {
+                                          className: [
+                                            "flex w-full flex-col items-start gap-0.5 px-4 py-2 text-left text-sm cursor-pointer",
+                                            opt.value === formState.meterId
+                                              ? "bg-cyan-50 text-cyan-700 font-semibold"
+                                              : "text-slate-700 hover:bg-slate-50",
+                                          ].join(" "),
+                                        })}
+                                      >
+                                        <span>{meta?.label ?? opt.label}</span>
+                                        {detailLine && (
+                                          <span className="text-xs font-normal text-slate-500">
+                                            {detailLine}
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }}
                   </Dropdown>
                 </div>
+                {loadingOptions && (
+                  <p className="mt-2 text-xs font-normal text-slate-500">
+                    กำลังโหลดรายชื่อมิเตอร์...
+                  </p>
+                )}
+                {!loadingOptions && meterOptions.length === 0 && (
+                  <p className="mt-2 text-xs font-normal text-red-500">
+                    ไม่พบมิเตอร์ใน Site นี้
+                  </p>
+                )}
               </label>
+
+              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                Base On Peak (บาท/หน่วย)
+                <input
+                  type="text"
+                  value={formState.baseOnPeak}
+                  readOnly
+                  disabled
+                  placeholder="กำลังโหลด..."
+                  className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-normal text-slate-500 outline-none disabled:cursor-not-allowed"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                Base Off Peak (บาท/หน่วย)
+                <input
+                  type="text"
+                  value={formState.baseOffPeak}
+                  readOnly
+                  disabled
+                  placeholder="กำลังโหลด..."
+                  className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-normal text-slate-500 outline-none disabled:cursor-not-allowed"
+                />
+                <span className="text-xs font-normal text-slate-500">
+                  Discount Rate: {discountPercentLabel ?? "-"}
+                </span>
+              </label>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                  <span>ค่าที่อ่านได้จากฐานข้อมูล (Auto-fill)</span>
+                  <span>{summaryLabel}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
+                  <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs text-slate-500">On Peak (kWh)</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {summaryLoading
+                        ? "..."
+                        : formatDisplayNumber(summaryTotals.onPeak)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs text-slate-500">Off Peak (kWh)</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {summaryLoading
+                        ? "..."
+                        : formatDisplayNumber(summaryTotals.offPeak)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
+                    <p className="text-xs text-slate-500">
+                      {billingMode === "monthly" ? "รวมทั้งเดือน" : "รวมวันนี้"}
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">
+                      {summaryLoading
+                        ? "..."
+                        : formatDisplayNumber(summaryTotals.total)}
+                    </p>
+                  </div>
+                </div>
+                {summaryError && (
+                  <p className="mt-3 text-xs text-red-500">{summaryError}</p>
+                )}
+              </div>
 
               <button
                 type="submit"
@@ -574,10 +1173,19 @@ const GenerateBillForm: React.FC = () => {
         open={siteGuardOpen}
         id="manual-billing-site-required"
         icon="cancel"
-        title="กรุณาเลือก Site ก่อนใช้งาน"
-        message="โปรดเลือก Site จากเมนูด้านบน (Navbar) ก่อนเริ่มคำนวณบิลค่าไฟ"
-        closeLabel="โอเค"
+        title={siteGuardConfig.title}
+        message={siteGuardConfig.message}
+        closeLabel={siteGuardConfig.closeLabel}
         onClose={handleSiteGuardClose}
+      />
+      <Modal
+        open={Boolean(errorModalMessage)}
+        id="manual-billing-error"
+        icon="warning"
+        title="ไม่สามารถดำเนินการได้"
+        message={errorModalMessage ?? ""}
+        closeLabel="ปิด"
+        onClose={() => setErrorModalMessage(null)}
       />
     </Sidebar>
   );
@@ -585,7 +1193,138 @@ const GenerateBillForm: React.FC = () => {
 
 export default GenerateBillForm;
 
+function formatDisplayNumber(value: number) {
+  return Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function formatInputNumber(value: number) {
   if (!Number.isFinite(value)) return "0";
   return Number(value).toFixed(2);
+}
+
+function formatMonthYear(month?: string, year?: string) {
+  if (!month || !year) return "-";
+  const date = new Date(Number(year), Number(month) - 1, 1);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("th-TH", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function buildMonthRange(month?: string, year?: string) {
+  if (!month || !year) return null;
+  const monthNum = Number(month);
+  const yearNum = Number(year);
+  if (!Number.isFinite(monthNum) || !Number.isFinite(yearNum)) return null;
+  const start = new Date(yearNum, monthNum - 1, 1, 0, 0, 0, 0);
+  const end = new Date(yearNum, monthNum, 0, 23, 59, 59, 999);
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+  };
+}
+
+function buildMonthRangeForRequest(month?: string, year?: string) {
+  const base = buildMonthRange(month, year);
+  if (!base) return null;
+  const today = new Date();
+  const isCurrentMonth =
+    Number(month) === today.getMonth() + 1 &&
+    Number(year) === today.getFullYear();
+  if (!isCurrentMonth) {
+    return base;
+  }
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
+  return {
+    startIso: base.startIso,
+    endIso: end.toISOString(),
+  };
+}
+
+function getDefaultBillingPeriod() {
+  const today = new Date();
+  return {
+    month: String(today.getMonth() + 1).padStart(2, "0"),
+    year: String(today.getFullYear()),
+  };
+}
+
+function formatDailyLabel(date: Date) {
+  return date.toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function buildDailyRange(date: Date | null) {
+  const target = date ? new Date(date) : new Date();
+  const start = startOfDay(target);
+  const now = new Date();
+  const isToday =
+    start.getFullYear() === now.getFullYear() &&
+    start.getMonth() === now.getMonth() &&
+    start.getDate() === now.getDate();
+  let end: Date;
+  if (isToday) {
+    end = new Date(now);
+    end.setMinutes(0, 0, 0);
+  } else {
+    end = endOfDay(target);
+  }
+  if (end.getTime() < start.getTime()) {
+    end = new Date(start);
+  }
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+  };
+}
+
+function startOfDay(date: Date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+}
+
+function endOfDay(date: Date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
+}
+
+function dateToValue(date: Date): DateValue {
+  return {
+    y: date.getFullYear(),
+    m: date.getMonth() + 1,
+    d: date.getDate(),
+  };
+}
+
+function dateValueToDate(value: DateValue) {
+  return new Date(value.y, value.m - 1, value.d);
 }

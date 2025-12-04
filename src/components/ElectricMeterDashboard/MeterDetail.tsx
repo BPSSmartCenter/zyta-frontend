@@ -17,13 +17,6 @@ const STATUS_COLOR: Record<
   offline: { dot: "bg-rose-400", text: "text-rose-300" },
 };
 
-const BILLING_STATUS_COLOR: Record<
-  NonNullable<MeterOption["billingStatus"]>,
-  string
-> = {
-  paid: "border border-emerald-300 bg-emerald-400/10 text-emerald-200",
-  pending: "border border-amber-200 bg-amber-300/10 text-amber-200",
-};
 
 const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
   const navigate = useNavigate();
@@ -33,7 +26,6 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
     : { dot: "bg-slate-300", text: "text-slate-300" };
   const canCreateBill = Boolean(meter && !meter.isOverall);
   const billDisabled = meter?.billingStatus === "paid";
-  const billingTarget = meter?.billingOutstandingMonth ?? "เดือนก่อนหน้า";
 
   return (
     <>
@@ -54,12 +46,6 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
                 <span>ยังไม่ได้เลือกมิเตอร์</span>
               )}
             </div>
-            <p className="text-sm text-[#7EAEDA]">
-              {meter
-                ? meter.description ??
-                  "มิเตอร์ mock data ใช้สำหรับออกแบบเท่านั้น"
-                : "เลือกมิเตอร์หรือมุมมอง Overall เพื่อเริ่มต้นแสดงผล"}
-            </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <button
@@ -74,8 +60,11 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (billDisabled) return;
-                    navigate(abs("/electric/generate-bill"));
+                    if (billDisabled || !meter?.id) return;
+                    const target = `${abs("/electric/generate-bill")}?meterId=${encodeURIComponent(
+                      meter.id
+                    )}`;
+                    navigate(target, { state: { meterId: meter.id } });
                   }}
                   className={[
                     "inline-flex items-center justify-center rounded-2xl border border-slate-400/60 px-4 py-2 text-sm font-medium text-white transition",
@@ -85,11 +74,8 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
                   ].join(" ")}
                   aria-disabled={billDisabled}
                 >
-                  สร้างบิลชำระเงิน
+                  สร้างบิล
                 </button>
-                <p className="text-xs text-[#9fb6cc]">
-                  บิลเดือน : {billingTarget}
-                </p>
               </div>
             )}
           </div>
@@ -140,16 +126,6 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
           <span className="rounded-full bg-white/10 px-3 py-1 text-sm text-white">
             {meter?.billingMonth ?? "ไม่ระบุ"}
           </span>
-          {!meter?.isOverall && meter?.billingStatus && (
-            <span
-              className={[
-                "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold",
-                BILLING_STATUS_COLOR[meter.billingStatus],
-              ].join(" ")}
-            >
-              {meter.billingStatus === "paid" ? "ชำระแล้ว" : "รอการชำระ"}
-            </span>
-          )}
         </div>
       </div>
 

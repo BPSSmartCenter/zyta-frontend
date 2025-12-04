@@ -24,6 +24,9 @@ type Props = {
   className?: string;
   placeholder?: string;
   displayMode?: "full" | "monthYear";
+  iconClassName?: string;
+  align?: "left" | "full";
+  textAlign?: "left" | "center";
 };
 
 export default function DatePicker({
@@ -34,6 +37,9 @@ export default function DatePicker({
   className = "",
   placeholder,
   displayMode = "full",
+  iconClassName = "",
+  align = "left",
+  textAlign = "center",
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
@@ -50,7 +56,7 @@ export default function DatePicker({
   }, [selected]);
 
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
@@ -168,26 +174,36 @@ export default function DatePicker({
       : t("date.placeholder", { defaultValue: "YYYY-MM-DD" }));
 
   return (
-    <div ref={wrapRef} className={`relative inline-block`}>
+    <div ref={wrapRef} className={`relative inline-block ${align === "full" ? "w-full" : ""}`}>
       {/* ปุ่มหลัก */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`h-[40px] w-[240px] rounded-md border border-gray-300 bg-white
-                   pl-3 pr-10 text-gray-800 flex  items-center justify-center
+        className={`relative h-[40px] ${align === "full" ? "w-full" : "w-[240px]"} rounded-md border border-gray-300 bg-white
+                   pl-3 pr-10 text-gray-800 flex items-center
                    focus:outline-none focus:bg-gray-50 hover:cursor-pointer ${className}`}
       >
-        <span className="truncate">
+        <span
+          className={`truncate w-full ${
+            textAlign === "center" ? "text-center" : "text-left"
+          }`}
+        >
           {value ? toDisplayLabel(value) : placeholderText}{" "}
         </span>
-        <i className="material-icons absolute right-2  text-gray-300 ">
+        <i className={`material-icons absolute right-2  text-gray-300 ${iconClassName}`}>
           calendar_today
         </i>
       </button>
 
       {/* ปฏิทิน */}
       {open && (
-        <div className="absolute z-50 mt-2 w-[240px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+        <div
+          className={`absolute z-50 w-[240px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg ${
+            align === "full"
+              ? "bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2"
+              : "mt-2 left-0"
+          }`}
+        >
           {/* Header */}
           <div className="mb-2 flex items-center justify-between">
             <button

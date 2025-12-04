@@ -2,6 +2,7 @@ import React from "react";
 import type { SiteRow } from "./site.constant";
 import { lookupThaiAddress } from "../../api/thaiAddress";
 import Dropdown from "../Dropdown";
+import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type UpdatePayload = {
   name?: string;
@@ -13,6 +14,8 @@ type UpdatePayload = {
   addressDistrict?: string;
   addressSubDistrict?: string;
   addressLine?: string;
+  brandingLogoDataUrl?: string;
+  removeBrandingLogo?: boolean;
 };
 
 type Props = {
@@ -39,6 +42,13 @@ export default function ContentEdit({
     addressSubDistrict: site.addressSubDistrict ?? "",
     addressLine: site.addressLine ?? "",
   });
+  const [logoPreview, setLogoPreview] = React.useState<string | null>(
+    site.brandingLogoUrl ?? null
+  );
+  const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);
+  const [logoRemoved, setLogoRemoved] = React.useState(false);
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const logoInputRef = React.useRef<HTMLInputElement | null>(null);
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [districtOptions, setDistrictOptions] = React.useState<string[]>(() =>
     site.addressDistrict ? [site.addressDistrict] : []
@@ -70,6 +80,11 @@ export default function ContentEdit({
     }
     return list;
   }, [subDistrictOptions, form.addressSubDistrict]);
+
+  const displayLogoSrc = React.useMemo(
+    () => buildBrandingLogoSrc(logoPreview),
+    [logoPreview]
+  );
 
   const handleChange = (
     field:
@@ -109,6 +124,8 @@ export default function ContentEdit({
       addressDistrict: form.addressDistrict?.trim() || undefined,
       addressSubDistrict: form.addressSubDistrict?.trim() || undefined,
       addressLine: form.addressLine?.trim() || undefined,
+      brandingLogoDataUrl: logoDataUrl ?? undefined,
+      removeBrandingLogo: logoRemoved && !logoDataUrl ? true : undefined,
     });
   };
 
@@ -166,6 +183,41 @@ export default function ContentEdit({
     }
   }, [form.zipcode]);
 
+  const handleLogoFile = (file: File | null) => {
+    if (!file) {
+      setLogoDataUrl(null);
+      setLogoPreview(site.brandingLogoUrl ?? null);
+      setLogoRemoved(false);
+      setLogoError(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setLogoError("กรุณาเลือกไฟล์รูปภาพ");
+      return;
+    }
+    if (file.size > 2.5 * 1024 * 1024) {
+      setLogoError("ไฟล์ต้องไม่เกิน 2.5MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      setLogoDataUrl(result);
+      setLogoPreview(result);
+      setLogoRemoved(false);
+      setLogoError(null);
+    };
+    reader.onerror = () => setLogoError("ไม่สามารถอ่านไฟล์ได้");
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    setLogoDataUrl(null);
+    setLogoRemoved(true);
+    setLogoError(null);
+  };
+
   return (
     <div className="mt-6 p-6 bg-white rounded-lg">
       <div className="flex items-center gap-3 pb-4 border-b">
@@ -207,6 +259,53 @@ export default function ContentEdit({
             onChange={(e) => handleChange("code", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
             placeholder="รหัสภายใน"
+          />
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            Branding logo
+          </label>
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 flex flex-col gap-3">
+            {logoPreview ? (
+              <img
+                src={displayLogoSrc ?? ""}
+                alt="Site logo preview"
+                className="h-20 w-32 object-contain mx-auto"
+              />
+            ) : (
+              <p className="text-xs text-slate-500 text-center">
+                ยังไม่มีโลโก้ กดอัปโหลดเพื่อเพิ่มรูป (PNG / JPG / WEBP ไม่เกิน 2.5MB)
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold hover:bg-cyan-500 cursor-pointer"
+              >
+                {logoPreview ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+              </button>
+              {(logoPreview || site.brandingLogoUrl) && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-white cursor-pointer"
+                >
+                  ลบรูป
+                </button>
+              )}
+            </div>
+            {logoError && (
+              <p className="text-xs text-red-500 text-center">{logoError}</p>
+            )}
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            className="hidden"
+            onChange={(event) => handleLogoFile(event.target.files?.[0] ?? null)}
           />
         </div>
 

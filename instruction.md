@@ -237,7 +237,7 @@ curl -X POST http://localhost:3000/site/3078000/air/devices/register \
 - **Headers**: `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Body**: ใส่จำนวน record ได้หลายตัวในครั้งเดียว ตัวอย่าง
 
-```bash
+```bashhttps://cloud.embedig.com/index.html#homeSubmenu
 curl -X POST http://localhost:3000/devices/8d6d1e94-.../readings \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -256,7 +256,7 @@ curl -X POST http://localhost:3000/devices/8d6d1e94-.../readings \
   }'
 ```
 
-เมื่อ API ตอบ `{ "ok": true, "inserted": 1 }` ข้อมูลจะถูกใช้บนหน้า BillingOverview, Electric Meter Dashboard และป้อนเป็น default ให้ Generate Bill Form
+เมื่อ API ตอบ `{ "ok": true, "inserted": 1 }` ข้อมูลจะถูกใช้บนหน้า BillingOverview, Electric Meter Dashboard และป้อนเป็น default ให้ Generate Bill Form</token>
 
 ### 3.3 สร้างบิลด้วย Manual Billing API
 

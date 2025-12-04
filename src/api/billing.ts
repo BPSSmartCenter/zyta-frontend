@@ -5,6 +5,9 @@ export type BillingMonitorRow = {
   meter: string;
   meterId?: string;
   reading?: string;
+  readingOnPeakKwh?: number;
+  readingOffPeakKwh?: number;
+  voltage?: number | null;
   timestamp?: string;
   arlTime?: string;
   site?: string;
@@ -14,6 +17,9 @@ export type BillingMonitorRow = {
   billingCost?: number;
   billingStatus?: "paid" | "due";
   documentUrl?: string | null;
+  issuedAt?: string;
+  billingPeriodMonth?: number;
+  billingPeriodYear?: number;
 };
 
 export type MonthlyListRow = {
@@ -22,6 +28,8 @@ export type MonthlyListRow = {
   cost: number;
   status: "paid" | "due";
   billId?: string | null;
+  usageTotalKwh: number;
+  updatedAt: string;
 };
 
 export type BillingOverviewPayload = {
@@ -57,12 +65,13 @@ export type CreateBillPayload = {
   baseOnPeak: string;
   baseOffPeak: string;
   notes?: string;
+  brandingLogoDataUrl?: string;
 };
 
 export type BillDetailPayload = {
   id: string;
   status: string;
-  site: { name?: string; address?: string };
+  site: { name?: string; address?: string; brandingLogoUrl?: string | null };
   meter: { id?: string; name?: string; serial?: string | null };
   period: { month: number; year: number; label: string };
   totals: { totalKwh: number; onPeakKwh: number; offPeakKwh: number };
@@ -104,4 +113,11 @@ export async function downloadBillPdf(billId: string) {
     responseType: "blob",
   });
   return response.data as Blob;
+}
+
+export async function deleteBill(billId: string) {
+  const { data } = await api.delete<{ ok: boolean }>(
+    `/billing/bills/${encodeURIComponent(billId)}`
+  );
+  return data;
 }
