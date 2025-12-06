@@ -11,7 +11,15 @@ import { brandImage, meaLogo } from "../assets";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
 import type { MeterDashboard } from "../api/meter";
-import { createBill, downloadBillPdf, getBillDetailApi, uploadBillPdf, type BillDetailPayload } from "../api/billing";
+import {
+  createBill,
+  downloadBillPdf,
+  getBillDetailApi,
+  getBillingReadingsData,
+  uploadBillPdf,
+  type BillDetailPayload,
+  type BillingReadingsPayload,
+} from "../api/billing";
 import { saveBlobAsFile } from "../utils/download";
 import { buildBrandingLogoSrc } from "../utils/branding";
 type BillingMode = "monthly" | "daily";
@@ -92,14 +100,17 @@ const BillPdfPreview: React.FC = () => {
   const [downloadingStored, setDownloadingStored] = React.useState(false);
   const [currentBillId, setCurrentBillId] = React.useState<string | null>(billIdParam);
   const [savingBill, setSavingBill] = React.useState(false);
+  const [billingReadings, setBillingReadings] = React.useState<BillingReadingsPayload | null>(null);
+  const [billingReadingsError, setBillingReadingsError] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (billIdParam) {
       setCurrentBillId(billIdParam);
     }
   }, [billIdParam]);
-  const preferredData = billDetail ?? preview ?? null;
-  const dashboard = billDetail ? null : preview?.dashboard ?? null;
   const previewForm = preview?.form;
+  const preferredData = billDetail ?? preview ?? null;
+  const preferredDeviceId = preferredData?.meter?.id ?? previewForm?.meterId ?? null;
+  const dashboard = billDetail ? null : preview?.dashboard ?? null;
   const queryForm = React.useMemo(() => {
     const payload: Record<string, any> = {};
     if (modeParam === "daily") {
@@ -143,30 +154,77 @@ const BillPdfPreview: React.FC = () => {
     preferredData?.meter?.name ??
     previewMeterDescription ??
     "มิเตอร์";
-  const totalEnergy = billDetail
-    ? billDetail.totals.totalKwh
-    : dashboard?.totals.energyUsageKwh ?? 0;
-  const onPeakKwhValue = billDetail
-    ? billDetail.totals.onPeakKwh
-    : dashboard?.totals.onPeakKwh ?? 0;
-  const offPeakKwhValue = billDetail
-    ? billDetail.totals.offPeakKwh
-    : dashboard?.totals.offPeakKwh ?? 0;
-  const onPeakCost = billDetail
-    ? billDetail.cost.onPeak
-    : dashboard?.cost.onPeakCost ?? 0;
-  const offPeakCost = billDetail
-    ? billDetail.cost.offPeak
-    : dashboard?.cost.offPeakCost ?? 0;
-  const totalCost = billDetail
-    ? billDetail.cost.total
-    : dashboard?.cost.totalCost ?? 0;
 
   const reportMode = React.useMemo<BillingMode>(() => {
     return resolveReportMode(billDetail, formValues);
   }, [billDetail, formValues]);
 
+  const monthlyPeriod = React.useMemo(() => {
+    if (reportMode !== "monthly") return null;
+    return getPeriodMonthYear(billDetail, formValues);
+  }, [reportMode, billDetail, formValues]);
+
+  const resolvedDailyDate = React.useMemo(() => {
+    const candidates = [
+      (billDetail?.form as any)?.dailyDate,
+      formValues.dailyDate,
+      dailyDateParam,
+      previewForm?.dailyDate,
+    ];
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const parsed = new Date(candidate);
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    }
+    return null;
+  }, [billDetail?.form, formValues, dailyDateParam, previewForm]);
+
+  React.useEffect(() => {
+    if (!preferredDeviceId) return;
+    if (!reportMode) return;
+    let requestParams: { mode: "daily"; date: string } | { mode: "monthly"; month: number; year: number } | null = null;
+    if (reportMode === "daily") {
+      if (!resolvedDailyDate) return;
+      requestParams = { mode: "daily", date: resolvedDailyDate };
+    } else {
+      const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+      if (!period) return;
+      requestParams = { mode: "monthly", month: period.month, year: period.year };
+    }
+    let cancelled = false;
+    setBillingReadingsError(null);
+    setBillingReadings(null);
+    getBillingReadingsData(preferredDeviceId, requestParams)
+      .then((data) => {
+        if (!cancelled) {
+          setBillingReadings(data);
+        }
+      })
+      .catch((err) => {
+        console.error("[BillPdfPreview] load billing readings failed", err);
+        if (!cancelled) {
+          setBillingReadings(null);
+          setBillingReadingsError("ไม่สามารถโหลดข้อมูลพลังงานได้");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preferredDeviceId, reportMode, resolvedDailyDate, monthlyPeriod, billDetail, formValues]);
+
+  const billingReadingRows = React.useMemo<BillDetailPayload["rows"]>(() => {
+    if (!billingReadings?.rows?.length) return [];
+    return billingReadings.rows.map((row) => ({
+      timestamp: row.timestamp,
+      energyProduction: row.total,
+      energyOnPeak: row.onPeak,
+      energyOffPeak: row.offPeak,
+      energyPurchased: row.total,
+    }));
+  }, [billingReadings]);
+
   const previewRows = React.useMemo<BillDetailPayload["rows"]>(() => {
+    if (billingReadingRows.length) return billingReadingRows;
     if (billDetail?.rows?.length) return billDetail.rows;
     if (reportMode === "daily" && dashboard?.chart?.categories?.length) {
       const total = dashboard.totals.energyUsageKwh || 1;
@@ -184,12 +242,7 @@ const BillPdfPreview: React.FC = () => {
       }) as BillDetailPayload["rows"];
     }
     return [];
-  }, [billDetail, dashboard, reportMode]);
-
-  const monthlyPeriod = React.useMemo(() => {
-    if (reportMode !== "monthly") return null;
-    return getPeriodMonthYear(billDetail, formValues);
-  }, [reportMode, billDetail, formValues]);
+  }, [billingReadingRows, billDetail, dashboard, reportMode]);
 
   const tableData = React.useMemo<TableDataRow[]>(() => {
     const rows = previewRows;
@@ -207,7 +260,6 @@ const BillPdfPreview: React.FC = () => {
         production: acc.production + row.energyProduction,
         onPeak: acc.onPeak + row.energyOnPeak,
         offPeak: acc.offPeak + row.energyOffPeak,
-        purchased: acc.purchased + row.energyPurchased,
         irradiance: acc.irradiance + row.irradiance,
         ambient: acc.ambient + row.ambientTemp,
         module: acc.module + row.moduleTemp,
@@ -216,7 +268,6 @@ const BillPdfPreview: React.FC = () => {
         production: 0,
         onPeak: 0,
         offPeak: 0,
-        purchased: 0,
         irradiance: 0,
         ambient: 0,
         module: 0,
@@ -224,7 +275,35 @@ const BillPdfPreview: React.FC = () => {
     );
   }, [tableData]);
 
+  const totalEnergy = tableTotals.production;
+  const onPeakKwhValue = tableTotals.onPeak;
+  const offPeakKwhValue = tableTotals.offPeak;
+  const rateOnPeak = toNumber(formValues.baseOnPeak);
+  const rateOffPeak = toNumber(formValues.baseOffPeak);
+  const onPeakCost = onPeakKwhValue * rateOnPeak;
+  const offPeakCost = offPeakKwhValue * rateOffPeak;
+  const totalCost = onPeakCost + offPeakCost;
+
+  const chartPointsFromTable = React.useMemo(() => {
+    if (!tableData.length) return null;
+    return tableData.map((row, index) => {
+      const label =
+        reportMode === "monthly"
+          ? formatMonthlyLabel(row.time, monthlyPeriod)
+          : row.time.replace(/:00$/, "");
+      return {
+        label,
+        index,
+        onPeak: row.energyOnPeak,
+        purchased: row.energyOffPeak,
+      };
+    });
+  }, [tableData, reportMode, monthlyPeriod]);
+
   const chartPointsData = React.useMemo(() => {
+    if (chartPointsFromTable?.length) {
+      return chartPointsFromTable;
+    }
     if (billDetail?.chartPoints?.length) {
       return billDetail.chartPoints;
     }
@@ -235,13 +314,30 @@ const BillPdfPreview: React.FC = () => {
         const base = Number(dashboard.chart.current[idx] ?? 0);
         return {
           label,
-          purchased: base,
+          purchased: base * (1 - onRatio),
           onPeak: base * onRatio,
         };
       });
     }
     return CHART_POINTS;
-  }, [billDetail, dashboard]);
+  }, [chartPointsFromTable, billDetail, dashboard, reportMode]);
+
+  const chartBarStyles = React.useMemo(() => {
+    if (reportMode === "monthly") {
+      return {
+        barWidthClass: "w-2.5",
+        gapClass: "gap-1",
+        maxHeight: 140,
+        labelClass: "text-[9px]",
+      };
+    }
+    return {
+      barWidthClass: "w-4",
+      gapClass: "gap-2",
+      maxHeight: 180,
+      labelClass: "text-[10px]",
+    };
+  }, [reportMode]);
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
@@ -545,10 +641,11 @@ const BillPdfPreview: React.FC = () => {
             </div>
           )}
 
-          <div
-            ref={pdfRef}
-            className="rounded-[36px] bg-white p-8 text-slate-800 shadow-[0_30px_60px_rgba(15,23,42,0.12)]"
-          >
+          <div className="flex justify-center">
+            <div
+              ref={pdfRef}
+              className="w-full max-w-[900px] rounded-[36px] bg-white p-8 text-slate-800 shadow-[0_30px_60px_rgba(15,23,42,0.12)]"
+            >
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-around">
                 <img
@@ -586,6 +683,11 @@ const BillPdfPreview: React.FC = () => {
             </div>
 
             <div className="mt-3">
+              {billingReadingsError && (
+                <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                  {billingReadingsError}
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px] text-sm text-black">
                   <thead className="text-xs uppercase tracking-wide text-black">
@@ -596,7 +698,6 @@ const BillPdfPreview: React.FC = () => {
                       <th className="py-2 px-2 border">Energy Production (kWh)</th>
                       <th className="py-2 px-2 border">Energy On Peak (kWh)</th>
                       <th className="py-2 px-2 border">Energy Off Peak (kWh)</th>
-                      <th className="py-2 px-2 border">Energy Purchased (kWh)</th>
                       <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
                       <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
                       <th className="py-2 px-2 border">Module Temp. (°C)</th>
@@ -616,7 +717,6 @@ const BillPdfPreview: React.FC = () => {
                         <td className="text-[15px] border">{formatValue(row.energyProduction)}</td>
                         <td className="text-[15px] border">{formatValue(row.energyOnPeak)}</td>
                         <td className="text-[15px] border">{formatValue(row.energyOffPeak)}</td>
-                        <td className="text-[15px] border">{formatValue(row.energyPurchased)}</td>
                         <td className="text-[15px] border">{formatValue(row.irradiance)}</td>
                         <td className="text-[15px] border">{formatValue(row.ambientTemp)}</td>
                         <td className="text-[15px] border">{formatValue(row.moduleTemp)}</td>
@@ -634,9 +734,6 @@ const BillPdfPreview: React.FC = () => {
                       </td>
                       <td className="text-[15px] border">
                         {formatValue(tableTotals.offPeak)}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(tableTotals.purchased)}
                       </td>
                       <td className="text-[15px] border">
                         {formatValue(tableTotals.irradiance)}
@@ -657,30 +754,38 @@ const BillPdfPreview: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-2 rounded-3xl px-4 py-4">
-              <div className="mt-4 h-64 w-full overflow-x-auto px-2">
-                <div className="flex min-w-[640px] items-end gap-4">
-                  {chartPointsData.map((point) => {
-                    const onHeight = (point.onPeak / chartBarMax) * 180;
-                    const offHeight = (point.purchased / chartBarMax) * 180;
-                    return (
-                      <div key={point.label} className="flex w-12 flex-col items-center gap-1 text-xs">
-                        <div className="relative flex h-48 w-6 flex-col justify-end gap-1">
+            <div className="rounded-3xl py-4 w-full">
+              <div className="mt-4 h-48 w-full">
+                <div className="w-full flex justify-center">
+                  <div className={`inline-flex items-end ${chartBarStyles.gapClass}`}>
+                    {chartPointsData.map((point) => {
+                      const onHeight = (point.onPeak / chartBarMax) * chartBarStyles.maxHeight;
+                      const offHeight = (point.purchased / chartBarMax) * chartBarStyles.maxHeight;
+                      return (
+                        <div
+                          key={point.label}
+                          className={`flex flex-col items-center gap-1 ${chartBarStyles.barWidthClass}`}
+                        >
                           <div
-                            className="rounded-sm bg-[#2ab07f]"
-                            style={{ height: `${onHeight}px` }}
-                          />
-                          <div
-                            className="rounded-sm bg-[#1e88e5]"
-                            style={{ height: `${offHeight}px` }}
-                          />
+                            className={`relative flex ${chartBarStyles.barWidthClass} flex-col justify-end gap-1`}
+                            style={{ height: `${chartBarStyles.maxHeight}px` }}
+                          >
+                            <div
+                              className="rounded-sm bg-[#2ab07f]"
+                              style={{ height: `${onHeight}px` }}
+                            />
+                            <div
+                              className="rounded-sm bg-[#1e88e5]"
+                              style={{ height: `${offHeight}px` }}
+                            />
+                          </div>
+                          <span className={`${chartBarStyles.labelClass} text-slate-600`}>
+                            {point.label}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-600">
-                          {point.label}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-6 text-sm font-semibold text-slate-600">
@@ -721,6 +826,7 @@ const BillPdfPreview: React.FC = () => {
                   {downloadingStored ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด PDF ที่บันทึกไว้"}
                 </button>
               )}
+            </div>
             </div>
           </div>
         </div>
@@ -920,4 +1026,12 @@ function getDayOfMonth(raw: string) {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return -1;
   return date.getDate();
+}
+
+function toNumber(value: unknown) {
+  if (value === null || value === undefined) return 0;
+  const normalized =
+    typeof value === "string" ? value.replace(/,/g, "") : value;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

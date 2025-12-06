@@ -121,3 +121,38 @@ export async function deleteBill(billId: string) {
   );
   return data;
 }
+
+export type BillingReadingsRow = {
+  label: string;
+  timestamp: string;
+  onPeak: number;
+  offPeak: number;
+  total: number;
+};
+
+export type BillingReadingsPayload = {
+  mode: "daily" | "monthly";
+  rows: BillingReadingsRow[];
+  range: { start: string; end: string };
+};
+
+type DailyBillingReadingsParams = { mode: "daily"; date: string };
+type MonthlyBillingReadingsParams = { mode: "monthly"; month: number; year: number };
+
+export async function getBillingReadingsData(
+  deviceId: string,
+  params: DailyBillingReadingsParams | MonthlyBillingReadingsParams
+) {
+  const query = new URLSearchParams();
+  query.set("mode", params.mode);
+  if (params.mode === "daily") {
+    query.set("date", params.date);
+  } else {
+    query.set("month", String(params.month));
+    query.set("year", String(params.year));
+  }
+  const { data } = await api.get<{ ok: boolean; data: BillingReadingsPayload }>(
+    `/devices/${encodeURIComponent(deviceId)}/billing-readings?${query.toString()}`
+  );
+  return data.data;
+}

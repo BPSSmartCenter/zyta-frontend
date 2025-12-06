@@ -15,10 +15,9 @@ import { getElectricDevices } from "../api/electric";
 import { getSiteDetails } from "../api/sites";
 import {
   getMeterDashboard,
-  getMeterSummary,
   type MeterDashboard,
 } from "../api/meter";
-import { createBill } from "../api/billing";
+import { createBill, getBillingReadingsData } from "../api/billing";
 import Dropdown from "../components/Dropdown";
 import DatePicker, { type DateValue } from "../components/DateInput";
 import { buildBrandingLogoSrc } from "../utils/branding";
@@ -420,56 +419,56 @@ const GenerateBillForm: React.FC = () => {
     if (!meterId) {
       setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
       setSummaryError(null);
+      setSummaryLoading(false);
       return;
     }
     let canceled = false;
     setSummaryLoading(true);
     setSummaryError(null);
-    let summaryParams: {
-      startDate?: string;
-      endDate?: string;
-      month?: string;
-      year?: string;
-    } | null = null;
+    let request:
+      | { mode: "monthly"; month: number; year: number }
+      | { mode: "daily"; date: string }
+      | null = null;
     if (billingMode === "monthly") {
-      if (!formState.billingMonth || !formState.billingYear) {
+      const monthNum = Number(formState.billingMonth);
+      const yearNum = Number(formState.billingYear);
+      if (!monthNum || !yearNum) {
         setSummaryLoading(false);
         return;
       }
-      if (monthlyRequestRange) {
-        summaryParams = {
-          startDate: monthlyRequestRange.startIso,
-          endDate: monthlyRequestRange.endIso,
-        };
-      } else {
-        summaryParams = {
-          month: formState.billingMonth,
-          year: formState.billingYear,
-        };
-      }
+      request = { mode: "monthly", month: monthNum, year: yearNum };
     } else {
-      const range = buildDailyRange(dailyDate);
-      summaryParams = range;
+      const iso = dailyDate?.toISOString?.();
+      if (!iso) {
+        setSummaryLoading(false);
+        return;
+      }
+      request = { mode: "daily", date: iso };
     }
-    getMeterSummary(meterId, summaryParams ?? undefined)
+    getBillingReadingsData(meterId, request)
       .then((data) => {
         if (canceled) return;
-        const onPeak = data.totals.energyOnPeakKwh;
-        const offPeak = data.totals.energyOffPeakKwh;
-        const total = data.totals.energyProductionKwh;
-        setSummaryTotals({ onPeak, offPeak, total });
+        const totals = data.rows.reduce(
+          (acc, row) => {
+            acc.onPeak += row.onPeak;
+            acc.offPeak += row.offPeak;
+            acc.total += row.total;
+            return acc;
+          },
+          { onPeak: 0, offPeak: 0, total: 0 }
+        );
+        setSummaryTotals(totals);
         setFormState((prev) => ({
           ...prev,
-          ereOnPeak: formatInputNumber(onPeak),
-          ereOffPeak: formatInputNumber(offPeak),
+          ereOnPeak: formatInputNumber(totals.onPeak),
+          ereOffPeak: formatInputNumber(totals.offPeak),
         }));
       })
       .catch((err) => {
-        console.error("[GenerateBillForm] load meter summary failed", err);
-        if (!canceled) {
-          setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
-          setSummaryError("ไม่สามารถโหลดสรุปข้อมูลไฟสำหรับช่วงนี้ได้");
-        }
+        console.error("[GenerateBillForm] load billing readings failed", err);
+        if (canceled) return;
+        setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
+        setSummaryError("ไม่สามารถโหลดข้อมูล Billing สำหรับช่วงนี้ได้");
       })
       .finally(() => {
         if (!canceled) setSummaryLoading(false);
@@ -477,15 +476,7 @@ const GenerateBillForm: React.FC = () => {
     return () => {
       canceled = true;
     };
-  }, [
-    meterId,
-    billingMode,
-    formState.billingMonth,
-    formState.billingYear,
-    dailyDate,
-    monthlyRequestRange?.startIso,
-    monthlyRequestRange?.endIso,
-  ]);
+  }, [meterId, billingMode, formState.billingMonth, formState.billingYear, dailyDate]);
 
   const handleSiteGuardClose = React.useCallback(() => {
     setGuardType("none");
