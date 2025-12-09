@@ -16,6 +16,8 @@ type UpdatePayload = {
   addressLine?: string;
   brandingLogoDataUrl?: string;
   removeBrandingLogo?: boolean;
+  solaredgeSiteId?: string;
+  solaredgeApiKey?: string;
 };
 
 type Props = {
@@ -41,6 +43,8 @@ export default function ContentEdit({
     addressDistrict: site.addressDistrict ?? "",
     addressSubDistrict: site.addressSubDistrict ?? "",
     addressLine: site.addressLine ?? "",
+    solaredgeSiteId: site.solaredgeSiteId ?? "",
+    solaredgeApiKey: site.solaredgeApiKey ?? "",
   });
   const [logoPreview, setLogoPreview] = React.useState<string | null>(
     site.brandingLogoUrl ?? null
@@ -94,7 +98,9 @@ export default function ContentEdit({
       | "addressProvince"
       | "addressDistrict"
       | "addressSubDistrict"
-      | "addressLine",
+      | "addressLine"
+      | "solaredgeSiteId"
+      | "solaredgeApiKey",
     value: string
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -114,9 +120,8 @@ export default function ContentEdit({
     if (!form.name?.trim()) nextErrors.name = "กรุณากรอกชื่อไซต์";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
-    await onSave({
+    const payload: UpdatePayload = {
       name: form.name.trim(),
-      code: form.code?.trim() || undefined,
       lat: form.lat,
       lng: form.lng,
       zipcode: form.zipcode?.trim() || undefined,
@@ -126,7 +131,23 @@ export default function ContentEdit({
       addressLine: form.addressLine?.trim() || undefined,
       brandingLogoDataUrl: logoDataUrl ?? undefined,
       removeBrandingLogo: logoRemoved && !logoDataUrl ? true : undefined,
-    });
+    };
+    const nextSiteId = form.solaredgeSiteId?.trim() ?? "";
+    const prevSiteId = site.solaredgeSiteId?.trim() ?? "";
+    if (nextSiteId !== prevSiteId) {
+      payload.solaredgeSiteId = nextSiteId;
+    }
+    const trimmedCode = form.code?.trim() ?? "";
+    const prevCode = site.code?.trim() ?? "";
+    if (trimmedCode !== prevCode) {
+      payload.code = trimmedCode || undefined;
+    }
+    const nextApiKey = form.solaredgeApiKey?.trim() ?? "";
+    const prevApiKey = site.solaredgeApiKey?.trim() ?? "";
+    if (nextApiKey !== prevApiKey) {
+      payload.solaredgeApiKey = nextApiKey;
+    }
+    await onSave(payload);
   };
 
   React.useEffect(() => {
@@ -260,6 +281,41 @@ export default function ContentEdit({
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
             placeholder="รหัสภายใน"
           />
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-sm">SolarEdge Credentials</p>
+            <p className="text-xs text-gray-500">
+              ปรับ Site ID / API Key ที่ใช้เชื่อมกับ SolarEdge (เคลียร์ช่องเพื่อรีเซ็ตเป็นค่า default)
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="font-semibold text-sm block mb-2">
+                SolarEdge Site ID
+              </label>
+              <input
+                type="text"
+                value={form.solaredgeSiteId ?? ""}
+                onChange={(e) => handleChange("solaredgeSiteId", e.target.value)}
+                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder="เช่น 3078000"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-sm block mb-2">
+                SolarEdge API Key
+              </label>
+              <input
+                type="password"
+                value={form.solaredgeApiKey ?? ""}
+                onChange={(e) => handleChange("solaredgeApiKey", e.target.value)}
+                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder="SE_xxxxxxxx"
+              />
+            </div>
+          </div>
         </div>
 
         <div>

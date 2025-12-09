@@ -47,6 +47,92 @@ type ComparisonItem = {
   series: number[];
 };
 
+type DeviceCategory = "INVERTER" | "METER" | "GATEWAY" | "SENSOR";
+
+type ElectricDeviceOption = {
+  id: string;
+  label: string;
+  sn: string;
+  category: DeviceCategory;
+  status?: string | null;
+};
+
+const DEVICE_CATEGORY_SET: ReadonlySet<DeviceCategory> = new Set([
+  "INVERTER",
+  "METER",
+  "GATEWAY",
+  "SENSOR",
+]);
+
+const DEFAULT_INVERTER_SN = "7B0C44D5-A0";
+
+function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
+  if (!Array.isArray(items)) return [];
+  const options: ElectricDeviceOption[] = [];
+  for (const item of items) {
+    const rawModel = typeof item?.model === "string" ? item.model : "";
+    let modelCategory: string | null = null;
+    let modelIdentifier: string | null = null;
+    if (rawModel.includes(":")) {
+      const [left, right] = rawModel.split(":", 2);
+      modelCategory = left;
+      modelIdentifier = right;
+    } else if (rawModel) {
+      modelIdentifier = rawModel;
+    }
+    const rawCategory =
+      item?.meta?.deviceCategory ??
+      item?.meta?.device_category ??
+      item?.category ??
+      modelCategory;
+    const categoryUpper =
+      typeof rawCategory === "string" ? rawCategory.trim().toUpperCase() : "";
+    if (!DEVICE_CATEGORY_SET.has(categoryUpper as DeviceCategory)) continue;
+
+    const snCandidates = [
+      item?.meta?.details?.serialNumber,
+      item?.meta?.details?.sn,
+      item?.meta?.details?.raw?.SN,
+      item?.sn,
+      modelIdentifier,
+    ];
+    const sn =
+      snCandidates
+        .map((candidate) =>
+          typeof candidate === "string" ? candidate.trim() : ""
+        )
+        .find((value) => value.length > 0) ?? "";
+    if (!sn) continue;
+
+    const labelCandidates = [
+      item?.name,
+      item?.label,
+      item?.meta?.details?.name,
+      item?.meta?.details?.model,
+      sn,
+    ];
+    const label =
+      labelCandidates
+        .map((candidate) =>
+          typeof candidate === "string" ? candidate.trim() : ""
+        )
+        .find((value) => value.length > 0) || `${categoryUpper} ${sn}`;
+    const id =
+      typeof item?.id === "string" && item.id.trim().length > 0
+        ? item.id
+        : `${categoryUpper}:${sn}`.toUpperCase();
+
+    options.push({
+      id,
+      label,
+      sn,
+      category: categoryUpper as DeviceCategory,
+      status: item?.status ?? null,
+    });
+  }
+  return options;
+}
+
 function formatWithComma(v: number | string) {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n)
@@ -317,15 +403,79 @@ const [thermoOne, setThermoOne] = useState<{
   const [overviewTodayValue, setOverviewTodayValue] = useState<number | null>(null);
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
-  const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const urlInverterSN = qs?.get('inverterSN') || undefined;
+  const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
+  const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const qs = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const urlDeviceSN = qs?.get("inverterSN") || qs?.get("deviceSn") || undefined;
   const siteForApi =
     selectedSite && selectedSite !== "all"
       ? String(selectedSite)
       : siteCode && /^\d+$/.test(String(siteCode))
       ? String(siteCode)
       : "3078000";
-  const inverterSN = urlInverterSN || "7B0C44D5-A0";
+  const fallbackDeviceSn = urlDeviceSN || DEFAULT_INVERTER_SN;
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setDeviceOptionsLoading(true);
+    (async () => {
+      try {
+        const res = await getElectricDevices(siteForApi);
+        const items: any[] = Array.isArray((res as any)?.items)
+          ? (res as any).items
+          : Array.isArray((res as any)?.data?.items)
+          ? (res as any).data.items
+          : [];
+        if (cancelled) return;
+        const normalized = normalizeElectricDeviceOptions(items);
+        const filtered = normalized.filter((opt) => opt.category !== "METER");
+        setDeviceOptions(filtered);
+        setSelectedDeviceId((prev) => {
+          if (prev && filtered.some((opt) => opt.id === prev)) return prev;
+          const matchSn =
+            urlDeviceSN &&
+            filtered.find(
+              (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
+            );
+          if (matchSn) return matchSn.id;
+          const preferred =
+            filtered.find((opt) => opt.category === "INVERTER") ??
+            filtered[0] ??
+            null;
+          return preferred?.id ?? null;
+        });
+      } catch {
+        if (cancelled) return;
+        setDeviceOptions([]);
+      } finally {
+        if (!cancelled) {
+          setDeviceOptionsLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [siteForApi, urlDeviceSN]);
+
+  const selectedDevice = React.useMemo(() => {
+    if (!selectedDeviceId) return null;
+    return deviceOptions.find((opt) => opt.id === selectedDeviceId) ?? null;
+  }, [deviceOptions, selectedDeviceId]);
+
+  const deviceSN =
+    (selectedDevice?.sn || fallbackDeviceSn || DEFAULT_INVERTER_SN).trim() ||
+    DEFAULT_INVERTER_SN;
+  const deviceCategory = selectedDevice?.category ?? "INVERTER";
+  const deviceDropdownOptions = React.useMemo(
+    () =>
+      deviceOptions.map((opt) => ({
+        value: opt.id,
+        label: `${opt.label} (${opt.sn})`,
+      })),
+    [deviceOptions]
+  );
 
   React.useEffect(() => {
     let active = true;
@@ -342,10 +492,10 @@ const [thermoOne, setThermoOne] = useState<{
         try {
           const res = await fetchEquipmentTelemetry({
             siteIdOrCode: siteForApi,
-            sn: inverterSN,
+            sn: deviceSN,
             startTime: formatDateTimeForApi(dayStart),
             endTime: formatDateTimeForApi(dayEnd),
-            category: "INVERTER",
+            category: deviceCategory,
           });
           const list: any[] = (res?.data as any)?.telemetries ?? [];
           const points = normalizeTelemetries(list);
@@ -384,7 +534,7 @@ const [thermoOne, setThermoOne] = useState<{
     return () => {
       active = false;
     };
-  }, [siteForApi, inverterSN]);
+  }, [siteForApi, deviceSN, deviceCategory]);
 
   const todaySeriesData = React.useMemo(
     () => dailySeries.find((item) => item.isToday) ?? null,
@@ -472,12 +622,23 @@ const [thermoOne, setThermoOne] = useState<{
     (async () => {
       try {
         const range = computeRange();
-        console.debug('[FE] fetch equipment', {siteForApi, inverterSN, range});
-        const res = await fetchEquipmentTelemetry({ siteIdOrCode: siteForApi, sn: inverterSN, startTime: range.from, endTime: range.to, category: 'INVERTER' });
+        console.debug("[FE] fetch equipment", {
+          siteForApi,
+          sn: deviceSN,
+          category: deviceCategory,
+          range,
+        });
+        const res = await fetchEquipmentTelemetry({
+          siteIdOrCode: siteForApi,
+          sn: deviceSN,
+          startTime: range.from,
+          endTime: range.to,
+          category: deviceCategory,
+        });
         const list: any[] = (res?.data as any)?.telemetries ?? [];
         const t1: any = (res?.data as any)?.telemetryFirst ?? list[0] ?? null;
         const t2: any = (res?.data as any)?.telemetryLast ?? (list.length ? list[list.length-1] : null);
-        console.debug('[FE] rangeRes', { count: list.length });
+        console.debug("[FE] rangeRes", { count: list.length });
 
         const last: any = (t2 || t1 || {});
         const phaseVs = [last?.L1Data?.acVoltage, last?.L2Data?.acVoltage, last?.L3Data?.acVoltage].filter((v: any) => Number.isFinite(Number(v))) as number[];
@@ -509,7 +670,7 @@ const [thermoOne, setThermoOne] = useState<{
         // ignore
       }
     })();
-  }, [computeRange, siteForApi, inverterSN]);
+  }, [computeRange, siteForApi, deviceSN, deviceCategory]);
 
 
   const cardItems = React.useMemo(
@@ -599,7 +760,9 @@ const [thermoOne, setThermoOne] = useState<{
     let active = true;
     (async () => {
       try {
-        await updateElectricOverview(siteForApi, inverterSN);
+        await updateElectricOverview(siteForApi, deviceSN, {
+          category: deviceCategory,
+        });
       } catch {
         // ignore updater failures; still attempt to read cached meta
       }
@@ -611,7 +774,7 @@ const [thermoOne, setThermoOne] = useState<{
           : Array.isArray((res as any)?.data?.items)
           ? (res as any).data.items
           : [];
-        const identity = `INVERTER:${inverterSN}`.toUpperCase();
+        const identity = `${deviceCategory}:${deviceSN}`.toUpperCase();
         const device = items.find((item) => {
           const model = String(item?.model ?? "");
           return model.toUpperCase() === identity;
@@ -676,7 +839,7 @@ const [thermoOne, setThermoOne] = useState<{
     return () => {
       active = false;
     };
-  }, [siteForApi, inverterSN]);
+  }, [siteForApi, deviceSN, deviceCategory]);
 
   const lifetimeMaxValue =
     typeof overviewLifetimeValue === "number" && Number.isFinite(overviewLifetimeValue)
@@ -699,7 +862,96 @@ const [thermoOne, setThermoOne] = useState<{
   return (
     <>
       <div className="grid grid-cols-1 lg-1355:grid-cols-5 gap-3 mt-6">
-        <div className="col-span-5 lg-1355:col-span-4 flex flex-col justify-center items-center bg-white rounded-xl gap-10 p-6">
+        <div className="col-span-5 lg-1355:col-span-4 flex flex-col justify-center items-center bg-white rounded-xl gap-10 p-6 w-full">
+          <div className="w-full flex flex-col gap-2">
+            <span className="text-sm font-semibold text-gray-600">
+              {t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
+            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <Dropdown
+                options={deviceDropdownOptions}
+                value={selectedDeviceId ?? ""}
+                onChange={(value) => setSelectedDeviceId(value || null)}
+              >
+                {({
+                  open,
+                  selected,
+                  getButtonProps,
+                  getMenuProps,
+                  getItemProps,
+                  options,
+                }) => {
+                  const disabled = options.length === 0;
+                  return (
+                    <div className="relative w-full sm:w-64">
+                      <button
+                        {...getButtonProps({
+                          disabled,
+                          className: [
+                            "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium transition",
+                            disabled
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
+                              : "bg-[#F6FBFF] text-cyan hover:bg-cyan-300 hover:text-white border-transparent",
+                          ].join(" "),
+                        })}
+                      >
+                        <span className="truncate">
+                          {selected?.label ??
+                            (disabled
+                              ? t("devices.electric.deviceSelector.emptyShort", {
+                                  defaultValue: "ไม่มีอุปกรณ์",
+                                })
+                              : t("devices.electric.deviceSelector.placeholder", {
+                                  defaultValue: "เลือกอุปกรณ์",
+                                }))}
+                        </span>
+                        <i className="material-icons text-base text-current">
+                          {open ? "expand_less" : "expand_more"}
+                        </i>
+                      </button>
+                      {open && !disabled && (
+                        <div
+                          {...getMenuProps({
+                            className:
+                              "absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-64 overflow-auto",
+                          })}
+                        >
+                          {options.map((opt) => (
+                            <button
+                              key={opt.value}
+                              {...getItemProps(opt, {
+                                className:
+                                  "w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer",
+                              })}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              </Dropdown>
+              {deviceOptionsLoading && (
+                <span className="text-xs text-gray-500">
+                  {t("devices.electric.loadingDevices", { defaultValue: "กำลังโหลด..." })}
+                </span>
+              )}
+            </div>
+            {selectedDevice && (
+              <p className="text-xs text-gray-500">
+                {selectedDevice.category} · SN: {selectedDevice.sn}
+              </p>
+            )}
+            {!deviceOptionsLoading && deviceOptions.length === 0 && (
+              <p className="text-xs text-red-500">
+                {t("devices.electric.noDevices", {
+                  defaultValue: "ยังไม่พบอุปกรณ์ไฟฟ้าสำหรับไซต์นี้",
+                })}
+              </p>
+            )}
+          </div>
           {/* Time Range (Dropdown x2) */}
           <div className="flex items-center gap-3">
             {/* From */}

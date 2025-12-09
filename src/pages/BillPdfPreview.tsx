@@ -3,7 +3,10 @@ import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import Modal from "../components/Modal";
 import { useFilters } from "../context/FiltersContext";
-import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
+import {
+  useDeviceInventory,
+  getCountForType,
+} from "../context/DeviceInventoryContext";
 import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import { useUserPath } from "../routes/useUserPath";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -13,10 +16,11 @@ import jsPDF from "jspdf";
 import type { MeterDashboard } from "../api/meter";
 import {
   createBill,
-  downloadBillPdf,
+  downloadBillExcel,
   getBillDetailApi,
   getBillingReadingsData,
   uploadBillPdf,
+  generateBillExcel as generateBillExcelApi,
   type BillDetailPayload,
   type BillingReadingsPayload,
 } from "../api/billing";
@@ -71,7 +75,9 @@ type TableDataRow = {
 
 const BillPdfPreview: React.FC = () => {
   const location = useLocation();
-  const preview = (location.state as { preview?: BillPreviewPayload } | undefined)?.preview;
+  const preview = (
+    location.state as { preview?: BillPreviewPayload } | undefined
+  )?.preview;
   const {
     searchSite,
     setSearchSite,
@@ -89,19 +95,29 @@ const BillPdfPreview: React.FC = () => {
   const dailyDateParam = searchParams.get("dailyDate");
   const billingMonthParam = searchParams.get("billingMonth");
   const billingYearParam = searchParams.get("billingYear");
-  const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
-  const [guardType, setGuardType] = React.useState<"none" | "select" | "blocked">("none");
+  const { counts: inventoryCounts, loading: inventoryLoading } =
+    useDeviceInventory();
+  const [guardType, setGuardType] = React.useState<
+    "none" | "select" | "blocked"
+  >("none");
   const pdfRef = React.useRef<HTMLDivElement | null>(null);
-  const [billDetail, setBillDetail] = React.useState<BillDetailPayload | null>(null);
+  const [billDetail, setBillDetail] = React.useState<BillDetailPayload | null>(
+    null
+  );
   const [loadingDetail, setLoadingDetail] = React.useState(false);
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [exporting, setExporting] = React.useState(false);
-  const [hasStoredPdf, setHasStoredPdf] = React.useState(false);
-  const [downloadingStored, setDownloadingStored] = React.useState(false);
-  const [currentBillId, setCurrentBillId] = React.useState<string | null>(billIdParam);
+  const [hasStoredExcel, setHasStoredExcel] = React.useState(false);
+  const [downloadingExcel, setDownloadingExcel] = React.useState(false);
+  const [currentBillId, setCurrentBillId] = React.useState<string | null>(
+    billIdParam
+  );
   const [savingBill, setSavingBill] = React.useState(false);
-  const [billingReadings, setBillingReadings] = React.useState<BillingReadingsPayload | null>(null);
-  const [billingReadingsError, setBillingReadingsError] = React.useState<string | null>(null);
+  const [billingReadings, setBillingReadings] =
+    React.useState<BillingReadingsPayload | null>(null);
+  const [billingReadingsError, setBillingReadingsError] = React.useState<
+    string | null
+  >(null);
   React.useEffect(() => {
     if (billIdParam) {
       setCurrentBillId(billIdParam);
@@ -109,7 +125,8 @@ const BillPdfPreview: React.FC = () => {
   }, [billIdParam]);
   const previewForm = preview?.form;
   const preferredData = billDetail ?? preview ?? null;
-  const preferredDeviceId = preferredData?.meter?.id ?? previewForm?.meterId ?? null;
+  const preferredDeviceId =
+    preferredData?.meter?.id ?? previewForm?.meterId ?? null;
   const dashboard = billDetail ? null : preview?.dashboard ?? null;
   const queryForm = React.useMemo(() => {
     const payload: Record<string, any> = {};
@@ -149,11 +166,11 @@ const BillPdfPreview: React.FC = () => {
   const leftLogoSrc =
     (normalizedLogo && normalizedLogo.length > 0 ? normalizedLogo : null) ??
     brandImage;
-  const previewMeterDescription = getPreviewMeterDescription(preferredData?.meter);
+  const previewMeterDescription = getPreviewMeterDescription(
+    preferredData?.meter
+  );
   const meterName =
-    preferredData?.meter?.name ??
-    previewMeterDescription ??
-    "มิเตอร์";
+    preferredData?.meter?.name ?? previewMeterDescription ?? "มิเตอร์";
 
   const reportMode = React.useMemo<BillingMode>(() => {
     return resolveReportMode(billDetail, formValues);
@@ -182,14 +199,22 @@ const BillPdfPreview: React.FC = () => {
   React.useEffect(() => {
     if (!preferredDeviceId) return;
     if (!reportMode) return;
-    let requestParams: { mode: "daily"; date: string } | { mode: "monthly"; month: number; year: number } | null = null;
+    let requestParams:
+      | { mode: "daily"; date: string }
+      | { mode: "monthly"; month: number; year: number }
+      | null = null;
     if (reportMode === "daily") {
       if (!resolvedDailyDate) return;
       requestParams = { mode: "daily", date: resolvedDailyDate };
     } else {
-      const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+      const period =
+        monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
       if (!period) return;
-      requestParams = { mode: "monthly", month: period.month, year: period.year };
+      requestParams = {
+        mode: "monthly",
+        month: period.month,
+        year: period.year,
+      };
     }
     let cancelled = false;
     setBillingReadingsError(null);
@@ -210,7 +235,14 @@ const BillPdfPreview: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [preferredDeviceId, reportMode, resolvedDailyDate, monthlyPeriod, billDetail, formValues]);
+  }, [
+    preferredDeviceId,
+    reportMode,
+    resolvedDailyDate,
+    monthlyPeriod,
+    billDetail,
+    formValues,
+  ]);
 
   const billingReadingRows = React.useMemo<BillDetailPayload["rows"]>(() => {
     if (!billingReadings?.rows?.length) return [];
@@ -346,7 +378,10 @@ const BillPdfPreview: React.FC = () => {
     selectedSiteCode: !requiresSiteSelection ? normalizedSite : undefined,
     enabled: !requiresSiteSelection,
   });
-  const electricDeviceCount = getCountForType(inventoryCounts as any, "electricmeter" as any);
+  const electricDeviceCount = getCountForType(
+    inventoryCounts as any,
+    "electricmeter" as any
+  );
   const noElectricAccess =
     !requiresSiteSelection &&
     normalizedSite !== "all" &&
@@ -367,7 +402,7 @@ const BillPdfPreview: React.FC = () => {
     getBillDetailApi(currentBillId)
       .then((data) => {
         setBillDetail(data);
-        setHasStoredPdf(Boolean(data.documentUrl));
+        setHasStoredExcel(Boolean(data.documentExcelUrl));
       })
       .catch((err) => {
         console.error("[BillPdfPreview] fetch bill detail failed", err);
@@ -412,7 +447,7 @@ const BillPdfPreview: React.FC = () => {
       const newBillId = bill?.billId;
       if (!newBillId) throw new Error("missing bill id");
       setCurrentBillId(newBillId);
-      setHasStoredPdf(false);
+      setHasStoredExcel(false);
       const params = new URLSearchParams(location.search);
       params.set("billId", newBillId);
       const modeValue = previewForm.billingMode ?? "monthly";
@@ -458,11 +493,13 @@ const BillPdfPreview: React.FC = () => {
     const hiddenNodes: HTMLElement[] = [];
     const previousDisplay: string[] = [];
     try {
-      node.querySelectorAll<HTMLElement>("[data-export-hidden='true']").forEach((el) => {
-        hiddenNodes.push(el);
-        previousDisplay.push(el.style.display);
-        el.style.display = "none";
-      });
+      node
+        .querySelectorAll<HTMLElement>("[data-export-hidden='true']")
+        .forEach((el) => {
+          hiddenNodes.push(el);
+          previousDisplay.push(el.style.display);
+          el.style.display = "none";
+        });
 
       const dataUrl = await toJpeg(node, {
         cacheBust: true,
@@ -506,7 +543,6 @@ const BillPdfPreview: React.FC = () => {
       if (currentBillId) {
         const pdfBase64 = pdf.output("datauristring").split(",")[1];
         await uploadBillPdf(currentBillId, pdfBase64);
-        setHasStoredPdf(true);
       }
 
       pdf.save(`bill-${currentBillId}.pdf`);
@@ -523,19 +559,23 @@ const BillPdfPreview: React.FC = () => {
     }
   }, [currentBillId]);
 
-  const handleDownloadStored = React.useCallback(async () => {
+  const handleDownloadExcel = React.useCallback(async () => {
     if (!currentBillId) return;
-    setDownloadingStored(true);
+    setDownloadingExcel(true);
     try {
-      const blob = await downloadBillPdf(currentBillId);
-      saveBlobAsFile(blob, `bill-${currentBillId}.pdf`);
+      if (!hasStoredExcel) {
+        await generateBillExcelApi(currentBillId);
+        setHasStoredExcel(true);
+      }
+      const blob = await downloadBillExcel(currentBillId);
+      saveBlobAsFile(blob, `bill-${currentBillId}.xlsx`);
     } catch (err) {
-      console.error("[BillPdfPreview] download stored pdf failed", err);
-      alert("ไม่สามารถดาวน์โหลดไฟล์ PDF ที่บันทึกไว้ได้");
+      console.error("[BillPdfPreview] download excel failed", err);
+      alert("ไม่สามารถดาวน์โหลดไฟล์ Excel ได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
-      setDownloadingStored(false);
+      setDownloadingExcel(false);
     }
-  }, [currentBillId]);
+  }, [currentBillId, hasStoredExcel]);
 
   const reportDate = React.useMemo(() => {
     if (reportMode === "daily") {
@@ -563,7 +603,8 @@ const BillPdfPreview: React.FC = () => {
         }
       }
     } else if (reportMode === "monthly") {
-      const month = formValues.billingMonth ?? preferredData?.form?.billingMonth;
+      const month =
+        formValues.billingMonth ?? preferredData?.form?.billingMonth;
       const year = formValues.billingYear ?? preferredData?.form?.billingYear;
       if (month && year) {
         const date = new Date(Number(year), Number(month) - 1, 1);
@@ -646,187 +687,246 @@ const BillPdfPreview: React.FC = () => {
               ref={pdfRef}
               className="w-full max-w-[900px] rounded-[36px] bg-white p-8 text-slate-800 shadow-[0_30px_60px_rgba(15,23,42,0.12)]"
             >
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-around">
-                <img
-                  src={leftLogoSrc}
-                  alt={siteLogoUrl ? "Site logo" : "Brand"}
-                  className="h-34 w-40 object-contain"
-                />
-                <div className="text-center text-slate-900">
-                  <p className="text-xl font-semibold">{siteName}</p>
-                  <p className="text-lg">
-                    {reportMode === "monthly" ? "Monthly Energy Report" : "Daily Energy Report"}
-                  </p>
-                  <p className="text-sm">{reportDate}</p>
-                  <p className="text-sm">{meterName}</p>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-around">
+                  <img
+                    src={leftLogoSrc}
+                    alt={siteLogoUrl ? "Site logo" : "Brand"}
+                    className="h-34 w-40 object-contain"
+                  />
+                  <div className="text-center text-slate-900">
+                    <p className="text-xl font-semibold">{siteName}</p>
+                    <p className="text-lg">
+                      {reportMode === "monthly"
+                        ? "Monthly Energy Report"
+                        : "Daily Energy Report"}
+                    </p>
+                    <p className="text-sm">{reportDate}</p>
+                    <p className="text-sm">{meterName}</p>
+                  </div>
+                  <img
+                    src={meaLogo}
+                    alt="MEA"
+                    className="h-34 w-40 object-contain"
+                  />
                 </div>
-                <img src={meaLogo} alt="MEA" className="h-34 w-40 object-contain" />
+                <div className="h-[2px] w-full bg-[#d40000]" />
               </div>
-              <div className="h-[2px] w-full bg-[#d40000]" />
-            </div>
-            <div className="mt-6 grid gap-40 px-1 text-sm text-black md:grid-cols-2">
-              <div className="space-y-1">
-                <SummaryRow label="Energy Production" value={`${formatValue(totalEnergy)} kWh`} />
-                <SummaryRow label="Energy Production (On Peak)" value={`${formatValue(onPeakKwhValue)} kWh`} />
-                <SummaryRow label="Energy Production (Off Peak)" value={`${formatValue(offPeakKwhValue)} kWh`} />
-                <SummaryRow label="CO₂ Reduction" value="- kg" />
-                <SummaryRow label="Tree Saving" value="- Trees" />
+              <div className="mt-6 grid gap-40 px-1 text-sm text-black md:grid-cols-2">
+                <div className="space-y-1">
+                  <SummaryRow
+                    label="Energy Production"
+                    value={`${formatValue(totalEnergy)} kWh`}
+                  />
+                  <SummaryRow
+                    label="Energy Production (On Peak)"
+                    value={`${formatValue(onPeakKwhValue)} kWh`}
+                  />
+                  <SummaryRow
+                    label="Energy Production (Off Peak)"
+                    value={`${formatValue(offPeakKwhValue)} kWh`}
+                  />
+                  <SummaryRow label="CO₂ Reduction" value="- kg" />
+                  <SummaryRow label="Tree Saving" value="- Trees" />
+                </div>
+                <div className="space-y-1">
+                  <SummaryRow
+                    label="Energy Charge"
+                    value={`${formatValue(totalCost)} THB`}
+                  />
+                  <SummaryRow
+                    label="Energy Charge (On Peak)"
+                    value={`${formatValue(onPeakCost)} THB`}
+                  />
+                  <SummaryRow
+                    label="Energy Charge (Off Peak)"
+                    value={`${formatValue(offPeakCost)} THB`}
+                  />
+                  <SummaryRow label="Financial Saving" value="-" />
+                  <SummaryRow label="Financial Saving (FT)" value="-" />
+                </div>
               </div>
-              <div className="space-y-1">
-                <SummaryRow label="Energy Charge" value={`${formatValue(totalCost)} THB`} />
-                <SummaryRow label="Energy Charge (On Peak)" value={`${formatValue(onPeakCost)} THB`} />
-                <SummaryRow label="Energy Charge (Off Peak)" value={`${formatValue(offPeakCost)} THB`} />
-                <SummaryRow label="Financial Saving" value="-" />
-                <SummaryRow label="Financial Saving (FT)" value="-" />
-              </div>
-            </div>
 
-            <div className="mt-3">
-              {billingReadingsError && (
-                <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                  {billingReadingsError}
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[800px] text-sm text-black">
-                  <thead className="text-xs uppercase tracking-wide text-black">
-                    <tr className="text-center">
-                      <th className="py-2 px-2 border">
-                        {reportMode === "monthly" ? "Date" : "Time"}
-                      </th>
-                      <th className="py-2 px-2 border">Energy Production (kWh)</th>
-                      <th className="py-2 px-2 border">Energy On Peak (kWh)</th>
-                      <th className="py-2 px-2 border">Energy Off Peak (kWh)</th>
-                      <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
-                      <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
-                      <th className="py-2 px-2 border">Module Temp. (°C)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.map((row) => (
-                      <tr
-                        key={row.time}
-                        className="border text-center text-sm"
-                      >
-                        <td className="text-center text-black">
-                          {reportMode === "monthly"
-                            ? formatMonthlyLabel(row.time, monthlyPeriod)
-                            : row.time}
-                        </td>
-                        <td className="text-[15px] border">{formatValue(row.energyProduction)}</td>
-                        <td className="text-[15px] border">{formatValue(row.energyOnPeak)}</td>
-                        <td className="text-[15px] border">{formatValue(row.energyOffPeak)}</td>
-                        <td className="text-[15px] border">{formatValue(row.irradiance)}</td>
-                        <td className="text-[15px] border">{formatValue(row.ambientTemp)}</td>
-                        <td className="text-[15px] border">{formatValue(row.moduleTemp)}</td>
+              <div className="mt-3">
+                {billingReadingsError && (
+                  <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                    {billingReadingsError}
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[800px] text-sm text-black">
+                    <thead className="text-xs uppercase tracking-wide text-black">
+                      <tr className="text-center">
+                        <th className="py-2 px-2 border">
+                          {reportMode === "monthly" ? "Date" : "Time"}
+                        </th>
+                        <th className="py-2 px-2 border">
+                          Energy Production (kWh)
+                        </th>
+                        <th className="py-2 px-2 border">
+                          Energy On Peak (kWh)
+                        </th>
+                        <th className="py-2 px-2 border">
+                          Energy Off Peak (kWh)
+                        </th>
+                        <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
+                        <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
+                        <th className="py-2 px-2 border">Module Temp. (°C)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t border-black text-center font-bold">
-                      <td className=" text-center text-[14px] px-2 border">Total/Average</td>
-                      <td className="text-[15px] border">
-                        {formatValue(tableTotals.production)}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(tableTotals.onPeak)}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(tableTotals.offPeak)}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(tableTotals.irradiance)}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(
-                          tableTotals.ambient / (tableData.length || 1)
-                        )}
-                      </td>
-                      <td className="text-[15px] border">
-                        {formatValue(
-                          tableTotals.module / (tableData.length || 1)
-                        )}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-
-            <div className="rounded-3xl py-4 w-full">
-              <div className="mt-4 h-48 w-full">
-                <div className="w-full flex justify-center">
-                  <div className={`inline-flex items-end ${chartBarStyles.gapClass}`}>
-                    {chartPointsData.map((point) => {
-                      const onHeight = (point.onPeak / chartBarMax) * chartBarStyles.maxHeight;
-                      const offHeight = (point.purchased / chartBarMax) * chartBarStyles.maxHeight;
-                      return (
-                        <div
-                          key={point.label}
-                          className={`flex flex-col items-center gap-1 ${chartBarStyles.barWidthClass}`}
+                    </thead>
+                    <tbody>
+                      {tableData.map((row) => (
+                        <tr
+                          key={row.time}
+                          className="border text-center text-sm"
                         >
+                          <td className="text-center text-black">
+                            {reportMode === "monthly"
+                              ? formatMonthlyLabel(row.time, monthlyPeriod)
+                              : row.time}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.energyProduction)}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.energyOnPeak)}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.energyOffPeak)}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.irradiance)}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.ambientTemp)}
+                          </td>
+                          <td className="text-[15px] border">
+                            {formatValue(row.moduleTemp)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-black text-center font-bold">
+                        <td className=" text-center text-[14px] px-2 border">
+                          Total/Average
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(tableTotals.production)}
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(tableTotals.onPeak)}
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(tableTotals.offPeak)}
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(tableTotals.irradiance)}
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(
+                            tableTotals.ambient / (tableData.length || 1)
+                          )}
+                        </td>
+                        <td className="text-[15px] border">
+                          {formatValue(
+                            tableTotals.module / (tableData.length || 1)
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              <div className="rounded-3xl py-4 w-full">
+                <div className="mt-4 h-48 w-full">
+                  <div className="w-full flex justify-center">
+                    <div
+                      className={`inline-flex items-end ${chartBarStyles.gapClass}`}
+                    >
+                      {chartPointsData.map((point) => {
+                        const onHeight =
+                          (point.onPeak / chartBarMax) *
+                          chartBarStyles.maxHeight;
+                        const offHeight =
+                          (point.purchased / chartBarMax) *
+                          chartBarStyles.maxHeight;
+                        return (
                           <div
-                            className={`relative flex ${chartBarStyles.barWidthClass} flex-col justify-end gap-1`}
-                            style={{ height: `${chartBarStyles.maxHeight}px` }}
+                            key={point.label}
+                            className={`flex flex-col items-center gap-1 ${chartBarStyles.barWidthClass}`}
                           >
                             <div
-                              className="rounded-sm bg-[#2ab07f]"
-                              style={{ height: `${onHeight}px` }}
-                            />
-                            <div
-                              className="rounded-sm bg-[#1e88e5]"
-                              style={{ height: `${offHeight}px` }}
-                            />
+                              className={`relative flex ${chartBarStyles.barWidthClass} flex-col justify-end gap-1`}
+                              style={{
+                                height: `${chartBarStyles.maxHeight}px`,
+                              }}
+                            >
+                              <div
+                                className="rounded-sm bg-[#2ab07f]"
+                                style={{ height: `${onHeight}px` }}
+                              />
+                              <div
+                                className="rounded-sm bg-[#1e88e5]"
+                                style={{ height: `${offHeight}px` }}
+                              />
+                            </div>
+                            <span
+                              className={`${chartBarStyles.labelClass} text-slate-600`}
+                            >
+                              {point.label}
+                            </span>
                           </div>
-                          <span className={`${chartBarStyles.labelClass} text-slate-600`}>
-                            {point.label}
-                          </span>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-6 text-sm font-semibold text-slate-600">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-[#1e88e5]" />
+                    Energy Off Peak
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full bg-[#2ab07f]" />
+                    Energy On Peak
+                  </span>
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-6 text-sm font-semibold text-slate-600">
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-[#1e88e5]" />
-                  Energy Off Peak
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-[#2ab07f]" />
-                  Energy On Peak
-                </span>
-              </div>
-            </div>
-            <div className="mt-8 flex flex-col items-center gap-3 pb-6" data-export-hidden="true">
-              <button
-                onClick={primaryButtonHandler}
-                disabled={primaryButtonDisabled}
-                className={[
-                  "rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1cb5ff]/30 transition",
-                  primaryButtonDisabled
-                    ? "bg-[#9bdfff] cursor-not-allowed"
-                    : "bg-[#1cb5ff] hover:bg-[#0f9eda] cursor-pointer",
-                ].join(" ")}
+              <div
+                className="mt-8 flex flex-col items-center gap-3 pb-6"
+                data-export-hidden="true"
               >
-                {primaryButtonLabel}
-              </button>
-              {hasStoredPdf && currentBillId && (
                 <button
-                  onClick={handleDownloadStored}
-                  disabled={downloadingStored}
+                  onClick={primaryButtonHandler}
+                  disabled={primaryButtonDisabled}
                   className={[
-                    "rounded-2xl border border-[#1cb5ff] px-6 py-2 text-sm font-semibold text-[#0a86ba] transition",
-                    downloadingStored
-                      ? "cursor-not-allowed opacity-60"
-                      : "hover:bg-[#e5f7ff] cursor-pointer",
+                    "rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1cb5ff]/30 transition",
+                    primaryButtonDisabled
+                      ? "bg-[#9bdfff] cursor-not-allowed"
+                      : "bg-[#1cb5ff] hover:bg-[#0f9eda] cursor-pointer",
                   ].join(" ")}
                 >
-                  {downloadingStored ? "กำลังดาวน์โหลด..." : "ดาวน์โหลด PDF ที่บันทึกไว้"}
+                  {primaryButtonLabel}
                 </button>
-              )}
-            </div>
+                {hasSavedBill && (
+                  <button
+                    onClick={handleDownloadExcel}
+                    disabled={downloadingExcel}
+                    className={[
+                      "rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1cb5ff]/30 transition",
+                      downloadingExcel
+                        ? "bg-[#9bdfff] cursor-not-allowed"
+                        : "bg-[#1cb5ff] hover:bg-[#0f9eda] cursor-pointer",
+                    ].join(" ")}
+                  >
+                    {downloadingExcel
+                      ? "กำลังดาวน์โหลด Excel..."
+                      : "ดาวน์โหลด Excel"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -876,7 +976,10 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatMonthlyLabel(label: string, period: { month: number; year: number } | null) {
+function formatMonthlyLabel(
+  label: string,
+  period: { month: number; year: number } | null
+) {
   const day = Number.parseInt(label, 10);
   if (Number.isNaN(day)) return label;
   const fallback = period ?? {
@@ -898,13 +1001,14 @@ function resolveReportMode(
 ): BillingMode {
   const normalizedForm = (form ?? {}) as Record<string, any>;
   const formMode =
-    (billDetail?.form as any)?.billingMode ??
-    normalizedForm.billingMode;
+    (billDetail?.form as any)?.billingMode ?? normalizedForm.billingMode;
   if (formMode === "daily" || formMode === "monthly") return formMode;
   const rows = billDetail?.rows ?? [];
   if (rows.length) {
     const firstKey = dayKey(rows[0].timestamp);
-    const hasMultipleDays = rows.some((row) => dayKey(row.timestamp) !== firstKey);
+    const hasMultipleDays = rows.some(
+      (row) => dayKey(row.timestamp) !== firstKey
+    );
     return hasMultipleDays ? "monthly" : "daily";
   }
   return "monthly";
@@ -916,10 +1020,10 @@ function getPeriodMonthYear(
 ) {
   const normalizedForm = (form ?? {}) as Record<string, any>;
   const resolvedMonth =
-    Number((billDetail?.period?.month ?? normalizedForm.billingMonth) ?? NaN) ||
+    Number(billDetail?.period?.month ?? normalizedForm.billingMonth ?? NaN) ||
     new Date().getMonth() + 1;
   const resolvedYear =
-    Number((billDetail?.period?.year ?? normalizedForm.billingYear) ?? NaN) ||
+    Number(billDetail?.period?.year ?? normalizedForm.billingYear ?? NaN) ||
     new Date().getFullYear();
   return {
     month: clampMonth(resolvedMonth),

@@ -19,6 +19,8 @@ export type SiteRow = {
   billingOnPeakRate?: number | null;
   billingOffPeakRate?: number | null;
   billingDiscountRate?: number | null;
+  solaredgeSiteId?: string | null;
+  solaredgeApiKey?: string | null;
 };
 
 export const SITE_ROWS: SiteRow[] = [];

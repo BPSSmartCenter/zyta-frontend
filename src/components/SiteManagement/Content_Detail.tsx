@@ -47,7 +47,7 @@ const STATUS_OPTIONS: Array<"online" | "offline" | "maintenance"> = [
   "offline",
   "maintenance",
 ];
-const ELECTRIC_CATEGORIES = ["INVERTER", "METER", "GATEWAY", "SENSOR"] as const;
+const ELECTRIC_CATEGORIES = ["INVERTER", "METER"] as const;
 type ElectricCategory = (typeof ELECTRIC_CATEGORIES)[number];
 
 function flattenItems(payload: any): any[] {
@@ -1188,9 +1188,7 @@ function normalizeElectricCategory(value: unknown): ElectricCategory {
     const normalized = value.trim().toUpperCase();
     if (
       normalized === "INVERTER" ||
-      normalized === "METER" ||
-      normalized === "GATEWAY" ||
-      normalized === "SENSOR"
+      normalized === "METER"
     ) {
       return normalized as ElectricCategory;
     }
@@ -1204,9 +1202,7 @@ function extractCategory(model?: string): ElectricCategory | undefined {
   const normalized = candidate?.trim().toUpperCase();
   if (
     normalized === "INVERTER" ||
-    normalized === "METER" ||
-    normalized === "GATEWAY" ||
-    normalized === "SENSOR"
+    normalized === "METER"
   ) {
     return normalized as ElectricCategory;
   }

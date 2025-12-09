@@ -13,6 +13,8 @@ type CreatePayload = {
   addressSubDistrict?: string;
   addressLine?: string;
   brandingLogoDataUrl?: string;
+  solaredgeSiteId?: string;
+  solaredgeApiKey?: string;
 };
 
 type Props = {
@@ -29,6 +31,8 @@ export default function ContentCreate({
   const [form, setForm] = React.useState<CreatePayload>({
     name: "",
     code: "",
+    solaredgeSiteId: "",
+    solaredgeApiKey: "",
   });
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);
@@ -96,6 +100,8 @@ export default function ContentCreate({
       addressSubDistrict: form.addressSubDistrict?.trim() || undefined,
       addressLine: form.addressLine?.trim() || undefined,
       brandingLogoDataUrl: logoDataUrl ?? undefined,
+      solaredgeSiteId: form.solaredgeSiteId?.trim() || undefined,
+      solaredgeApiKey: form.solaredgeApiKey?.trim() || undefined,
     });
   };
 
@@ -278,6 +284,41 @@ export default function ContentCreate({
           {errors.code && (
             <p className="text-xs text-red-500 mt-1">{errors.code}</p>
           )}
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+          <div>
+            <p className="font-semibold text-sm">SolarEdge Credentials</p>
+            <p className="text-xs text-gray-500">
+              ระบุ Site ID และ API Key สำหรับไซต์นี้ (เว้นว่างเพื่อตกลงใช้ค่า default ของระบบ)
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="font-semibold text-sm block mb-2">
+                SolarEdge Site ID
+              </label>
+              <input
+                type="text"
+                value={form.solaredgeSiteId ?? ""}
+                onChange={(e) => handleChange("solaredgeSiteId", e.target.value)}
+                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder="เช่น 3078000"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-sm block mb-2">
+                SolarEdge API Key
+              </label>
+              <input
+                type="password"
+                value={form.solaredgeApiKey ?? ""}
+                onChange={(e) => handleChange("solaredgeApiKey", e.target.value)}
+                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder="SE_xxxxxxxx"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">

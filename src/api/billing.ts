@@ -85,6 +85,8 @@ export type BillDetailPayload = {
   }>;
   chartPoints: Array<{ label: string; purchased: number; onPeak: number }>;
   documentUrl?: string | null;
+  documentExcelUrl?: string | null;
+  documents?: Partial<Record<"pdf" | "xlsx", string>>;
   form?: Record<string, any>;
 };
 
@@ -113,6 +115,25 @@ export async function downloadBillPdf(billId: string) {
     responseType: "blob",
   });
   return response.data as Blob;
+}
+
+export async function uploadBillExcel(billId: string, excelBase64: string) {
+  const { data } = await api.post(`/billing/bills/${encodeURIComponent(billId)}/excel`, {
+    excelBase64,
+  });
+  return data;
+}
+
+export async function downloadBillExcel(billId: string) {
+  const response = await api.get(`/billing/bills/${encodeURIComponent(billId)}/excel`, {
+    responseType: "blob",
+  });
+  return response.data as Blob;
+}
+
+export async function generateBillExcel(billId: string) {
+  const { data } = await api.post(`/billing/bills/${encodeURIComponent(billId)}/excel/generate`, {});
+  return data;
 }
 
 export async function deleteBill(billId: string) {

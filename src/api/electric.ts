@@ -16,10 +16,19 @@ export async function getElectricOverview(siteCode: string) {
   return data;
 }
 
-export async function updateElectricOverview(siteCode: string, sn: string) {
+export async function updateElectricOverview(
+  siteCode: string,
+  sn: string,
+  opts?: { category?: "INVERTER" | "METER" | "GATEWAY" | "SENSOR" }
+) {
   const params = new URLSearchParams();
   params.set("sn", sn);
-  const { data } = await api.get(`/site/${encodeURIComponent(siteCode)}/electric/overview/update?${params.toString()}`);
+  if (opts?.category) {
+    params.set("category", opts.category);
+  }
+  const { data } = await api.get(
+    `/site/${encodeURIComponent(siteCode)}/electric/overview/update?${params.toString()}`
+  );
   return data as { ok: boolean; today_kwh: number; month_kwh: number } | any;
 }
 

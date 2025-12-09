@@ -89,6 +89,16 @@ function SiteManagementInner() {
       allowWaterBilling: Boolean(
         site.allowWaterBilling ?? site.allow_water_billing
       ),
+      solaredgeSiteId:
+        site.solaredgeSiteId ??
+        site.se_site_id ??
+        site.seSiteId ??
+        null,
+      solaredgeApiKey:
+        site.solaredgeApiKey ??
+        site.se_api_key ??
+        site.seApiKey ??
+        null,
     };
   }, []);
 
@@ -137,6 +147,8 @@ function SiteManagementInner() {
       addressSubDistrict?: string;
       addressLine?: string;
       brandingLogoDataUrl?: string;
+      solaredgeSiteId?: string;
+      solaredgeApiKey?: string;
     }) => {
       try {
         setLoading(true);
@@ -185,6 +197,8 @@ function SiteManagementInner() {
       addressLine?: string;
       brandingLogoDataUrl?: string;
       removeBrandingLogo?: boolean;
+      solaredgeSiteId?: string;
+      solaredgeApiKey?: string;
     }) => {
       if (!editing) return;
       try {

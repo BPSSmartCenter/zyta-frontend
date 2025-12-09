@@ -35,6 +35,8 @@ export type RegisterSiteInput = {
   addressSubDistrict?: string;
   addressLine?: string;
   brandingLogoDataUrl?: string;
+  solaredgeSiteId?: string;
+  solaredgeApiKey?: string;
 };
 
 export async function registerSite(input: RegisterSiteInput) {
@@ -51,6 +53,12 @@ export async function registerSite(input: RegisterSiteInput) {
     payload.addressSubDistrict = input.addressSubDistrict;
   if (input.addressLine) payload.addressLine = input.addressLine;
   if (input.brandingLogoDataUrl) payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
+  if (typeof input.solaredgeSiteId === "string") {
+    payload.solaredgeSiteId = input.solaredgeSiteId.trim();
+  }
+  if (typeof input.solaredgeApiKey === "string") {
+    payload.solaredgeApiKey = input.solaredgeApiKey.trim();
+  }
 
   const { data } = await api.post("/site/register", payload);
   return data;
@@ -68,6 +76,8 @@ export type UpdateSiteInput = {
   addressLine?: string;
   brandingLogoDataUrl?: string;
   removeBrandingLogo?: boolean;
+  solaredgeSiteId?: string;
+  solaredgeApiKey?: string;
 };
 
 function normalizeSitePayload(input: UpdateSiteInput) {
@@ -94,6 +104,12 @@ function normalizeSitePayload(input: UpdateSiteInput) {
     payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
   if (typeof input.removeBrandingLogo === "boolean")
     payload.removeBrandingLogo = input.removeBrandingLogo;
+  if (typeof input.solaredgeSiteId === "string") {
+    payload.solaredgeSiteId = input.solaredgeSiteId;
+  }
+  if (typeof input.solaredgeApiKey === "string") {
+    payload.solaredgeApiKey = input.solaredgeApiKey;
+  }
   return payload;
 }
 
