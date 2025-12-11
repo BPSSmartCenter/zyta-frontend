@@ -77,6 +77,7 @@ export type BillDetailPayload = {
   totals: { totalKwh: number; onPeakKwh: number; offPeakKwh: number };
   cost: { total: number; onPeak: number; offPeak: number };
   rows: Array<{
+    label?: string;
     timestamp: string;
     energyProduction: number;
     energyOnPeak: number;

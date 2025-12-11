@@ -116,6 +116,7 @@ const BillPdfPreview: React.FC = () => {
   const [currentBillId, setCurrentBillId] = React.useState<string | null>(
     billIdParam
   );
+  const lastExcelContextRef = React.useRef<string | null>(null);
   const [savingBill, setSavingBill] = React.useState(false);
   const [billingReadings, setBillingReadings] =
     React.useState<BillingReadingsPayload | null>(null);
@@ -408,6 +409,7 @@ const BillPdfPreview: React.FC = () => {
       .then((data) => {
         setBillDetail(data);
         setHasStoredExcel(Boolean(data.documentExcelUrl));
+        lastExcelContextRef.current = null;
       })
       .catch((err) => {
         console.error("[BillPdfPreview] fetch bill detail failed", err);
@@ -582,9 +584,13 @@ const BillPdfPreview: React.FC = () => {
           };
         }
       }
-      if (!hasStoredExcel) {
+      const payloadKey = JSON.stringify(excelPayload ?? {});
+      const needsGenerate =
+        !hasStoredExcel || lastExcelContextRef.current !== payloadKey;
+      if (needsGenerate) {
         await generateBillExcelApi(currentBillId, excelPayload);
         setHasStoredExcel(true);
+        lastExcelContextRef.current = payloadKey;
       }
       const blob = await downloadBillExcel(currentBillId);
       saveBlobAsFile(blob, `bill-${currentBillId}.xlsx`);
