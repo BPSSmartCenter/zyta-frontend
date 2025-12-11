@@ -563,8 +563,22 @@ const BillPdfPreview: React.FC = () => {
     if (!currentBillId) return;
     setDownloadingExcel(true);
     try {
+      let excelPayload: Parameters<typeof generateBillExcelApi>[1] | undefined;
+      if (reportMode === "daily" && resolvedDailyDate) {
+        excelPayload = { mode: "daily", dailyDate: resolvedDailyDate };
+      } else if (reportMode === "monthly") {
+        const period =
+          monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+        if (period) {
+          excelPayload = {
+            mode: "monthly",
+            billingMonth: period.month,
+            billingYear: period.year,
+          };
+        }
+      }
       if (!hasStoredExcel) {
-        await generateBillExcelApi(currentBillId);
+        await generateBillExcelApi(currentBillId, excelPayload);
         setHasStoredExcel(true);
       }
       const blob = await downloadBillExcel(currentBillId);
@@ -575,7 +589,15 @@ const BillPdfPreview: React.FC = () => {
     } finally {
       setDownloadingExcel(false);
     }
-  }, [currentBillId, hasStoredExcel]);
+  }, [
+    currentBillId,
+    hasStoredExcel,
+    reportMode,
+    resolvedDailyDate,
+    monthlyPeriod,
+    billDetail,
+    formValues,
+  ]);
 
   const reportDate = React.useMemo(() => {
     if (reportMode === "daily") {

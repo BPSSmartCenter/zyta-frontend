@@ -51,7 +51,6 @@ export default function Modal({
       if (HSO?.open) {
         try {
           HSO.open(el);
-          return;
         } catch {}
       }
       el.classList.add("open");
@@ -60,7 +59,6 @@ export default function Modal({
       if (HSO?.close) {
         try {
           HSO.close(el);
-          return;
         } catch {}
       }
       el.classList.remove("open");
