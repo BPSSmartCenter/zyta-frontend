@@ -287,6 +287,16 @@ const GenerateBillForm: React.FC = () => {
           [];
         const mapped = (devicePayload as any[])
           .filter((item) => item?.id ?? item?.model)
+          .filter((item) => {
+            const meta = (item?.meta ?? {}) as Record<string, any>;
+            const details = (meta.details ?? {}) as Record<string, any>;
+            const categoryRaw =
+              meta.deviceCategory ??
+              meta.device_type ??
+              (item?.category ?? details?.category ?? "");
+            if (!categoryRaw) return true;
+            return String(categoryRaw).toLowerCase() === "meter";
+          })
           .map((item) => {
             const meta = (item?.meta ?? {}) as Record<string, any>;
             const details = (meta.details ?? {}) as Record<string, any>;
