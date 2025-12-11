@@ -131,8 +131,18 @@ export async function downloadBillExcel(billId: string) {
   return response.data as Blob;
 }
 
-export async function generateBillExcel(billId: string) {
-  const { data } = await api.post(`/billing/bills/${encodeURIComponent(billId)}/excel/generate`, {});
+type BillExcelPayload = {
+  mode?: "daily" | "monthly";
+  dailyDate?: string;
+  billingMonth?: number | string;
+  billingYear?: number | string;
+};
+
+export async function generateBillExcel(billId: string, payload?: BillExcelPayload) {
+  const { data } = await api.post(
+    `/billing/bills/${encodeURIComponent(billId)}/excel/generate`,
+    payload ?? {}
+  );
   return data;
 }
 

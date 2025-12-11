@@ -19,6 +19,7 @@ import { useUserPath } from "../routes/useUserPath";
 import Modal from "../components/Modal";
 import SearchInput from "../components/SearchInput";
 import {
+  deleteBill,
   getBillingOverview,
   type BillingMonitorRow,
   type BillingOverviewPayload,
@@ -86,10 +87,11 @@ const BillingOverview: React.FC = () => {
   const [activeCard, setActiveCard] = React.useState<string>("usage");
   const [tableSearch, setTableSearch] = React.useState("");
   const [realtimeRows, setRealtimeRows] = React.useState<RealtimeRow[]>([]);
-  const [realtimeLoading, setRealtimeLoading] = React.useState(false);
-  const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
-  const [monthlySearch, setMonthlySearch] = React.useState("");
-  const [billingSearch, setBillingSearch] = React.useState("");
+const [realtimeLoading, setRealtimeLoading] = React.useState(false);
+const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
+const [monthlySearch, setMonthlySearch] = React.useState("");
+const [billingSearch, setBillingSearch] = React.useState("");
+const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
@@ -102,6 +104,7 @@ const BillingOverview: React.FC = () => {
     data: billingData,
     loading,
     error,
+    refresh,
   } = useBillingOverviewData(requiresSiteSelection ? null : normalizedSite);
 
   const fetchRealtimeRowsForSite = React.useCallback(async (siteCode: string) => {
@@ -271,6 +274,33 @@ const BillingOverview: React.FC = () => {
     },
     [navigate, abs]
   );
+  const handleDeleteRequest = React.useCallback((row: BillingRow) => {
+    if (!row?.id) return;
+    setDeleteTarget(row);
+  }, []);
+  const handleDeleteConfirm = React.useCallback(
+    (row?: BillingRow | null) => {
+      const target = row ?? deleteTarget;
+      if (!target?.id) return;
+      const targetId = target.id;
+      setDeleteTarget(null);
+      deleteBill(targetId)
+        .then(() => {
+          refresh();
+        })
+        .catch((err) => {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "ไม่สามารถลบบิลได้ กรุณาลองใหม่อีกครั้ง";
+          alert(message);
+        });
+    },
+    [deleteTarget, refresh]
+  );
+  const handleDeleteCancel = React.useCallback(() => {
+    setDeleteTarget(null);
+  }, []);
   const handleCardChange = React.useCallback((ids: string[]) => {
     if (!ids.length) return;
     setActiveCard(ids[0]);
@@ -523,13 +553,20 @@ const BillingOverview: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-2">
                           <button
                             className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed"
                             onClick={() => handleBillingPreview(row)}
                             disabled={!row.id}
                           >
                             Preview
+                          </button>
+                          <button
+                            className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={() => handleDeleteRequest(row)}
+                            disabled={!row.id}
+                          >
+                            Delete
                           </button>
                         </div>
                       </td>
@@ -639,6 +676,27 @@ const BillingOverview: React.FC = () => {
         message={siteGuardConfig.message}
         closeLabel={siteGuardConfig.closeLabel}
         onClose={handleSiteGuardClose}
+      />
+      <Modal
+        open={Boolean(deleteTarget)}
+        id="billing-delete-confirm"
+        icon="warning"
+        title="ยืนยันการลบบิลนี้หรือไม่?"
+        message={
+          deleteTarget ? (
+            <div className="text-sm text-slate-600 space-y-1">
+              <p>
+                มิเตอร์: <span className="font-semibold">{deleteTarget.meter ?? "-"}</span>
+              </p>
+              <p>รอบบิล: {formatBillingPeriod(deleteTarget)}</p>
+              <p className="text-red-600">การลบจะไม่สามารถกู้คืนได้</p>
+            </div>
+          ) : undefined
+        }
+        confirmLabel="ลบบิล"
+        cancelLabel="ยกเลิก"
+        onConfirm={() => handleDeleteConfirm(deleteTarget)}
+        onClose={handleDeleteCancel}
       />
     </Sidebar>
   );
