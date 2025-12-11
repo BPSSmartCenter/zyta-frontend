@@ -73,6 +73,10 @@ type TableDataRow = {
   moduleTemp: number;
 };
 
+type ExtendedBillRow = BillDetailPayload["rows"][number] & {
+  label?: string;
+};
+
 const BillPdfPreview: React.FC = () => {
   const location = useLocation();
   const preview = (
@@ -244,9 +248,10 @@ const BillPdfPreview: React.FC = () => {
     formValues,
   ]);
 
-  const billingReadingRows = React.useMemo<BillDetailPayload["rows"]>(() => {
+  const billingReadingRows = React.useMemo<ExtendedBillRow[]>(() => {
     if (!billingReadings?.rows?.length) return [];
     return billingReadings.rows.map((row) => ({
+      label: row.label,
       timestamp: row.timestamp,
       energyProduction: row.total,
       energyOnPeak: row.onPeak,
@@ -255,7 +260,7 @@ const BillPdfPreview: React.FC = () => {
     }));
   }, [billingReadings]);
 
-  const previewRows = React.useMemo<BillDetailPayload["rows"]>(() => {
+  const previewRows = React.useMemo<ExtendedBillRow[]>(() => {
     if (billingReadingRows.length) return billingReadingRows;
     if (billDetail?.rows?.length) return billDetail.rows;
     if (reportMode === "daily" && dashboard?.chart?.categories?.length) {
@@ -1060,10 +1065,10 @@ function clampMonth(month: number) {
   return month;
 }
 
-function buildDailyTableRows(rows: BillDetailPayload["rows"]): TableDataRow[] {
+function buildDailyTableRows(rows: ExtendedBillRow[]): TableDataRow[] {
   const map = new Map<string, TableDataRow>();
   rows.forEach((row) => {
-    const label = getHourLabel(row.timestamp);
+    const label = row.label ?? getHourLabel(row.timestamp);
     const target = map.get(label) ?? createEmptyRow(label);
     map.set(label, mergeRowValues(target, row));
   });
