@@ -346,89 +346,86 @@ const handleCameraTileClick = (
       </StatCardGroup>
 
       {/* ===== Mobile carousel (<= 1024px) — จำกัดความกว้างรูปไม่เกิน 500px ตามเดิม ===== */}
-      <div className="lg-1024:hidden relative mt-4">
-        <div
-          ref={scrollRef}
-          onScroll={onScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth p-3"
-          style={{ scrollSnapType: "x mandatory" }}
-        >
-          {computedCamera.map((c, i) => (
-            <div
-              key={i}
-              className="flex-none w-full snap-center px-6"
-              style={{ scrollSnapAlign: "center" }}
-            >
-              <div className="w-full max-w-[500px] mx-auto relative">
-                <CameraTile
-                  ringColor={c.ringColor}
-                  imgSrc={c.imgSrc}
-                  embedUrl={c.embedUrl}
-                  embedTitle={c.embedTitle}
-                  isFallbackImg={c.isFallback}
-                  className="w-full"
-                />
-                {c.eventKey && (
-                  <button
-                    type="button"
-                    onClick={() => handleCameraTileClick(c.eventKey, c.noti)}
-                    className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
-                    aria-label={t("alerts.goToEvent", {
-                      event: c.eventKey,
-                      defaultValue: `View ${c.eventKey} alerts`,
-                    })}
+      {computedCamera.length > 0 && (
+        <div className="lg-1024:hidden relative mt-4">
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth p-3"
+            style={{ scrollSnapType: "x mandatory" }}
+          >
+            {computedCamera.map((c, i) => (
+              <div
+                key={i}
+                className="flex-none w-full snap-center px-6"
+                style={{ scrollSnapAlign: "center" }}
+              >
+                <div className="w-full max-w-[500px] mx-auto relative">
+                  <CameraTile
+                    ringColor={c.ringColor}
+                    imgSrc={c.imgSrc}
+                    embedUrl={c.embedUrl}
+                    embedTitle={c.embedTitle}
+                    isFallbackImg={c.isFallback}
+                    className="w-full"
                   />
-                )}
+                  {c.eventKey && (
+                    <button
+                      type="button"
+                      onClick={() => handleCameraTileClick(c.eventKey, c.noti)}
+                      className="absolute inset-0 z-10 h-full w-full border-none bg-transparent p-0 cursor-pointer"
+                      aria-label={t("alerts.goToEvent", {
+                        event: c.eventKey,
+                        defaultValue: `View ${c.eventKey} alerts`,
+                      })}
+                    />
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          {computedCamera.length === 0 && (
-            <div className="lg-1024:hidden relative mt-4">
-              <div className="h-[180px] w-full rounded-xl bg-gray-100" />
+            ))}
+          </div>
+
+          {computedCamera.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() => go(-1)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
+                aria-label="Previous"
+              >
+                <i className="material-icons">chevron_left</i>
+              </button>
+              <button
+                type="button"
+                onClick={() => go(1)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
+                aria-label="Next"
+              >
+                <i className="material-icons">chevron_right</i>
+              </button>
+            </>
+          )}
+
+          {computedCamera.length > 1 && (
+            <div className="mt-3 flex justify-center gap-2">
+              {computedCamera.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSlide(i);
+                    scrollTo(i);
+                  }}
+                  className={`h-2 w-2 rounded-full ${
+                    i === slide ? "bg-cyan-500" : "bg-gray-300"
+                  }`}
+                  aria-label={`Go to slide ${i + 1}`}
+                  type="button"
+                />
+              ))}
             </div>
           )}
         </div>
-
-        {computedCamera.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={() => go(-1)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
-              aria-label="Previous"
-            >
-              <i className="material-icons">chevron_left</i>
-            </button>
-            <button
-              type="button"
-              onClick={() => go(1)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow p-2"
-              aria-label="Next"
-            >
-              <i className="material-icons">chevron_right</i>
-            </button>
-          </>
-        )}
-
-        {computedCamera.length > 1 && (
-          <div className="mt-3 flex justify-center gap-2">
-            {computedCamera.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  setSlide(i);
-                  scrollTo(i);
-                }}
-                className={`h-2 w-2 rounded-full ${
-                  i === slide ? "bg-cyan-500" : "bg-gray-300"
-                }`}
-                aria-label={`Go to slide ${i + 1}`}
-                type="button"
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* camera tiles (Desktop layout เดิม) */}
       {computedCamera.length > 0 && (

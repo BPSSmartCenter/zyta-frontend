@@ -315,7 +315,7 @@ export default function Dashboard() {
 
   return (
     <Sidebar>
-      <div className="p-0 min-h-screen bg-[#F8FBFE] gap-6 flex flex-col">
+      <div className="p-0 min-h-screen bg-[#F8FBFE] flex flex-col gap-3 sm:gap-4 lg:gap-6">
         <Navbar
           searchSite={searchSite}
           setSearchSite={setSearchSite}

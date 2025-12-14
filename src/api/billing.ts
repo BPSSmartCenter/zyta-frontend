@@ -163,25 +163,31 @@ export type BillingReadingsRow = {
 };
 
 export type BillingReadingsPayload = {
-  mode: "daily" | "monthly";
+  mode: "daily" | "monthly" | "quarter";
   rows: BillingReadingsRow[];
   range: { start: string; end: string };
 };
 
 type DailyBillingReadingsParams = { mode: "daily"; date: string };
 type MonthlyBillingReadingsParams = { mode: "monthly"; month: number; year: number };
+type QuarterBillingReadingsParams = { mode: "quarter"; date: string };
 
 export async function getBillingReadingsData(
   deviceId: string,
-  params: DailyBillingReadingsParams | MonthlyBillingReadingsParams
+  params:
+    | DailyBillingReadingsParams
+    | MonthlyBillingReadingsParams
+    | QuarterBillingReadingsParams
 ) {
   const query = new URLSearchParams();
   query.set("mode", params.mode);
   if (params.mode === "daily") {
     query.set("date", params.date);
-  } else {
+  } else if (params.mode === "monthly") {
     query.set("month", String(params.month));
     query.set("year", String(params.year));
+  } else {
+    query.set("date", params.date);
   }
   const { data } = await api.get<{ ok: boolean; data: BillingReadingsPayload }>(
     `/devices/${encodeURIComponent(deviceId)}/billing-readings?${query.toString()}`

@@ -105,6 +105,15 @@ const BillPdfPreview: React.FC = () => {
     "none" | "select" | "blocked"
   >("none");
   const pdfRef = React.useRef<HTMLDivElement | null>(null);
+  const manualScaleRef = React.useRef(false);
+  const [previewScale, setPreviewScale] = React.useState(() => {
+    if (typeof window === "undefined") return 1;
+    return computeAutoPreviewScale(window.innerWidth);
+  });
+  const [isMobileViewport, setIsMobileViewport] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth < 640;
+  });
   const [billDetail, setBillDetail] = React.useState<BillDetailPayload | null>(
     null
   );
@@ -123,11 +132,30 @@ const BillPdfPreview: React.FC = () => {
   const [billingReadingsError, setBillingReadingsError] = React.useState<
     string | null
   >(null);
+  const [billingQuarterReadings, setBillingQuarterReadings] =
+    React.useState<BillingReadingsPayload | null>(null);
+  const [billingQuarterReadingsError, setBillingQuarterReadingsError] =
+    React.useState<string | null>(null);
+  const [currentPreviewPage, setCurrentPreviewPage] = React.useState(0);
   React.useEffect(() => {
     if (billIdParam) {
       setCurrentBillId(billIdParam);
     }
   }, [billIdParam]);
+  React.useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === "undefined") return;
+      const width = window.innerWidth;
+      const mobile = width < 640;
+      setIsMobileViewport(mobile);
+      if (!manualScaleRef.current) {
+        setPreviewScale(computeAutoPreviewScale(width));
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const previewForm = preview?.form;
   const preferredData = billDetail ?? preview ?? null;
   const preferredDeviceId =
@@ -224,6 +252,8 @@ const BillPdfPreview: React.FC = () => {
     let cancelled = false;
     setBillingReadingsError(null);
     setBillingReadings(null);
+    setBillingQuarterReadings(null);
+    setBillingQuarterReadingsError(null);
     getBillingReadingsData(preferredDeviceId, requestParams)
       .then((data) => {
         if (!cancelled) {
@@ -237,6 +267,32 @@ const BillPdfPreview: React.FC = () => {
           setBillingReadingsError("ไม่สามารถโหลดข้อมูลพลังงานได้");
         }
       });
+    if (reportMode === "daily" && resolvedDailyDate) {
+      getBillingReadingsData(preferredDeviceId, {
+        mode: "quarter",
+        date: resolvedDailyDate,
+      })
+        .then((data) => {
+          if (!cancelled) {
+            setBillingQuarterReadings(data);
+          }
+        })
+        .catch((err) => {
+          console.error(
+            "[BillPdfPreview] load quarter billing readings failed",
+            err
+          );
+          if (!cancelled) {
+            setBillingQuarterReadings(null);
+            setBillingQuarterReadingsError(
+              "ไม่สามารถโหลดข้อมูลพลังงานแบบ 15 นาทีได้"
+            );
+          }
+        });
+    } else {
+      setBillingQuarterReadings(null);
+      setBillingQuarterReadingsError(null);
+    }
     return () => {
       cancelled = true;
     };
@@ -291,27 +347,77 @@ const BillPdfPreview: React.FC = () => {
     return buildMonthlyTableRows(rows, period.year, period.month);
   }, [billDetail, formValues, previewRows, reportMode, monthlyPeriod]);
 
+  const quarterTableRows = React.useMemo<TableDataRow[]>(() => {
+    if (!billingQuarterReadings?.rows?.length) return [];
+    return billingQuarterReadings.rows.map((row) => ({
+      time: row.label,
+      energyProduction: row.total,
+      energyOnPeak: row.onPeak,
+      energyOffPeak: row.offPeak,
+      energyPurchased: row.total,
+      irradiance: 0,
+      ambientTemp: 0,
+      moduleTemp: 0,
+    }));
+  }, [billingQuarterReadings]);
+
+  const quarterPages = React.useMemo(() => {
+    if (quarterTableRows.length === 0) return [];
+    const segments = [
+      { label: "00:00 - 07:45", start: 0, end: 32 },
+      { label: "08:00 - 15:45", start: 32, end: 64 },
+      { label: "16:00 - 23:45", start: 64, end: 96 },
+    ];
+    return segments
+      .map((segment) => ({
+        label: segment.label,
+        rows: quarterTableRows.slice(segment.start, segment.end),
+      }))
+      .filter((segment) => segment.rows.length > 0);
+  }, [quarterTableRows]);
+
+  React.useEffect(() => {
+    if (reportMode !== "daily") {
+      if (currentPreviewPage !== 0) setCurrentPreviewPage(0);
+      return;
+    }
+    if (currentPreviewPage > 0 && !quarterPages[currentPreviewPage - 1]) {
+      setCurrentPreviewPage(0);
+    }
+  }, [reportMode, quarterPages, currentPreviewPage]);
+
+  const previewPageOptions = React.useMemo(() => {
+    if (reportMode !== "daily" || quarterPages.length === 0) return [];
+    return [
+      { value: 0, label: "ภาพรวม" },
+      ...quarterPages.map((page, index) => ({
+        value: index + 1,
+        label: page.label,
+      })),
+    ];
+  }, [reportMode, quarterPages]);
+
+  const tableTotals = React.useMemo(
+    () => sumTableRows(tableData),
+    [tableData]
+  );
+
+  const displayTableRows = React.useMemo(() => {
+    if (currentPreviewPage === 0 || reportMode !== "daily") {
+      return tableData;
+    }
+    const targetPage = quarterPages[currentPreviewPage - 1];
+    return targetPage?.rows ?? tableData;
+  }, [currentPreviewPage, quarterPages, tableData, reportMode]);
+
+  const displayTableTotals = React.useMemo(
+    () => sumTableRows(displayTableRows),
+    [displayTableRows]
+  );
+
+  const displayRowCount = displayTableRows.length || 1;
+
   const hasSavedBill = Boolean(currentBillId);
-  const tableTotals = React.useMemo(() => {
-    return tableData.reduce(
-      (acc, row) => ({
-        production: acc.production + row.energyProduction,
-        onPeak: acc.onPeak + row.energyOnPeak,
-        offPeak: acc.offPeak + row.energyOffPeak,
-        irradiance: acc.irradiance + row.irradiance,
-        ambient: acc.ambient + row.ambientTemp,
-        module: acc.module + row.moduleTemp,
-      }),
-      {
-        production: 0,
-        onPeak: 0,
-        offPeak: 0,
-        irradiance: 0,
-        ambient: 0,
-        module: 0,
-      }
-    );
-  }, [tableData]);
 
   const totalEnergy = tableTotals.production;
   const onPeakKwhValue = tableTotals.onPeak;
@@ -322,13 +428,25 @@ const BillPdfPreview: React.FC = () => {
   const offPeakCost = offPeakKwhValue * rateOffPeak;
   const totalCost = onPeakCost + offPeakCost;
 
+  const chartSourceRows = React.useMemo(() => {
+    if (reportMode !== "daily") {
+      return tableData;
+    }
+    if (currentPreviewPage === 0) {
+      return tableData;
+    }
+    return displayTableRows;
+  }, [reportMode, currentPreviewPage, tableData, displayTableRows]);
+
+  const isQuarterPage = reportMode === "daily" && currentPreviewPage > 0;
+
   const chartPointsFromTable = React.useMemo(() => {
-    if (!tableData.length) return null;
-    return tableData.map((row, index) => {
+    if (!chartSourceRows.length) return null;
+    return chartSourceRows.map((row, index) => {
       const label =
         reportMode === "monthly"
           ? formatMonthlyLabel(row.time, monthlyPeriod)
-          : row.time.replace(/:00$/, "");
+          : formatChartTimeLabel(row.time, isQuarterPage);
       return {
         label,
         index,
@@ -336,7 +454,7 @@ const BillPdfPreview: React.FC = () => {
         purchased: row.energyOffPeak,
       };
     });
-  }, [tableData, reportMode, monthlyPeriod]);
+  }, [chartSourceRows, reportMode, monthlyPeriod, isQuarterPage]);
 
   const chartPointsData = React.useMemo(() => {
     if (chartPointsFromTable?.length) {
@@ -422,6 +540,24 @@ const BillPdfPreview: React.FC = () => {
     setGuardType("none");
     navigate(abs("/dashboard"), { replace: true });
   }, [navigate, abs]);
+  const adjustPreviewScale = React.useCallback((delta: number) => {
+    manualScaleRef.current = true;
+    setPreviewScale((prev) => clampPreviewScale(prev + delta));
+  }, []);
+  const handleZoomOut = React.useCallback(() => adjustPreviewScale(-0.1), [
+    adjustPreviewScale,
+  ]);
+  const handleZoomIn = React.useCallback(() => adjustPreviewScale(0.1), [
+    adjustPreviewScale,
+  ]);
+  const handleResetZoom = React.useCallback(() => {
+    manualScaleRef.current = false;
+    if (typeof window === "undefined") {
+      setPreviewScale(1);
+      return;
+    }
+    setPreviewScale(computeAutoPreviewScale(window.innerWidth));
+  }, []);
   const handleSaveBill = React.useCallback(async () => {
     if (hasSavedBill) return;
     if (!previewForm) {
@@ -491,6 +627,32 @@ const BillPdfPreview: React.FC = () => {
     }
     navigate(abs("/electric/generate-bill"));
   }, [navigate, abs]);
+  const temporarilyResetPreviewScale = React.useCallback(() => {
+    const node = pdfRef.current;
+    if (!node) return () => {};
+    const prevTransform = node.style.transform;
+    const prevTransition = node.style.transition;
+    const prevOrigin = node.style.transformOrigin;
+    node.style.transition = "none";
+    node.style.transform = "scale(1)";
+    node.style.transformOrigin = "top center";
+    return () => {
+      node.style.transition = prevTransition;
+      node.style.transform = prevTransform;
+      node.style.transformOrigin = prevOrigin;
+    };
+  }, []);
+
+  const waitForNextFrame = React.useCallback(() => {
+    if (typeof window === "undefined") {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => resolve())
+      );
+    });
+  }, []);
 
   const handleExportPdf = React.useCallback(async () => {
     if (!currentBillId) return;
@@ -499,7 +661,15 @@ const BillPdfPreview: React.FC = () => {
     setExporting(true);
     const hiddenNodes: HTMLElement[] = [];
     const previousDisplay: string[] = [];
+    const previousPage = currentPreviewPage;
+    const exportPageCandidates = previewPageOptions.length
+      ? previewPageOptions.map((option) => option.value)
+      : [];
+    const exportPages = Array.from(new Set([0, ...exportPageCandidates]));
+    let restoreScale: (() => void) | null = null;
+    let activePage = currentPreviewPage;
     try {
+      restoreScale = temporarilyResetPreviewScale();
       node
         .querySelectorAll<HTMLElement>("[data-export-hidden='true']")
         .forEach((el) => {
@@ -508,45 +678,60 @@ const BillPdfPreview: React.FC = () => {
           el.style.display = "none";
         });
 
-      const dataUrl = await toJpeg(node, {
-        cacheBust: true,
-        pixelRatio: 1.25,
-        quality: 0.82,
-        backgroundColor: "#ffffff",
-        filter: (domNode) => {
-          if (!(domNode instanceof Element)) return true;
-          if (
-            domNode.tagName === "LINK" &&
-            domNode.getAttribute("href")?.includes("fonts.googleapis.com")
-          ) {
-            return false;
-          }
-          return true;
-        },
-      });
       const pdf = new jsPDF("p", "pt", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const image = new Image();
-      image.src = dataUrl;
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = (event) => reject(event);
-      });
-      const imgHeight = (image.height * pdfWidth) / image.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      let pageIndex = 0;
+      for (const targetPage of exportPages) {
+        if (activePage !== targetPage) {
+          setCurrentPreviewPage(targetPage);
+          activePage = targetPage;
+        }
+        await waitForNextFrame();
+        const dataUrl = await toJpeg(node, {
+          cacheBust: true,
+          pixelRatio: 1.25,
+          quality: 0.82,
+          backgroundColor: "#ffffff",
+          filter: (domNode) => {
+            if (!(domNode instanceof Element)) return true;
+            if (
+              domNode.tagName === "LINK" &&
+              domNode.getAttribute("href")?.includes("fonts.googleapis.com")
+            ) {
+              return false;
+            }
+            return true;
+          },
+        });
+        const image = new Image();
+        image.src = dataUrl;
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = (event) => reject(event);
+        });
+        const imgHeight = (image.height * pdfWidth) / image.width;
+        let heightLeft = imgHeight;
+        let position = 0;
 
-      pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-      heightLeft -= pageHeight;
+        if (pageIndex === 0) {
+          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+        } else {
+          pdf.addPage();
+          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
 
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight;
+          pdf.addPage();
+          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        pageIndex += 1;
       }
-
       if (currentBillId) {
         const pdfBase64 = pdf.output("datauristring").split(",")[1];
         await uploadBillPdf(currentBillId, pdfBase64);
@@ -562,9 +747,23 @@ const BillPdfPreview: React.FC = () => {
           el.style.display = previousDisplay[idx];
         });
       }
+      if (previousPage !== activePage) {
+        setCurrentPreviewPage(previousPage);
+        await waitForNextFrame();
+        activePage = previousPage;
+      }
+      if (restoreScale) {
+        restoreScale();
+      }
       setExporting(false);
     }
-  }, [currentBillId]);
+  }, [
+    currentBillId,
+    temporarilyResetPreviewScale,
+    currentPreviewPage,
+    previewPageOptions,
+    waitForNextFrame,
+  ]);
 
   const handleDownloadExcel = React.useCallback(async () => {
     if (!currentBillId) return;
@@ -670,6 +869,8 @@ const BillPdfPreview: React.FC = () => {
     ? exporting
     : savingBill || !previewForm;
   const primaryButtonHandler = hasSavedBill ? handleExportPdf : handleSaveBill;
+  const showZoomControls = isMobileViewport;
+  const zoomPercentage = Math.round(previewScale * 100);
 
   return (
     <Sidebar>
@@ -684,7 +885,7 @@ const BillPdfPreview: React.FC = () => {
           setDate={setDate as any}
         />
 
-        <div className="mx-auto max-w-5xl px-6 py-10">
+        <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
           <button
             onClick={handleBack}
             className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 cursor-pointer"
@@ -715,9 +916,71 @@ const BillPdfPreview: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center">
+            {showZoomControls && (
+              <div className="mb-4 flex items-center gap-2 text-xs font-semibold text-slate-600 sm:hidden">
+                <span className="tracking-wide">
+                  Zoom {zoomPercentage}%
+                </span>
+                <div className="inline-flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600 shadow-sm transition hover:bg-slate-100 active:scale-95"
+                  >
+                    รีเซ็ต
+                  </button>
+                </div>
+              </div>
+            )}
+            {previewPageOptions.length > 1 && (
+              <div
+                className="mb-4 flex flex-wrap items-center justify-center gap-3"
+                data-export-hidden="true"
+              >
+                {previewPageOptions.map((option) => {
+                  const isActive = currentPreviewPage === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setCurrentPreviewPage(option.value)}
+                      className={[
+                        "rounded-full px-4 py-1.5 text-sm font-semibold transition cursor-pointer",
+                        isActive
+                          ? "bg-[#1cb5ff] text-white shadow"
+                          : "border border-[#1cb5ff] text-[#0a86ba] bg-white hover:bg-[#e5f7ff]",
+                      ].join(" ")}
+                    >
+                      {option.value === 0
+                        ? option.label
+                        : `ช่วง ${option.label}`}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div
               ref={pdfRef}
+              style={{
+                transform: `scale(${previewScale})`,
+                transformOrigin: "top center",
+                transition: "transform 150ms ease-out",
+              }}
               className="w-full max-w-[900px] rounded-[36px] bg-white p-8 text-slate-800 shadow-[0_30px_60px_rgba(15,23,42,0.12)]"
             >
               <div className="flex flex-col gap-4">
@@ -786,6 +1049,11 @@ const BillPdfPreview: React.FC = () => {
                     {billingReadingsError}
                   </div>
                 )}
+                {reportMode === "daily" && billingQuarterReadingsError && (
+                  <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                    {billingQuarterReadingsError}
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[800px] text-sm text-black">
                     <thead className="text-xs uppercase tracking-wide text-black">
@@ -808,9 +1076,9 @@ const BillPdfPreview: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {tableData.map((row) => (
+                      {displayTableRows.map((row) => (
                         <tr
-                          key={row.time}
+                          key={`${row.time}-${row.energyProduction}-${row.energyOnPeak}`}
                           className="border text-center text-sm"
                         >
                           <td className="text-center text-black">
@@ -845,25 +1113,25 @@ const BillPdfPreview: React.FC = () => {
                           Total/Average
                         </td>
                         <td className="text-[15px] border">
-                          {formatValue(tableTotals.production)}
+                          {formatValue(displayTableTotals.production)}
                         </td>
                         <td className="text-[15px] border">
-                          {formatValue(tableTotals.onPeak)}
+                          {formatValue(displayTableTotals.onPeak)}
                         </td>
                         <td className="text-[15px] border">
-                          {formatValue(tableTotals.offPeak)}
+                          {formatValue(displayTableTotals.offPeak)}
                         </td>
                         <td className="text-[15px] border">
-                          {formatValue(tableTotals.irradiance)}
+                          {formatValue(displayTableTotals.irradiance)}
                         </td>
                         <td className="text-[15px] border">
                           {formatValue(
-                            tableTotals.ambient / (tableData.length || 1)
+                            displayTableTotals.ambient / displayRowCount
                           )}
                         </td>
                         <td className="text-[15px] border">
                           {formatValue(
-                            tableTotals.module / (tableData.length || 1)
+                            displayTableTotals.module / displayRowCount
                           )}
                         </td>
                       </tr>
@@ -1028,6 +1296,21 @@ function formatMonthlyLabel(
     .padStart(2, "0");
 }
 
+function formatChartTimeLabel(label: string, useQuarterGranularity: boolean) {
+  const [hourRaw, minuteRaw = "0"] = label.split(":");
+  const hour = Number.parseInt(hourRaw, 10);
+  const minute = Number.parseInt(minuteRaw, 10) || 0;
+  if (Number.isNaN(hour)) return label;
+  if (!useQuarterGranularity) {
+    return String(hour);
+  }
+  if (minute === 0) {
+    return String(hour);
+  }
+  const minuteStr = minute.toString().padStart(2, "0");
+  return `${hour}.${minuteStr}`;
+}
+
 function resolveReportMode(
   billDetail?: BillDetailPayload | null,
   form?: BillFormLike
@@ -1069,6 +1352,27 @@ function clampMonth(month: number) {
   if (month < 1) return 1;
   if (month > 12) return 12;
   return month;
+}
+
+function sumTableRows(rows: TableDataRow[]) {
+  return rows.reduce(
+    (acc, row) => ({
+      production: acc.production + row.energyProduction,
+      onPeak: acc.onPeak + row.energyOnPeak,
+      offPeak: acc.offPeak + row.energyOffPeak,
+      irradiance: acc.irradiance + row.irradiance,
+      ambient: acc.ambient + row.ambientTemp,
+      module: acc.module + row.moduleTemp,
+    }),
+    {
+      production: 0,
+      onPeak: 0,
+      offPeak: 0,
+      irradiance: 0,
+      ambient: 0,
+      module: 0,
+    }
+  );
 }
 
 function buildDailyTableRows(rows: ExtendedBillRow[]): TableDataRow[] {
@@ -1171,4 +1475,21 @@ function toNumber(value: unknown) {
     typeof value === "string" ? value.replace(/,/g, "") : value;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function clampPreviewScale(value: number) {
+  const min = 0.35;
+  const max = 1.35;
+  if (Number.isNaN(value)) return min;
+  if (value < min) return min;
+  if (value > max) return max;
+  return Number(value.toFixed(2));
+}
+
+function computeAutoPreviewScale(viewportWidth: number) {
+  if (!viewportWidth || Number.isNaN(viewportWidth)) return 1;
+  if (viewportWidth <= 320) {
+    return clampPreviewScale(0.9);
+  }
+  return 1;
 }
