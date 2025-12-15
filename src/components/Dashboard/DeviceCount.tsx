@@ -5,6 +5,7 @@ import {
   solarImage,
   windImage,
   waterTapImage,
+  wifiImage,
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -18,6 +19,8 @@ type DeviceCounts = {
   electricMeter: number;
   airSensor: number;
   zyta: number;
+  iot: number;
+
 };
 
 type Props = {
@@ -55,6 +58,7 @@ export default function DeviceCount({
   });
   const labelAir = t("devices.air", { defaultValue: "Air" });
   // const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
+  const labelIot = t("devices.iot", { defaultValue: "IoT" });
 
   const CCTV_DISABLED = true;
 
@@ -72,9 +76,11 @@ export default function DeviceCount({
     electricMeter: 0,
     airSensor: 0,
     zyta: 0,
+    iot: 0,
     ...(globalCounts || {}),
     ...(counts || {}),
   } as DeviceCounts;
+  console.log("DEBUG: DeviceCount mergedCounts:", mergedCounts);
 
   // Per-type status placeholders (keep style; values can be wired later)
   const statusByType = {
@@ -84,6 +90,7 @@ export default function DeviceCount({
     electricMeter: { on: 0, off: 0 },
     airSensor: { on: 0, off: 0 },
     zyta: { on: 0, off: 0 },
+    iot: { on: 0, off: 0 },
   } as const;
 
   // คำนวณเปอร์เซ็นต์ออนไลน์จริงจากค่า on/off รวมทั้งหมด
@@ -99,8 +106,8 @@ export default function DeviceCount({
       typeof offlinePercent === "number"
         ? Math.max(0, Math.min(100, 100 - offlinePercent))
         : sumRaw === 0
-        ? 0
-        : (on / sumRaw) * 100;
+          ? 0
+          : (on / sumRaw) * 100;
     return { on, oc, pct: pctOnline, sum: sumRaw };
   })();
 
@@ -166,9 +173,8 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.cameras)}
             disabled={isZero(mergedCounts.cameras)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${
-              isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass
-            }`}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.cameras) ? disabledBtnClass : enabledBtnClass
+              }`}
             onClick={() => {
               if (CCTV_DISABLED) return;
               if (!isZero(mergedCounts.cameras)) goDevices("cctv");
@@ -229,11 +235,10 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.waterMeter)}
             disabled={isZero(mergedCounts.waterMeter)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${
-              isZero(mergedCounts.waterMeter)
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.waterMeter)
                 ? disabledBtnClass
                 : enabledBtnClass
-            }`}
+              }`}
             onClick={() =>
               !isZero(mergedCounts.waterMeter) && goDevices("watermeter")
             }
@@ -250,7 +255,7 @@ export default function DeviceCount({
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
                   {/* {statusByType.waterMeter.on} */}
-                   {mergedCounts.waterMeter}
+                  {mergedCounts.waterMeter}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">
@@ -268,11 +273,10 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.electricMeter)}
             disabled={isZero(mergedCounts.electricMeter)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${
-              isZero(mergedCounts.electricMeter)
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.electricMeter)
                 ? disabledBtnClass
                 : enabledBtnClass
-            }`}
+              }`}
             onClick={() =>
               !isZero(mergedCounts.electricMeter) && goDevices("electricmeter")
             }
@@ -306,11 +310,10 @@ export default function DeviceCount({
             type="button"
             aria-disabled={isZero(mergedCounts.airSensor)}
             disabled={isZero(mergedCounts.airSensor)}
-            className={`w-full min-h-[56px] flex items-center gap-4 ${
-              isZero(mergedCounts.airSensor)
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.airSensor)
                 ? disabledBtnClass
                 : enabledBtnClass
-            }`}
+              }`}
             onClick={() =>
               !isZero(mergedCounts.airSensor) && goDevices("airsensor")
             }
@@ -332,6 +335,39 @@ export default function DeviceCount({
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">
                   {statusByType.airSensor.off}
+                </span>
+                <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
+        </li>
+
+        {/* IoT */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.iot)}
+            disabled={isZero(mergedCounts.iot)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.iot) ? disabledBtnClass : enabledBtnClass
+              }`}
+            onClick={() => !isZero(mergedCounts.iot) && goDevices("iot")}
+          >
+            <img src={wifiImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelIot}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.iot}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">
+                  {mergedCounts.iot}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">
+                  {statusByType.iot.off}
                 </span>
                 <span className="text-gray-500">)</span>
               </span>

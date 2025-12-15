@@ -6,7 +6,8 @@ export type DeviceTypeKey =
   | "electricmeter"
   | "airsensor"
   | "intercom"
-  | "zyta";
+  | "zyta"
+  | "iot";
 
 export type DeviceCounts = Partial<{
   cameras: number;
@@ -15,6 +16,7 @@ export type DeviceCounts = Partial<{
   electricMeter: number;
   airSensor: number;
   zyta: number;
+  iot: number;
 }>;
 
 type Ctx = {
@@ -41,9 +43,9 @@ export function useDeviceInventory() {
   if (!ctx) {
     return {
       counts: {},
-      setCounts: () => {},
+      setCounts: () => { },
       loading: false,
-      setLoading: () => {},
+      setLoading: () => { },
     } as unknown as Ctx;
   }
   return ctx;
@@ -64,6 +66,8 @@ export function getCountForType(map: DeviceCounts, type: DeviceTypeKey): number 
       return Number(map.intercom ?? 0);
     case "zyta":
       return Number(map.zyta ?? 0);
+    case "iot":
+      return Number(map.iot ?? 0);
     default:
       return 0;
   }

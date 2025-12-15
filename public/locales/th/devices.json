@@ -9,7 +9,8 @@
     "intercomeCard": "Red box",
     "waterCard": "มิเตอร์น้ำ",
     "electricCard": "มิเตอร์ไฟ",
-    "airCard": "อากาศ"
+    "airCard": "อากาศ",
+    "iotCard": "IoT"
   },
   "table": {
     "title": "ตารางการแจ้งเตือนแบบรวม",

@@ -1,5 +1,7 @@
 {
-  "search": { "placeholder": "Search" },
+  "search": {
+    "placeholder": "Search"
+  },
   "aria": {
     "toggleSidebar": "Toggle sidebar",
     "sidebarLabel": "Sidebar",
@@ -16,6 +18,7 @@
     "devices_watermeter": "Water Meter",
     "devices_electricmeter": "Electric Meter",
     "devices_airsensor": "Air Sensor",
+    "devices_iot": "IoT",
     "alerts_fire": "Fire detected",
     "alerts_motion": "Motion detected",
     "alerts_offline": "Cameras offline",
@@ -23,12 +26,17 @@
     "alerts_sleep": "Sleep detected",
     "user_management": "User Management"
   },
-  "account": { "logout": "Sign out" },
+  "account": {
+    "logout": "Sign out"
+  },
   "logout": {
     "title": "Sign out",
     "message": "Are you sure you want to sign out?"
   },
-  "actions": { "cancel": "Cancel", "signOut": "Sign out" },
+  "actions": {
+    "cancel": "Cancel",
+    "signOut": "Sign out"
+  },
   "footer": {
     "support": "Support",
     "setting": "Settings",

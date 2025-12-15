@@ -75,9 +75,9 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
               onBlur={() => setEmailTouched(true)}
               {...(emailInvalid
                 ? {
-                    "aria-invalid": "true",
-                    "aria-describedby": "email-error",
-                  }
+                  "aria-invalid": "true",
+                  "aria-describedby": "email-error",
+                }
                 : {})}
             />
             <div className="h-[18px] mt-[-3px]" aria-live="polite">

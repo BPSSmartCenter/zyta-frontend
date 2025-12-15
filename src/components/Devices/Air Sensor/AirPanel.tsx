@@ -6,7 +6,7 @@ import ThermostatAir from "../../ThermostatAir";
 import waterDrop from "../../../assets/waterDrop.png";
 import { windSelected } from "../../../assets";
 import { cloudyDay1, rainyDay1, thunderDay1 } from "../../../assets/index";
-import { getAirDevices, type AirDeviceRecord } from "../../../api/air";
+import { getIoTDevices, type IoTDevice } from "../../../api/iot"; // Updated import
 import { useFilters } from "../../../context/FiltersContext";
 
 type Props = {
@@ -20,7 +20,7 @@ type CardValueProps = {
   value: number | string;
   valueLabel: string;
   valueLabel2?: string;
-  onClick?: () => void; // ← รับคลิกจาก parent
+  onClick?: () => void;
 };
 
 type AirStatus = "good" | "medium" | "high" | "na";
@@ -35,10 +35,16 @@ type AirReading = Partial<Record<AirKpiKey, number>> & {
   capturedAt?: string;
   status?: Partial<Record<AirKpiKey, AirStatus>>;
   source?: string;
+  // Extra fields from IoT
+  mode?: string;
+  anion?: boolean;
+  uv_light?: boolean;
+  filter_reset?: boolean;
+  fault?: number;
 };
 
 type DeviceSnapshot = {
-  device: AirDeviceRecord;
+  device: IoTDevice; // Updated to IoTDevice
   reading: AirReading;
   timestamp: number | null;
 };
@@ -54,10 +60,8 @@ type WeatherSnapshot = {
 
 const AIR_THRESHOLDS = {
   pm25: { medium: 25, high: 50 },
-  pm10: { medium: 50, high: 120 },
+  co2: { medium: 1000, high: 1500 },
 } as const;
-
-const DEFAULT_SITE_CODE = "3078000";
 
 const BANGKOK_COORDS = {
   lat: 13.7563,
@@ -79,31 +83,19 @@ const KPI_CONFIG: Array<{
   unitKey: string;
   thresholds: (typeof AIR_THRESHOLDS)[AirKpiKey];
 }> = [
-  {
-    key: "pm25",
-    label: "PM 2.5",
-    unitKey: "devices.air.units.ugm3",
-    thresholds: AIR_THRESHOLDS.pm25,
-  },
-  {
-    key: "pm10",
-    label: "PM 10",
-    unitKey: "devices.air.units.ugm3",
-    thresholds: AIR_THRESHOLDS.pm10,
-  },
-];
-
-// type SideCardValueProps = {
-//   img: string;
-//   valueLabel: string;
-//   value: number | string;
-//   unit: string;
-// };
-
-// function formatWithComma(v: number | string) {
-//   const n = typeof v === "number" ? v : Number(v);
-//   return Number.isFinite(n) ? n.toLocaleString("en-US") : v;
-// }
+    {
+      key: "pm25",
+      label: "PM 2.5",
+      unitKey: "devices.air.units.ugm3",
+      thresholds: AIR_THRESHOLDS.pm25,
+    },
+    {
+      key: "co2",
+      label: "CO2",
+      unitKey: "ppm",
+      thresholds: AIR_THRESHOLDS.co2,
+    },
+  ];
 
 function CardValue({
   img,
@@ -113,7 +105,7 @@ function CardValue({
   valueLabel2,
   onClick,
 }: CardValueProps) {
-  const showImage = !!img; // true ถ้ามี path รูปที่ไม่ใช่ค่าว่าง
+  const showImage = !!img;
 
   return (
     <div
@@ -125,7 +117,6 @@ function CardValue({
           <img src={img} className="p-3 w-full" alt={imgLabel ?? ""} />
         </div>
       ) : (
-        // กรณีไม่มีรูป — แสดงข้อความแทน และล็อกขนาดให้เป็นวงกลม 50x50
         <div className="select-none bg-white w-[50px] h-[50px] rounded-full flex items-center justify-center">
           <span className="text-[15px] font-bold text-[#A9DB4E] text-center px-1">
             {imgLabel ?? ""}
@@ -140,22 +131,6 @@ function CardValue({
     </div>
   );
 }
-
-// function SideCardValue({ img, value, valueLabel, unit }: SideCardValueProps) {
-//   return (
-//     <div className="flex flex-1 items-center p-5 bg-white w-full h-[100px] rounded-lg gap-5">
-//       <div className="w-[57px] rounded-full bg-[#A9DB4E]">
-//         <img src={img} className="p-2" alt="" />
-//       </div>
-//       <div>
-//         <h1 className="text-gray-400 text-[14px]">{valueLabel}</h1>
-//         <p className="font-bold text-[21px] whitespace-nowrap">
-//           {formatWithComma(value)} <span>{unit}</span>
-//         </p>
-//       </div>
-//     </div>
-//   );
-// }
 
 // ------- helpers สำหรับ time dropdown -------
 const formatTime = (h: number, m: number) => {
@@ -185,11 +160,6 @@ const buildDateWithTime = (baseDay: Date, label: string) => {
   return next;
 };
 
-const safeObject = (value: unknown): Record<string, any> | null =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, any>)
-    : null;
-
 const coerceNumber = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -199,69 +169,45 @@ const coerceNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const normalizeStatus = (value: unknown): AirStatus | undefined => {
-  if (
-    value === "good" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "na"
-  ) {
-    return value;
-  }
-  return undefined;
-};
 
 const parseReadingFromDevice = (
-  device?: AirDeviceRecord | null
+  device?: IoTDevice | null
 ): AirReading => {
-  if (!device) return {};
-  const meta = safeObject(device.meta);
-  const airMeta = safeObject(meta?.air);
-  const lastReading =
-    safeObject(airMeta?.lastReading) ??
-    safeObject(meta?.lastAirReading) ??
-    safeObject(meta?.lastReading) ??
-    {};
+  if (!device || !device.snapshot) return {};
 
-  const statusRaw = safeObject(lastReading?.status);
+  const snap = device.snapshot;
+
+  // Mapping based on user request:
+  // "eco2": 0, "pm25": 10, "tvoc": 0, "temp_indoor": 29
+  // "mode", "anion", "fault", "switch", "uv_light", "air_quality", "filter_reset"
+
   const reading: AirReading = {
-    pm25: coerceNumber(lastReading?.pm25 ?? lastReading?.pm_2_5),
-    pm10: coerceNumber(lastReading?.pm10 ?? lastReading?.pm_10),
-    humidity: coerceNumber(
-      lastReading?.humidity ?? lastReading?.rh ?? lastReading?.hum
-    ),
-    temperature: coerceNumber(
-      lastReading?.temperature ?? lastReading?.temp ?? lastReading?.celsius
-    ),
-    co2: coerceNumber(lastReading?.co2),
-    voc: coerceNumber(lastReading?.voc ?? lastReading?.tvoc),
-    pressure: coerceNumber(lastReading?.pressure ?? lastReading?.hpa),
-    updatedAt:
-      typeof lastReading?.updatedAt === "string"
-        ? lastReading.updatedAt
-        : undefined,
-    capturedAt:
-      typeof lastReading?.capturedAt === "string"
-        ? lastReading.capturedAt
-        : undefined,
-    source:
-      typeof lastReading?.source === "string" ? lastReading.source : undefined,
+    pm25: coerceNumber(snap.pm25),
+    // Map eco2 -> co2
+    co2: coerceNumber(snap.eco2),
+    // Map tvoc -> voc
+    voc: coerceNumber(snap.tvoc),
+    // Map temp_indoor -> temperature
+    temperature: coerceNumber(snap.temp_indoor),
+
+    // Other fields
+    mode: typeof snap.mode === 'string' ? snap.mode : undefined,
+    anion: snap.anion === true || snap.anion === 'true',
+    uv_light: snap.uv_light === true || snap.uv_light === 'true',
+    filter_reset: snap.filter_reset === true || snap.filter_reset === 'true',
+    fault: coerceNumber(snap.fault),
+
+    // Status mapping? "air_quality": "great"
+    // We might need to map "great" to "good" for our types?
+    status: {
+      pm25: snap.pm25 > 50 ? 'high' : snap.pm25 > 25 ? 'medium' : 'good'
+    },
+
+    // Default others
+    updatedAt: new Date().toISOString(), // Use current time if not provided
   };
 
-  if (statusRaw) {
-    reading.status = {
-      pm25: normalizeStatus(statusRaw.pm25) ?? undefined,
-      pm10: normalizeStatus(statusRaw.pm10) ?? undefined,
-    };
-  }
-
   return reading;
-};
-
-const formatValue = (value?: number, digits = 1): string => {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "--";
-  const factor = 10 ** digits;
-  return String(Math.round(value * factor) / factor);
 };
 
 const readingTimestamp = (reading?: AirReading | null): number | null => {
@@ -339,9 +285,9 @@ function PinIcon({ className = "" }: { className?: string }) {
   );
 }
 
-export default function AirPanel({ siteCode, timeRange }: Props) {
-  const { t, i18n } = useTranslation("devices"); // ใช้คีย์แบบ devices.*
-  const { selectedSite, date: filtersDate, siteOptions } = useFilters();
+export default function AirPanel({ timeRange }: Props) {
+  const { t, i18n } = useTranslation("devices");
+  const { date: filtersDate } = useFilters(); // Removed selectedSite, siteOptions
 
   const timeOptions = useMemo(
     () =>
@@ -400,84 +346,6 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
   const [weatherLoading, setWeatherLoading] = useState<boolean>(false);
   const [, setWeatherError] = useState<string | null>(null);
 
-  const [activeSite, setActiveSite] = useState<string | "ALL" | null>(
-    DEFAULT_SITE_CODE
-  );
-
-  const availableSites = useMemo(
-    () =>
-      siteOptions
-        ?.map((opt) => (opt.value ? String(opt.value).trim() : ""))
-        .filter(
-          (value, idx, arr) =>
-            value &&
-            value.toLowerCase() !== "all" &&
-            arr.indexOf(value) === idx
-        ) ?? [],
-    [siteOptions]
-  );
-
-  const normalizeSite = (value?: string | null) => {
-    if (!value) return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    return trimmed.toLowerCase() === "all" ? "ALL" : trimmed;
-  };
-
-  useEffect(() => {
-    const normalized = normalizeSite(siteCode);
-    let next: string | "ALL" | null = null;
-
-    if (normalized && normalized !== "ALL") {
-      next = normalized;
-    } else if (selectedSite && selectedSite !== "all") {
-      next = String(selectedSite).trim();
-    } else if (selectedSite === "all" || normalized === "ALL") {
-      next = "ALL";
-    } else if (availableSites.length > 0) {
-      next = availableSites[0];
-    } else {
-      next = DEFAULT_SITE_CODE;
-    }
-
-    if (next && next !== activeSite) {
-      setActiveSite(next);
-    }
-  }, [siteCode, selectedSite, availableSites, activeSite]);
-
-  const siteTargets = useMemo(() => {
-    if (activeSite === "ALL") {
-      if (availableSites.length > 0) return availableSites;
-      return [DEFAULT_SITE_CODE];
-    }
-    if (activeSite) return [activeSite];
-    if (availableSites.length > 0) return availableSites;
-    return [DEFAULT_SITE_CODE];
-  }, [activeSite, availableSites]);
-
-  const selectedSiteLabel = useMemo(() => {
-    if (selectedSite === "all" || activeSite === "ALL") {
-      return (
-        siteOptions?.find((opt) => opt.value?.toLowerCase() === "all")?.label ??
-        t("navbar.allSites", { defaultValue: "All Sites" })
-      );
-    }
-    if (selectedSite && selectedSite !== "all") {
-      const match = siteOptions?.find((opt) => opt.value === selectedSite);
-      return match?.label ?? selectedSite;
-    }
-    if (typeof siteCode === "string" && siteCode.trim()) {
-      const trimmed = siteCode.trim();
-      const match = siteOptions?.find((opt) => opt.value === trimmed);
-      return match?.label ?? trimmed;
-    }
-    if (activeSite && activeSite !== "ALL") {
-      const match = siteOptions?.find((opt) => opt.value === activeSite);
-      return match?.label ?? activeSite;
-    }
-    return "";
-  }, [selectedSite, siteCode, siteOptions, activeSite, t]);
-
   const fetchErrorLabel = t("devices.air.fetchError", {
     defaultValue: "Unable to load air sensor data",
   });
@@ -523,11 +391,11 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
         data?.current ??
         (data?.current_weather
           ? {
-              temperature_2m: data.current_weather.temperature,
-              wind_speed_10m: data.current_weather.windspeed,
-              time: data.current_weather.time,
-              weather_code: data.current_weather.weathercode,
-            }
+            temperature_2m: data.current_weather.temperature,
+            wind_speed_10m: data.current_weather.windspeed,
+            time: data.current_weather.time,
+            weather_code: data.current_weather.weathercode,
+          }
           : null);
       if (!current) return null;
       return {
@@ -582,13 +450,6 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!siteTargets.length) {
-      setDeviceSnapshots([]);
-      setLoadError(null);
-      setLoadingDevice(false);
-      return;
-    }
-
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -597,42 +458,30 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
       setLoadError(null);
 
       try {
-        const aggregated: AirDeviceRecord[] = [];
-        let anyRequestSucceeded = false;
-
-        for (const targetSite of siteTargets) {
-          try {
-            const res = await getAirDevices(targetSite);
-            anyRequestSucceeded = true;
-            const items: AirDeviceRecord[] = Array.isArray((res as any)?.items)
-              ? ((res as any)?.items as AirDeviceRecord[])
-              : Array.isArray(res)
-              ? (res as AirDeviceRecord[])
-              : [];
-            aggregated.push(...items);
-          } catch (error) {
-            console.error("[AirPanel] failed to load air devices", {
-              site: targetSite,
-              error,
-            });
-          }
-        }
+        // fetch all IoT devices
+        const allDevices = await getIoTDevices();
 
         if (cancelled) return;
 
-        if (!aggregated.length) {
-          if (!anyRequestSucceeded) setLoadError(fetchErrorLabel);
-          else setLoadError(null);
+        if (!allDevices.length) {
+          setLoadError("No devices found");
           setDeviceSnapshots([]);
           return;
         }
 
-        const snapshots: DeviceSnapshot[] = aggregated.map((device) => {
+        // Filter for Air Sensors (heuristic: has pm25 or eco2 or explicit type)
+        // User didn't specify a type, so we check for keys
+        const airDevices = allDevices.filter(d =>
+          d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
+        );
+
+        const snapshots: DeviceSnapshot[] = airDevices.map((device) => {
           const parsed = parseReadingFromDevice(device);
           return {
             device,
             reading: parsed,
-            timestamp: readingTimestamp(parsed),
+            // Use current time as timestamp as a fallback
+            timestamp: readingTimestamp(parsed) ?? Date.now(),
           };
         });
         setDeviceSnapshots(snapshots);
@@ -658,7 +507,7 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
         clearTimeout(timer);
       }
     };
-  }, [siteTargets, fetchErrorLabel]);
+  }, [fetchErrorLabel]);
 
   const rangedReading = useMemo(() => {
     if (!deviceSnapshots.length) return null;
@@ -692,7 +541,7 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
 
     return KPI_CONFIG.map((config) => {
       const rawValue = rangedReading?.[config.key];
-      const unit = t(config.unitKey, { defaultValue: "µg/m³" });
+      const unit = config.unitKey === "ppm" ? "ppm" : t(config.unitKey, { defaultValue: "µg/m³" });
       const thresholds = config.thresholds;
       const derivedStatus =
         rangedReading?.status?.[config.key] ??
@@ -700,8 +549,8 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
           ? rawValue >= thresholds.high
             ? "high"
             : rawValue >= thresholds.medium
-            ? "medium"
-            : "good"
+              ? "medium"
+              : "good"
           : "na");
 
       return {
@@ -748,29 +597,17 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
       }
       return next;
     });
+
   }, [computedKpis]);
 
-  const hasHumidity =
-    typeof rangedReading?.humidity === "number" &&
-    Number.isFinite(rangedReading.humidity);
-  const humidityValue = hasHumidity
-    ? Math.min(100, Math.max(0, rangedReading!.humidity as number))
-    : 0;
-  const humidityDisplay = hasHumidity ? `${Math.round(humidityValue)}%` : "--";
 
-  const temperatureValue =
-    typeof rangedReading?.temperature === "number" &&
-    Number.isFinite(rangedReading.temperature)
-      ? rangedReading.temperature
-      : undefined;
+  // humidityValue, humidityDisplay, temperatureValue, temperatureLabel removed as they are no longer displayed.
 
-  const humidityLabel = t("devices.air.cards.humidity", {
-    defaultValue: "Humidity",
-  });
-  const temperatureLabel = t("devices.air.thermostat.temperatureLabel", {
-    value: formatValue(temperatureValue, 1),
-    defaultValue: "{{value}}°C",
-  });
+  const tvocValue =
+    typeof rangedReading?.voc === "number" &&
+      Number.isFinite(rangedReading.voc)
+      ? rangedReading.voc
+      : 0;
 
   const selectTimeLabel = t("devices.air.selectTime", {
     defaultValue: "Select time",
@@ -785,7 +622,7 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
   const bangkokDisplay = buildWeatherDisplay(weatherBangkok, locale);
   const thailandDisplay = buildWeatherDisplay(weatherThailand, locale);
   const heroSubtitle = weatherLoading ? loadingLabel : heroDisplay.time;
-  const heroLabel = selectedSiteLabel ?? BANGKOK_COORDS.label;
+  const heroLabel = BANGKOK_COORDS.label;
   const bangkokCard = weatherBangkok ? bangkokDisplay : heroDisplay;
   const thailandCard = weatherThailand ? thailandDisplay : heroDisplay;
   const heroTempDisplay = heroDisplay.temp;
@@ -914,7 +751,7 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
             <div className="flex flex-col items-center gap-14">
               {/* ใช้ key เพื่อให้ re-mount เมื่อค่าจาก CardValue เปลี่ยน */}
               <ThermostatAir
-                key={`${airConfig.key}-${airConfig.initialValue}-${airConfig.unit}`}
+                key={`${airConfig.key} -${airConfig.initialValue} -${airConfig.unit} `}
                 unit=""
                 initialValue={airConfig.initialValue}
                 maxLabel={airConfig.unit}
@@ -926,12 +763,12 @@ export default function AirPanel({ siteCode, timeRange }: Props) {
 
             <div className="flex flex-col items-center gap-20">
               <Thermostat
-                initialValue={humidityValue}
-                value={humidityValue}
-                max={100}
-                maxLabel={temperatureLabel}
-                valueLabel={humidityLabel}
-                valueDisplay={humidityDisplay}
+                initialValue={tvocValue}
+                value={tvocValue}
+                max={1000}
+                unit=""
+                maxLabel={<span className="font-bold">µg/m³</span>}
+                valueLabel={<span className="font-bold">TVOC</span>}
               />
             </div>
           </div>

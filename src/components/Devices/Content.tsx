@@ -9,6 +9,8 @@ import CCTVTable from "./CCTV/cctvTable";
 import WaterMeterPanel from "./Water Meter/waterMeterPanel";
 import ElectricMeterPanel from "./Electric Meter/electricMeterPanel";
 import AirPanel from "./Air Sensor/AirPanel";
+import IoTPanel from "./IoT/IoTPanel";
+import IoTDetail from "./IoT/IoTDetail";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { useFilters } from "../../context/FiltersContext";
@@ -26,6 +28,7 @@ const TYPE_TO_ID: Record<string, string> = {
   watermeter: "water-1",
   electricmeter: "electric-1",
   airsensor: "air-1",
+  iot: "iot-1",
 };
 
 const ID_TO_TYPE: Record<string, string> = Object.entries(TYPE_TO_ID).reduce(
@@ -47,7 +50,7 @@ const BILLING_FIELD_BY_TYPE: Record<BillingType, keyof SiteBillingAccess> = {
   water: "allowWaterBilling",
 };
 
-export default function Content({}: Props) {
+export default function Content({ }: Props) {
   const { t: tDevices } = useTranslation("devices");
   const { t: tSidebar } = useTranslation("sidebar");
   const location = useLocation();
@@ -69,6 +72,11 @@ export default function Content({}: Props) {
     return DISABLED_DEVICE_TYPES.has(candidate) ? DEFAULT_DEVICE_TYPE : candidate;
   }, [location.search]);
 
+  // Read deviceId for IoT Detail View
+  const deviceId = useMemo(() => {
+    return new URLSearchParams(location.search).get("deviceId");
+  }, [location.search]);
+
   // If current URL points to a zero-count type and there exists any available type, redirect to the first available
   const selectedId = useMemo(() => TYPE_TO_ID[urlType], [urlType]);
   const availableTypes = (Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>).filter(
@@ -85,6 +93,7 @@ export default function Content({}: Props) {
       const nextType = availableTypes[0];
       const params = new URLSearchParams(location.search);
       params.set("type", nextType);
+      params.delete("deviceId"); // Clear detail on type switch
       if (siteCode) {
         navigate(
           { pathname: absSite("/devices", siteCode), search: `?${params.toString()}` },
@@ -298,6 +307,21 @@ export default function Content({}: Props) {
           <AirPanel siteCode={siteCode} />
           <CCTVTable />
         </div>
+      ) : selectedId === "iot-1" ? (
+        <div className="mt-6">
+          {deviceId ? (
+            <IoTDetail
+              deviceId={deviceId}
+              onBack={() => {
+                const params = new URLSearchParams(location.search);
+                params.delete("deviceId");
+                navigate({ search: `?${params.toString()}` }, { replace: false });
+              }}
+            />
+          ) : (
+            <IoTPanel />
+          )}
+        </div>
       ) : (
         <div className="mt-6" />
       )}
@@ -329,8 +353,8 @@ export default function Content({}: Props) {
           currentBillingType === "water"
             ? "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของมิเตอร์น้ำก่อน"
             : currentBillingType === "electric"
-            ? "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของมิเตอร์ไฟก่อน"
-            : "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของไซต์นี้ก่อน"
+              ? "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของมิเตอร์ไฟก่อน"
+              : "ไปที่ Site Management เพื่อเปิดการใช้งาน Billing ของไซต์นี้ก่อน"
         }
         closeLabel="รับทราบ"
         onClose={() => setBillingDisabledOpen(false)}

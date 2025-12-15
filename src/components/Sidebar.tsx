@@ -359,75 +359,75 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                     if (!showSection) return null;
                     const forceOpen = !!q;
                     return (
-                  <li className={cx("hs-accordion", forceOpen && "active")} id="alert-accordion">
-                    <button
-                      type="button"
-                      className={cx(
-                        "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
-                        active.alert
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-800 hover:bg-gray-100"
-                      )}
-                    >
-                      {/* bell icon */}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-bell-icon lucide-bell"
-                        aria-hidden="true"
-                      >
-                        <path d="M10.268 21a2 2 0 0 0 3.464 0" />
-                        <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
-                      </svg>
-                      <span>{headerLabel}</span>
+                      <li className={cx("hs-accordion", forceOpen && "active")} id="alert-accordion">
+                        <button
+                          type="button"
+                          className={cx(
+                            "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                            active.alert
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-800 hover:bg-gray-100"
+                          )}
+                        >
+                          {/* bell icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-bell-icon lucide-bell"
+                            aria-hidden="true"
+                          >
+                            <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+                            <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+                          </svg>
+                          <span>{headerLabel}</span>
 
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
+                          <svg
+                            className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="m18 15-6-6-6 6" />
+                          </svg>
+                          <svg
+                            className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
 
-                    <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
-                      <ul className="pt-1 ps-7 space-y-1">
-                        {matchedItems.map((it) => (
-                          <li key={it.key}>
-                            <a
-                              onClick={() => go(`/alert?event=${it.key}`)}
-                              className={cx(
-                                "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
-                                active.alertEvent(it.key)
-                                  ? "bg-gray-100 text-gray-900"
-                                  : "hover:bg-gray-100"
-                              )}
-                            >
-                              {it.label}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </li>
+                        <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
+                          <ul className="pt-1 ps-7 space-y-1">
+                            {matchedItems.map((it) => (
+                              <li key={it.key}>
+                                <a
+                                  onClick={() => go(`/alert?event=${it.key}`)}
+                                  className={cx(
+                                    "block py-2 px-2.5 text-sm rounded-lg cursor-pointer",
+                                    active.alertEvent(it.key)
+                                      ? "bg-gray-100 text-gray-900"
+                                      : "hover:bg-gray-100"
+                                  )}
+                                >
+                                  {it.label}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </li>
                     );
                   })()}
 
@@ -438,36 +438,36 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                     const show = !q || label.toLowerCase().includes(q);
                     if (!show) return null;
                     return (
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => go("/facerec")}
-                      className={cx(
-                        "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
-                        active.facerec
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-800 hover:bg-gray-100"
-                      )}
-                    >
-                      {/* user icon */}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-user-icon lucide-user"
-                      >
-                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                      <span>{label}</span>
-                    </button>
-                  </li>
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => go("/facerec")}
+                          className={cx(
+                            "w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                            active.facerec
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-800 hover:bg-gray-100"
+                          )}
+                        >
+                          {/* user icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-user-icon lucide-user"
+                          >
+                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                          <span>{label}</span>
+                        </button>
+                      </li>
                     );
                   })()}
 
@@ -480,97 +480,98 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       { key: "watermeter", label: t("menu.devices_watermeter", { defaultValue: "Water Meter" }) },
                       { key: "electricmeter", label: t("menu.devices_electricmeter", { defaultValue: "Electric Meter" }) },
                       { key: "airsensor", label: t("menu.devices_airsensor", { defaultValue: "Air Sensor" }) },
+                      { key: "iot", label: t("menu.devices_iot", { defaultValue: "IoT" }) },
                     ] as const;
                     const matched = !q ? items : items.filter((it) => it.label.toLowerCase().includes(q));
                     const showSection = !q || headerLabel.toLowerCase().includes(q) || matched.length > 0;
                     if (!showSection) return null;
                     const forceOpen = !!q;
                     return (
-                  <li className={cx("hs-accordion", forceOpen && "active")} id="devices-accordion">
-                    <button
-                      type="button"
-                      className={cx(
-                        "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
-                        active.devices
-                          ? "bg-gray-100 text-gray-900"
-                          : "text-gray-800 hover:bg-gray-100"
-                      )}
-                    >
-                      {/* CCTV-ish icon */}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="19"
-                        height="19"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="lucide lucide-cctv-icon lucide-cctv"
-                      >
-                        <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97" />
-                        <path d="M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.92-1.3z" />
-                        <path d="M2 19h3.76a2 2 0 0 0 1.8-1.1L9 15" />
-                        <path d="M2 21v-4" />
-                        <path d="M7 9h.01" />
-                      </svg>
-                      <span>{headerLabel}</span>
+                      <li className={cx("hs-accordion", forceOpen && "active")} id="devices-accordion">
+                        <button
+                          type="button"
+                          className={cx(
+                            "hs-accordion-toggle w-full text-start flex items-center gap-x-3.5 py-2 px-2.5 text-sm rounded-lg focus:outline-hidden cursor-pointer",
+                            active.devices
+                              ? "bg-gray-100 text-gray-900"
+                              : "text-gray-800 hover:bg-gray-100"
+                          )}
+                        >
+                          {/* CCTV-ish icon */}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-cctv-icon lucide-cctv"
+                          >
+                            <path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97" />
+                            <path d="M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.92-1.3z" />
+                            <path d="M2 19h3.76a2 2 0 0 0 1.8-1.1L9 15" />
+                            <path d="M2 21v-4" />
+                            <path d="M7 9h.01" />
+                          </svg>
+                          <span>{headerLabel}</span>
 
-                      <svg
-                        className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m18 15-6-6-6 6" />
-                      </svg>
-                      <svg
-                        className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </button>
+                          <svg
+                            className="hs-accordion-active:block ms-auto hidden size-4 text-gray-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="m18 15-6-6-6 6" />
+                          </svg>
+                          <svg
+                            className="hs-accordion-active:hidden ms-auto block size-4 text-gray-600"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
 
-                    <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
-                      <ul className="pt-1 ps-7 space-y-1">
-                        {matched.map((it) => {
-                          const zero = getCountForType(inventoryCounts as any, it.key as any) <= 0;
-                          const hardDisabled = DISABLED_DEVICE_TYPES.has(it.key);
-                          const disabled = zero || hardDisabled;
-                          return (
-                            <li key={it.key}>
-                              <a
-                                aria-disabled={disabled}
-                                onClick={() => {
-                                  if (disabled) return;
-                                  goSiteOrGlobal(`/devices?type=${it.key}`);
-                                }}
-                                className={cx(
-                                  "block py-2 px-2.5 text-sm rounded-lg",
-                                  disabled
-                                    ? "opacity-40 cursor-not-allowed pointer-events-none"
-                                    : "cursor-pointer",
-                                  active.devicesType(it.key)
-                                    ? "bg-gray-100 text-gray-900"
-                                    : disabled
-                                    ? ""
-                                    : "hover:bg-gray-100"
-                                )}
-                              >
-                                {it.label}
-                              </a>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </li>
+                        <div className={["hs-accordion-content w-full overflow-hidden transition-[height] duration-300", q ? "" : "hidden"].join(" ")} style={q ? { height: "auto" } : undefined}>
+                          <ul className="pt-1 ps-7 space-y-1">
+                            {matched.map((it) => {
+                              const zero = getCountForType(inventoryCounts as any, it.key as any) <= 0;
+                              const hardDisabled = DISABLED_DEVICE_TYPES.has(it.key);
+                              const disabled = zero || hardDisabled;
+                              return (
+                                <li key={it.key}>
+                                  <a
+                                    aria-disabled={disabled}
+                                    onClick={() => {
+                                      if (disabled) return;
+                                      goSiteOrGlobal(`/devices?type=${it.key}`);
+                                    }}
+                                    className={cx(
+                                      "block py-2 px-2.5 text-sm rounded-lg",
+                                      disabled
+                                        ? "opacity-40 cursor-not-allowed pointer-events-none"
+                                        : "cursor-pointer",
+                                      active.devicesType(it.key)
+                                        ? "bg-gray-100 text-gray-900"
+                                        : disabled
+                                          ? ""
+                                          : "hover:bg-gray-100"
+                                    )}
+                                  >
+                                    {it.label}
+                                  </a>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      </li>
                     );
                   })()}
 
@@ -654,7 +655,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                             </svg>
                             <span>{label}</span>
                           </button>
-                      </li>
+                        </li>
                       );
                     })()}
                 </ul>

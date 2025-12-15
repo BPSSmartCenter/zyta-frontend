@@ -1,5 +1,6 @@
 import React from "react";
 import { getSiteDetails, listSites } from "../api/sites";
+import { getIoTDevices } from "../api/iot";
 import { useDeviceInventory } from "../context/DeviceInventoryContext";
 
 type DeviceCounts = Partial<{
@@ -9,6 +10,7 @@ type DeviceCounts = Partial<{
   electricMeter: number;
   airSensor: number;
   zyta: number;
+  iot: number;
 }>;
 
 type DeviceTotals = { online: number; offline: number };
@@ -57,7 +59,7 @@ async function fetchSiteDetailsFor(site: SiteSummary): Promise<any | null> {
 }
 
 const reduceDeviceCounters = (
-  acc: { total: number; cameras: number; intercom: number; water: number; electric: number; air: number },
+  acc: { total: number; cameras: number; intercom: number; water: number; electric: number; air: number; iot: number },
   item: any | null
 ) => {
   if (!item) return acc;
@@ -69,6 +71,7 @@ const reduceDeviceCounters = (
     water: acc.water + Number(counters.devices_water ?? 0),
     electric: acc.electric + Number(counters.devices_electric ?? 0),
     air: acc.air + Number(counters.devices_air ?? 0),
+    iot: acc.iot + Number(counters.devices_iot ?? 0),
   };
 };
 
@@ -121,8 +124,8 @@ export function useDeviceInventoryLoader({
         const items = Array.isArray(resp?.items)
           ? resp.items
           : Array.isArray(resp)
-          ? resp
-          : [];
+            ? resp
+            : [];
         const normalized = items.map(normalizeSite);
         sitesCacheRef.current = normalized;
         return normalized;
@@ -159,8 +162,30 @@ export function useDeviceInventoryLoader({
 
         const aggregated = detailsList.reduce(
           reduceDeviceCounters,
-          { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0 }
+          { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 }
         );
+
+        // Fetch real IoT count
+        try {
+          const iotDevices = await getIoTDevices();
+          if (Array.isArray(iotDevices)) {
+            aggregated.iot = iotDevices.length;
+
+            // Count devices that look like Air Sensors (have pm25 or eco2 in snapshot)
+            const airCount = iotDevices.filter(d =>
+              d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
+            ).length;
+
+            if (airCount > 0) {
+              aggregated.air = airCount;
+            }
+          }
+        } catch (iotErr) {
+          console.debug("Failed to sync IoT count", iotErr);
+          // keep default aggregated.iot (from sites) if fail, or set to 0?
+          // User prefers real data, so if fail, maybe 0 or keep static. 
+          // Let's keep existing aggregation as fallback or just log error.
+        }
 
         if (cancelled) return;
 
@@ -170,6 +195,7 @@ export function useDeviceInventoryLoader({
           waterMeter: aggregated.water,
           electricMeter: aggregated.electric,
           airSensor: aggregated.air,
+          iot: aggregated.iot,
         };
 
         const nextTotals: DeviceTotals = {
@@ -201,8 +227,12 @@ export function useDeviceInventoryLoader({
     };
 
     syncCounts();
+    // Poll every 3 seconds for real-time updates
+    const interval = setInterval(syncCounts, 3000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [accessDigest, selectedKey, enabled, setCounts, setLoading, accessibleSites]);
 

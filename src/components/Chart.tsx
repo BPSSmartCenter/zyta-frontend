@@ -447,7 +447,7 @@ export default function Chart({
       if (raf) cancelAnimationFrame(raf);
       try {
         ro.unobserve(el);
-      } catch {}
+      } catch { }
       ro.disconnect();
     };
   }, []);
@@ -488,7 +488,7 @@ export default function Chart({
                 <Dropdown
                   options={EVENT_OPTIONS}
                   value="__multi__"
-                  onChange={() => {}}
+                  onChange={() => { }}
                 >
                   {({ open, getButtonProps, getMenuProps }) => (
                     <div className="relative inline-block ml-3">
@@ -1088,14 +1088,13 @@ export function MonthlyChart({
         const costLabel =
           costValue !== null
             ? `${costValue.toLocaleString("th-TH", {
-                style: "currency",
-                currency: "THB",
-                minimumFractionDigits: 2,
-              })}`
+              style: "currency",
+              currency: "THB",
+              minimumFractionDigits: 2,
+            })}`
             : "";
-        return `<div style="padding:8px 12px;font-size:12px;color:#0f172a">${month}<br/>${usageLabel}${
-          costLabel ? `<br/>${costLabel}` : ""
-        }</div>`;
+        return `<div style="padding:8px 12px;font-size:12px;color:#0f172a">${month}<br/>${usageLabel}${costLabel ? `<br/>${costLabel}` : ""
+          }</div>`;
       },
     },
     legend: { show: false },
@@ -1116,3 +1115,70 @@ export function MonthlyChart({
 - เพิ่ม named export: WaterStackedChart, WaterAreaStackedChart สำหรับ Water
   และ MonthlyChart สำหรับ Billing overview
 ================================================================ */
+
+/* ── 4) NEW: Simple Line Chart (Requested for IoT) */
+export type LineChartProps = {
+  categories?: string[];
+  series?: AxisSeries;
+  height?: number | string;
+  title?: string;
+};
+
+export function LineChart({
+  categories,
+  series,
+  height = 350,
+  title = "Real-time Trend",
+}: LineChartProps) {
+  const options: ApexOptions = {
+    chart: {
+      type: "line",
+      toolbar: { show: false },
+      animations: { enabled: true, dynamicAnimation: { enabled: false } },
+      zoom: { enabled: false },
+    },
+    title: {
+      text: title,
+      align: "left",
+      style: { fontSize: "14px", fontWeight: 600, color: "#374151" },
+    },
+    stroke: {
+      curve: "smooth",
+      width: 3,
+    },
+    colors: ["#4A3AFF", "#39B8EE", "#D3F7FF", "#FF5733", "#33FF57"],
+    xaxis: {
+      categories: categories || [],
+      axisTicks: { show: false },
+      axisBorder: { show: false },
+      labels: { style: { fontSize: "12px", colors: "#94A3B8" } },
+      tooltip: { enabled: false },
+    },
+    yaxis: {
+      forceNiceScale: true,
+      labels: { style: { fontSize: "12px", colors: "#94A3B8" } },
+    },
+    grid: {
+      strokeDashArray: 3,
+      borderColor: "rgba(0,0,0,0.06)",
+      yaxis: { lines: { show: true } },
+      xaxis: { lines: { show: true } },
+    },
+    legend: {
+      position: "top",
+      horizontalAlign: "right",
+    },
+    tooltip: {
+      y: { formatter: (val: number) => val.toLocaleString() },
+    },
+  };
+
+  return (
+    <ReactApexChart
+      type="line"
+      height={height}
+      options={options}
+      series={series || []}
+    />
+  );
+}

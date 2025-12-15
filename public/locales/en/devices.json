@@ -9,7 +9,8 @@
     "intercomeCard": "Red box",
     "waterCard": "Water Meter",
     "electricCard": "Electric Meter",
-    "airCard": "Air Sensor"
+    "airCard": "Air Sensor",
+    "iotCard": "IoT"
   },
   "table": {
     "title": "Consolidated Alert Log",

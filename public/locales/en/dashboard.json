@@ -20,7 +20,6 @@
     "nextMonth": "Next month",
     "placeholder": "YYYY-MM-DD"
   },
-
   "stats": {
     "fire": "Fire detected",
     "motion": "Motion detected",
@@ -29,7 +28,6 @@
     "sleep": "Sleep detected",
     "face": "Face/Plate Recognize"
   },
-
   "map": {
     "title": "MAP",
     "anySeverity": "Any Severity",
@@ -65,7 +63,8 @@
     "waterMeter": "Water",
     "electricMeter": "Electric",
     "air": "Air",
-    "zyta": "Red Box"
+    "zyta": "Red Box",
+    "iot": "IoT"
   },
   "userMgmt": {
     "title": "USER MANAGEMENT",
@@ -103,7 +102,6 @@
     "title": "Face Recognize / License Plates",
     "searchPlaceholder": "Search face & license-plate alerts"
   },
-
   "search": {
     "placeholder": "Search events"
   },

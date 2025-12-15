@@ -9,6 +9,8 @@ import {
   solarSelected,
   windImage,
   windSelected,
+  wifiImage,
+  wifiSelected,
 } from "../../assets";
 import type { AxisSeries } from "../../types/apexSeries";
 
@@ -51,6 +53,12 @@ export const DEVICE_CARDS: DeviceCard[] = [
     label: "header.airCard",
     img: windImage,
     activeImg: windSelected,
+  },
+  {
+    id: "iot-1",
+    label: "header.iotCard",
+    img: wifiImage,
+    activeImg: wifiSelected,
   },
 ];
 

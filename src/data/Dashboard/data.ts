@@ -31,6 +31,7 @@ export type Site = {
   devices_water?: number;
   devices_electric?: number;
   devices_air?: number;
+  devices_iot?: number;
 
   notis_total?: number;
   notis_alert?: number;
@@ -87,7 +88,7 @@ export const SITES: Site[] = [
     province_code: "10", // กรุงเทพมหานคร
     lat: 13.7563,
     lng: 100.5018,
-    devices_total: 10,
+    devices_total: 15,
     notis_total: 5,
   },
   {

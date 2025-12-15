@@ -1,6 +1,7 @@
 // src/api/auth.ts
 import { api } from "./axios";
 
+
 export async function register(input: {
   firstName: string;
   lastName: string;
