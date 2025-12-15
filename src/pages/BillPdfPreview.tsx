@@ -710,24 +710,17 @@ const BillPdfPreview: React.FC = () => {
           image.onload = () => resolve();
           image.onerror = (event) => reject(event);
         });
-        const imgHeight = (image.height * pdfWidth) / image.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+        const scale = Math.min(pdfWidth / image.width, pageHeight / image.height);
+        const renderWidth = image.width * scale;
+        const renderHeight = image.height * scale;
+        const offsetX = (pdfWidth - renderWidth) / 2;
+        const offsetY = (pageHeight - renderHeight) / 2;
 
         if (pageIndex === 0) {
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
+          pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
         } else {
           pdf.addPage();
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
-        }
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
+          pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
         }
 
         pageIndex += 1;
