@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Relative URL to use Vite proxy
-const IOT_API_URL = "/api/devices";
+const IOT_API_URL = "http://203.159.95.162:3000/api/devices";
 
 export interface IoTDevice {
     id?: string | number;
