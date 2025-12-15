@@ -668,6 +668,7 @@ const BillPdfPreview: React.FC = () => {
     const exportPages = Array.from(new Set([0, ...exportPageCandidates]));
     let restoreScale: (() => void) | null = null;
     let activePage = currentPreviewPage;
+    let pdfPageIndex = 0;
     try {
       restoreScale = temporarilyResetPreviewScale();
       node
@@ -681,56 +682,53 @@ const BillPdfPreview: React.FC = () => {
       const pdf = new jsPDF("p", "pt", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      let pageIndex = 0;
       for (const targetPage of exportPages) {
         if (activePage !== targetPage) {
           setCurrentPreviewPage(targetPage);
           activePage = targetPage;
         }
         await waitForNextFrame();
-        const dataUrl = await toJpeg(node, {
-          cacheBust: true,
-          pixelRatio: 1.25,
-          quality: 0.82,
-          backgroundColor: "#ffffff",
-          filter: (domNode) => {
-            if (!(domNode instanceof Element)) return true;
-            if (
-              domNode.tagName === "LINK" &&
-              domNode.getAttribute("href")?.includes("fonts.googleapis.com")
-            ) {
-              return false;
-            }
-            return true;
-          },
-        });
-        const image = new Image();
-        image.src = dataUrl;
-        await new Promise<void>((resolve, reject) => {
-          image.onload = () => resolve();
-          image.onerror = (event) => reject(event);
-        });
-        const imgHeight = (image.height * pdfWidth) / image.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+        const sectionNodes = Array.from(
+          node.querySelectorAll<HTMLElement>("[data-export-section='page']")
+        );
+        const captureTargets = sectionNodes.length ? sectionNodes : [node];
+        for (const targetNode of captureTargets) {
+          const dataUrl = await toJpeg(targetNode, {
+            cacheBust: true,
+            pixelRatio: 1.25,
+            quality: 0.82,
+            backgroundColor: "#ffffff",
+            filter: (domNode) => {
+              if (!(domNode instanceof Element)) return true;
+              if (
+                domNode.tagName === "LINK" &&
+                domNode.getAttribute("href")?.includes("fonts.googleapis.com")
+              ) {
+                return false;
+              }
+              return true;
+            },
+          });
+          const image = new Image();
+          image.src = dataUrl;
+          await new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = (event) => reject(event);
+          });
+          const scale = Math.min(pdfWidth / image.width, pageHeight / image.height);
+          const renderWidth = image.width * scale;
+          const renderHeight = image.height * scale;
+          const offsetX = (pdfWidth - renderWidth) / 2;
+          const offsetY = (pageHeight - renderHeight) / 2;
 
-        if (pageIndex === 0) {
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
-        } else {
-          pdf.addPage();
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
+          if (pdfPageIndex === 0) {
+            pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
+          } else {
+            pdf.addPage();
+            pdf.addImage(dataUrl, "PNG", offsetX, offsetY, renderWidth, renderHeight);
+          }
+          pdfPageIndex += 1;
         }
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeight);
-          heightLeft -= pageHeight;
-        }
-
-        pageIndex += 1;
       }
       if (currentBillId) {
         const pdfBase64 = pdf.output("datauristring").split(",")[1];
@@ -983,164 +981,176 @@ const BillPdfPreview: React.FC = () => {
               }}
               className="w-full max-w-[900px] rounded-[36px] bg-white p-8 text-slate-800 shadow-[0_30px_60px_rgba(15,23,42,0.12)]"
             >
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-around">
-                  <img
-                    src={leftLogoSrc}
-                    alt={siteLogoUrl ? "Site logo" : "Brand"}
-                    className="h-34 w-40 object-contain"
-                  />
-                  <div className="text-center text-slate-900">
-                    <p className="text-xl font-semibold">{siteName}</p>
-                    <p className="text-lg">
-                      {reportMode === "monthly"
-                        ? "Monthly Energy Report"
-                        : "Daily Energy Report"}
-                    </p>
-                    <p className="text-sm">{reportDate}</p>
-                    <p className="text-sm">{meterName}</p>
+              <div
+                data-export-section="page"
+                className="space-y-6 px-6 md:px-10"
+              >
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-around">
+                    <img
+                      src={leftLogoSrc}
+                      alt={siteLogoUrl ? "Site logo" : "Brand"}
+                      className="h-34 w-40 object-contain"
+                    />
+                    <div className="text-center text-slate-900">
+                      <p className="text-xl font-semibold">{siteName}</p>
+                      <p className="text-lg">
+                        {reportMode === "monthly"
+                          ? "Monthly Energy Report"
+                          : "Daily Energy Report"}
+                      </p>
+                      <p className="text-sm">{reportDate}</p>
+                      <p className="text-sm">{meterName}</p>
+                    </div>
+                    <img
+                      src={meaLogo}
+                      alt="MEA"
+                      className="h-34 w-40 object-contain"
+                    />
                   </div>
-                  <img
-                    src={meaLogo}
-                    alt="MEA"
-                    className="h-34 w-40 object-contain"
-                  />
+                  <div className="h-[2px] w-full bg-[#d40000]" />
                 </div>
-                <div className="h-[2px] w-full bg-[#d40000]" />
-              </div>
-              <div className="mt-6 grid gap-40 px-1 text-sm text-black md:grid-cols-2">
-                <div className="space-y-1">
-                  <SummaryRow
-                    label="Energy Production"
-                    value={`${formatValue(totalEnergy)} kWh`}
-                  />
-                  <SummaryRow
-                    label="Energy Production (On Peak)"
-                    value={`${formatValue(onPeakKwhValue)} kWh`}
-                  />
-                  <SummaryRow
-                    label="Energy Production (Off Peak)"
-                    value={`${formatValue(offPeakKwhValue)} kWh`}
-                  />
-                  <SummaryRow label="CO₂ Reduction" value="- kg" />
-                  <SummaryRow label="Tree Saving" value="- Trees" />
+                <div className="grid gap-40 px-1 text-sm text-black md:grid-cols-2">
+                  <div className="space-y-1">
+                    <SummaryRow
+                      label="Energy Production"
+                      value={`${formatValue(totalEnergy)} kWh`}
+                    />
+                    <SummaryRow
+                      label="Energy Production (On Peak)"
+                      value={`${formatValue(onPeakKwhValue)} kWh`}
+                    />
+                    <SummaryRow
+                      label="Energy Production (Off Peak)"
+                      value={`${formatValue(offPeakKwhValue)} kWh`}
+                    />
+                    <SummaryRow label="CO₂ Reduction" value="- kg" />
+                    <SummaryRow label="Tree Saving" value="- Trees" />
+                  </div>
+                  <div className="space-y-1">
+                    <SummaryRow
+                      label="Energy Charge"
+                      value={`${formatValue(totalCost)} THB`}
+                    />
+                    <SummaryRow
+                      label="Energy Charge (On Peak)"
+                      value={`${formatValue(onPeakCost)} THB`}
+                    />
+                    <SummaryRow
+                      label="Energy Charge (Off Peak)"
+                      value={`${formatValue(offPeakCost)} THB`}
+                    />
+                    <SummaryRow label="Financial Saving" value="-" />
+                    <SummaryRow label="Financial Saving (FT)" value="-" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <SummaryRow
-                    label="Energy Charge"
-                    value={`${formatValue(totalCost)} THB`}
-                  />
-                  <SummaryRow
-                    label="Energy Charge (On Peak)"
-                    value={`${formatValue(onPeakCost)} THB`}
-                  />
-                  <SummaryRow
-                    label="Energy Charge (Off Peak)"
-                    value={`${formatValue(offPeakCost)} THB`}
-                  />
-                  <SummaryRow label="Financial Saving" value="-" />
-                  <SummaryRow label="Financial Saving (FT)" value="-" />
-                </div>
-              </div>
 
-              <div className="mt-3">
-                {billingReadingsError && (
-                  <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                    {billingReadingsError}
-                  </div>
-                )}
-                {reportMode === "daily" && billingQuarterReadingsError && (
-                  <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                    {billingQuarterReadingsError}
-                  </div>
-                )}
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[800px] text-sm text-black">
-                    <thead className="text-xs uppercase tracking-wide text-black">
-                      <tr className="text-center">
-                        <th className="py-2 px-2 border">
-                          {reportMode === "monthly" ? "Date" : "Time"}
-                        </th>
-                        <th className="py-2 px-2 border">
-                          Energy Production (kWh)
-                        </th>
-                        <th className="py-2 px-2 border">
-                          Energy On Peak (kWh)
-                        </th>
-                        <th className="py-2 px-2 border">
-                          Energy Off Peak (kWh)
-                        </th>
-                        <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
-                        <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
-                        <th className="py-2 px-2 border">Module Temp. (°C)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayTableRows.map((row) => (
-                        <tr
-                          key={`${row.time}-${row.energyProduction}-${row.energyOnPeak}`}
-                          className="border text-center text-sm"
-                        >
-                          <td className="text-center text-black">
-                            {reportMode === "monthly"
-                              ? formatMonthlyLabel(row.time, monthlyPeriod)
-                              : row.time}
+                <div className="mt-3">
+                  {billingReadingsError && (
+                    <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                      {billingReadingsError}
+                    </div>
+                  )}
+                  {reportMode === "daily" && billingQuarterReadingsError && (
+                    <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+                      {billingQuarterReadingsError}
+                    </div>
+                  )}
+                  <div
+                    className={
+                      exporting ? "overflow-visible" : "overflow-x-auto"
+                    }
+                  >
+                    <table className="w-full text-sm text-black">
+                      <thead className="text-xs uppercase tracking-wide text-black">
+                        <tr className="text-center">
+                          <th className="py-2 px-2 border">
+                            {reportMode === "monthly" ? "Date" : "Time"}
+                          </th>
+                          <th className="py-2 px-2 border">
+                            Energy Production (kWh)
+                          </th>
+                          <th className="py-2 px-2 border">
+                            Energy On Peak (kWh)
+                          </th>
+                          <th className="py-2 px-2 border">
+                            Energy Off Peak (kWh)
+                          </th>
+                          <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
+                          <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
+                          <th className="py-2 px-2 border">Module Temp. (°C)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayTableRows.map((row) => (
+                          <tr
+                            key={`${row.time}-${row.energyProduction}-${row.energyOnPeak}`}
+                            className="border text-center text-sm"
+                          >
+                            <td className="text-center text-black">
+                              {reportMode === "monthly"
+                                ? formatMonthlyLabel(row.time, monthlyPeriod)
+                                : row.time}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.energyProduction)}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.energyOnPeak)}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.energyOffPeak)}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.irradiance)}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.ambientTemp)}
+                            </td>
+                            <td className="text-[15px] border">
+                              {formatValue(row.moduleTemp)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-black text-center font-bold">
+                          <td className=" text-center text-[14px] px-2 border">
+                            Total/Average
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.energyProduction)}
+                            {formatValue(displayTableTotals.production)}
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.energyOnPeak)}
+                            {formatValue(displayTableTotals.onPeak)}
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.energyOffPeak)}
+                            {formatValue(displayTableTotals.offPeak)}
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.irradiance)}
+                            {formatValue(displayTableTotals.irradiance)}
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.ambientTemp)}
+                            {formatValue(
+                              displayTableTotals.ambient / displayRowCount
+                            )}
                           </td>
                           <td className="text-[15px] border">
-                            {formatValue(row.moduleTemp)}
+                            {formatValue(
+                              displayTableTotals.module / displayRowCount
+                            )}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-black text-center font-bold">
-                        <td className=" text-center text-[14px] px-2 border">
-                          Total/Average
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(displayTableTotals.production)}
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(displayTableTotals.onPeak)}
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(displayTableTotals.offPeak)}
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(displayTableTotals.irradiance)}
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(
-                            displayTableTotals.ambient / displayRowCount
-                          )}
-                        </td>
-                        <td className="text-[15px] border">
-                          {formatValue(
-                            displayTableTotals.module / displayRowCount
-                          )}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                      </tfoot>
+                    </table>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl py-4 w-full">
+              <div
+                className="rounded-3xl py-4 w-full"
+                data-export-section="page"
+              >
                 <div className="mt-4 h-48 w-full">
                   <div className="w-full flex justify-center">
                     <div
