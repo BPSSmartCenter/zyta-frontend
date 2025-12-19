@@ -1,0 +1,180 @@
+{
+  "overview": {
+    "title": "ภาพรวม Billing",
+    "subtitle": "ภาพรวมข้อมูลการใช้งานพลังงานและบิลจากฝั่ง Backend",
+    "cards": {
+      "usage": "การใช้พลังงานรวม (kWh)",
+      "billing": "ยอดค่าไฟของเดือนนี้",
+      "trend": "แนวโน้มรายเดือน"
+    },
+    "realtime": {
+      "heading": "Real-Time Monitor",
+      "description": "รายการอ่านค่าล่าสุดจาก Gateway",
+      "searchPlaceholder": "ค้นหารายการ...",
+      "buttons": {
+        "refresh": "รีเฟรช",
+        "generate": "สร้างบิล",
+        "monitor": "ดูข้อมูล"
+      },
+      "table": {
+        "meter": "มิเตอร์",
+        "onPeak": "พลังงานช่วงพีค (kWh)",
+        "offPeak": "พลังงานช่วงออฟพีค (kWh)",
+        "timestamp": "เวลาที่อ่านค่า",
+        "actions": "การดำเนินการ"
+      },
+      "loading": "กำลังโหลดข้อมูล...",
+      "empty": "ไม่พบข้อมูลสำหรับเงื่อนไขปัจจุบัน",
+      "siteLabel": "ไซต์",
+      "defaultDevice": "มิเตอร์",
+      "fallbackMeterName": "มิเตอร์ {{id}}"
+    },
+    "errors": {
+      "gateway": "ไม่สามารถโหลดค่าจาก Gateway ได้",
+      "delete": "ไม่สามารถลบบิลได้ กรุณาลองใหม่อีกครั้ง",
+      "fetchBilling": "ไม่สามารถดึงข้อมูล Billing ได้ในขณะนี้"
+    },
+    "billing": {
+      "heading": "บันทึกบิล",
+      "description": "ข้อมูลบิลที่บันทึกและออกเอกสารแล้ว",
+      "searchPlaceholder": "ค้นหาบิล...",
+      "table": {
+        "meter": "มิเตอร์",
+        "billingPeriod": "รอบบิล",
+        "usage": "หน่วยใช้ (kWh)",
+        "cost": "ค่าไฟ (บาท)",
+        "timestamp": "เวลาที่สร้าง",
+        "actions": "การดำเนินการ"
+      },
+      "loading": "กำลังโหลดข้อมูลบิล...",
+      "empty": "ไม่พบบิลในช่วงนี้",
+      "buttons": {
+        "preview": "ดูตัวอย่าง",
+        "delete": "ลบ"
+      }
+    },
+    "trend": {
+      "chartTitle": "กราฟแนวโน้มรายเดือน",
+      "tableTitle": "ตารางแนวโน้มรายเดือน",
+      "tableSubtitle": "ยอดค่าไฟรวมรายเดือน",
+      "searchPlaceholder": "ค้นหาเดือน...",
+      "table": {
+        "month": "เดือน",
+        "cost": "ค่าไฟ (บาท)",
+        "usage": "หน่วยใช้ (kWh)",
+        "timestamp": "เวลาที่อัปเดต"
+      },
+      "empty": "ไม่พบข้อมูลรายเดือน"
+    },
+    "siteGuard": {
+      "blocked": {
+        "title": "ไม่สามารถใช้งาน Billing ได้",
+        "message": "ไซต์นี้ยังไม่มีอุปกรณ์ไฟฟ้าที่รองรับ กรุณาเลือกไซต์อื่น",
+        "close": "ย้อนกลับ"
+      },
+      "select": {
+        "title": "กรุณาเลือกไซต์ก่อนใช้งาน",
+        "message": "โปรดเลือกไซต์จากเมนูด้านบนก่อนใช้งานฟีเจอร์ Billing",
+        "close": "โอเค"
+      }
+    },
+    "modals": {
+      "delete": {
+        "title": "ยืนยันการลบบิลนี้หรือไม่",
+        "meterLabel": "มิเตอร์:",
+        "billingLabel": "รอบบิล:",
+        "warning": "การลบจะไม่สามารถกู้คืนได้",
+        "confirm": "ลบบิล",
+        "cancel": "ยกเลิก"
+      }
+    }
+  },
+  "generate": {
+    "back": "ย้อนกลับ",
+    "title": "คำนวณค่าไฟฟ้า",
+    "branding": {
+      "previewAlt": "ตัวอย่างโลโก้ไซต์",
+      "siteFallback": "ไซต์",
+      "addressLabel": "ที่อยู่:",
+      "addressUnknown": "ไม่ระบุ",
+      "upload": "อัปโหลดรูป",
+      "change": "เปลี่ยนรูป",
+      "clear": "ล้างรูป",
+      "errors": {
+        "invalidType": "กรุณาเลือกไฟล์รูปภาพ",
+        "fileTooLarge": "ไฟล์ต้องไม่เกิน 2.5MB",
+        "readFail": "ไม่สามารถอ่านไฟล์ได้"
+      }
+    },
+    "messages": {
+      "loadMeters": "ไม่สามารถโหลดข้อมูลมิเตอร์ของไซต์นี้ได้",
+      "loadDashboard": "ไม่สามารถดึงข้อมูลมิเตอร์ได้",
+      "loadingDashboard": "กำลังโหลดข้อมูลจากมิเตอร์...",
+      "loadingMetersList": "กำลังโหลดรายชื่อมิเตอร์...",
+      "noMetersInSite": "ไม่พบมิเตอร์ในไซต์นี้",
+      "summaryError": "ไม่สามารถโหลดข้อมูล Billing สำหรับช่วงนี้ได้",
+      "createBillError": "ไม่สามารถสร้างบิลได้ กรุณาลองใหม่",
+      "selectMeterRequired": "กรุณาเลือกมิเตอร์ก่อนสร้างบิล",
+      "selectSiteRequired": "กรุณาเลือกไซต์ก่อนสร้างบิล"
+    },
+    "form": {
+      "billingType": "ประเภทบิล",
+      "monthly": "รายเดือน",
+      "daily": "รายวัน",
+      "selectMonthYear": "เลือกเดือน/ปี ที่ต้องการออกรอบบิล",
+      "monthPlaceholder": "เลือกเดือน",
+      "yearPlaceholder": "เลือกปี",
+      "billingRangeLabel": "รอบบิลที่จะสร้าง:",
+      "selectDate": "เลือกวันที่ต้องการออกรอบบิล",
+      "dateHint": "ระบบจะคำนวณตั้งแต่ 00:00 ถึงชั่วโมงล่าสุดของวันที่เลือก",
+      "selectMeter": "เลือกมิเตอร์",
+      "meterSubtitle": "เลือกมิเตอร์ที่ต้องการออกรอบบิล",
+      "meterFallback": "มิเตอร์",
+      "searchPlaceholder": "ค้นหาชื่อหรือ Serial หมายเลขมิเตอร์...",
+      "noMeterMatch": "ไม่พบมิเตอร์ที่ตรงกับคำค้นหา",
+      "baseOnPeak": "Base On Peak (บาท/หน่วย)",
+      "baseOffPeak": "Base Off Peak (บาท/หน่วย)",
+      "discountRate": "ส่วนลด",
+      "autoFillLabel": "ค่าที่อ่านได้จากฐานข้อมูล (Auto-fill)",
+      "loadingPlaceholder": "กำลังโหลด...",
+      "submit": "คำนวณค่าไฟฟ้า",
+      "submitting": "กำลังสร้างบิล..."
+    },
+    "summary": {
+      "monthlyTotal": "รวมทั้งเดือน",
+      "dailyTotal": "รวมวันนี้",
+      "onPeak": "On Peak (kWh)",
+      "offPeak": "Off Peak (kWh)"
+    },
+    "siteGuard": {
+      "blocked": {
+        "title": "ไซต์นี้ยังไม่อนุญาตให้ใช้งาน Billing",
+        "message": "ไซต์ที่คุณเลือกไม่ได้รับสิทธิ์ กรุณาเปลี่ยนไปยังไซต์ที่ได้รับอนุญาต",
+        "close": "ย้อนกลับ"
+      },
+      "select": {
+        "title": "กรุณาเลือกไซต์ก่อนใช้งาน",
+        "message": "โปรดเลือกไซต์จากเมนูด้านบนก่อนใช้งานฟีเจอร์สร้างบิล",
+        "close": "โอเค"
+      }
+    },
+    "modal": {
+      "errorTitle": "ไม่สามารถดำเนินการได้",
+      "close": "ปิด"
+    },
+    "months": {
+      "01": "มกราคม",
+      "02": "กุมภาพันธ์",
+      "03": "มีนาคม",
+      "04": "เมษายน",
+      "05": "พฤษภาคม",
+      "06": "มิถุนายน",
+      "07": "กรกฎาคม",
+      "08": "สิงหาคม",
+      "09": "กันยายน",
+      "10": "ตุลาคม",
+      "11": "พฤศจิกายน",
+      "12": "ธันวาคม"
+    }
+  }
+}

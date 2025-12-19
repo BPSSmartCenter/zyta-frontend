@@ -86,6 +86,11 @@ export default function Map({
   const isDrillingRef = useRef(false);
 
   const prevFocusRef = useRef<string | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [countryLoaded, setCountryLoaded] = useState(false);
+  const [provincesLoaded, setProvincesLoaded] = useState(false);
+  const [markersReady, setMarkersReady] = useState(false);
+  const fitRetryRef = useRef(0);
 
   // rings ที่ active อยู่ (ใช้กู้คืนตอน zoom out จากหมุด)
 
@@ -365,7 +370,7 @@ export default function Map({
     };
   }, []);
 
-  const fitThailandTight = (animate = false) => {
+  const fitThailandTight = (animate = false, retry = 0) => {
     const map = mapRef.current;
 
     if (!map) return;
@@ -375,6 +380,12 @@ export default function Map({
     map.invalidateSize(false);
 
     const sz = map.getSize();
+    if ((sz.x === 0 || sz.y === 0) && retry < 10) {
+      fitRetryRef.current = retry + 1;
+      setTimeout(() => fitThailandTight(animate, retry + 1), 80);
+      return;
+    }
+    fitRetryRef.current = 0;
 
     const vw = typeof window !== "undefined" ? window.innerWidth : sz.x;
 
@@ -528,7 +539,7 @@ export default function Map({
   function resetToCountry(animate = true) {
     const map = mapRef.current;
 
-    if (!map) return;
+    if (!map || !countryLoaded) return;
 
     viewStackRef.current = [];
 
@@ -753,11 +764,17 @@ export default function Map({
     map.getPane("markerLabels")!.style.pointerEvents = "none";
 
     // โหลดขอบประเทศ
+    const abortCountry = new AbortController();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/data/thailand.geojson", {
+          signal: abortCountry.signal,
+        });
+        if (!res.ok) throw new Error("failed to load thailand.geojson");
+        const geojson = await res.json();
+        if (cancelled) return;
 
-    fetch("/data/thailand.geojson")
-      .then((r) => r.json())
-
-      .then((geojson) => {
         thLayerRef.current = L.geoJSON(geojson, {
           style: { color: EDGE, weight: 1.2, fillOpacity: 0 },
 
@@ -781,15 +798,23 @@ export default function Map({
         setInnerShade(true);
 
         fitThailandTight(false);
+        setCountryLoaded(true);
+        setGeoError(null);
 
         if (!initialResetDoneRef.current) {
           initialResetDoneRef.current = true;
 
           resetToCountry(true);
         }
-      });
+      } catch (err) {
+        if (abortCountry.signal.aborted || cancelled) return;
+        console.error("[Map] cannot load thailand.geojson", err);
+        setGeoError("country");
+      }
+    })();
 
     markersLayerRef.current = L.layerGroup().addTo(map);
+    setMarkersReady(true);
 
     // ปุ่ม Zoom out
 
@@ -855,12 +880,18 @@ export default function Map({
     map.on("layeradd", onLayerAdd);
 
     return () => {
+      cancelled = true;
+      abortCountry.abort();
       map.off("layeradd", onLayerAdd);
 
       map.remove();
 
       mapRef.current = null;
       setMapReady(false);
+      setMarkersReady(false);
+      setCountryLoaded(false);
+      setProvincesLoaded(false);
+      setGeoError(null);
     };
   }, []);
 
@@ -883,10 +914,14 @@ export default function Map({
 
     if (provincesLayerRef.current) return;
 
-    fetch("/data/provinces.geojson")
-      .then((r) => r.json())
-
-      .then((provinces) => {
+    const abortProvinces = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch("/data/provinces.geojson", {
+          signal: abortProvinces.signal,
+        });
+        if (!res.ok) throw new Error("failed to load provinces");
+        const provinces = await res.json();
         const layer = L.geoJSON(provinces, {
           style: styleProvinceDefault,
 
@@ -1044,6 +1079,8 @@ export default function Map({
         }).addTo(map);
 
         provincesLayerRef.current = layer;
+        setProvincesLoaded(true);
+        setGeoError(null);
 
         if (prevFocusRef.current) {
           const want = prevFocusRef.current;
@@ -1098,7 +1135,15 @@ export default function Map({
             }
           });
         } catch {}
-      });
+      } catch (err) {
+        if (abortProvinces.signal.aborted) return;
+        console.error("[Map] cannot load provinces.geojson", err);
+        setGeoError("provinces");
+      }
+    })();
+    return () => {
+      abortProvinces.abort();
+    };
   }, [notis, aggregateBySite, severityFilter, t, i18n.language]);
 
   // อัปเดตหมุดทุกครั้งที่ข้อมูล/ตัวกรองเปลี่ยน
@@ -1108,7 +1153,7 @@ export default function Map({
 
     const grp = markersLayerRef.current;
 
-    if (!map || !grp) return;
+    if (!map || !grp || !markersReady) return;
 
     try {
       grp.clearLayers();
@@ -1131,7 +1176,7 @@ export default function Map({
 
       t
     );
-  }, [notis, aggregateBySite, severityFilter, sitePoints, t, i18n.language]);
+  }, [notis, aggregateBySite, severityFilter, sitePoints, t, i18n.language, markersReady]);
 
   // โฟกัสจังหวัดจาก dropdown (null = ทุกพื้นที่)
 
@@ -1184,7 +1229,7 @@ export default function Map({
         isDrillingRef.current = false;
       });
     }
-  }, [focusProvince, focusSiteCenter, mapReady]);
+  }, [focusProvince, focusSiteCenter, mapReady, provincesLoaded]);
 
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1223,11 +1268,28 @@ export default function Map({
     }
   }, [lockZoomOut, mapReady]);
 
+  const isLoading = !geoError && (!countryLoaded || !provincesLoaded);
+
   return (
-    <div
-      id="th-map"
-      className="relative z-0 h-[680px] w-full rounded-lg bg-gray-200 md:h-[560px] sm:h-[440px]"
-      onContextMenu={onContextMenu}
-    />
+    <div className="relative">
+      <div
+        id="th-map"
+        className="relative z-0 h-[680px] w-full rounded-lg bg-gray-200 md:h-[560px] sm:h-[440px]"
+        onContextMenu={onContextMenu}
+        aria-busy={isLoading ? "true" : "false"}
+      />
+      {(isLoading || geoError) && (
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 text-sm text-slate-600"
+          aria-live="polite"
+        >
+          {geoError
+            ? t("map.loadError", {
+                defaultValue: "โหลดชั้นแผนที่ไม่สำเร็จ โปรดลองรีเฟรช",
+              })
+            : t("map.loading", { defaultValue: "กำลังโหลดแผนที่..." })}
+        </div>
+      )}
+    </div>
   );
 }

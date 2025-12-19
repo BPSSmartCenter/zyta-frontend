@@ -10,7 +10,17 @@ i18n
   .init({
     fallbackLng: "th", // ดีฟอลต์เป็นไทย
     supportedLngs: ["th", "en"],
-    ns: ["common", "dashboard", "signin", "signup"],
+    ns: [
+      "common",
+      "dashboard",
+      "signin",
+      "signup",
+      "devices",
+      "alert",
+      "billing",
+      "userManagement",
+      "siteManagement",
+    ],
     defaultNS: "common",
     debug: false,
     interpolation: { escapeValue: false },

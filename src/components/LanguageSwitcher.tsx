@@ -3,17 +3,22 @@ import { useTranslation } from "react-i18next";
 
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
+  const [pendingLng, setPendingLng] = React.useState<"th" | "en" | null>(null);
 
-  // เปลี่ยนภาษาแล้วรีโหลดหน้า 1 ครั้ง
+  // เปลี่ยนภาษาแบบไม่รีโหลดทั้งหน้า
   const setLng = (lng: "th" | "en") => {
-    if (i18n.language === lng) return; // กดภาษาที่ใช้อยู่แล้ว ไม่ต้องทำอะไร
-    void i18n.changeLanguage(lng).then(() => {
-      // ให้ i18n อัปเดตก่อนแล้วค่อยรีโหลด
-      window.location.reload();
-    });
+    if (i18n.language === lng || pendingLng) return; // กดภาษาที่ใช้อยู่แล้ว ไม่ต้องทำอะไร
+    setPendingLng(lng);
+    void i18n
+      .changeLanguage(lng)
+      .catch(() => {
+        // noop: ให้ผู้ใช้ลองกดอีกครั้งหากโหลดภาษาไม่สำเร็จ
+      })
+      .finally(() => setPendingLng(null));
   };
 
-  const isActive = (lng: "th" | "en") => i18n.language === lng;
+  const isActive = (lng: "th" | "en") =>
+    pendingLng ? pendingLng === lng : i18n.language === lng;
 
   // ซ่อนปุ่มเมื่อมีการ scroll ลง (ไม่อยู่บนสุด) และแสดงเมื่อกลับไปบนสุดของหน้า
   const [show, setShow] = React.useState(true);
@@ -44,6 +49,7 @@ export default function LanguageSwitcher() {
   const content = (
     <fieldset
       aria-label="Language switcher"
+      aria-busy={pendingLng ? "true" : "false"}
       className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
     >
       {/* TH */}
@@ -53,6 +59,7 @@ export default function LanguageSwitcher() {
         name="lng"
         className="sr-only"
         checked={isActive("th")}
+         disabled={Boolean(pendingLng)}
         onChange={() => setLng("th")}
       />
       <label htmlFor="lng-th" className={btnClass("th")}>
@@ -66,6 +73,7 @@ export default function LanguageSwitcher() {
         name="lng"
         className="sr-only"
         checked={isActive("en")}
+        disabled={Boolean(pendingLng)}
         onChange={() => setLng("en")}
       />
       <label htmlFor="lng-en" className={btnClass("en")}>

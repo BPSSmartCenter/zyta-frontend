@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import { lookupThaiAddress } from "../../api/thaiAddress";
 import Dropdown from "../Dropdown";
@@ -33,6 +34,122 @@ export default function ContentEdit({
   onSave,
   onCancel,
 }: Props) {
+  const { t } = useTranslation("siteManagement");
+  const texts = React.useMemo(
+    () => ({
+      header: {
+        title: t("edit.title", { defaultValue: "Edit site" }),
+        subtitle: t("edit.subtitle", {
+          name: site.name ?? "",
+          defaultValue: "{{name}}",
+        }),
+      },
+      labels: {
+        siteName: t("form.labels.siteName", { defaultValue: "Site name" }),
+        siteCode: t("form.labels.siteCode", { defaultValue: "Site code" }),
+        solarEdgeTitle: t("form.labels.solarEdgeTitle", {
+          defaultValue: "SolarEdge Credentials",
+        }),
+        solarEdgeSiteId: t("form.labels.solarEdgeSiteId", {
+          defaultValue: "SolarEdge Site ID",
+        }),
+        solarEdgeApiKey: t("form.labels.solarEdgeApiKey", {
+          defaultValue: "SolarEdge API Key",
+        }),
+        brandingLogo: t("form.labels.brandingLogo", { defaultValue: "Branding logo" }),
+        latitude: t("form.labels.latitude", { defaultValue: "Latitude" }),
+        longitude: t("form.labels.longitude", { defaultValue: "Longitude" }),
+        addressDetail: t("form.labels.addressDetail", { defaultValue: "Address detail" }),
+        zipcode: t("form.labels.zipcode", { defaultValue: "Zipcode (auto-fill)" }),
+        province: t("form.labels.province", { defaultValue: "Province" }),
+        district: t("form.labels.district", { defaultValue: "District" }),
+        subDistrict: t("form.labels.subDistrict", { defaultValue: "Sub-district" }),
+      },
+      placeholders: {
+        siteName: t("form.placeholders.siteName", { defaultValue: "e.g. Bangkok HQ" }),
+        siteCode: t("form.placeholders.siteCodeEdit", {
+          defaultValue: "Internal code",
+        }),
+        solarEdgeSiteId: t("form.placeholders.solarEdgeSiteId", {
+          defaultValue: "e.g. 3078000",
+        }),
+        solarEdgeApiKey: t("form.placeholders.solarEdgeApiKey", {
+          defaultValue: "SE_xxxxxxxx",
+        }),
+        latitude: t("form.placeholders.latitude", { defaultValue: "13.7563" }),
+        longitude: t("form.placeholders.longitude", { defaultValue: "100.5018" }),
+        addressDetail: t("form.placeholders.addressDetail", {
+          defaultValue: "House number / building / road",
+        }),
+        zipcode: t("form.placeholders.zipcode", { defaultValue: "e.g. 10100" }),
+        province: t("form.placeholders.province", { defaultValue: "Province" }),
+      },
+      hints: {
+        solarEdge: t("form.hints.solarEdgeEdit", {
+          defaultValue:
+            "Adjust Site ID / API Key for SolarEdge (clear to revert to default).",
+        }),
+        zipInfo: t("form.hints.zipManual", {
+          defaultValue: "You can edit from postal code or type manually.",
+        }),
+      },
+      logo: {
+        empty: t("edit.logo.empty", {
+          defaultValue: "No logo yet. Upload PNG / JPG / WEBP under 2.5MB.",
+        }),
+        upload: t("form.logo.upload", { defaultValue: "Upload" }),
+        change: t("form.logo.change", { defaultValue: "Change" }),
+        remove: t("form.logo.remove", { defaultValue: "Remove" }),
+        alt: t("form.logo.previewAlt", { defaultValue: "Site logo preview" }),
+        errors: {
+          notImage: t("form.logo.errors.notImage", {
+            defaultValue: "Please select an image file",
+          }),
+          tooLarge: t("form.logo.errors.tooLarge", {
+            defaultValue: "File must be smaller than 2.5MB",
+          }),
+          readFail: t("form.logo.errors.readFail", {
+            defaultValue: "Unable to read file",
+          }),
+        },
+      },
+      errors: {
+        nameRequired: t("form.errors.nameRequired", {
+          defaultValue: "Please enter site name",
+        }),
+      },
+      zip: {
+        loading: t("form.zip.loading", { defaultValue: "Fetching address..." }),
+        notFound: t("form.zip.notFound", {
+          defaultValue: "Postal code not found",
+        }),
+        failed: t("form.zip.failed", {
+          defaultValue: "Unable to fetch address from postal code",
+        }),
+        success: (province: string, count: number) =>
+          t("form.zip.success", {
+            province,
+            count,
+            defaultValue: "Found {{count}} subdistricts in {{province}}",
+          }),
+        needPostal: t("form.zip.needPostal", {
+          defaultValue: "Enter postal code first",
+        }),
+        selectDistrict: t("form.zip.selectDistrict", {
+          defaultValue: "Select district",
+        }),
+        selectSubDistrict: t("form.zip.selectSubDistrict", {
+          defaultValue: "Select sub-district",
+        }),
+      },
+      buttons: {
+        cancel: t("form.buttons.cancel", { defaultValue: "Cancel" }),
+        submit: t("edit.buttons.submit", { defaultValue: "Save changes" }),
+        submitting: t("edit.buttons.submitting", { defaultValue: "Saving..." }),
+      },
+    }),
+    [t, site.name]
+  );
   const [form, setForm] = React.useState({
     name: site.name ?? "",
     code: site.code ?? "",
@@ -117,7 +234,7 @@ export default function ContentEdit({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const nextErrors: Record<string, string> = {};
-    if (!form.name?.trim()) nextErrors.name = "กรุณากรอกชื่อไซต์";
+    if (!form.name?.trim()) nextErrors.name = texts.errors.nameRequired;
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     const payload: UpdatePayload = {
@@ -160,22 +277,20 @@ export default function ContentEdit({
     if (/^\d{5}$/.test(zip) && zip !== lastLookupRef.current) {
       lastLookupRef.current = zip;
       setZipStatus("loading");
-      setZipMessage("กำลังดึงข้อมูล...");
+      setZipMessage(texts.zip.loading);
       lookupThaiAddress(zip)
         .then((resp) => {
           const payload = resp?.data;
           if (!payload) {
             setZipStatus("error");
-            setZipMessage("ไม่พบรหัสไปรษณีย์นี้");
+            setZipMessage(texts.zip.notFound);
             setDistrictOptions([]);
             setSubDistrictOptions([]);
             return;
           }
           setZipStatus("success");
           setZipMessage(
-            `พบข้อมูลจังหวัด ${payload.province?.th ?? "-"} จำนวน ${
-              payload.combinations.length
-            } ตำบล`
+            texts.zip.success(payload.province?.th ?? "-", payload.combinations.length)
           );
           const districts = payload.districts.map((d) => d.th);
           const subDistricts = payload.subDistricts.map((s) => s.th);
@@ -197,12 +312,12 @@ export default function ContentEdit({
         })
         .catch(() => {
           setZipStatus("error");
-          setZipMessage("ดึงข้อมูลรหัสไปรษณีย์ไม่สำเร็จ");
+          setZipMessage(texts.zip.failed);
           setDistrictOptions([]);
           setSubDistrictOptions([]);
         });
     }
-  }, [form.zipcode]);
+  }, [form.zipcode, texts.zip]);
 
   const handleLogoFile = (file: File | null) => {
     if (!file) {
@@ -213,11 +328,11 @@ export default function ContentEdit({
       return;
     }
     if (!file.type.startsWith("image/")) {
-      setLogoError("กรุณาเลือกไฟล์รูปภาพ");
+      setLogoError(texts.logo.errors.notImage);
       return;
     }
     if (file.size > 2.5 * 1024 * 1024) {
-      setLogoError("ไฟล์ต้องไม่เกิน 2.5MB");
+      setLogoError(texts.logo.errors.tooLarge);
       return;
     }
     const reader = new FileReader();
@@ -228,7 +343,7 @@ export default function ContentEdit({
       setLogoRemoved(false);
       setLogoError(null);
     };
-    reader.onerror = () => setLogoError("ไม่สามารถอ่านไฟล์ได้");
+    reader.onerror = () => setLogoError(texts.logo.errors.readFail);
     reader.readAsDataURL(file);
   };
 
@@ -250,22 +365,22 @@ export default function ContentEdit({
           <i className="material-icons-outlined">arrow_back</i>
         </button>
         <div>
-          <h2 className="text-xl font-semibold">Edit site</h2>
-          <p className="text-sm text-gray-500">{site.name}</p>
+          <h2 className="text-xl font-semibold">{texts.header.title}</h2>
+          <p className="text-sm text-gray-500">{texts.header.subtitle}</p>
         </div>
       </div>
 
       <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
         <div>
           <label className="font-semibold text-sm block mb-2">
-            Site name <span className="text-red-500">*</span>
+            {texts.labels.siteName} <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => handleChange("name", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-            placeholder="เช่น Bangkok HQ"
+            placeholder={texts.placeholders.siteName}
           />
           {errors.name && (
             <p className="text-xs text-red-500 mt-1">{errors.name}</p>
@@ -273,46 +388,48 @@ export default function ContentEdit({
         </div>
 
         <div>
-          <label className="font-semibold text-sm block mb-2">Site code</label>
+          <label className="font-semibold text-sm block mb-2">
+            {texts.labels.siteCode}
+          </label>
           <input
             type="text"
             value={form.code}
             onChange={(e) => handleChange("code", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-            placeholder="รหัสภายใน"
+            placeholder={texts.placeholders.siteCode}
           />
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 p-4">
           <div className="flex flex-col gap-1">
-            <p className="font-semibold text-sm">SolarEdge Credentials</p>
-            <p className="text-xs text-gray-500">
-              ปรับ Site ID / API Key ที่ใช้เชื่อมกับ SolarEdge (เคลียร์ช่องเพื่อรีเซ็ตเป็นค่า default)
+            <p className="font-semibold text-sm">
+              {texts.labels.solarEdgeTitle}
             </p>
+            <p className="text-xs text-gray-500">{texts.hints.solarEdge}</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="font-semibold text-sm block mb-2">
-                SolarEdge Site ID
+                {texts.labels.solarEdgeSiteId}
               </label>
               <input
                 type="text"
                 value={form.solaredgeSiteId ?? ""}
                 onChange={(e) => handleChange("solaredgeSiteId", e.target.value)}
                 className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-                placeholder="เช่น 3078000"
+                placeholder={texts.placeholders.solarEdgeSiteId}
               />
             </div>
             <div>
               <label className="font-semibold text-sm block mb-2">
-                SolarEdge API Key
+                {texts.labels.solarEdgeApiKey}
               </label>
               <input
                 type="password"
                 value={form.solaredgeApiKey ?? ""}
                 onChange={(e) => handleChange("solaredgeApiKey", e.target.value)}
                 className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-                placeholder="SE_xxxxxxxx"
+                placeholder={texts.placeholders.solarEdgeApiKey}
               />
             </div>
           </div>
@@ -320,18 +437,18 @@ export default function ContentEdit({
 
         <div>
           <label className="font-semibold text-sm block mb-2">
-            Branding logo
+            {texts.labels.brandingLogo}
           </label>
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 flex flex-col gap-3">
             {logoPreview ? (
               <img
                 src={displayLogoSrc ?? ""}
-                alt="Site logo preview"
+                alt={texts.logo.alt}
                 className="h-20 w-32 object-contain mx-auto"
               />
             ) : (
               <p className="text-xs text-slate-500 text-center">
-                ยังไม่มีโลโก้ กดอัปโหลดเพื่อเพิ่มรูป (PNG / JPG / WEBP ไม่เกิน 2.5MB)
+                {texts.logo.empty}
               </p>
             )}
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -340,7 +457,7 @@ export default function ContentEdit({
                 onClick={() => logoInputRef.current?.click()}
                 className="px-4 py-2 rounded-xl bg-cyan text-white text-sm font-semibold hover:bg-cyan-500 cursor-pointer"
               >
-                {logoPreview ? "เปลี่ยนรูป" : "อัปโหลดรูป"}
+                {logoPreview ? texts.logo.change : texts.logo.upload}
               </button>
               {(logoPreview || site.brandingLogoUrl) && (
                 <button
@@ -348,7 +465,7 @@ export default function ContentEdit({
                   onClick={handleRemoveLogo}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-white cursor-pointer"
                 >
-                  ลบรูป
+                  {texts.logo.remove}
                 </button>
               )}
             </div>
@@ -367,19 +484,21 @@ export default function ContentEdit({
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="font-semibold text-sm block mb-2">Latitude</label>
+            <label className="font-semibold text-sm block mb-2">
+              {texts.labels.latitude}
+            </label>
             <input
               type="number"
               step="0.0001"
               value={form.lat ?? ""}
               onChange={(e) => handleNumber("lat", e.target.value)}
               className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="13.7563"
+              placeholder={texts.placeholders.latitude}
             />
           </div>
           <div>
             <label className="font-semibold text-sm block mb-2">
-              Longitude
+              {texts.labels.longitude}
             </label>
             <input
               type="number"
@@ -387,35 +506,35 @@ export default function ContentEdit({
               value={form.lng ?? ""}
               onChange={(e) => handleNumber("lng", e.target.value)}
               className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="100.5018"
+              placeholder={texts.placeholders.longitude}
             />
           </div>
         </div>
 
         <div>
-          <label className="font-semibold text-sm block mb-2">
-            Address detail
-          </label>
+            <label className="font-semibold text-sm block mb-2">
+              {texts.labels.addressDetail}
+            </label>
           <textarea
             value={form.addressLine ?? ""}
             onChange={(e) => handleChange("addressLine", e.target.value)}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
             rows={3}
-            placeholder="บ้านเลขที่ / อาคาร / ถนน ฯลฯ"
+            placeholder={texts.placeholders.addressDetail}
           />
         </div>
 
         <div>
-          <label className="font-semibold text-sm block mb-2">
-            Zipcode (ดึงที่อยู่)
-          </label>
+            <label className="font-semibold text-sm block mb-2">
+              {texts.labels.zipcode}
+            </label>
           <input
             type="text"
             value={form.zipcode ?? ""}
             onChange={(e) => handleChange("zipcode", e.target.value)}
             maxLength={5}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-            placeholder="เช่น 10100"
+            placeholder={texts.placeholders.zipcode}
           />
           {zipMessage && (
             <p
@@ -431,19 +550,19 @@ export default function ContentEdit({
         <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
           <div>
             <label className="font-semibold text-sm block mb-2">
-              Province
+              {texts.labels.province}
             </label>
             <input
               type="text"
               value={form.addressProvince ?? ""}
               onChange={(e) => handleChange("addressProvince", e.target.value)}
               className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="จังหวัด"
+              placeholder={texts.placeholders.province}
             />
           </div>
           <div>
             <label className="font-semibold text-sm block mb-2">
-              District
+              {texts.labels.district}
             </label>
             <Dropdown
               options={districtDropdownOptions}
@@ -472,7 +591,7 @@ export default function ContentEdit({
                     >
                       <span className="truncate">
                         {selected?.label ??
-                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกอำเภอ")}
+                          (disabled ? texts.zip.needPostal : texts.zip.selectDistrict)}
                       </span>
                       <svg
                         className={`h-4 w-4 text-slate-500 transition ${
@@ -516,7 +635,7 @@ export default function ContentEdit({
           </div>
           <div>
             <label className="font-semibold text-sm block mb-2">
-              Sub-district
+              {texts.labels.subDistrict}
             </label>
             <Dropdown
               options={subDistrictDropdownOptions}
@@ -547,7 +666,7 @@ export default function ContentEdit({
                     >
                       <span className="truncate">
                         {selected?.label ??
-                          (disabled ? "กรุณากรอกรหัสไปรษณีย์" : "เลือกตำบล")}
+                          (disabled ? texts.zip.needPostal : texts.zip.selectSubDistrict)}
                       </span>
                       <svg
                         className={`h-4 w-4 text-slate-500 transition ${
@@ -590,9 +709,7 @@ export default function ContentEdit({
             </Dropdown>
           </div>
         </div>
-        <p className="text-xs text-gray-500">
-          ปรับแก้ได้ทั้งจากรหัสไปรษณีย์หรือกรอกเอง
-        </p>
+        <p className="text-xs text-gray-500">{texts.hints.zipInfo}</p>
 
         <div className="flex flex-col gap-3 md:flex-row md:justify-end">
           <button
@@ -601,14 +718,14 @@ export default function ContentEdit({
             className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
             disabled={loading}
           >
-            Cancel
+            {texts.buttons.cancel}
           </button>
           <button
             type="submit"
             disabled={loading}
             className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60"
           >
-            {loading ? "Saving..." : "Save changes"}
+            {loading ? texts.buttons.submitting : texts.buttons.submit}
           </button>
         </div>
       </form>

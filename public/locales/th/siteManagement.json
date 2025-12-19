@@ -1,0 +1,250 @@
+{
+  "page": {
+    "title": "จัดการไซต์",
+    "loading": "กำลังโหลด..."
+  },
+  "toasts": {
+    "listFailed": "โหลดรายการไซต์ไม่สำเร็จ",
+    "createSuccess": "สร้างไซต์สำเร็จ",
+    "createFailed": "สร้างไซต์ไม่สำเร็จ",
+    "updateSuccess": "บันทึกข้อมูลไซต์แล้ว",
+    "updateFailed": "แก้ไขไซต์ไม่สำเร็จ",
+    "deleteSuccess": "ลบไซต์แล้ว",
+    "deleteFailed": "ลบไซต์ไม่สำเร็จ"
+  },
+  "confirm": {
+    "deleteSite": "ยืนยันลบไซต์ {{name}}?",
+    "deleteDevice": "ยืนยันลบอุปกรณ์ {{name}}?"
+  },
+  "content": {
+    "title": "จัดการไซต์",
+    "subtitle": "รายการไซต์ทั้งหมดที่ SuperAdmin ดูแล",
+    "buttons": {
+      "refresh": "รีเฟรช",
+      "create": "เพิ่มไซต์"
+    },
+    "search": {
+      "label": "ค้นหา",
+      "placeholder": "ค้นหาด้วยชื่อหรือรหัสไซต์"
+    },
+    "province": {
+      "label": "จังหวัด",
+      "all": "ทุกจังหวัด"
+    },
+    "table": {
+      "site": "ไซต์",
+      "code": "รหัส",
+      "address": "ที่อยู่",
+      "devices": "อุปกรณ์",
+      "users": "ผู้ใช้",
+      "actions": "การจัดการ"
+    },
+    "loading": "กำลังโหลดข้อมูล...",
+    "empty": "ไม่พบข้อมูลไซต์",
+    "detail": "รายละเอียด",
+    "pagination": {
+      "prev": "ก่อนหน้า",
+      "next": "ถัดไป",
+      "label": "หน้า {{page}} / {{total}}"
+    }
+  },
+  "form": {
+    "labels": {
+      "siteName": "ชื่อไซต์",
+      "brandingLogo": "โลโก้ประจำไซต์",
+      "siteCode": "รหัสไซต์",
+      "solarEdgeTitle": "ข้อมูล SolarEdge",
+      "solarEdgeSiteId": "SolarEdge Site ID",
+      "solarEdgeApiKey": "SolarEdge API Key",
+      "latitude": "ละติจูด",
+      "longitude": "ลองจิจูด",
+      "addressDetail": "รายละเอียดที่อยู่",
+      "zipcode": "รหัสไปรษณีย์ (ดึงที่อยู่)",
+      "province": "จังหวัด",
+      "district": "อำเภอ",
+      "subDistrict": "ตำบล"
+    },
+    "placeholders": {
+      "siteName": "เช่น Bangkok HQ",
+      "siteCode": "ระบุรหัสหรือเว้นว่างให้ระบบสร้างอัตโนมัติ",
+      "siteCodeEdit": "รหัสภายใน",
+      "solarEdgeSiteId": "เช่น 3078000",
+      "solarEdgeApiKey": "SE_xxxxxxxx",
+      "latitude": "13.7563",
+      "longitude": "100.5018",
+      "addressDetail": "บ้านเลขที่ / อาคาร / ถนน ฯลฯ",
+      "zipcode": "เช่น 10100",
+      "province": "จังหวัด"
+    },
+    "hints": {
+      "solarEdgeCreate": "ระบุ Site ID และ API Key สำหรับไซต์นี้ (เว้นว่างเพื่อตกลงใช้ค่า default ของระบบ)",
+      "solarEdgeEdit": "ปรับ Site ID / API Key ที่ใช้เชื่อมกับ SolarEdge (เคลียร์ช่องเพื่อรีเซ็ตเป็นค่า default)",
+      "zipAuto": "เมื่อกรอกรหัสไปรษณีย์ครบ 5 หลัก ระบบจะเติมจังหวัด/อำเภอ/ตำบลให้อัตโนมัติ",
+      "zipManual": "ปรับแก้ได้ทั้งจากรหัสไปรษณีย์หรือกรอกเอง"
+    },
+    "logo": {
+      "upload": "อัปโหลดรูป",
+      "change": "เปลี่ยนรูป",
+      "remove": "ลบรูป",
+      "previewAlt": "Site logo preview",
+      "errors": {
+        "notImage": "กรุณาเลือกไฟล์รูปภาพ",
+        "tooLarge": "ไฟล์ต้องไม่เกิน 2.5MB",
+        "readFail": "ไม่สามารถอ่านไฟล์ได้"
+      }
+    },
+    "errors": {
+      "nameRequired": "กรุณากรอกชื่อไซต์",
+      "codeLength": "รหัสไซต์ควรมีอย่างน้อย 3 ตัวอักษร"
+    },
+    "zip": {
+      "loading": "กำลังดึงข้อมูล...",
+      "notFound": "ไม่พบรหัสไปรษณีย์นี้",
+      "failed": "ดึงข้อมูลรหัสไปรษณีย์ไม่สำเร็จ",
+      "success": "พบข้อมูลจังหวัด {{province}} จำนวน {{count}} ตำบล",
+      "needPostal": "กรุณากรอกรหัสไปรษณีย์",
+      "selectDistrict": "เลือกอำเภอ",
+      "selectSubDistrict": "เลือกตำบล"
+    },
+    "buttons": {
+      "cancel": "ยกเลิก"
+    }
+  },
+  "create": {
+    "title": "เพิ่มไซต์ใหม่",
+    "subtitle": "กรอกข้อมูลเบื้องต้นเพื่อเพิ่ม Site เข้าระบบ",
+    "logo": {
+      "empty": "อัปโหลดโลโก้ที่จะใช้แสดงบนรายงาน (PNG / JPG / WEBP ไม่เกิน 2.5MB)"
+    },
+    "buttons": {
+      "submit": "บันทึกไซต์",
+      "submitting": "กำลังบันทึก..."
+    }
+  },
+  "edit": {
+    "title": "แก้ไขไซต์",
+    "subtitle": "{{name}}",
+    "logo": {
+      "empty": "ยังไม่มีโลโก้ กดอัปโหลดเพื่อเพิ่มรูป (PNG / JPG / WEBP ไม่เกิน 2.5MB)"
+    },
+    "buttons": {
+      "submit": "บันทึกการเปลี่ยนแปลง",
+      "submitting": "กำลังบันทึก..."
+    }
+  },
+  "detail": {
+    "buttons": {
+      "back": "กลับไปหน้ารายการ",
+      "refresh": "รีเฟรช",
+      "edit": "แก้ไขไซต์",
+      "delete": "ลบ"
+    },
+    "summary": {
+      "code": "รหัส:",
+      "address": "ที่อยู่:",
+      "latLng": "ละติจูด/ลองจิจูด:",
+      "zipcode": "รหัสไปรษณีย์:",
+      "statsTitle": "สรุปข้อมูล",
+      "devices": "จำนวนอุปกรณ์",
+      "users": "ผู้ใช้"
+    },
+    "errors": {
+      "load": "ไม่สามารถดึงข้อมูลล่าสุดได้"
+    },
+    "devices": {
+      "addButton": "เพิ่มอุปกรณ์",
+      "loading": "กำลังโหลด...",
+      "empty": "ยังไม่มีอุปกรณ์ในหมวดนี้",
+      "searchPlaceholder": "ค้นหาชื่อ Serial หรือ IP",
+      "tabs": {
+        "electric": "อุปกรณ์ไฟฟ้า",
+        "water": "เครื่องวัดน้ำ",
+        "air": "เซนเซอร์อากาศ",
+        "camera": "CCTV"
+      },
+      "table": {
+        "device": "อุปกรณ์",
+        "model": "รุ่น",
+        "serial": "Serial",
+        "status": "สถานะ",
+        "actions": "การจัดการ",
+        "edit": "แก้ไข",
+        "delete": "ลบ",
+        "copyId": "คัดลอก ID"
+      },
+      "pagination": {
+        "prev": "ก่อนหน้า",
+        "next": "ถัดไป",
+        "label": "{{start}}-{{end}} จาก {{total}} รายการ",
+        "empty": "0 รายการ"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "maintenance": "maintenance"
+      },
+      "copyId": {
+        "success": "คัดลอก ID: {{id}}",
+        "failed": "ไม่สามารถคัดลอก Device ID ได้"
+      },
+      "deleteSuccess": "ลบอุปกรณ์แล้ว",
+      "deleteFailed": "ลบอุปกรณ์ไม่สำเร็จ",
+      "saveSuccess": "บันทึกข้อมูลอุปกรณ์แล้ว",
+      "saveFailed": "บันทึกอุปกรณ์ไม่สำเร็จ"
+    },
+    "billing": {
+      "enable": "Enable Billing",
+      "save": "บันทึกอัตรา",
+      "saving": "กำลังบันทึก...",
+      "electric": {
+        "title": "การคิดค่าบริการไฟฟ้า",
+        "hint": "กรอกค่า base และ discount ก่อนเปิดใช้งาน"
+      },
+      "water": {
+        "title": "การคิดค่าบริการน้ำ",
+        "hint": "ใช้สำหรับเปิด/ปิดการคิดค่าบริการน้ำ"
+      },
+      "fields": {
+        "baseOn": "Base (On Peak) บาท/หน่วย",
+        "baseOff": "Base (Off Peak) บาท/หน่วย",
+        "discount": "Discount rate (%) 0-100"
+      },
+      "discountNote": "ตัวอย่าง discount 30 = ลด 30%",
+      "toggleFailed": "ปรับสถานะ Billing ไม่สำเร็จ",
+      "saveSuccess": "บันทึกอัตราค่าไฟเรียบร้อย",
+      "saveFailed": "บันทึกอัตราค่าไฟไม่สำเร็จ",
+      "validation": {
+        "baseOn": "กรุณากรอก Base (On Peak) ให้มากกว่า 0",
+        "baseOff": "กรุณากรอก Base (Off Peak) ให้มากกว่า 0",
+        "discount": "Discount rate (%) ต้องอยู่ระหว่าง 0 - 100",
+        "generic": "กรุณากรอกอัตราค่าไฟให้ครบถ้วน"
+      }
+    },
+    "devicesForm": {
+      "titleAdd": "เพิ่มอุปกรณ์",
+      "titleEdit": "แก้ไขอุปกรณ์",
+      "labels": {
+        "category": "ประเภท",
+        "sn": "SN",
+        "deviceKey": "Device key",
+        "status": "สถานะ",
+        "ipAddress": "IP Address",
+        "name": "ชื่อ"
+      },
+      "placeholders": {
+        "sn": "Serial Number",
+        "deviceKey": "Unique device key",
+        "ipAddress": "192.168.x.x",
+        "name": "ชื่อสำหรับแสดง"
+      },
+      "errors": {
+        "snRequired": "กรุณากรอก Serial Number",
+        "deviceKeyRequired": "กรุณากรอก Device Key"
+      },
+      "buttons": {
+        "submit": "บันทึกอุปกรณ์",
+        "submitting": "กำลังบันทึก..."
+      }
+    }
+  }
+}

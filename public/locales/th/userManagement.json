@@ -1,0 +1,128 @@
+{
+  "page": {
+    "title": "จัดการผู้ใช้งาน",
+    "loading": "กำลังโหลด..."
+  },
+  "toasts": {
+    "createSuccess": "สร้างสำเร็จ",
+    "createFailed": "สร้างไม่สำเร็จ",
+    "resetSuccess": "รีเซ็ตรหัสผ่านแล้ว",
+    "resetFailed": "รีเซ็ตรหัสผ่านไม่สำเร็จ",
+    "editSuccess": "บันทึกการแก้ไขแล้ว",
+    "editFailed": "แก้ไขไม่สำเร็จ",
+    "deleteSuccess": "ลบแล้ว",
+    "deleteFailed": "ลบไม่สำเร็จ"
+  },
+  "content": {
+    "header": "จัดการผู้ดูแล",
+    "createButton": "เพิ่มผู้ดูแล",
+    "filters": {
+      "statusLabel": "สถานะ",
+      "status": {
+        "all": "ทุกสถานะ",
+        "active": "ใช้งาน",
+        "inactive": "ปิดใช้งาน"
+      },
+      "roleLabel": "สิทธิ์",
+      "role": {
+        "all": "ทุกสิทธิ์",
+        "admin": "ผู้ดูแล",
+        "officer": "เจ้าหน้าที่",
+        "user": "ผู้ใช้"
+      }
+    },
+    "table": {
+      "no": "ลำดับ",
+      "fullName": "ชื่อ-นามสกุล",
+      "email": "อีเมล",
+      "role": "สิทธิ์",
+      "addedDate": "วันที่เพิ่ม",
+      "lastAccess": "เข้าล่าสุด",
+      "status": "สถานะ",
+      "action": "จัดการ"
+    },
+    "actions": {
+      "edit": "แก้ไข",
+      "resetPassword": "รีเซ็ตรหัสผ่าน",
+      "delete": "ลบ"
+    },
+    "pagination": {
+      "prev": "ก่อนหน้า",
+      "next": "ถัดไป"
+    }
+  },
+  "form": {
+    "labels": {
+      "firstName": "ชื่อ",
+      "lastName": "นามสกุล",
+      "email": "อีเมล",
+      "role": "สิทธิ์",
+      "sites": "สิทธิ์การเข้าถึงไซต์",
+      "password": "รหัสผ่าน",
+      "confirmPassword": "ยืนยันรหัสผ่าน",
+      "fullName": "ชื่อ-นามสกุล"
+    },
+    "placeholders": {
+      "firstName": "กรุณากรอกชื่อ",
+      "lastName": "กรุณากรอกนามสกุล",
+      "email": "กรุณากรอกอีเมล",
+      "role": "กรุณาเลือกสิทธิ์",
+      "password": "กรุณากรอกรหัสผ่านใหม่",
+      "confirmPassword": "กรุณายืนยันรหัสผ่าน"
+    },
+    "sitesHelper": "เลือกไซต์ที่ผู้ใช้นี้มีสิทธิ์เข้าได้",
+    "selectSites": "เลือกไซต์",
+    "sitesSelected": {
+      "one": "เลือก {{count}} ไซต์",
+      "other": "เลือก {{count}} ไซต์"
+    },
+    "remove": "นำออก",
+    "passwordHints": {
+      "min": "ความยาวอย่างน้อย 10 ตัวอักษร",
+      "complex": "ประกอบด้วยตัวเลข ตัวพิมพ์ใหญ่ และตัวพิมพ์เล็ก"
+    },
+    "emailError": "รูปแบบอีเมลไม่ถูกต้อง",
+    "confirmError": "รหัสผ่านไม่ตรงกัน",
+    "resetNote": "เมื่อยืนยัน รหัสผ่านของผู้ใช้นี้จะถูกเปลี่ยนและต้องเข้าสู่ระบบใหม่"
+  },
+  "create": {
+    "title": "เพิ่มผู้ดูแล",
+    "buttons": {
+      "cancel": "ยกเลิก",
+      "submit": "สร้าง"
+    }
+  },
+  "edit": {
+    "title": "แก้ไขข้อมูลผู้ดูแล",
+    "errors": {
+      "required": "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน"
+    },
+    "duplicate": {
+      "title": "แก้ไขไม่สำเร็จ",
+      "intro": "พบข้อมูลซ้ำ:",
+      "email": "อีเมลนี้ถูกใช้งานแล้ว",
+      "fullName": "ชื่อนี้ถูกใช้งานแล้ว",
+      "close": "ตกลง"
+    },
+    "buttons": {
+      "cancel": "ยกเลิก",
+      "submit": "บันทึก"
+    }
+  },
+  "reset": {
+    "title": "รีเซ็ตรหัสผ่าน",
+    "buttons": {
+      "cancel": "ยกเลิก",
+      "submit": "รีเซ็ต"
+    }
+  },
+  "roles": {
+    "admin": "ผู้ดูแล",
+    "officer": "เจ้าหน้าที่",
+    "user": "ผู้ใช้"
+  },
+  "status": {
+    "active": "ใช้งาน",
+    "inactive": "ปิดใช้งาน"
+  }
+}

@@ -1,5 +1,6 @@
 // src/pages/GenerateBillForm.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
@@ -41,19 +42,19 @@ type SummaryTotals = {
   total: number;
 };
 
-const MONTH_OPTIONS = [
-  { value: "01", label: "มกราคม" },
-  { value: "02", label: "กุมภาพันธ์" },
-  { value: "03", label: "มีนาคม" },
-  { value: "04", label: "เมษายน" },
-  { value: "05", label: "พฤษภาคม" },
-  { value: "06", label: "มิถุนายน" },
-  { value: "07", label: "กรกฎาคม" },
-  { value: "08", label: "สิงหาคม" },
-  { value: "09", label: "กันยายน" },
-  { value: "10", label: "ตุลาคม" },
-  { value: "11", label: "พฤศจิกายน" },
-  { value: "12", label: "ธันวาคม" },
+const MONTH_CHOICES = [
+  { value: "01", defaultLabel: "January" },
+  { value: "02", defaultLabel: "February" },
+  { value: "03", defaultLabel: "March" },
+  { value: "04", defaultLabel: "April" },
+  { value: "05", defaultLabel: "May" },
+  { value: "06", defaultLabel: "June" },
+  { value: "07", defaultLabel: "July" },
+  { value: "08", defaultLabel: "August" },
+  { value: "09", defaultLabel: "September" },
+  { value: "10", defaultLabel: "October" },
+  { value: "11", defaultLabel: "November" },
+  { value: "12", defaultLabel: "December" },
 ];
 
 const DEFAULT_FORM_STATE: ManualFormState = {
@@ -67,6 +68,154 @@ const DEFAULT_FORM_STATE: ManualFormState = {
 };
 
 const GenerateBillForm: React.FC = () => {
+  const { t, i18n } = useTranslation(["billing"]);
+  const locale = React.useMemo(
+    () => ((i18n.language || "th").toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
+    [i18n.language]
+  );
+  const generateText = React.useMemo(
+    () => ({
+      back: t("generate.back", { defaultValue: "Back" }),
+      title: t("generate.title", { defaultValue: "Generate electricity bill" }),
+      branding: {
+        previewAlt: t("generate.branding.previewAlt", {
+          defaultValue: "Site branding preview",
+        }),
+        siteFallback: t("generate.branding.siteFallback", { defaultValue: "Site" }),
+        addressLabel: t("generate.branding.addressLabel", { defaultValue: "Address:" }),
+        addressUnknown: t("generate.branding.addressUnknown", { defaultValue: "Not specified" }),
+        upload: t("generate.branding.upload", { defaultValue: "Upload logo" }),
+        change: t("generate.branding.change", { defaultValue: "Change logo" }),
+        clear: t("generate.branding.clear", { defaultValue: "Remove logo" }),
+        errors: {
+          invalidType: t("generate.branding.errors.invalidType", {
+            defaultValue: "Please select an image file",
+          }),
+          fileTooLarge: t("generate.branding.errors.fileTooLarge", {
+            defaultValue: "File must be smaller than 2.5MB",
+          }),
+          readFail: t("generate.branding.errors.readFail", {
+            defaultValue: "Unable to read the file",
+          }),
+        },
+      },
+      messages: {
+        loadMeters: t("generate.messages.loadMeters", {
+          defaultValue: "Unable to load meters for this site",
+        }),
+        loadDashboard: t("generate.messages.loadDashboard", {
+          defaultValue: "Unable to fetch meter data",
+        }),
+        loadingDashboard: t("generate.messages.loadingDashboard", {
+          defaultValue: "Loading data from meter...",
+        }),
+        loadingMetersList: t("generate.messages.loadingMetersList", {
+          defaultValue: "Loading meter list...",
+        }),
+        noMetersInSite: t("generate.messages.noMetersInSite", {
+          defaultValue: "No meters found in this site",
+        }),
+        summaryError: t("generate.messages.summaryError", {
+          defaultValue: "Unable to load billing data for this period",
+        }),
+        createBillError: t("generate.messages.createBillError", {
+          defaultValue: "Unable to create bill, please try again",
+        }),
+        selectMeterRequired: t("generate.messages.selectMeterRequired", {
+          defaultValue: "Please select a meter before creating a bill",
+        }),
+        selectSiteRequired: t("generate.messages.selectSiteRequired", {
+          defaultValue: "Please select a site before creating a bill",
+        }),
+      },
+      form: {
+        billingType: t("generate.form.billingType", { defaultValue: "Billing type" }),
+        monthly: t("generate.form.monthly", { defaultValue: "Monthly" }),
+        daily: t("generate.form.daily", { defaultValue: "Daily" }),
+        selectMonthYear: t("generate.form.selectMonthYear", {
+          defaultValue: "Select billing month/year",
+        }),
+        monthPlaceholder: t("generate.form.monthPlaceholder", { defaultValue: "Select month" }),
+        yearPlaceholder: t("generate.form.yearPlaceholder", { defaultValue: "Select year" }),
+        billingRangeLabel: t("generate.form.billingRangeLabel", {
+          defaultValue: "Billing period to generate:",
+        }),
+        selectDate: t("generate.form.selectDate", {
+          defaultValue: "Select billing date",
+        }),
+        dateHint: t("generate.form.dateHint", {
+          defaultValue: "System will calculate from 00:00 to the latest hour of that day.",
+        }),
+        selectMeter: t("generate.form.selectMeter", { defaultValue: "Select meter" }),
+        meterSubtitle: t("generate.form.meterSubtitle", {
+          defaultValue: "Choose the meter for billing",
+        }),
+        meterFallback: t("generate.form.meterFallback", { defaultValue: "Meter" }),
+        meterSearchPlaceholder: t("generate.form.searchPlaceholder", {
+          defaultValue: "Search meter name or serial...",
+        }),
+        noMeterMatch: t("generate.form.noMeterMatch", {
+          defaultValue: "No meters match the search",
+        }),
+        baseOnPeak: t("generate.form.baseOnPeak", { defaultValue: "Base On Peak (THB/unit)" }),
+        baseOffPeak: t("generate.form.baseOffPeak", { defaultValue: "Base Off Peak (THB/unit)" }),
+        discountRate: t("generate.form.discountRate", { defaultValue: "Discount Rate" }),
+        autoFillLabel: t("generate.form.autoFillLabel", {
+          defaultValue: "Values from database (auto-fill)",
+        }),
+        loadingPlaceholder: t("generate.form.loadingPlaceholder", { defaultValue: "Loading..." }),
+        submit: t("generate.form.submit", { defaultValue: "Calculate bill" }),
+        submitting: t("generate.form.submitting", { defaultValue: "Generating bill..." }),
+      },
+      summary: {
+        monthlyTotal: t("generate.summary.monthlyTotal", { defaultValue: "Month total" }),
+        dailyTotal: t("generate.summary.dailyTotal", { defaultValue: "Day total" }),
+        onPeak: t("generate.summary.onPeak", { defaultValue: "On Peak (kWh)" }),
+        offPeak: t("generate.summary.offPeak", { defaultValue: "Off Peak (kWh)" }),
+      },
+      buttons: {
+        modalClose: t("generate.modal.close", { defaultValue: "Close" }),
+      },
+      siteGuard: {
+        blocked: {
+          title: t("generate.siteGuard.blocked.title", {
+            defaultValue: "Billing not allowed for this site",
+          }),
+          message: t("generate.siteGuard.blocked.message", {
+            defaultValue:
+              "The selected site is not permitted to use billing. Please switch to an allowed site.",
+          }),
+          close: t("generate.siteGuard.blocked.close", { defaultValue: "Go back" }),
+        },
+        select: {
+          title: t("generate.siteGuard.select.title", { defaultValue: "Select a site first" }),
+          message: t("generate.siteGuard.select.message", {
+            defaultValue: "Choose a site from the navbar before generating bills.",
+          }),
+          close: t("generate.siteGuard.select.close", { defaultValue: "OK" }),
+        },
+      },
+      modal: {
+        errorTitle: t("generate.modal.errorTitle", { defaultValue: "Cannot proceed" }),
+      },
+    }),
+    [t]
+  );
+  const loadMetersErrorText = generateText.messages.loadMeters;
+  const loadDashboardErrorText = generateText.messages.loadDashboard;
+  const summaryErrorText = generateText.messages.summaryError;
+  const createBillErrorText = generateText.messages.createBillError;
+  const selectMeterRequiredText = generateText.messages.selectMeterRequired;
+  const selectSiteRequiredText = generateText.messages.selectSiteRequired;
+  const meterFallbackLabel = generateText.form.meterFallback;
+  const monthOptions = React.useMemo(
+    () =>
+      MONTH_CHOICES.map((item) => ({
+        value: item.value,
+        label: t(`generate.months.${item.value}`, { defaultValue: item.defaultLabel }),
+      })),
+    [t]
+  );
   const {
     searchSite,
     setSearchSite,
@@ -84,9 +233,10 @@ const GenerateBillForm: React.FC = () => {
     const current = new Date().getFullYear();
     return Array.from({ length: 6 }, (_, idx) => {
       const year = current - idx;
-      return { value: String(year), label: String(year + 543) };
+      const displayYear = locale.startsWith("th") ? year + 543 : year;
+      return { value: String(year), label: String(displayYear) };
     });
-  }, []);
+  }, [locale]);
   const [formState, setFormState] = React.useState<ManualFormState>(() => ({
     ...DEFAULT_FORM_STATE,
     billingMonth: defaultBillingPeriod.month,
@@ -147,8 +297,8 @@ const GenerateBillForm: React.FC = () => {
   const [meterSearch, setMeterSearch] = React.useState("");
   const summaryLabel =
     billingMode === "monthly"
-      ? formatMonthYear(formState.billingMonth, formState.billingYear)
-      : formatDailyLabel(dailyDate);
+      ? formatMonthYear(formState.billingMonth, formState.billingYear, locale)
+      : formatDailyLabel(dailyDate, locale);
   const location = useLocation();
   const navigate = useNavigate();
   const { abs } = useUserPath();
@@ -309,7 +459,7 @@ const GenerateBillForm: React.FC = () => {
                 details.name ??
                 (typeof item.model === "string"
                   ? item.model.split(":").pop()
-                  : "Meter"),
+                  : meterFallbackLabel),
               description: details.location ?? item.siteName ?? "",
               serial:
                 details.serialNumber ??
@@ -346,7 +496,7 @@ const GenerateBillForm: React.FC = () => {
       } catch (err) {
         console.error("[GenerateBillForm] load site/meter failed", err);
         if (!canceled) {
-          setLoadError("ไม่สามารถโหลดข้อมูลมิเตอร์ของไซต์นี้ได้");
+          setLoadError(loadMetersErrorText);
           setMeterOptions([]);
           setSiteInfo(null);
           setCustomLogoDataUrl(null);
@@ -361,7 +511,7 @@ const GenerateBillForm: React.FC = () => {
     return () => {
       canceled = true;
     };
-  }, [requiresSiteSelection, normalizedSite]);
+  }, [requiresSiteSelection, normalizedSite, loadMetersErrorText, meterFallbackLabel]);
 
   React.useEffect(() => {
     if (!meterId) {
@@ -392,7 +542,7 @@ const GenerateBillForm: React.FC = () => {
         console.error("[GenerateBillForm] load meter dashboard failed", err);
         if (!canceled) {
           setMeterDashboard(null);
-          setMeterDashboardError("ไม่สามารถดึงข้อมูลมิเตอร์ได้");
+          setMeterDashboardError(loadDashboardErrorText);
         }
       })
       .finally(() => {
@@ -407,6 +557,7 @@ const GenerateBillForm: React.FC = () => {
     monthlyRequestRange?.startIso,
     monthlyRequestRange?.endIso,
     dailyDate,
+    loadDashboardErrorText,
   ]);
 
   React.useEffect(() => {
@@ -478,7 +629,7 @@ const GenerateBillForm: React.FC = () => {
         console.error("[GenerateBillForm] load billing readings failed", err);
         if (canceled) return;
         setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
-        setSummaryError("ไม่สามารถโหลดข้อมูล Billing สำหรับช่วงนี้ได้");
+        setSummaryError(summaryErrorText);
       })
       .finally(() => {
         if (!canceled) setSummaryLoading(false);
@@ -486,7 +637,14 @@ const GenerateBillForm: React.FC = () => {
     return () => {
       canceled = true;
     };
-  }, [meterId, billingMode, formState.billingMonth, formState.billingYear, dailyDate]);
+  }, [
+    meterId,
+    billingMode,
+    formState.billingMonth,
+    formState.billingYear,
+    dailyDate,
+    summaryErrorText,
+  ]);
 
   const handleSiteGuardClose = React.useCallback(() => {
     setGuardType("none");
@@ -494,18 +652,8 @@ const GenerateBillForm: React.FC = () => {
   }, [navigate, abs]);
   const siteGuardConfig =
     guardType === "blocked"
-      ? {
-          title: "Site นี้ยังไม่อนุญาตให้ใช้งาน Billing",
-          message:
-            "Site ที่คุณเลือกไม่ได้รับสิทธิ์เข้าถึงระบบ Billing กรุณาเปลี่ยนไปยัง Site ที่ได้รับอนุญาตหรือขอสิทธิ์ผ่านผู้ดูแล",
-          closeLabel: "ย้อนกลับ",
-        }
-      : {
-          title: "กรุณาเลือก Site ก่อนใช้งาน",
-          message:
-            "โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานฟีเจอร์สร้างบิล",
-          closeLabel: "โอเค",
-        };
+      ? generateText.siteGuard.blocked
+      : generateText.siteGuard.select;
 
   const siteBrandingLogo = siteInfo?.brandingLogoUrl ?? null;
   const brandingPreviewSrc = React.useMemo(
@@ -524,11 +672,11 @@ const GenerateBillForm: React.FC = () => {
       return;
     }
     if (!file.type.startsWith("image/")) {
-      setCustomLogoError("กรุณาเลือกไฟล์รูปภาพ");
+      setCustomLogoError(generateText.branding.errors.invalidType);
       return;
     }
     if (file.size > 2.5 * 1024 * 1024) {
-      setCustomLogoError("ไฟล์ต้องไม่เกิน 2.5MB");
+      setCustomLogoError(generateText.branding.errors.fileTooLarge);
       return;
     }
     const reader = new FileReader();
@@ -538,10 +686,10 @@ const GenerateBillForm: React.FC = () => {
       setCustomLogoError(null);
     };
     reader.onerror = () => {
-      setCustomLogoError("ไม่สามารถอ่านไฟล์ได้");
+      setCustomLogoError(generateText.branding.errors.readFail);
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [generateText.branding.errors.invalidType, generateText.branding.errors.fileTooLarge, generateText.branding.errors.readFail]);
 
   const handleRemoveCustomLogo = React.useCallback(() => {
     setCustomLogoDataUrl(null);
@@ -564,11 +712,11 @@ const GenerateBillForm: React.FC = () => {
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (!formState.meterId) {
-        setErrorModalMessage("กรุณาเลือกมิเตอร์ก่อนสร้างบิล");
+        setErrorModalMessage(selectMeterRequiredText);
         return;
       }
       if (requiresSiteSelection) {
-        setErrorModalMessage("กรุณาเลือก Site ก่อนสร้างบิล");
+        setErrorModalMessage(selectSiteRequiredText);
         return;
       }
       const selectedMeter = meterOptions.find(
@@ -631,7 +779,7 @@ const GenerateBillForm: React.FC = () => {
         );
       } catch (err) {
         console.error("[GenerateBillForm] create bill failed", err);
-        setErrorModalMessage("ไม่สามารถสร้างบิลได้ กรุณาลองใหม่");
+        setErrorModalMessage(createBillErrorText);
       } finally {
         setSubmitting(false);
       }
@@ -647,6 +795,9 @@ const GenerateBillForm: React.FC = () => {
       siteInfo,
       meterDashboard,
       customLogoDataUrl,
+      createBillErrorText,
+      selectMeterRequiredText,
+      selectSiteRequiredText,
     ]
   );
 
@@ -688,12 +839,12 @@ const GenerateBillForm: React.FC = () => {
             >
               <polyline points="15 18 9 12 15 6" />
             </svg>
-            ย้อนกลับ
+            {generateText.back}
           </button>
 
           <div className="w-full rounded-[32px] bg-slate-50/90 p-8">
             <h1 className="text-center text-2xl font-semibold text-slate-900">
-              คำนวณค่าไฟฟ้า
+              {generateText.title}
             </h1>
             {showBrandingPreview && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
@@ -701,16 +852,17 @@ const GenerateBillForm: React.FC = () => {
                   <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3">
                     <img
                       src={brandingPreviewSrc}
-                      alt="Site branding preview"
+                      alt={generateText.branding.previewAlt}
                       className="h-20 w-32 object-contain"
                     />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-900">
-                      {siteInfo?.name ?? "Site"}
+                      {siteInfo?.name ?? generateText.branding.siteFallback}
                     </p>
                     <p className="mt-1">
-                      ที่อยู่: {siteInfo?.address ?? "ไม่ระบุ"}
+                      {generateText.branding.addressLabel}{" "}
+                      {siteInfo?.address ?? generateText.branding.addressUnknown}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
@@ -719,8 +871,8 @@ const GenerateBillForm: React.FC = () => {
                         className="rounded-xl bg-cyan px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 cursor-pointer"
                       >
                         {customLogoDataUrl
-                          ? "เปลี่ยนรูป"
-                          : "อัปโหลดรูป"}
+                          ? generateText.branding.change
+                          : generateText.branding.upload}
                       </button>
                       {customLogoDataUrl && (
                         <button
@@ -728,7 +880,7 @@ const GenerateBillForm: React.FC = () => {
                           onClick={handleRemoveCustomLogo}
                           className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 cursor-pointer"
                         >
-                          ล้างรูป
+                          {generateText.branding.clear}
                         </button>
                       )}
                     </div>
@@ -762,13 +914,13 @@ const GenerateBillForm: React.FC = () => {
             )}
             {loadingDashboard && (
               <div className="mt-3 text-sm text-slate-500">
-                กำลังโหลดข้อมูลจากมิเตอร์...
+                {generateText.messages.loadingDashboard}
               </div>
             )}
 
             <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
               <div className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                ประเภทบิล
+                {generateText.form.billingType}
                 <div className="inline-flex rounded-2xl border border-slate-200 p-1">
                   <button
                     type="button"
@@ -779,7 +931,7 @@ const GenerateBillForm: React.FC = () => {
                         : "text-slate-600 hover:bg-slate-100 cursor-pointer"
                     }`}
                   >
-                    รายเดือน
+                    {generateText.form.monthly}
                   </button>
                   <button
                     type="button"
@@ -790,17 +942,17 @@ const GenerateBillForm: React.FC = () => {
                         : "text-slate-600 hover:bg-slate-100 cursor-pointer"
                     }`}
                   >
-                    รายวัน
+                    {generateText.form.daily}
                   </button>
                 </div>
               </div>
 
               {billingMode === "monthly" ? (
                 <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                  เลือกเดือน/ปี ที่ต้องการออกรอบบิล
+                  {generateText.form.selectMonthYear}
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <Dropdown
-                      options={MONTH_OPTIONS}
+                      options={monthOptions}
                       value={formState.billingMonth}
                       onChange={(value) =>
                         setFormState((prev) => ({
@@ -824,7 +976,7 @@ const GenerateBillForm: React.FC = () => {
                                 "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
                             })}
                           >
-                            <span>{selected?.label ?? "เลือกเดือน"}</span>
+                            <span>{selected?.label ?? generateText.form.monthPlaceholder}</span>
                             <svg
                               className={`h-4 w-4 text-slate-500 transition ${
                                 open ? "rotate-180" : ""
@@ -893,7 +1045,7 @@ const GenerateBillForm: React.FC = () => {
                                 "flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-base font-normal text-slate-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-50 cursor-pointer",
                             })}
                           >
-                            <span>{selected?.label ?? "เลือกปี"}</span>
+                            <span>{selected?.label ?? generateText.form.yearPlaceholder}</span>
                             <svg
                               className={`h-4 w-4 text-slate-500 transition ${
                                 open ? "rotate-180" : ""
@@ -935,12 +1087,12 @@ const GenerateBillForm: React.FC = () => {
                     </Dropdown>
                   </div>
                   <p className="mt-2 text-xs font-normal text-slate-500">
-                    รอบบิลที่จะสร้าง: เดือน {summaryLabel}
+                    {generateText.form.billingRangeLabel} {summaryLabel}
                   </p>
                 </label>
               ) : (
                 <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                  เลือกวันที่ต้องการออกรอบบิล
+                  {generateText.form.selectDate}
                   <DatePicker
                     value={dateToValue(dailyDate)}
                     max={dateToValue(new Date())}
@@ -950,13 +1102,13 @@ const GenerateBillForm: React.FC = () => {
                     }}
                   />
                   <p className="mt-2 text-xs font-normal text-slate-500">
-                    ระบบจะคำนวณตั้งแต่ 00:00 ถึงชั่วโมงล่าสุดของวันที่เลือก
+                    {generateText.form.dateHint}
                   </p>
                 </label>
               )}
 
               <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                เลือกมิเตอร์
+                {generateText.form.selectMeter}
                 <div
                   className={[
                     "w-full rounded-2xl border border-slate-200 bg-white",
@@ -993,11 +1145,11 @@ const GenerateBillForm: React.FC = () => {
                           >
                             <div className="flex flex-1 flex-col text-left">
                               <span className="text-base font-semibold text-slate-900">
-                                {selectedMeta?.label ?? "เลือกมิเตอร์"}
+                                {selectedMeta?.label ?? generateText.form.selectMeter}
                               </span>
                               <span className="text-xs font-normal text-slate-500">
                                 {selectedMeta?.description ??
-                                  "เลือกมิเตอร์ที่ต้องการออกรอบบิล"}
+                                  generateText.form.meterSubtitle}
                               </span>
                             </div>
                             <svg
@@ -1026,14 +1178,14 @@ const GenerateBillForm: React.FC = () => {
                                   onChange={(e) =>
                                     setMeterSearch(e.target.value)
                                   }
-                                  placeholder="ค้นหาชื่อหรือ Serial หมายเลขมิเตอร์..."
+                                  placeholder={generateText.form.meterSearchPlaceholder}
                                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-200"
                                 />
                               </div>
                               <div className="max-h-64 overflow-y-auto py-2">
                                 {options.length === 0 ? (
                                   <div className="px-4 py-3 text-sm text-slate-500">
-                                    ไม่พบมิเตอร์ที่ตรงกับคำค้นหา
+                                    {generateText.form.noMeterMatch}
                                   </div>
                                 ) : (
                                   options.map((opt) => {
@@ -1079,51 +1231,51 @@ const GenerateBillForm: React.FC = () => {
                 </div>
                 {loadingOptions && (
                   <p className="mt-2 text-xs font-normal text-slate-500">
-                    กำลังโหลดรายชื่อมิเตอร์...
+                    {generateText.messages.loadingMetersList}
                   </p>
                 )}
                 {!loadingOptions && meterOptions.length === 0 && (
                   <p className="mt-2 text-xs font-normal text-red-500">
-                    ไม่พบมิเตอร์ใน Site นี้
+                    {generateText.messages.noMetersInSite}
                   </p>
                 )}
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                Base On Peak (บาท/หน่วย)
+                {generateText.form.baseOnPeak}
                 <input
                   type="text"
                   value={formState.baseOnPeak}
                   readOnly
                   disabled
-                  placeholder="กำลังโหลด..."
+                  placeholder={generateText.form.loadingPlaceholder}
                   className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-normal text-slate-500 outline-none disabled:cursor-not-allowed"
                 />
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                Base Off Peak (บาท/หน่วย)
+                {generateText.form.baseOffPeak}
                 <input
                   type="text"
                   value={formState.baseOffPeak}
                   readOnly
                   disabled
-                  placeholder="กำลังโหลด..."
+                  placeholder={generateText.form.loadingPlaceholder}
                   className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-normal text-slate-500 outline-none disabled:cursor-not-allowed"
                 />
                 <span className="text-xs font-normal text-slate-500">
-                  Discount Rate: {discountPercentLabel ?? "-"}
+                  {generateText.form.discountRate}: {discountPercentLabel ?? "-"}
                 </span>
               </label>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-                  <span>ค่าที่อ่านได้จากฐานข้อมูล (Auto-fill)</span>
+                  <span>{generateText.form.autoFillLabel}</span>
                   <span>{summaryLabel}</span>
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
                   <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                    <p className="text-xs text-slate-500">On Peak (kWh)</p>
+                    <p className="text-xs text-slate-500">{generateText.summary.onPeak}</p>
                     <p className="mt-1 text-2xl font-semibold text-slate-900">
                       {summaryLoading
                         ? "..."
@@ -1131,7 +1283,7 @@ const GenerateBillForm: React.FC = () => {
                     </p>
                   </div>
                   <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                    <p className="text-xs text-slate-500">Off Peak (kWh)</p>
+                    <p className="text-xs text-slate-500">{generateText.summary.offPeak}</p>
                     <p className="mt-1 text-2xl font-semibold text-slate-900">
                       {summaryLoading
                         ? "..."
@@ -1140,7 +1292,9 @@ const GenerateBillForm: React.FC = () => {
                   </div>
                   <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
                     <p className="text-xs text-slate-500">
-                      {billingMode === "monthly" ? "รวมทั้งเดือน" : "รวมวันนี้"}
+                      {billingMode === "monthly"
+                        ? generateText.summary.monthlyTotal
+                        : generateText.summary.dailyTotal}
                     </p>
                     <p className="mt-1 text-2xl font-semibold text-slate-900">
                       {summaryLoading
@@ -1164,7 +1318,7 @@ const GenerateBillForm: React.FC = () => {
                     : "bg-[#1cb5ff] hover:bg-[#11a2e6] cursor-pointer",
                 ].join(" ")}
               >
-                {submitting ? "กำลังสร้างบิล..." : "คำนวณค่าไฟฟ้า"}
+                {submitting ? generateText.form.submitting : generateText.form.submit}
               </button>
             </form>
           </div>
@@ -1176,16 +1330,16 @@ const GenerateBillForm: React.FC = () => {
         icon="cancel"
         title={siteGuardConfig.title}
         message={siteGuardConfig.message}
-        closeLabel={siteGuardConfig.closeLabel}
+        closeLabel={siteGuardConfig.close}
         onClose={handleSiteGuardClose}
       />
       <Modal
         open={Boolean(errorModalMessage)}
         id="manual-billing-error"
         icon="warning"
-        title="ไม่สามารถดำเนินการได้"
+        title={generateText.modal.errorTitle}
         message={errorModalMessage ?? ""}
-        closeLabel="ปิด"
+        closeLabel={generateText.buttons.modalClose}
         onClose={() => setErrorModalMessage(null)}
       />
     </Sidebar>
@@ -1206,11 +1360,11 @@ function formatInputNumber(value: number) {
   return Number(value).toFixed(2);
 }
 
-function formatMonthYear(month?: string, year?: string) {
+function formatMonthYear(month?: string, year?: string, locale = "th-TH") {
   if (!month || !year) return "-";
   const date = new Date(Number(year), Number(month) - 1, 1);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("th-TH", {
+  return date.toLocaleDateString(locale, {
     month: "long",
     year: "numeric",
   });
@@ -1262,8 +1416,8 @@ function getDefaultBillingPeriod() {
   };
 }
 
-function formatDailyLabel(date: Date) {
-  return date.toLocaleDateString("th-TH", {
+function formatDailyLabel(date: Date, locale = "th-TH") {
+  return date.toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",

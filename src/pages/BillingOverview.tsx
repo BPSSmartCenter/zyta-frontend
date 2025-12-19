@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
@@ -30,7 +31,8 @@ import { MonthlyChart } from "../components/Chart";
 
 type CardConfig = {
   id: string;
-  label: string;
+  labelKey: string;
+  defaultLabel: string;
   img: string;
   activeImg: string;
   labelClassName?: string;
@@ -39,20 +41,23 @@ type CardConfig = {
 const CARD_CONFIG: CardConfig[] = [
   {
     id: "usage",
-    label: "Total usage (kWh)",
+    labelKey: "overview.cards.usage",
+    defaultLabel: "Total usage (kWh)",
     img: cyanBolt,
     activeImg: whiteBolt,
   },
   {
     id: "billing",
-    label: "Bill amount this month",
+    labelKey: "overview.cards.billing",
+    defaultLabel: "Bill amount this month",
     img: cyanBaht,
     activeImg: whiteBaht,
     labelClassName: "text-[10px] uppercase tracking-wide",
   },
   {
     id: "trend",
-    label: "Monthly trend",
+    labelKey: "overview.cards.trend",
+    defaultLabel: "Monthly trend",
     img: cyanTrend,
     activeImg: whiteTrend,
   },
@@ -70,6 +75,169 @@ type RealtimeRow = {
 type BillingRow = BillingMonitorRow;
 
 const BillingOverview: React.FC = () => {
+  const { t, i18n } = useTranslation(["billing"]);
+  const locale = React.useMemo(
+    () => ((i18n.language || "th").toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
+    [i18n.language]
+  );
+  const overviewText = React.useMemo(
+    () => ({
+      title: t("overview.title", { defaultValue: "Billing Overview" }),
+      subtitle: t("overview.subtitle", {
+        defaultValue: "Overall usage and billing data from backend",
+      }),
+      realtime: {
+        heading: t("overview.realtime.heading", { defaultValue: "Real-Time Monitor" }),
+        description: t("overview.realtime.description", {
+          defaultValue: "Latest readings from gateway",
+        }),
+        searchPlaceholder: t("overview.realtime.searchPlaceholder", {
+          defaultValue: "Search readings...",
+        }),
+        buttons: {
+          refresh: t("overview.realtime.buttons.refresh", { defaultValue: "Refresh" }),
+          generate: t("overview.realtime.buttons.generate", {
+            defaultValue: "Generate Bills",
+          }),
+          monitor: t("overview.realtime.buttons.monitor", { defaultValue: "Monitor" }),
+        },
+        table: {
+          meter: t("overview.realtime.table.meter", { defaultValue: "Meter" }),
+          onPeak: t("overview.realtime.table.onPeak", {
+            defaultValue: "Energy On Peak (kWh)",
+          }),
+          offPeak: t("overview.realtime.table.offPeak", {
+            defaultValue: "Energy Off Peak (kWh)",
+          }),
+          timestamp: t("overview.realtime.table.timestamp", {
+            defaultValue: "Timestamp",
+          }),
+          actions: t("overview.realtime.table.actions", { defaultValue: "Actions" }),
+        },
+        loading: t("overview.realtime.loading", {
+          defaultValue: "Loading data...",
+        }),
+        empty: t("overview.realtime.empty", {
+          defaultValue: "No readings match the filters",
+        }),
+        siteLabel: t("overview.realtime.siteLabel", { defaultValue: "Site" }),
+        defaultDevice: t("overview.realtime.defaultDevice", { defaultValue: "Meter" }),
+        fallbackDeviceName: t("overview.realtime.fallbackMeterName", {
+          defaultValue: "Meter {{id}}",
+          id: "",
+        }),
+      },
+      errors: {
+        gateway: t("overview.errors.gateway", {
+          defaultValue: "Unable to load values from gateway",
+        }),
+        delete: t("overview.errors.delete", {
+          defaultValue: "Unable to delete bill, please try again",
+        }),
+        fetch: t("overview.errors.fetchBilling", {
+          defaultValue: "Unable to fetch billing data right now",
+        }),
+      },
+      billing: {
+        heading: t("overview.billing.heading", { defaultValue: "Billing Records" }),
+        description: t("overview.billing.description", {
+          defaultValue: "Issued bills with saved documents",
+        }),
+        searchPlaceholder: t("overview.billing.searchPlaceholder", {
+          defaultValue: "Search bills...",
+        }),
+        table: {
+          meter: t("overview.billing.table.meter", { defaultValue: "Meter" }),
+          billingPeriod: t("overview.billing.table.billingPeriod", {
+            defaultValue: "Billing period",
+          }),
+          usage: t("overview.billing.table.usage", { defaultValue: "Usage (kWh)" }),
+          cost: t("overview.billing.table.cost", { defaultValue: "Cost (THB)" }),
+          timestamp: t("overview.billing.table.timestamp", { defaultValue: "Timestamp" }),
+          actions: t("overview.billing.table.actions", { defaultValue: "Actions" }),
+        },
+        loading: t("overview.billing.loading", {
+          defaultValue: "Loading bills...",
+        }),
+        empty: t("overview.billing.empty", {
+          defaultValue: "No bills found for this period",
+        }),
+        buttons: {
+          preview: t("overview.billing.buttons.preview", { defaultValue: "Preview" }),
+          delete: t("overview.billing.buttons.delete", { defaultValue: "Delete" }),
+        },
+      },
+      trend: {
+        chartTitle: t("overview.trend.chartTitle", { defaultValue: "Monthly Trend Chart" }),
+        tableTitle: t("overview.trend.tableTitle", { defaultValue: "Monthly Trend Table" }),
+        tableSubtitle: t("overview.trend.tableSubtitle", {
+          defaultValue: "Monthly electricity totals",
+        }),
+        searchPlaceholder: t("overview.trend.searchPlaceholder", {
+          defaultValue: "Search month...",
+        }),
+        table: {
+          month: t("overview.trend.table.month", { defaultValue: "Month" }),
+          cost: t("overview.trend.table.cost", { defaultValue: "Cost (THB)" }),
+          usage: t("overview.trend.table.usage", { defaultValue: "Usage (kWh)" }),
+          timestamp: t("overview.trend.table.timestamp", { defaultValue: "Timestamp" }),
+        },
+        empty: t("overview.trend.table.empty", {
+          defaultValue: "No monthly data available",
+        }),
+      },
+      siteGuard: {
+        blocked: {
+          title: t("overview.siteGuard.blocked.title", {
+            defaultValue: "Billing is not available",
+          }),
+          message: t("overview.siteGuard.blocked.message", {
+            defaultValue: "This site has no compatible devices. Please choose another site.",
+          }),
+          close: t("overview.siteGuard.blocked.close", { defaultValue: "Go back" }),
+        },
+        select: {
+          title: t("overview.siteGuard.select.title", {
+            defaultValue: "Please select a site",
+          }),
+          message: t("overview.siteGuard.select.message", {
+            defaultValue: "Choose a site from the navbar before using billing features.",
+          }),
+          close: t("overview.siteGuard.select.close", { defaultValue: "OK" }),
+        },
+      },
+      modal: {
+        title: t("overview.modals.delete.title", {
+          defaultValue: "Delete this bill?",
+        }),
+        meterLabel: t("overview.modals.delete.meterLabel", { defaultValue: "Meter:" }),
+        billingLabel: t("overview.modals.delete.billingLabel", {
+          defaultValue: "Billing period:",
+        }),
+        warning: t("overview.modals.delete.warning", {
+          defaultValue: "This action cannot be undone",
+        }),
+        confirm: t("overview.modals.delete.confirm", { defaultValue: "Delete bill" }),
+        cancel: t("overview.modals.delete.cancel", { defaultValue: "Cancel" }),
+      },
+    }),
+    [t]
+  );
+  const fallbackDeviceLabel = React.useMemo(
+    () => t("overview.realtime.defaultDevice", { defaultValue: "Meter" }),
+    [t]
+  );
+  const fallbackMeterName = React.useCallback(
+    (id: string) =>
+      t("overview.realtime.fallbackMeterName", {
+        id,
+        defaultValue: "Meter {{id}}",
+      }),
+    [t]
+  );
+  const realtimeGatewayError = overviewText.errors.gateway;
+  const fetchBillingError = overviewText.errors.fetch;
+  const deleteBillingError = overviewText.errors.delete;
   const {
     searchSite,
     setSearchSite,
@@ -105,24 +273,27 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
     loading,
     error,
     refresh,
-  } = useBillingOverviewData(requiresSiteSelection ? null : normalizedSite);
+  } = useBillingOverviewData(requiresSiteSelection ? null : normalizedSite, fetchBillingError);
 
-  const fetchRealtimeRowsForSite = React.useCallback(async (siteCode: string) => {
-    const devicesResp = await getElectricDevices(siteCode);
-    const deviceItems = normalizeDeviceList(devicesResp);
-    if (!deviceItems.length) return [];
-    const dashboards = await Promise.allSettled(
-      deviceItems.map((device) => getMeterDashboard(device.id))
-    );
-    const rows: RealtimeRow[] = [];
-    dashboards.forEach((result) => {
-      if (result.status !== "fulfilled") return;
-      const mapped = dashboardToRealtimeRow(result.value);
-      if (mapped) rows.push(mapped);
-    });
-    rows.sort((a, b) => compareTimestampDesc(a.timestamp, b.timestamp));
-    return rows;
-  }, []);
+  const fetchRealtimeRowsForSite = React.useCallback(
+    async (siteCode: string) => {
+      const devicesResp = await getElectricDevices(siteCode);
+      const deviceItems = normalizeDeviceList(devicesResp, fallbackDeviceLabel);
+      if (!deviceItems.length) return [];
+      const dashboards = await Promise.allSettled(
+        deviceItems.map((device) => getMeterDashboard(device.id))
+      );
+      const rows: RealtimeRow[] = [];
+      dashboards.forEach((result) => {
+        if (result.status !== "fulfilled") return;
+        const mapped = dashboardToRealtimeRow(result.value, fallbackMeterName);
+        if (mapped) rows.push(mapped);
+      });
+      rows.sort((a, b) => compareTimestampDesc(a.timestamp, b.timestamp));
+      return rows;
+    },
+    [fallbackDeviceLabel, fallbackMeterName]
+  );
 
   React.useEffect(() => {
     if (requiresSiteSelection) {
@@ -142,7 +313,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
         console.error("[BillingOverview] load realtime failed", err);
         if (!cancelled) {
           setRealtimeRows([]);
-          setRealtimeError("ไม่สามารถโหลดค่าจาก Gateway ได้");
+          setRealtimeError(realtimeGatewayError);
         }
       })
       .finally(() => {
@@ -151,7 +322,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
     return () => {
       cancelled = true;
     };
-  }, [requiresSiteSelection, normalizedSite, fetchRealtimeRowsForSite]);
+  }, [requiresSiteSelection, normalizedSite, fetchRealtimeRowsForSite, realtimeGatewayError]);
 
   const handleRefreshRealtime = React.useCallback(() => {
     if (requiresSiteSelection) return;
@@ -162,10 +333,15 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
       .catch((err) => {
         console.error("[BillingOverview] load realtime failed", err);
         setRealtimeRows([]);
-        setRealtimeError("ไม่สามารถโหลดค่าจาก Gateway ได้");
+        setRealtimeError(realtimeGatewayError);
       })
       .finally(() => setRealtimeLoading(false));
-  }, [requiresSiteSelection, normalizedSite, fetchRealtimeRowsForSite]);
+  }, [
+    requiresSiteSelection,
+    normalizedSite,
+    fetchRealtimeRowsForSite,
+    realtimeGatewayError,
+  ]);
 
   const filteredRealtimeRows = React.useMemo(() => {
     const term = tableSearch.trim().toLowerCase();
@@ -207,14 +383,15 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
   const cardItems = React.useMemo(() => {
     const cards = billingData?.cards;
     return CARD_CONFIG.map((card) => {
+      const label = t(card.labelKey, { defaultValue: card.defaultLabel });
       let valueDisplay = loading ? "..." : "-";
       if (card.id === "usage") {
-        valueDisplay = realtimeUsageTotal.toLocaleString(undefined, {
+        valueDisplay = realtimeUsageTotal.toLocaleString(locale, {
           maximumFractionDigits: 2,
         });
       } else if (card.id === "billing") {
         const billAmount = cards?.billAmountThisMonth ?? 0;
-        valueDisplay = billAmount.toLocaleString("th-TH", {
+        valueDisplay = billAmount.toLocaleString(locale, {
           style: "currency",
           currency: "THB",
           minimumFractionDigits: 2,
@@ -223,9 +400,9 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
         const val = cards?.monthlyTrendPercent ?? 0;
         valueDisplay = `${val >= 0 ? "+" : ""}${val.toFixed(1)}%`;
       }
-      return { ...card, value: valueDisplay };
+      return { ...card, value: valueDisplay, label };
     });
-  }, [billingData, loading, realtimeUsageTotal]);
+  }, [billingData, loading, realtimeUsageTotal, t, locale]);
 
   const electricDeviceCount = getCountForType(inventoryCounts as any, "electricmeter" as any);
   const noElectricAccess =
@@ -292,11 +469,11 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
           const message =
             err instanceof Error
               ? err.message
-              : "ไม่สามารถลบบิลได้ กรุณาลองใหม่อีกครั้ง";
-          alert(message);
+              : deleteBillingError;
+          alert(message || deleteBillingError);
         });
     },
-    [deleteTarget, refresh]
+    [deleteTarget, refresh, deleteBillingError]
   );
   const handleDeleteCancel = React.useCallback(() => {
     setDeleteTarget(null);
@@ -308,16 +485,8 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   const siteGuardConfig =
     siteGuardType === "blocked"
-      ? {
-          title: "ไม่สามารถใช้งาน Billing ได้",
-          message: "Site นี้ยังไม่มีอุปกรณ์ไฟฟ้าที่รองรับ Billing กรุณาเลือก Site อื่น",
-          closeLabel: "ย้อนกลับ",
-        }
-      : {
-          title: "กรุณาเลือก Site ก่อนใช้งาน",
-          message: "โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานฟีเจอร์ Billing",
-          closeLabel: "โอเค",
-        };
+      ? overviewText.siteGuard.blocked
+      : overviewText.siteGuard.select;
 
   return (
     <Sidebar>
@@ -335,11 +504,9 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
         <div className="mx-auto w-full  px-6 pb-16">
           <div className="mt-6">
             <h1 className="text-2xl font-semibold text-slate-900">
-              Billing Overview
+              {overviewText.title}
             </h1>
-            <p className="text-sm text-slate-500">
-              ภาพรวมข้อมูลการใช้งานพลังงานและบิลจากฝั่ง Backend
-            </p>
+            <p className="text-sm text-slate-500">{overviewText.subtitle}</p>
           </div>
 
           {error && (
@@ -383,15 +550,17 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
             <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Real-Time Monitor</h2>
-                <p className="text-sm text-slate-500">รายการอ่านค่าล่าสุดจาก Gateway</p>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {overviewText.realtime.heading}
+                </h2>
+                <p className="text-sm text-slate-500">{overviewText.realtime.description}</p>
               </div>
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
                 <div className="md:w-64">
                   <SearchInput
                     value={tableSearch}
                     onChange={setTableSearch}
-                    placeholder="ค้นหารายการ..."
+                    placeholder={overviewText.realtime.searchPlaceholder}
                     disableMenu={true}
                   />
                 </div>
@@ -400,13 +569,13 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                     className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
                     onClick={handleRefreshRealtime}
                   >
-                    Refresh
+                    {overviewText.realtime.buttons.refresh}
                   </button>
                   <button
                     className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
                     onClick={() => navigate(abs("/electric/generate-bill"))}
                   >
-                    Generate Bills
+                    {overviewText.realtime.buttons.generate}
                   </button>
                 </div>
               </div>
@@ -416,28 +585,28 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
               <table className="w-full min-w-[800px] table-fixed">
                 <thead>
                   <tr className="text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-6 py-3 text-left">Meter</th>
-                    <th className="px-6 py-3 text-left">Energy On Peak (kWh)</th>
-                    <th className="px-6 py-3 text-left">Energy Off Peak (kWh)</th>
-                    <th className="px-6 py-3 text-left">Timestamp</th>
-                    <th className="px-6 py-3 text-center">Actions</th>
+                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.meter}</th>
+                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.onPeak}</th>
+                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.offPeak}</th>
+                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.timestamp}</th>
+                    <th className="px-6 py-3 text-center">{overviewText.realtime.table.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {realtimeLoading && (
                     <tr>
                       <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
-                        กำลังโหลดข้อมูล...
+                        {overviewText.realtime.loading}
                       </td>
                     </tr>
                   )}
                   {!realtimeLoading &&
                     filteredRealtimeRows.map((row) => {
                       const onPeakDisplay =
-                        row.onPeak !== null ? formatRealtimeValue(row.onPeak) : "-";
+                        row.onPeak !== null ? formatRealtimeValue(row.onPeak, locale) : "-";
                       const offPeakDisplay =
-                        row.offPeak !== null ? formatRealtimeValue(row.offPeak) : "-";
-                      const timestampDisplay = formatRealtimeTimestamp(row.timestamp);
+                        row.offPeak !== null ? formatRealtimeValue(row.offPeak, locale) : "-";
+                      const timestampDisplay = formatRealtimeTimestamp(row.timestamp, locale);
                       return (
                         <tr
                           key={row.meterId}
@@ -445,9 +614,9 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                         >
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900">{row.meter}</span>
+                             <span className="font-semibold text-slate-900">{row.meter}</span>
                               <span className="text-xs text-slate-500">
-                                Site: {row.site ?? "-"}
+                                {overviewText.realtime.siteLabel}: {row.site ?? "-"}
                               </span>
                             </div>
                           </td>
@@ -468,7 +637,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                                 className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50"
                                 onClick={() => handleRowSelect(row)}
                               >
-                                Monitor
+                                {overviewText.realtime.buttons.monitor}
                               </button>
                             </div>
                           </td>
@@ -478,7 +647,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
           {!realtimeLoading && filteredRealtimeRows.length === 0 && (
             <tr>
               <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
-                ไม่พบข้อมูลสำหรับเงื่อนไขปัจจุบัน
+                {overviewText.realtime.empty}
               </td>
             </tr>
           )}
@@ -492,14 +661,16 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
             <div className="mt-10 rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">
             <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Billing Records</h2>
-                <p className="text-sm text-slate-500">ข้อมูลบิลที่บันทึกและออกเอกสารแล้ว</p>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {overviewText.billing.heading}
+                </h2>
+                <p className="text-sm text-slate-500">{overviewText.billing.description}</p>
               </div>
               <div className="md:w-64">
                 <SearchInput
                   value={billingSearch}
                   onChange={setBillingSearch}
-                  placeholder="ค้นหาบิล..."
+                  placeholder={overviewText.billing.searchPlaceholder}
                   disableMenu={true}
                 />
               </div>
@@ -508,19 +679,25 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
               <table className="w-full min-w-[800px] table-fixed">
                 <thead>
                   <tr className="text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-6 py-3 text-left">Meter</th>
-                    <th className="px-6 py-3 text-left">รอบบิล</th>
-                    <th className="px-6 py-3 text-left">หน่วยใช้ (kWh)</th>
-                    <th className="px-6 py-3 text-left">ค่าไฟ (บาท)</th>
-                    <th className="px-6 py-3 text-left">Timestamp</th>
-                    <th className="px-6 py-3 text-center">Actions</th>
+                    <th className="px-6 py-3 text-left">{overviewText.billing.table.meter}</th>
+                    <th className="px-6 py-3 text-left">
+                      {overviewText.billing.table.billingPeriod}
+                    </th>
+                    <th className="px-6 py-3 text-left">{overviewText.billing.table.usage}</th>
+                    <th className="px-6 py-3 text-left">{overviewText.billing.table.cost}</th>
+                    <th className="px-6 py-3 text-left">
+                      {overviewText.billing.table.timestamp}
+                    </th>
+                    <th className="px-6 py-3 text-center">
+                      {overviewText.billing.table.actions}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading && !billingData && (
                     <tr>
                       <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
-                        กำลังโหลดข้อมูลบิล...
+                        {overviewText.billing.loading}
                       </td>
                     </tr>
                   )}
@@ -529,22 +706,24 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="font-semibold text-slate-900">{row.meter}</span>
-                          <span className="text-xs text-slate-500">Site: {row.site ?? "-"}</span>
+                          <span className="text-xs text-slate-500">
+                            {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                          </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-slate-900">
-                          {formatBillingPeriod(row)}
+                          {formatBillingPeriod(row, locale)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-slate-900">
-                          {formatValue(row.usageKwh ?? 0)}
+                          {formatValue(row.usageKwh ?? 0, locale)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className="font-semibold text-slate-900">
-                          {formatCurrency(row.billingCost ?? 0)}
+                          {formatCurrency(row.billingCost ?? 0, locale)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -559,14 +738,14 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                             onClick={() => handleBillingPreview(row)}
                             disabled={!row.id}
                           >
-                            Preview
+                            {overviewText.billing.buttons.preview}
                           </button>
                           <button
                             className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                             onClick={() => handleDeleteRequest(row)}
                             disabled={!row.id}
                           >
-                            Delete
+                            {overviewText.billing.buttons.delete}
                           </button>
                         </div>
                       </td>
@@ -575,7 +754,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                   {!loading && filteredBillingRows.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
-                        ไม่พบบิลในช่วงนี้
+                        {overviewText.billing.empty}
                       </td>
                     </tr>
                   )}
@@ -588,7 +767,9 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
           {activeCard === "trend" && (
             <div className="mt-10 space-y-6">
               <div className="rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)] p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-4">Monthly Trend Chart</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                  {overviewText.trend.chartTitle}
+                </h2>
                 <MonthlyChart
                   categories={billingData?.monthlyChart?.categories}
                   series={billingData?.monthlyChart?.series}
@@ -602,14 +783,16 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
               <div className="rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">
                 <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-900">Monthly Trend Table</h2>
-                    <p className="text-sm text-slate-500">ยอดค่าไฟรวมรายเดือน</p>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {overviewText.trend.tableTitle}
+                    </h2>
+                    <p className="text-sm text-slate-500">{overviewText.trend.tableSubtitle}</p>
                   </div>
                   <div className="md:w-64">
                     <SearchInput
                       value={monthlySearch}
                       onChange={setMonthlySearch}
-                      placeholder="ค้นหาเดือน..."
+                      placeholder={overviewText.trend.searchPlaceholder}
                       disableMenu={true}
                     />
                   </div>
@@ -618,10 +801,12 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                   <table className="w-full min-w-[700px] table-fixed">
                     <thead>
                       <tr className="text-xs uppercase tracking-wide text-slate-500">
-                        <th className="px-6 py-3 text-left">เดือน</th>
-                        <th className="px-6 py-3 text-left">ค่าไฟ (บาท)</th>
-                        <th className="px-6 py-3 text-left">หน่วยใช้ (kWh)</th>
-                        <th className="px-6 py-3 text-left">Timestamp</th>
+                        <th className="px-6 py-3 text-left">{overviewText.trend.table.month}</th>
+                        <th className="px-6 py-3 text-left">{overviewText.trend.table.cost}</th>
+                        <th className="px-6 py-3 text-left">{overviewText.trend.table.usage}</th>
+                        <th className="px-6 py-3 text-left">
+                          {overviewText.trend.table.timestamp}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -632,7 +817,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                           </td>
                           <td className="px-6 py-4">
                             <span className="font-semibold text-slate-900">
-                              {row.cost.toLocaleString(undefined, {
+                              {row.cost.toLocaleString(locale, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}
@@ -640,14 +825,14 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                           </td>
                           <td className="px-6 py-4">
                             <span className="font-semibold text-slate-900">
-                              {row.usageTotalKwh.toLocaleString(undefined, {
+                              {row.usageTotalKwh.toLocaleString(locale, {
                                 maximumFractionDigits: 2,
                               })}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <span className="font-semibold text-slate-900">
-                              {formatHistoryTimestamp(row.updatedAt)}
+                              {formatHistoryTimestamp(row.updatedAt, locale)}
                             </span>
                           </td>
                         </tr>
@@ -655,7 +840,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                       {filteredMonthlyList.length === 0 && (
                         <tr>
                           <td colSpan={4} className="px-6 py-6 text-center text-sm text-slate-500">
-                            ไม่พบข้อมูลรายเดือน
+                            {overviewText.trend.empty}
                           </td>
                         </tr>
                       )}
@@ -674,27 +859,30 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
         icon="cancel"
         title={siteGuardConfig.title}
         message={siteGuardConfig.message}
-        closeLabel={siteGuardConfig.closeLabel}
+        closeLabel={siteGuardConfig.close}
         onClose={handleSiteGuardClose}
       />
       <Modal
         open={Boolean(deleteTarget)}
         id="billing-delete-confirm"
         icon="warning"
-        title="ยืนยันการลบบิลนี้หรือไม่?"
+        title={overviewText.modal.title}
         message={
           deleteTarget ? (
             <div className="text-sm text-slate-600 space-y-1">
               <p>
-                มิเตอร์: <span className="font-semibold">{deleteTarget.meter ?? "-"}</span>
+                {overviewText.modal.meterLabel}{" "}
+                <span className="font-semibold">{deleteTarget.meter ?? "-"}</span>
               </p>
-              <p>รอบบิล: {formatBillingPeriod(deleteTarget)}</p>
-              <p className="text-red-600">การลบจะไม่สามารถกู้คืนได้</p>
+              <p>
+                {overviewText.modal.billingLabel} {formatBillingPeriod(deleteTarget, locale)}
+              </p>
+              <p className="text-red-600">{overviewText.modal.warning}</p>
             </div>
           ) : undefined
         }
-        confirmLabel="ลบบิล"
-        cancelLabel="ยกเลิก"
+        confirmLabel={overviewText.modal.confirm}
+        cancelLabel={overviewText.modal.cancel}
         onConfirm={() => handleDeleteConfirm(deleteTarget)}
         onClose={handleDeleteCancel}
       />
@@ -717,29 +905,29 @@ function compareTimestampDesc(a?: string | null, b?: string | null) {
   return 0;
 }
 
-function formatRealtimeValue(value: number) {
-  return value.toLocaleString(undefined, {
+function formatRealtimeValue(value: number, locale?: string) {
+  return value.toLocaleString(locale, {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
   });
 }
 
-function formatValue(value: number) {
-  return Number(value ?? 0).toLocaleString(undefined, {
+function formatValue(value: number, locale: string) {
+  return Number(value ?? 0).toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
-function formatCurrency(value: number) {
-  return Number(value ?? 0).toLocaleString("th-TH", {
+function formatCurrency(value: number, locale: string) {
+  return Number(value ?? 0).toLocaleString(locale, {
     style: "currency",
     currency: "THB",
     minimumFractionDigits: 2,
   });
 }
 
-function normalizeDeviceList(payload: any) {
+function normalizeDeviceList(payload: any, fallbackName: string) {
   const source =
     payload?.items ??
     payload?.data?.items ??
@@ -758,21 +946,27 @@ function normalizeDeviceList(payload: any) {
         meta.deviceCategory ?? meta.device_type ?? item?.category ?? ""
       ).toLowerCase();
       if (category && category !== "meter") return null;
+      const fallback =
+        typeof normalizedId === "string"
+          ? normalizedId.split(":").pop()
+          : undefined;
       return {
         id: normalizedId,
         name:
           details.name ??
           item?.name ??
-          (typeof normalizedId === "string"
-            ? normalizedId.split(":").pop()
-            : "Meter"),
+          fallback ??
+          fallbackName,
         siteName: item?.siteName ?? details.site ?? undefined,
       };
     })
     .filter(Boolean) as Array<{ id: string; name: string; siteName?: string }>;
 }
 
-function dashboardToRealtimeRow(dashboard: MeterDashboard): RealtimeRow | null {
+function dashboardToRealtimeRow(
+  dashboard: MeterDashboard,
+  fallbackMeterName: (id: string) => string
+): RealtimeRow | null {
   if (!dashboard?.device?.id) return null;
   const realtime = dashboard.realtime ?? dashboard.lastReading ?? null;
   const onPeak =
@@ -785,7 +979,7 @@ function dashboardToRealtimeRow(dashboard: MeterDashboard): RealtimeRow | null {
     meter:
       dashboard.device.name ??
       dashboard.device.serial ??
-      `มิเตอร์ ${dashboard.device.id.slice(0, 4)}`,
+      fallbackMeterName(dashboard.device.id),
     site: dashboard.device.siteName ?? undefined,
     onPeak,
     offPeak,
@@ -793,42 +987,49 @@ function dashboardToRealtimeRow(dashboard: MeterDashboard): RealtimeRow | null {
   };
 }
 
-const realtimeDateFormatter = new Intl.DateTimeFormat("th-TH-u-ca-gregory", {
-  year: "numeric",
-  month: "short",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-});
-
-function formatRealtimeTimestamp(value?: string | null) {
+function formatRealtimeTimestamp(value?: string | null, locale = "th-TH") {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return realtimeDateFormatter.format(date);
+  const fmt = new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return fmt.format(date);
 }
 
-function formatBillingPeriod(row: BillingRow) {
+function formatBillingPeriod(row: BillingRow, locale = "th-TH") {
   if (
     typeof row.billingPeriodMonth === "number" &&
     typeof row.billingPeriodYear === "number"
   ) {
     const date = new Date(row.billingPeriodYear, row.billingPeriodMonth - 1, 1);
-    return date.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+    return date.toLocaleDateString(locale, { month: "long", year: "numeric" });
   }
   if (row.timestamp) return row.timestamp.slice(0, 7);
   return "-";
 }
 
-function formatHistoryTimestamp(value?: string | null) {
+function formatHistoryTimestamp(value?: string | null, locale = "th-TH") {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return realtimeDateFormatter.format(date);
+  const fmt = new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return fmt.format(date);
 }
 
-function useBillingOverviewData(siteId: string | null) {
+function useBillingOverviewData(siteId: string | null, errorFallback: string) {
   const [state, setState] = React.useState<{
     data: BillingOverviewPayload | null;
     loading: boolean;
@@ -849,13 +1050,10 @@ function useBillingOverviewData(siteId: string | null) {
         setState({ data: payload, loading: false, error: null });
       })
       .catch((err) => {
-        const message =
-          err instanceof Error
-            ? err.message
-            : "ไม่สามารถดึงข้อมูล Billing ได้ในขณะนี้";
+        const message = err instanceof Error ? err.message : errorFallback;
         setState({ data: null, loading: false, error: message });
       });
-  }, [siteId]);
+  }, [siteId, errorFallback]);
 
   React.useEffect(() => {
     refresh().catch(() => undefined);

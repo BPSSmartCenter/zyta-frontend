@@ -21,7 +21,8 @@
     "alerts_offline": "จำนวนกล้อง",
     "alerts_fall": "ตรวจพบการล้ม",
     "alerts_sleep": "ตรวจพบนอนหลับ",
-    "user_management": "การจัดการผู้ใช้"
+    "user_management": "การจัดการผู้ใช้",
+    "site_management": "การจัดการไซต์"
   },
   "account": { "logout": "ออกจากระบบ" },
   "logout": {

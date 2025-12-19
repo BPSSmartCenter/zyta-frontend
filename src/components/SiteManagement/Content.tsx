@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import Dropdown from "../Dropdown";
 
@@ -19,6 +20,53 @@ export default function Content({
   onCreateClick,
   onDetail,
 }: Props) {
+  const { t } = useTranslation("siteManagement");
+  const texts = React.useMemo(
+    () => ({
+      title: t("content.title", { defaultValue: "Site Management" }),
+      subtitle: t("content.subtitle", {
+        defaultValue: "All sites managed by SuperAdmin",
+      }),
+      buttons: {
+        refresh: t("content.buttons.refresh", { defaultValue: "Refresh" }),
+        create: t("content.buttons.create", { defaultValue: "Register site" }),
+      },
+      search: {
+        label: t("content.search.label", { defaultValue: "Search" }),
+        placeholder: t("content.search.placeholder", {
+          defaultValue: "Search by site name or code",
+        }),
+      },
+      province: {
+        label: t("content.province.label", { defaultValue: "Province" }),
+        all: t("content.province.all", { defaultValue: "All provinces" }),
+      },
+      table: {
+        site: t("content.table.site", { defaultValue: "Site" }),
+        code: t("content.table.code", { defaultValue: "Code" }),
+        address: t("content.table.address", { defaultValue: "Address" }),
+        devices: t("content.table.devices", { defaultValue: "Devices" }),
+        users: t("content.table.users", { defaultValue: "Users" }),
+        actions: t("content.table.actions", { defaultValue: "Actions" }),
+      },
+      status: {
+        loading: t("content.loading", { defaultValue: "Loading sites..." }),
+        empty: t("content.empty", { defaultValue: "No sites found" }),
+      },
+      detail: t("content.detail", { defaultValue: "Detail" }),
+      pagination: {
+        prev: t("content.pagination.prev", { defaultValue: "Prev" }),
+        next: t("content.pagination.next", { defaultValue: "Next" }),
+        label: (page: number, total: number) =>
+          t("content.pagination.label", {
+            page,
+            total,
+            defaultValue: "Page {{page}} / {{total}}",
+          }),
+      },
+    }),
+    [t]
+  );
   const [search, setSearch] = React.useState("");
   const [provinceFilter, setProvinceFilter] = React.useState("all");
   const [page, setPage] = React.useState(1);
@@ -57,11 +105,9 @@ export default function Content({
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between pb-4 border-b">
         <div>
           <h1 className="font-bold text-[22px] md:text-[24px]">
-            Site Management
+            {texts.title}
           </h1>
-          <p className="text-sm text-gray-500">
-            รายการไซต์ทั้งหมดที่ SuperAdmin ดูแล
-          </p>
+          <p className="text-sm text-gray-500">{texts.subtitle}</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -71,21 +117,23 @@ export default function Content({
             disabled={loading}
           >
             <i className="material-icons-outlined text-base">refresh</i>
-            Refresh
+            {texts.buttons.refresh}
           </button>
           <button
             onClick={onCreateClick}
             className="flex items-center gap-2 bg-cyan text-white p-2 px-3 rounded-lg cursor-pointer hover:bg-cyan-400"
           >
             <i className="material-icons-outlined">add_circle</i>
-            <span className="hidden md:block">Register site</span>
+            <span className="hidden md:block">{texts.buttons.create}</span>
           </button>
         </div>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto]">
         <div>
-          <label className="text-sm font-semibold block mb-2">Search</label>
+          <label className="text-sm font-semibold block mb-2">
+            {texts.search.label}
+          </label>
           <input
             type="text"
             value={search}
@@ -93,16 +141,18 @@ export default function Content({
               setPage(1);
               setSearch(e.target.value);
             }}
-            placeholder="ค้นหาด้วยชื่อหรือรหัสไซต์"
+            placeholder={texts.search.placeholder}
             className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
           />
         </div>
         <div>
-          <label className="text-sm font-semibold block mb-2">Province</label>
+          <label className="text-sm font-semibold block mb-2">
+            {texts.province.label}
+          </label>
           <Dropdown
             options={provinces.map((value) => ({
               value,
-              label: value === "all" ? "ทุกจังหวัด" : value,
+              label: value === "all" ? texts.province.all : value,
             }))}
             value={provinceFilter}
             onChange={(val) => {
@@ -126,7 +176,7 @@ export default function Content({
                   })}
                 >
                   <span className="truncate">
-                    {selected?.label ?? "ทุกจังหวัด"}
+                    {selected?.label ?? texts.province.all}
                   </span>
                   <i className="material-icons leading-none">
                     {open ? "arrow_drop_up" : "arrow_drop_down"}
@@ -163,25 +213,25 @@ export default function Content({
         <table className="min-w-full">
           <thead>
             <tr className="text-left text-gray-500 text-xs uppercase tracking-wide">
-              <th className="pb-3">Site</th>
-              <th className="pb-3">Code</th>
-              <th className="pb-3">Address</th>
-              <th className="pb-3 text-center">Devices</th>
-              <th className="pb-3 text-center">Users</th>
-              <th className="pb-3 text-center">Actions</th>
+              <th className="pb-3">{texts.table.site}</th>
+              <th className="pb-3">{texts.table.code}</th>
+              <th className="pb-3">{texts.table.address}</th>
+              <th className="pb-3 text-center">{texts.table.devices}</th>
+              <th className="pb-3 text-center">{texts.table.users}</th>
+              <th className="pb-3 text-center">{texts.table.actions}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 text-sm">
             {loading ? (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-gray-500">
-                  กำลังโหลดข้อมูล...
+                  {texts.status.loading}
                 </td>
               </tr>
             ) : rowsPage.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-gray-500">
-                  ไม่พบข้อมูลไซต์
+                  {texts.status.empty}
                 </td>
               </tr>
             ) : (
@@ -213,7 +263,7 @@ export default function Content({
                       <i className="material-icons-outlined text-sm">
                         visibility
                       </i>
-                      Detail
+                      {texts.detail}
                     </button>
                   </td>
                 </tr>
@@ -230,17 +280,17 @@ export default function Content({
             disabled={page === 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
-            Prev
+            {texts.pagination.prev}
           </button>
           <div className="px-3 py-1 text-sm font-semibold">
-            หน้า {page} / {pageCount}
+            {texts.pagination.label(page, pageCount)}
           </div>
           <button
             className="px-3 py-1 border rounded-md text-sm disabled:opacity-40"
             disabled={page === pageCount}
             onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
           >
-            Next
+            {texts.pagination.next}
           </button>
         </div>
       )}

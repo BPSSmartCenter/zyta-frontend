@@ -24,7 +24,8 @@
     "alerts_offline": "Cameras offline",
     "alerts_fall": "Fall detected",
     "alerts_sleep": "Sleep detected",
-    "user_management": "User Management"
+    "user_management": "User Management",
+    "site_management": "Site Management"
   },
   "account": {
     "logout": "Sign out"

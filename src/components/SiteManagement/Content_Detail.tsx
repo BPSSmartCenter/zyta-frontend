@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import { getSiteDetails, updateSiteBillingAccess } from "../../api/sites";
 import { registerElectricDevice } from "../../api/electric";
@@ -123,6 +124,214 @@ export default function ContentDetail({
   onEdit,
   onDelete,
 }: Props) {
+  const { t } = useTranslation("siteManagement");
+  const texts = React.useMemo(
+    () => ({
+      buttons: {
+        back: t("detail.buttons.back", { defaultValue: "Back to list" }),
+        refresh: t("detail.buttons.refresh", { defaultValue: "Refresh" }),
+        edit: t("detail.buttons.edit", { defaultValue: "Edit site" }),
+        delete: t("detail.buttons.delete", { defaultValue: "Delete" }),
+        addDevice: t("detail.devices.addButton", { defaultValue: "Add device" }),
+        enableBilling: t("detail.billing.enable", { defaultValue: "Enable Billing" }),
+        saveRates: t("detail.billing.save", { defaultValue: "Save rates" }),
+        savingRates: t("detail.billing.saving", { defaultValue: "Saving..." }),
+      },
+      summary: {
+        code: t("detail.summary.code", { defaultValue: "Code:" }),
+        address: t("detail.summary.address", { defaultValue: "Address:" }),
+        latLng: t("detail.summary.latLng", { defaultValue: "Lat / Lng:" }),
+        zipcode: t("detail.summary.zipcode", { defaultValue: "Zipcode:" }),
+        title: t("detail.summary.statsTitle", { defaultValue: "Summary Stats" }),
+        devices: t("detail.summary.devices", { defaultValue: "Total devices" }),
+        users: t("detail.summary.users", { defaultValue: "Users" }),
+      },
+      statusMessages: {
+        loadError: t("detail.errors.load", {
+          defaultValue: "Unable to fetch latest data",
+        }),
+        loadingDevices: t("detail.devices.loading", {
+          defaultValue: "Loading...",
+        }),
+        emptyDevices: t("detail.devices.empty", {
+          defaultValue: "No devices in this category",
+        }),
+      },
+      searchPlaceholder: t("detail.devices.searchPlaceholder", {
+        defaultValue: "Search name, serial or IP",
+      }),
+      deviceTabs: {
+        electric: t("detail.devices.tabs.electric", {
+          defaultValue: "Electric Devices",
+        }),
+        water: t("detail.devices.tabs.water", {
+          defaultValue: "Water Meter Devices",
+        }),
+        air: t("detail.devices.tabs.air", { defaultValue: "Air Sensor Devices" }),
+        camera: t("detail.devices.tabs.camera", { defaultValue: "CCTV Devices" }),
+      },
+      billing: {
+        electricTitle: t("detail.billing.electric.title", {
+          defaultValue: "Electric Billing",
+        }),
+        electricHint: t("detail.billing.electric.hint", {
+          defaultValue: "Enter base and discount values before enabling.",
+        }),
+        waterTitle: t("detail.billing.water.title", {
+          defaultValue: "Water Billing",
+        }),
+        waterHint: t("detail.billing.water.hint", {
+          defaultValue: "Enable or disable water billing.",
+        }),
+        baseOn: t("detail.billing.fields.baseOn", {
+          defaultValue: "Base (On Peak) THB/unit",
+        }),
+        baseOff: t("detail.billing.fields.baseOff", {
+          defaultValue: "Base (Off Peak) THB/unit",
+        }),
+        discount: t("detail.billing.fields.discount", {
+          defaultValue: "Discount rate (%) 0-100",
+        }),
+        discountNote: t("detail.billing.discountNote", {
+          defaultValue: "Example: discount 30 = 30% off",
+        }),
+      },
+      table: {
+        headers: {
+          device: t("detail.devices.table.device", { defaultValue: "Device" }),
+          model: t("detail.devices.table.model", { defaultValue: "Model" }),
+          serial: t("detail.devices.table.serial", { defaultValue: "Serial" }),
+          status: t("detail.devices.table.status", { defaultValue: "Status" }),
+          actions: t("detail.devices.table.actions", { defaultValue: "Actions" }),
+        },
+        actions: {
+          edit: t("detail.devices.table.edit", { defaultValue: "Edit" }),
+          delete: t("detail.devices.table.delete", { defaultValue: "Delete" }),
+          copyId: t("detail.devices.table.copyId", { defaultValue: "Copy ID" }),
+        },
+      },
+      pagination: {
+        prev: t("detail.devices.pagination.prev", { defaultValue: "Prev" }),
+        next: t("detail.devices.pagination.next", { defaultValue: "Next" }),
+        label: (start: number, end: number, total: number) =>
+          total === 0
+            ? t("detail.devices.pagination.empty", { defaultValue: "0 items" })
+            : t("detail.devices.pagination.label", {
+                start,
+                end,
+                total,
+                defaultValue: "{{start}}-{{end}} of {{total}} items",
+              }),
+      },
+      toasts: {
+        copySuccess: (id: string) =>
+          t("detail.devices.copyId.success", {
+            id,
+            defaultValue: "Copied ID: {{id}}",
+          }),
+        copyFailed: t("detail.devices.copyId.failed", {
+          defaultValue: "Unable to copy Device ID",
+        }),
+        billingToggleFailed: t("detail.billing.toggleFailed", {
+          defaultValue: "Unable to update billing status",
+        }),
+        billingSaveSuccess: t("detail.billing.saveSuccess", {
+          defaultValue: "Billing rates saved",
+        }),
+        billingSaveFailed: t("detail.billing.saveFailed", {
+          defaultValue: "Unable to save billing rates",
+        }),
+        deviceDeleteSuccess: t("detail.devices.deleteSuccess", {
+          defaultValue: "Device deleted",
+        }),
+        deviceDeleteFailed: t("detail.devices.deleteFailed", {
+          defaultValue: "Unable to delete device",
+        }),
+        deviceSaveSuccess: t("detail.devices.saveSuccess", {
+          defaultValue: "Device saved",
+        }),
+        deviceSaveFailed: t("detail.devices.saveFailed", {
+          defaultValue: "Unable to save device",
+        }),
+      },
+      confirm: {
+        deleteDevice: (name: string) =>
+          t("confirm.deleteDevice", {
+            name,
+            defaultValue: "Delete device {{name}}?",
+          }),
+      },
+      billingValidation: {
+        baseOn: t("detail.billing.validation.baseOn", {
+          defaultValue: "Please enter Base (On Peak) greater than 0",
+        }),
+        baseOff: t("detail.billing.validation.baseOff", {
+          defaultValue: "Please enter Base (Off Peak) greater than 0",
+        }),
+        discount: t("detail.billing.validation.discount", {
+          defaultValue: "Discount rate must be between 0 and 100",
+        }),
+        generic: t("detail.billing.validation.generic", {
+          defaultValue: "Please complete billing rates",
+        }),
+      },
+      deviceForm: {
+        titleAdd: t("detail.devices.form.titleAdd", { defaultValue: "Add device" }),
+        titleEdit: t("detail.devices.form.titleEdit", { defaultValue: "Edit device" }),
+        labels: {
+          category: t("detail.devices.form.labels.category", { defaultValue: "Category" }),
+          sn: t("detail.devices.form.labels.sn", { defaultValue: "SN" }),
+          deviceKey: t("detail.devices.form.labels.deviceKey", {
+            defaultValue: "Device key",
+          }),
+          status: t("detail.devices.form.labels.status", { defaultValue: "Status" }),
+          ipAddress: t("detail.devices.form.labels.ipAddress", {
+            defaultValue: "IP Address",
+          }),
+          name: t("detail.devices.form.labels.name", { defaultValue: "Name" }),
+        },
+        placeholders: {
+          sn: t("detail.devices.form.placeholders.sn", {
+            defaultValue: "Serial Number",
+          }),
+          deviceKey: t("detail.devices.form.placeholders.deviceKey", {
+            defaultValue: "Unique device key",
+          }),
+          ipAddress: t("detail.devices.form.placeholders.ipAddress", {
+            defaultValue: "192.168.x.x",
+          }),
+          name: t("detail.devices.form.placeholders.name", {
+            defaultValue: "Friendly name",
+          }),
+        },
+        errors: {
+          snRequired: t("detail.devices.form.errors.snRequired", {
+            defaultValue: "Please enter Serial Number",
+          }),
+          deviceKeyRequired: t("detail.devices.form.errors.deviceKeyRequired", {
+            defaultValue: "Please enter Device Key",
+          }),
+        },
+        buttons: {
+          cancel: t("form.buttons.cancel", { defaultValue: "Cancel" }),
+          submit: t("detail.devices.form.buttons.submit", {
+            defaultValue: "Save device",
+          }),
+          submitting: t("detail.devices.form.buttons.submitting", {
+            defaultValue: "Saving...",
+          }),
+        },
+      },
+      statuses: {
+        online: t("detail.devices.status.online", { defaultValue: "online" }),
+        offline: t("detail.devices.status.offline", { defaultValue: "offline" }),
+        maintenance: t("detail.devices.status.maintenance", {
+          defaultValue: "maintenance",
+        }),
+      },
+    }),
+    [t]
+  );
   const { show } = useToast();
   const [siteInfo, setSiteInfo] = React.useState<SiteRow>(site);
   const [devices, setDevices] = React.useState<DeviceMap>(() => ({
@@ -159,6 +368,15 @@ export default function ContentDetail({
   );
   const [deviceSearch, setDeviceSearch] = React.useState("");
   const [devicePage, setDevicePage] = React.useState(1);
+  const deviceSections = React.useMemo(
+    () => [
+      { key: "electric" as DeviceTypeKey, label: texts.deviceTabs.electric },
+      { key: "water" as DeviceTypeKey, label: texts.deviceTabs.water },
+      { key: "air" as DeviceTypeKey, label: texts.deviceTabs.air },
+      { key: "camera" as DeviceTypeKey, label: texts.deviceTabs.camera },
+    ],
+    [texts.deviceTabs]
+  );
 
   const siteKey = siteInfo.id || site.id || site.code;
   const activeDevices = React.useMemo(
@@ -194,13 +412,12 @@ export default function ContentDetail({
     const start = (devicePage - 1) * PAGE_SIZE;
     return filteredDevices.slice(start, start + PAGE_SIZE);
   }, [filteredDevices, devicePage]);
-  const paginationLabel =
-    filteredDevices.length === 0
-      ? "0 รายการ"
-      : `${(devicePage - 1) * PAGE_SIZE + 1}-${Math.min(
-          filteredDevices.length,
-          devicePage * PAGE_SIZE
-        )} จาก ${filteredDevices.length} รายการ`;
+  const paginationLabel = React.useMemo(() => {
+    if (filteredDevices.length === 0) return texts.pagination.label(0, 0, 0);
+    const start = (devicePage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(filteredDevices.length, devicePage * PAGE_SIZE);
+    return texts.pagination.label(start, end, filteredDevices.length);
+  }, [filteredDevices.length, devicePage, texts.pagination]);
   const activeBillingType = SECTION_BILLING_TYPE[activeDeviceType];
   const brandingLogoSrc = React.useMemo(
     () => buildBrandingLogoSrc(siteInfo.brandingLogoUrl ?? null),
@@ -296,11 +513,11 @@ export default function ContentDetail({
       setDevices(nextDevices);
     } catch (err) {
       console.error("[SiteDetail] load failed", err);
-      setError("ไม่สามารถดึงข้อมูลล่าสุดได้");
+      setError(texts.statusMessages.loadError);
     } finally {
       setLoading(false);
     }
-  }, [siteKey]);
+  }, [siteKey, texts.statusMessages.loadError]);
 
   React.useEffect(() => {
     loadDetail();
@@ -332,7 +549,7 @@ export default function ContentDetail({
           variant: "normal",
           message: (
             <span className="font-semibold text-gray-900">
-              Copy ID: {device.id}
+              {texts.toasts.copySuccess(device.id)}
             </span>
           ),
         });
@@ -342,13 +559,13 @@ export default function ContentDetail({
           variant: "error",
           message: (
             <span className="text-white font-semibold">
-              ไม่สามารถคัดลอก Device ID ได้
+              {texts.toasts.copyFailed}
             </span>
           ),
         });
       }
     },
-    [show]
+    [show, texts.toasts]
   );
 
   const handleRateInputChange =
@@ -397,11 +614,11 @@ export default function ContentDetail({
   const validateBillingRates = React.useCallback(() => {
     const onPeak = Number(billingRates.baseOnPeak);
     if (!Number.isFinite(onPeak) || onPeak <= 0) {
-      return { ok: false, message: "กรุณากรอก Base (On Peak) ให้มากกว่า 0" };
+      return { ok: false, message: texts.billingValidation.baseOn };
     }
     const offPeak = Number(billingRates.baseOffPeak);
     if (!Number.isFinite(offPeak) || offPeak <= 0) {
-      return { ok: false, message: "กรุณากรอก Base (Off Peak) ให้มากกว่า 0" };
+      return { ok: false, message: texts.billingValidation.baseOff };
     }
     const discountPercent = Number(billingRates.discountRate);
     if (
@@ -411,7 +628,7 @@ export default function ContentDetail({
     ) {
       return {
         ok: false,
-        message: "Discount rate (%) ต้องอยู่ระหว่าง 0 - 100",
+        message: texts.billingValidation.discount,
       };
     }
     return {
@@ -422,7 +639,7 @@ export default function ContentDetail({
         billingDiscountRate: Number((discountPercent / 100).toFixed(4)),
       },
     };
-  }, [billingRates]);
+  }, [billingRates, texts.billingValidation]);
 
   const handleBillingToggle = async (type: BillingType, next: boolean) => {
     if (!siteIdentifier) return;
@@ -439,7 +656,7 @@ export default function ContentDetail({
           variant: "error",
           message: (
             <span className="text-white font-semibold">
-              {validation.message ?? "กรุณากรอกอัตราค่าไฟให้ครบถ้วน"}
+              {validation.message ?? texts.billingValidation.generic}
             </span>
           ),
         });
@@ -469,7 +686,7 @@ export default function ContentDetail({
         variant: "error",
         message: (
           <span className="text-white font-semibold">
-            ปรับสถานะ Billing ไม่สำเร็จ
+            {texts.toasts.billingToggleFailed}
           </span>
         ),
       });
@@ -486,7 +703,7 @@ export default function ContentDetail({
         variant: "error",
         message: (
           <span className="text-white font-semibold">
-            {validation.message ?? "กรุณากรอกข้อมูลอัตราค่าไฟให้ครบ"}
+            {validation.message ?? texts.billingValidation.generic}
           </span>
         ),
       });
@@ -500,7 +717,7 @@ export default function ContentDetail({
         variant: "success",
         message: (
           <span className="text-white font-semibold">
-            บันทึกอัตราค่าไฟเรียบร้อย
+            {texts.toasts.billingSaveSuccess}
           </span>
         ),
       });
@@ -510,7 +727,7 @@ export default function ContentDetail({
         variant: "error",
         message: (
           <span className="text-white font-semibold">
-            บันทึกอัตราค่าไฟไม่สำเร็จ
+            {texts.toasts.billingSaveFailed}
           </span>
         ),
       });
@@ -524,14 +741,16 @@ export default function ContentDetail({
     const confirmed =
       typeof window === "undefined"
         ? true
-        : window.confirm(`ยืนยันลบอุปกรณ์ ${device.name}?`);
+        : window.confirm(texts.confirm.deleteDevice(device.name));
     if (!confirmed) return;
     try {
       await deleteSiteDevice(siteIdentifier, device.id);
       show({
         variant: "success",
         message: (
-          <span className="text-white font-semibold">ลบอุปกรณ์แล้ว</span>
+          <span className="text-white font-semibold">
+            {texts.toasts.deviceDeleteSuccess}
+          </span>
         ),
       });
       loadDetail();
@@ -540,7 +759,9 @@ export default function ContentDetail({
       show({
         variant: "error",
         message: (
-          <span className="text-white font-semibold">ลบอุปกรณ์ไม่สำเร็จ</span>
+          <span className="text-white font-semibold">
+            {texts.toasts.deviceDeleteFailed}
+          </span>
         ),
       });
     }
@@ -564,7 +785,7 @@ export default function ContentDetail({
         variant: "success",
         message: (
           <span className="text-white font-semibold">
-            บันทึกข้อมูลอุปกรณ์แล้ว
+            {texts.toasts.deviceSaveSuccess}
           </span>
         ),
       });
@@ -576,7 +797,7 @@ export default function ContentDetail({
         variant: "error",
         message: (
           <span className="text-white font-semibold">
-            บันทึกอุปกรณ์ไม่สำเร็จ
+            {texts.toasts.deviceSaveFailed}
           </span>
         ),
       });
@@ -594,7 +815,7 @@ export default function ContentDetail({
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 cursor-pointer"
         >
           <i className="material-icons-outlined text-base">arrow_back</i>
-          Back to list
+          {texts.buttons.back}
         </button>
         <div className="flex gap-2">
           <button
@@ -604,7 +825,7 @@ export default function ContentDetail({
             disabled={loading}
           >
             <i className="material-icons-outlined text-base">refresh</i>
-            Refresh
+            {texts.buttons.refresh}
           </button>
           <button
             type="button"
@@ -612,7 +833,7 @@ export default function ContentDetail({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-gray-200 text-sm hover:bg-gray-50 cursor-pointer"
           >
             <i className="material-icons-outlined text-base">edit</i>
-            Edit site
+            {texts.buttons.edit}
           </button>
           <button
             type="button"
@@ -620,7 +841,7 @@ export default function ContentDetail({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
           >
             <i className="material-icons-outlined text-base">delete</i>
-            Delete
+            {texts.buttons.delete}
           </button>
         </div>
       </div>
@@ -628,7 +849,9 @@ export default function ContentDetail({
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
           <h2 className="text-xl font-semibold">{siteInfo.name}</h2>
-          <p className="text-sm text-gray-500">Code: {siteInfo.code}</p>
+          <p className="text-sm text-gray-500">
+            {texts.summary.code} {siteInfo.code}
+          </p>
           {brandingLogoSrc && (
             <div className="mt-4 flex justify-start">
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
@@ -642,30 +865,30 @@ export default function ContentDetail({
           )}
           <div className="mt-4 space-y-2 text-sm text-gray-700">
             <div>
-              <span className="font-semibold">Address:</span>{" "}
+              <span className="font-semibold">{texts.summary.address}</span>{" "}
               {addressLines || "-"}
             </div>
             <div>
-              <span className="font-semibold">Lat / Lng:</span>{" "}
+              <span className="font-semibold">{texts.summary.latLng}</span>{" "}
               {formatCoord(siteInfo.lat)} , {formatCoord(siteInfo.lng)}
             </div>
             <div>
-              <span className="font-semibold">Zipcode:</span>{" "}
+              <span className="font-semibold">{texts.summary.zipcode}</span>{" "}
               {siteInfo.zipcode ?? "-"}
             </div>
           </div>
         </div>
         <div className="bg-gray-50 rounded-xl p-4">
           <h3 className="text-sm font-semibold text-gray-600">
-            Summary Stats
+            {texts.summary.title}
           </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <div className="text-gray-500">Total devices</div>
+              <div className="text-gray-500">{texts.summary.devices}</div>
               <div className="text-lg font-bold">{siteInfo.devicesTotal}</div>
             </div>
             <div>
-              <div className="text-gray-500">Users</div>
+              <div className="text-gray-500">{texts.summary.users}</div>
               <div className="text-lg font-bold">{siteInfo.usersCount}</div>
             </div>
           </div>
@@ -694,7 +917,7 @@ export default function ContentDetail({
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap gap-2">
-          {DEVICE_SECTIONS.map((section) => (
+          {deviceSections.map((section) => (
             <button
               key={section.key}
               type="button"
@@ -721,7 +944,7 @@ export default function ContentDetail({
             </i>
             <input
               type="text"
-              placeholder="ค้นหาชื่อ Serial หรือ IP"
+              placeholder={texts.searchPlaceholder}
               className="flex-1 border-none bg-transparent text-sm text-gray-700 outline-none"
               value={deviceSearch}
               onChange={handleDeviceSearchChange}
@@ -735,7 +958,7 @@ export default function ContentDetail({
             className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
             <i className="material-icons-outlined text-base">add</i>
-            Add device
+            {texts.buttons.addDevice}
           </button>
         </div>
 
@@ -744,10 +967,10 @@ export default function ContentDetail({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h4 className="text-sm font-semibold text-cyan-900">
-                  Electric Billing
+                  {texts.billing.electricTitle}
                 </h4>
                 <p className="text-xs text-cyan-900/70">
-                  กรอกค่า base และ discount ก่อนเปิดใช้งาน
+                  {texts.billing.electricHint}
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-cyan-900 cursor-pointer select-none">
@@ -760,12 +983,12 @@ export default function ContentDetail({
                     handleBillingToggle("electric", e.target.checked)
                   }
                 />
-                <span>Enable Billing</span>
+                <span>{texts.buttons.enableBilling}</span>
               </label>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <label className="text-xs font-semibold text-cyan-900">
-                Base (On Peak) บาท/หน่วย
+                {texts.billing.baseOn}
                 <input
                   type="number"
                   min="0"
@@ -776,7 +999,7 @@ export default function ContentDetail({
                 />
               </label>
               <label className="text-xs font-semibold text-cyan-900">
-                Base (Off Peak) บาท/หน่วย
+                {texts.billing.baseOff}
                 <input
                   type="number"
                   min="0"
@@ -787,7 +1010,7 @@ export default function ContentDetail({
                 />
               </label>
               <label className="text-xs font-semibold text-cyan-900">
-                Discount rate (%) 0-100
+                {texts.billing.discount}
                 <input
                   type="number"
                   min="0"
@@ -811,9 +1034,11 @@ export default function ContentDetail({
                     : "bg-cyan-500 hover:bg-cyan-600",
                 ].join(" ")}
               >
-                {billingConfigSaving ? "กำลังบันทึก..." : "บันทึกอัตรา"}
+                {billingConfigSaving
+                  ? texts.buttons.savingRates
+                  : texts.buttons.saveRates}
               </button>
-              <span>ตัวอย่าง discount 30 = ลด 30%</span>
+              <span>{texts.billing.discountNote}</span>
             </div>
           </div>
         )}
@@ -823,10 +1048,10 @@ export default function ContentDetail({
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-sm font-semibold text-blue-900">
-                  Water Billing
+                  {texts.billing.waterTitle}
                 </h4>
                 <p className="text-xs text-blue-900/70">
-                  ใช้สำหรับเปิด/ปิดการคิดค่าบริการน้ำ
+                  {texts.billing.waterHint}
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-blue-900 cursor-pointer select-none">
@@ -839,7 +1064,7 @@ export default function ContentDetail({
                     handleBillingToggle("water", e.target.checked)
                   }
                 />
-                <span>Enable Billing</span>
+                <span>{texts.buttons.enableBilling}</span>
               </label>
             </div>
           </div>
@@ -847,16 +1072,18 @@ export default function ContentDetail({
 
         <div className="mt-5 overflow-x-auto rounded-lg border border-gray-100">
           {loading ? (
-            <div className="px-4 py-6 text-sm text-gray-500">กำลังโหลด...</div>
+            <div className="px-4 py-6 text-sm text-gray-500">
+              {texts.statusMessages.loadingDevices}
+            </div>
           ) : paginatedDevices.length ? (
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                 <tr>
-                  <th className="px-4 py-2 text-left">Device</th>
-                  <th className="px-4 py-2 text-left">Model</th>
-                  <th className="px-4 py-2 text-left">Serial</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left">Actions</th>
+                  <th className="px-4 py-2 text-left">{texts.table.headers.device}</th>
+                  <th className="px-4 py-2 text-left">{texts.table.headers.model}</th>
+                  <th className="px-4 py-2 text-left">{texts.table.headers.serial}</th>
+                  <th className="px-4 py-2 text-left">{texts.table.headers.status}</th>
+                  <th className="px-4 py-2 text-left">{texts.table.headers.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -867,7 +1094,10 @@ export default function ContentDetail({
                     </td>
                     <td className="px-4 py-2 text-gray-700">{item.model}</td>
                     <td className="px-4 py-2 text-gray-700">{item.serial}</td>
-                    <td className="px-4 py-2 text-gray-700">{item.status}</td>
+                    <td className="px-4 py-2 text-gray-700">
+                      {texts.statuses[item.status as keyof typeof texts.statuses] ??
+                        item.status}
+                    </td>
                     <td className="px-4 py-2 text-gray-700">
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -884,7 +1114,7 @@ export default function ContentDetail({
                           <i className="material-icons-outlined text-xs">
                             edit
                           </i>
-                          Edit
+                          {texts.table.actions.edit}
                         </button>
                         <button
                           type="button"
@@ -894,7 +1124,7 @@ export default function ContentDetail({
                           <i className="material-icons-outlined text-xs">
                             delete
                           </i>
-                          Delete
+                          {texts.table.actions.delete}
                         </button>
                         <button
                           type="button"
@@ -904,7 +1134,7 @@ export default function ContentDetail({
                           <i className="material-icons-outlined text-xs">
                             content_copy
                           </i>
-                          Copy ID
+                          {texts.table.actions.copyId}
                         </button>
                       </div>
                     </td>
@@ -914,7 +1144,7 @@ export default function ContentDetail({
             </table>
           ) : (
             <div className="px-4 py-6 text-sm text-gray-500">
-              ยังไม่มีอุปกรณ์ในหมวดนี้
+              {texts.statusMessages.emptyDevices}
             </div>
           )}
         </div>
@@ -934,7 +1164,7 @@ export default function ContentDetail({
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300",
               ].join(" ")}
             >
-              ก่อนหน้า
+              {texts.pagination.prev}
             </button>
             <button
               type="button"
@@ -949,7 +1179,7 @@ export default function ContentDetail({
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300",
               ].join(" ")}
             >
-              ถัดไป
+              {texts.pagination.next}
             </button>
           </div>
         </div>
@@ -1033,6 +1263,65 @@ function DeviceForm({
   onCancel,
   onSubmit,
 }: DeviceFormProps) {
+  const { t } = useTranslation("siteManagement");
+  const texts = React.useMemo(
+    () => ({
+      title: device
+        ? t("detail.devices.form.titleEdit", { defaultValue: "Edit device" })
+        : t("detail.devices.form.titleAdd", { defaultValue: "Add device" }),
+      typeLabel: t(`detail.devices.tabs.${type}`, {
+        defaultValue: type,
+      }),
+      labels: {
+        category: t("detail.devices.form.labels.category", { defaultValue: "Category" }),
+        sn: t("detail.devices.form.labels.sn", { defaultValue: "SN" }),
+        deviceKey: t("detail.devices.form.labels.deviceKey", {
+          defaultValue: "Device key",
+        }),
+        status: t("detail.devices.form.labels.status", { defaultValue: "Status" }),
+        ipAddress: t("detail.devices.form.labels.ipAddress", {
+          defaultValue: "IP Address",
+        }),
+        name: t("detail.devices.form.labels.name", { defaultValue: "Name" }),
+      },
+      placeholders: {
+        sn: t("detail.devices.form.placeholders.sn", {
+          defaultValue: "Serial Number",
+        }),
+        deviceKey: t("detail.devices.form.placeholders.deviceKey", {
+          defaultValue: "Unique device key",
+        }),
+        ipAddress: t("detail.devices.form.placeholders.ipAddress", {
+          defaultValue: "192.168.x.x",
+        }),
+        name: t("detail.devices.form.placeholders.name", {
+          defaultValue: "Friendly name",
+        }),
+      },
+      errors: {
+        snRequired: t("detail.devices.form.errors.snRequired", {
+          defaultValue: "Please enter Serial Number",
+        }),
+        deviceKeyRequired: t("detail.devices.form.errors.deviceKeyRequired", {
+          defaultValue: "Please enter Device Key",
+        }),
+      },
+      buttons: {
+        cancel: t("form.buttons.cancel", { defaultValue: "Cancel" }),
+        submit: t("detail.devices.form.buttons.submit", {
+          defaultValue: "Save device",
+        }),
+        submitting: t("detail.devices.form.buttons.submitting", {
+          defaultValue: "Saving...",
+        }),
+      },
+      statusOptions: STATUS_OPTIONS.map((opt) => ({
+        value: opt,
+        label: t(`detail.devices.status.${opt}`, { defaultValue: opt }),
+      })),
+    }),
+    [device, t, type]
+  );
   const isElectric = type === "electric";
   const defaultCategory = normalizeElectricCategory(
     extractCategory(device?.model)
@@ -1056,12 +1345,12 @@ function DeviceForm({
     setError("");
     if (isElectric) {
       if (!form.sn.trim()) {
-        setError("กรุณากรอก Serial Number");
+        setError(texts.errors.snRequired);
         return;
       }
     } else {
       if (!form.deviceKey.trim()) {
-        setError("กรุณากรอก Device Key");
+        setError(texts.errors.deviceKeyRequired);
         return;
       }
     }
@@ -1072,14 +1361,14 @@ function DeviceForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
-          {device ? "Edit device" : "Add device"} ({type})
+          {texts.title} ({texts.typeLabel})
         </h3>
         <button
           type="button"
           onClick={onCancel}
           className="text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
         >
-          Cancel
+          {texts.buttons.cancel}
         </button>
       </div>
 
@@ -1087,7 +1376,7 @@ function DeviceForm({
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="text-sm font-semibold block mb-2">
-              Category
+              {texts.labels.category}
             </label>
             <select
               value={form.category}
@@ -1102,62 +1391,70 @@ function DeviceForm({
             </select>
           </div>
           <div>
-            <label className="text-sm font-semibold block mb-2">SN</label>
+            <label className="text-sm font-semibold block mb-2">
+              {texts.labels.sn}
+            </label>
             <input
               value={form.sn}
               onChange={(e) => handleChange("sn", e.target.value)}
               className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-              placeholder="Serial Number"
+              placeholder={texts.placeholders.sn}
             />
           </div>
         </div>
       ) : (
         <div>
-          <label className="text-sm font-semibold block mb-2">Device key</label>
+          <label className="text-sm font-semibold block mb-2">
+            {texts.labels.deviceKey}
+          </label>
           <input
             value={form.deviceKey}
             onChange={(e) => handleChange("deviceKey", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-            placeholder="Unique device key"
+            placeholder={texts.placeholders.deviceKey}
           />
         </div>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="text-sm font-semibold block mb-2">Status</label>
+          <label className="text-sm font-semibold block mb-2">
+            {texts.labels.status}
+          </label>
           <select
             value={form.status}
             onChange={(e) => handleChange("status", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
           >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
+            {texts.statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className="text-sm font-semibold block mb-2">
-            IP Address
+            {texts.labels.ipAddress}
           </label>
           <input
             value={form.ipAddress ?? ""}
             onChange={(e) => handleChange("ipAddress", e.target.value)}
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-            placeholder="192.168.x.x"
+            placeholder={texts.placeholders.ipAddress}
           />
         </div>
       </div>
 
       <div>
-        <label className="text-sm font-semibold block mb-2">Name</label>
+        <label className="text-sm font-semibold block mb-2">
+          {texts.labels.name}
+        </label>
         <input
           value={form.name ?? ""}
           onChange={(e) => handleChange("name", e.target.value)}
           className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-          placeholder="Friendly name"
+          placeholder={texts.placeholders.name}
         />
       </div>
 
@@ -1169,14 +1466,14 @@ function DeviceForm({
           onClick={onCancel}
           className="px-4 py-2 rounded-md border border-gray-300 text-sm hover:bg-gray-50 cursor-pointer"
         >
-          Cancel
+          {texts.buttons.cancel}
         </button>
         <button
           type="submit"
           disabled={submitting}
           className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60 cursor-pointer"
         >
-          {submitting ? "Saving..." : "Save device"}
+          {submitting ? texts.buttons.submitting : texts.buttons.submit}
         </button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import type { AdminRow } from "./user.constant";
 
 type Props = {
@@ -13,6 +14,47 @@ const hasComplex = (pwd: string) =>
 const minLen = (pwd: string) => pwd.length >= 10;
 
 export default function Content_Reset({ user, onCancel, onReset }: Props) {
+  const { t } = useTranslation("userManagement");
+  const texts = React.useMemo(
+    () => ({
+      title: t("reset.title", { defaultValue: "Reset password" }),
+      buttons: {
+        cancel: t("reset.buttons.cancel", { defaultValue: "Cancel" }),
+        submit: t("reset.buttons.submit", { defaultValue: "Reset" }),
+      },
+      labels: {
+        fullName: t("form.labels.fullName", { defaultValue: "Full name" }),
+        password: t("form.labels.password", { defaultValue: "Password" }),
+        confirmPassword: t("form.labels.confirmPassword", {
+          defaultValue: "Confirm password",
+        }),
+      },
+      placeholders: {
+        password: t("form.placeholders.password", {
+          defaultValue: "Please enter new password",
+        }),
+        confirmPassword: t("form.placeholders.confirmPassword", {
+          defaultValue: "Please confirm password",
+        }),
+      },
+      passwordHints: {
+        min: t("form.passwordHints.min", {
+          defaultValue: "At least 10 characters long",
+        }),
+        complex: t("form.passwordHints.complex", {
+          defaultValue: "Contains number, uppercase and lowercase letters",
+        }),
+      },
+      confirmError: t("form.confirmError", {
+        defaultValue: "Passwords do not match.",
+      }),
+      resetNote: t("form.resetNote", {
+        defaultValue:
+          "After confirmation the password will be changed and the user must log in again.",
+      }),
+    }),
+    [t]
+  );
   // แยกชื่อเพื่อแสดง/ล็อกไว้ (ไม่แก้ไขชื่อในหน้า Reset)
   const [first] = React.useState(() => user.fullName.split(" ")[0] ?? "");
   const [last] = React.useState(() =>
@@ -34,7 +76,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
 
   return (
     <div className="mt-6 p-6 bg-white rounded-lg">
-      <h2 className="text-[24px] font-bold">Reset Password</h2>
+      <h2 className="text-[24px] font-bold">{texts.title}</h2>
       <hr className="mt-3" />
 
       <div className="mt-6 space-y-5 max-w-3xl">
@@ -44,14 +86,14 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
             htmlFor="reset-name"
             className="col-span-12 md:col-span-3 font-medium"
           >
-            Full name <span className="text-red-500">*</span>
+            {texts.labels.fullName} <span className="text-red-500">*</span>
           </label>
           <input
             id="reset-name"
             value={`${first} ${last}`.trim()}
             disabled
             aria-readonly="true"
-            title="User full name"
+            title={texts.labels.fullName}
             className="col-span-12 md:col-span-9 h-10 rounded-md border border-gray-200 bg-gray-100 text-gray-600 px-3"
           />
         </div>
@@ -59,7 +101,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
         {/* Password */}
         <div className="grid grid-cols-12 items-start gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
-            Password <span className="text-red-500">*</span>
+            {texts.labels.password} <span className="text-red-500">*</span>
           </label>
           <div className="col-span-12 md:col-span-9 w-full">
             <div className="relative">
@@ -67,7 +109,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
                 type={"password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Please enter new password"
+                placeholder={texts.placeholders.password}
                 className="w-full h-10 rounded-md border border-gray-300 px-3 outline-none focus:ring-2 focus:ring-cyan/40"
               />
             </div>
@@ -83,7 +125,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
                 >
                   check_circle
                 </i>
-                <span>At least 10 characters long</span>
+                <span>{texts.passwordHints.min}</span>
               </div>
               <div className="flex items-center gap-2">
                 <i
@@ -94,7 +136,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
                 >
                   check_circle
                 </i>
-                <span>Contains number, uppercase and lowercase letters</span>
+                <span>{texts.passwordHints.complex}</span>
               </div>
             </div>
           </div>
@@ -103,7 +145,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
         {/* Confirm password */}
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
-            Confirm password <span className="text-red-500">*</span>
+            {texts.labels.confirmPassword} <span className="text-red-500">*</span>
           </label>
           <div className="col-span-12 md:col-span-9 w-full">
             <div className="relative">
@@ -111,7 +153,7 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
                 type={"password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Please enter confirm password"
+                placeholder={texts.placeholders.confirmPassword}
                 className="w-full h-10 rounded-md border border-gray-300 px-3 outline-none focus:ring-2 focus:ring-cyan/40"
                 {...(!confirmOk && confirmPassword.length > 0
                   ? {
@@ -127,14 +169,13 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
                   id="confirm-error"
                   className="select-none text-[#EC0357] text-[12px]"
                 >
-                  Passwords do not match.
+                  {texts.confirmError}
                 </span>
               )}
             </div>
 
             <p className="mt-3 text-[12px] text-gray-500">
-              After confirm the password for this user will be changed, The
-              change cannot be reverse and the user will have to login again
+              {texts.resetNote}
             </p>
           </div>
         </div>
@@ -146,14 +187,14 @@ export default function Content_Reset({ user, onCancel, onReset }: Props) {
           onClick={onCancel}
           className="h-9 px-4 rounded-md border border-gray-300 bg-gray-100 text-gray-700 cursor-pointer"
         >
-          Cancel
+          {texts.buttons.cancel}
         </button>
         <button
           onClick={submit}
           disabled={!formValid}
           className="h-9 px-4 rounded-md bg-cyan text-white cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
         >
-          Reset
+          {texts.buttons.submit}
         </button>
       </div>
     </div>

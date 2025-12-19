@@ -1,23 +1,25 @@
 // src/components/UserManagement/Content.tsx
 import React from "react";
-// import { useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import Dropdown from "../Dropdown";
 import Switch from "../Switch";
 import type { AdminRow } from "./user.constant";
 
 /* ---------- utils ---------- */
-const formatDateTime = (iso: string) => {
+const formatDateTime = (iso: string | null | undefined, locale: string) => {
+  if (!iso) return { date: "-", time: "-" };
   const d = new Date(iso);
-  const date = d.toLocaleDateString("en-GB", {
+  if (Number.isNaN(d.getTime())) return { date: "-", time: "-" };
+  const date = new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  });
-  const time = d.toLocaleTimeString("en-GB", {
+  }).format(d);
+  const time = new Intl.DateTimeFormat(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
-  });
+  }).format(d);
   return { date, time };
 };
 
@@ -51,21 +53,94 @@ export default function Content({
   onDelete,
   onToggleActive,
 }: Props) {
-  // const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("userManagement");
+  const locale = i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US";
+
+  const statusOptions = React.useMemo(
+    () => [
+      {
+        label: t("content.filters.status.all", { defaultValue: "All status" }),
+        value: "all",
+      },
+      {
+        label: t("content.filters.status.active", { defaultValue: "Active" }),
+        value: "active",
+      },
+      {
+        label: t("content.filters.status.inactive", { defaultValue: "Inactive" }),
+        value: "inactive",
+      },
+    ],
+    [t]
+  );
+
+  const roleOptions = React.useMemo(
+    () => [
+      {
+        label: t("content.filters.role.all", { defaultValue: "All role" }),
+        value: "all",
+      },
+      {
+        label: t("content.filters.role.admin", { defaultValue: "Admin" }),
+        value: "Admin",
+      },
+      {
+        label: t("content.filters.role.officer", { defaultValue: "Officer" }),
+        value: "Officer",
+      },
+      {
+        label: t("content.filters.role.user", { defaultValue: "User" }),
+        value: "User",
+      },
+    ],
+    [t]
+  );
+
+  const texts = React.useMemo(
+    () => ({
+      header: t("content.header", { defaultValue: "Admin management" }),
+      createButton: t("content.createButton", { defaultValue: "Create admin" }),
+      filters: {
+        statusLabel: t("content.filters.statusLabel", { defaultValue: "Status" }),
+        roleLabel: t("content.filters.roleLabel", { defaultValue: "Role" }),
+      },
+      table: {
+        no: t("content.table.no", { defaultValue: "NO" }),
+        fullName: t("content.table.fullName", { defaultValue: "FULL NAME" }),
+        email: t("content.table.email", { defaultValue: "EMAIL" }),
+        role: t("content.table.role", { defaultValue: "ROLE" }),
+        addedDate: t("content.table.addedDate", { defaultValue: "ADDED DATE" }),
+        lastAccess: t("content.table.lastAccess", { defaultValue: "LAST ACCESS" }),
+        status: t("content.table.status", { defaultValue: "STATUS" }),
+        action: t("content.table.action", { defaultValue: "ACTION" }),
+      },
+      actions: {
+        edit: t("content.actions.edit", { defaultValue: "Edit" }),
+        resetPassword: t("content.actions.resetPassword", {
+          defaultValue: "Reset password",
+        }),
+        delete: t("content.actions.delete", { defaultValue: "Delete" }),
+      },
+      pagination: {
+        prev: t("content.pagination.prev", { defaultValue: "Prev" }),
+        next: t("content.pagination.next", { defaultValue: "Next" }),
+      },
+    }),
+    [t]
+  );
+
+  const resolveRoleLabel = React.useCallback(
+    (roleValue: string) => {
+      const key = roleValue?.toLowerCase();
+      if (key === "admin" || key === "officer" || key === "user") {
+        return t(`roles.${key}`, { defaultValue: roleValue });
+      }
+      return roleValue;
+    },
+    [t]
+  );
 
   /* ---------- filters ---------- */
-  const STATUS_OPTIONS = [
-    { label: "All Status", value: "all" },
-    { label: "Active", value: "active" },
-    { label: "Inactive", value: "inactive" },
-  ];
-  const ROLE_OPTIONS = [
-    { label: "All Role", value: "all" },
-    { label: "Admin", value: "Admin" },
-    { label: "Officer", value: "Officer" },
-    { label: "User", value: "User" },
-  ];
-
   const [status, setStatus] = React.useState("all");
   const [role, setRole] = React.useState("all");
 
@@ -98,14 +173,14 @@ export default function Content({
         {/* header */}
         <div className="flex justify-between pb-4 border-b">
           <h1 className="font-bold text-[22px] md:text-[24px]">
-            Admin Management
+            {texts.header}
           </h1>
           <button
             onClick={onCreateClick} // ← ผูกปุ่ม
             className="flex items-center gap-2 bg-cyan text-white p-2 px-3 rounded-lg cursor-pointer hover:bg-cyan-400"
           >
             <i className="material-icons-outlined">add_circle</i>
-            <span className="hidden md:block">Create admin</span>
+            <span className="hidden md:block">{texts.createButton}</span>
           </button>
         </div>
 
@@ -117,9 +192,11 @@ export default function Content({
           <div className="flex gap-10 flex-col sm:flex-row">
             {/* Status */}
             <div>
-              <label className="font-bold text-sm block mb-2">Status</label>
+              <label className="font-bold text-sm block mb-2">
+                {texts.filters.statusLabel}
+              </label>
               <Dropdown
-                options={STATUS_OPTIONS}
+                options={statusOptions as any}
                 value={status}
                 onChange={(v) => {
                   setPage(1);
@@ -142,7 +219,7 @@ export default function Content({
                       })}
                     >
                       <span className="truncate">
-                        {selected?.label ?? "All Status"}
+                        {selected?.label ?? statusOptions[0]?.label}
                       </span>
                       <i className="material-icons leading-none">
                         {open ? "arrow_drop_up" : "arrow_drop_down"}
@@ -176,9 +253,11 @@ export default function Content({
 
             {/* Role */}
             <div>
-              <label className="font-bold text-sm block mb-2">Role</label>
+              <label className="font-bold text-sm block mb-2">
+                {texts.filters.roleLabel}
+              </label>
               <Dropdown
-                options={ROLE_OPTIONS}
+                options={roleOptions as any}
                 value={role}
                 onChange={(v) => {
                   setPage(1);
@@ -201,7 +280,7 @@ export default function Content({
                       })}
                     >
                       <span className="truncate">
-                        {selected?.label ?? "All Role"}
+                        {selected?.label ?? roleOptions[0]?.label}
                       </span>
                       <i className="material-icons leading-none">
                         {open ? "arrow_drop_up" : "arrow_drop_down"}
@@ -242,14 +321,14 @@ export default function Content({
             <div
               className={`grid ${GRID_COLS} place-items-center px-4 py-3 text-[12px] font-medium text-gray-500 text-center bg-gray-100 select-none`}
             >
-              <div>NO</div>
-              <div>FULL NAME</div>
-              <div>EMAIL</div>
-              <div>ROLE</div>
-              <div>ADDED DATE</div>
-              <div>LAST ACCESS</div>
-              <div>STATUS</div>
-              <div>ACTION</div>
+              <div>{texts.table.no}</div>
+              <div>{texts.table.fullName}</div>
+              <div>{texts.table.email}</div>
+              <div>{texts.table.role}</div>
+              <div>{texts.table.addedDate}</div>
+              <div>{texts.table.lastAccess}</div>
+              <div>{texts.table.status}</div>
+              <div>{texts.table.action}</div>
             </div>
             <hr className="border-gray-200" />
 
@@ -257,10 +336,12 @@ export default function Content({
             {rowsPage.map((r, idx) => {
               const i = start + idx;
               const { date: addedDate, time: addedTime } = formatDateTime(
-                r.addedAt
+                r.addedAt,
+                locale
               );
               const { date: lastDate, time: lastTime } = formatDateTime(
-                r.lastAccessAt
+                r.lastAccessAt,
+                locale
               );
 
               return (
@@ -278,7 +359,7 @@ export default function Content({
                   </div>
                   <div className="text-gray-800 truncate w-full">{r.email}</div>
                   <div className="font-bold text-gray-800 select-none">
-                    {r.role}
+                    {resolveRoleLabel(r.role)}
                   </div>
                   <div className="text-gray-800">
                     <div>{addedDate}</div>
@@ -306,7 +387,8 @@ export default function Content({
                   </div>
                   <div className="flex items-center gap-4 text-gray-700">
                     <button
-                      title="Edit"
+                      title={texts.actions.edit}
+                      aria-label={texts.actions.edit}
                       className="hover:text-cyan"
                       onClick={() => onEdit(r)}
                     >
@@ -315,14 +397,16 @@ export default function Content({
                       </i>
                     </button>
                     <button
-                      title="Reset Password"
+                      title={texts.actions.resetPassword}
+                      aria-label={texts.actions.resetPassword}
                       className="hover:text-cyan cursor-pointer"
                       onClick={() => onReset?.(r)}
                     >
                       <i className="material-icons-outlined">lock</i>
                     </button>
                     <button
-                      title="Delete"
+                      title={texts.actions.delete}
+                      aria-label={texts.actions.delete}
                       className="hover:text-red-400 cursor-pointer"
                       onClick={() => onDelete?.(r)}
                     >
@@ -349,7 +433,7 @@ export default function Content({
               disabled={page === 1}
               className="h-9 px-3 rounded-md border border-gray-300 text-gray-700 disabled:opacity-50"
             >
-              Prev
+              {texts.pagination.prev}
             </button>
 
             <div className="flex items-center gap-1">
@@ -383,7 +467,7 @@ export default function Content({
               disabled={page === pageCount}
               className="h-9 px-3 rounded-md border border-gray-300 text-gray-700 disabled:opacity-50"
             >
-              Next
+              {texts.pagination.next}
             </button>
           </div>
         </div>

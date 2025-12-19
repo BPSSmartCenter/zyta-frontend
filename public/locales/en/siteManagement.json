@@ -1,0 +1,250 @@
+{
+  "page": {
+    "title": "Site management",
+    "loading": "Loading..."
+  },
+  "toasts": {
+    "listFailed": "Unable to load sites",
+    "createSuccess": "Site created",
+    "createFailed": "Unable to create site",
+    "updateSuccess": "Site updated",
+    "updateFailed": "Unable to update site",
+    "deleteSuccess": "Site deleted",
+    "deleteFailed": "Unable to delete site"
+  },
+  "confirm": {
+    "deleteSite": "Delete site {{name}}?",
+    "deleteDevice": "Delete device {{name}}?"
+  },
+  "content": {
+    "title": "Site Management",
+    "subtitle": "All sites managed by SuperAdmin",
+    "buttons": {
+      "refresh": "Refresh",
+      "create": "Register site"
+    },
+    "search": {
+      "label": "Search",
+      "placeholder": "Search by site name or code"
+    },
+    "province": {
+      "label": "Province",
+      "all": "All provinces"
+    },
+    "table": {
+      "site": "Site",
+      "code": "Code",
+      "address": "Address",
+      "devices": "Devices",
+      "users": "Users",
+      "actions": "Actions"
+    },
+    "loading": "Loading sites...",
+    "empty": "No sites found",
+    "detail": "Detail",
+    "pagination": {
+      "prev": "Prev",
+      "next": "Next",
+      "label": "Page {{page}} / {{total}}"
+    }
+  },
+  "form": {
+    "labels": {
+      "siteName": "Site name",
+      "brandingLogo": "Branding logo",
+      "siteCode": "Site code",
+      "solarEdgeTitle": "SolarEdge Credentials",
+      "solarEdgeSiteId": "SolarEdge Site ID",
+      "solarEdgeApiKey": "SolarEdge API Key",
+      "latitude": "Latitude",
+      "longitude": "Longitude",
+      "addressDetail": "Address detail",
+      "zipcode": "Zipcode (auto-fill)",
+      "province": "Province",
+      "district": "District",
+      "subDistrict": "Sub-district"
+    },
+    "placeholders": {
+      "siteName": "e.g. Bangkok HQ",
+      "siteCode": "Leave empty to auto generate",
+      "siteCodeEdit": "Internal code",
+      "solarEdgeSiteId": "e.g. 3078000",
+      "solarEdgeApiKey": "SE_xxxxxxxx",
+      "latitude": "13.7563",
+      "longitude": "100.5018",
+      "addressDetail": "House number / building / road",
+      "zipcode": "e.g. 10100",
+      "province": "Province"
+    },
+    "hints": {
+      "solarEdgeCreate": "Provide Site ID and API Key for this site (or leave blank to use system default).",
+      "solarEdgeEdit": "Adjust Site ID / API Key for SolarEdge (clear to revert to default).",
+      "zipAuto": "Once a 5-digit postal code is entered, province/district/sub-district will be suggested automatically.",
+      "zipManual": "You can edit from postal code or type manually."
+    },
+    "logo": {
+      "upload": "Upload",
+      "change": "Change",
+      "remove": "Remove",
+      "previewAlt": "Site logo preview",
+      "errors": {
+        "notImage": "Please select an image file",
+        "tooLarge": "File must be smaller than 2.5MB",
+        "readFail": "Unable to read file"
+      }
+    },
+    "errors": {
+      "nameRequired": "Please enter site name",
+      "codeLength": "Site code should be at least 3 characters"
+    },
+    "zip": {
+      "loading": "Fetching address...",
+      "notFound": "Postal code not found",
+      "failed": "Unable to fetch address from postal code",
+      "success": "Found {{count}} subdistricts in {{province}}",
+      "needPostal": "Enter postal code first",
+      "selectDistrict": "Select district",
+      "selectSubDistrict": "Select sub-district"
+    },
+    "buttons": {
+      "cancel": "Cancel"
+    }
+  },
+  "create": {
+    "title": "Register new site",
+    "subtitle": "Fill in the details to add a site to the system.",
+    "logo": {
+      "empty": "Upload a logo to show on reports (PNG / JPG / WEBP up to 2.5MB)."
+    },
+    "buttons": {
+      "submit": "Save site",
+      "submitting": "Saving..."
+    }
+  },
+  "edit": {
+    "title": "Edit site",
+    "subtitle": "{{name}}",
+    "logo": {
+      "empty": "No logo yet. Upload PNG / JPG / WEBP under 2.5MB."
+    },
+    "buttons": {
+      "submit": "Save changes",
+      "submitting": "Saving..."
+    }
+  },
+  "detail": {
+    "buttons": {
+      "back": "Back to list",
+      "refresh": "Refresh",
+      "edit": "Edit site",
+      "delete": "Delete"
+    },
+    "summary": {
+      "code": "Code:",
+      "address": "Address:",
+      "latLng": "Lat / Lng:",
+      "zipcode": "Zipcode:",
+      "statsTitle": "Summary Stats",
+      "devices": "Total devices",
+      "users": "Users"
+    },
+    "errors": {
+      "load": "Unable to fetch latest data"
+    },
+    "devices": {
+      "addButton": "Add device",
+      "loading": "Loading...",
+      "empty": "No devices in this category",
+      "searchPlaceholder": "Search name, serial or IP",
+      "tabs": {
+        "electric": "Electric Devices",
+        "water": "Water Meter Devices",
+        "air": "Air Sensor Devices",
+        "camera": "CCTV Devices"
+      },
+      "table": {
+        "device": "Device",
+        "model": "Model",
+        "serial": "Serial",
+        "status": "Status",
+        "actions": "Actions",
+        "edit": "Edit",
+        "delete": "Delete",
+        "copyId": "Copy ID"
+      },
+      "pagination": {
+        "prev": "Prev",
+        "next": "Next",
+        "label": "{{start}}-{{end}} of {{total}} items",
+        "empty": "0 items"
+      },
+      "status": {
+        "online": "online",
+        "offline": "offline",
+        "maintenance": "maintenance"
+      },
+      "copyId": {
+        "success": "Copied ID: {{id}}",
+        "failed": "Unable to copy Device ID"
+      },
+      "deleteSuccess": "Device deleted",
+      "deleteFailed": "Unable to delete device",
+      "saveSuccess": "Device saved",
+      "saveFailed": "Unable to save device"
+    },
+    "billing": {
+      "enable": "Enable Billing",
+      "save": "Save rates",
+      "saving": "Saving...",
+      "electric": {
+        "title": "Electric Billing",
+        "hint": "Enter base and discount values before enabling."
+      },
+      "water": {
+        "title": "Water Billing",
+        "hint": "Enable or disable water billing."
+      },
+      "fields": {
+        "baseOn": "Base (On Peak) THB/unit",
+        "baseOff": "Base (Off Peak) THB/unit",
+        "discount": "Discount rate (%) 0-100"
+      },
+      "discountNote": "Example: discount 30 = 30% off",
+      "toggleFailed": "Unable to update billing status",
+      "saveSuccess": "Billing rates saved",
+      "saveFailed": "Unable to save billing rates",
+      "validation": {
+        "baseOn": "Please enter Base (On Peak) greater than 0",
+        "baseOff": "Please enter Base (Off Peak) greater than 0",
+        "discount": "Discount rate must be between 0 and 100",
+        "generic": "Please complete billing rates"
+      }
+    },
+    "devicesForm": {
+      "titleAdd": "Add device",
+      "titleEdit": "Edit device",
+      "labels": {
+        "category": "Category",
+        "sn": "SN",
+        "deviceKey": "Device key",
+        "status": "Status",
+        "ipAddress": "IP Address",
+        "name": "Name"
+      },
+      "placeholders": {
+        "sn": "Serial Number",
+        "deviceKey": "Unique device key",
+        "ipAddress": "192.168.x.x",
+        "name": "Friendly name"
+      },
+      "errors": {
+        "snRequired": "Please enter Serial Number",
+        "deviceKeyRequired": "Please enter Device Key"
+      },
+      "buttons": {
+        "submit": "Save device",
+        "submitting": "Saving..."
+      }
+    }
+  }
+}

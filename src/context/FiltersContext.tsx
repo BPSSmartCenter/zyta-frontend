@@ -8,6 +8,9 @@ import { listSites } from "../api/sites";
 
 export type SiteOption = { label: string; value: string; i18nKey?: string };
 
+const SELECTED_SITE_STORAGE_PREFIX = "filters:selectedSite";
+const SELECTED_SITE_TTL_MS = 1000 * 60 * 15; // 15 นาทีพอให้ refresh แล้วยังจำได้ แต่ไม่ค้างนานเกินไป
+
 type FiltersState = {
   date: DateValue;
   setDate: (v: DateValue) => void;
@@ -31,14 +34,72 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const matchScopedUid = useMatch("/u/:uid/*");
   const matchRootUid = useMatch("/u/:uid");
   const activeUid = matchScopedUid?.params?.uid ?? matchRootUid?.params?.uid ?? null;
+  const storageKey = activeUid
+    ? `${SELECTED_SITE_STORAGE_PREFIX}:${activeUid}`
+    : null;
 
   const [date, setDateState] = React.useState<DateValue>(defaultToday);
   const [dateTouched, setDateTouched] = React.useState<boolean>(false);
-  const [selectedSite, setSelectedSite] = React.useState<string>("all");
+  const [selectedSite, setSelectedSiteState] = React.useState<string>("all");
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
   const [searchSite, setSearchSite] = React.useState("");
+  const storedSiteRef = React.useRef<string | null>(null);
+  const selectedSiteRef = React.useRef<string>("all");
+
+  React.useEffect(() => {
+    selectedSiteRef.current = selectedSite;
+  }, [selectedSite]);
+
+  const readStoredSite = React.useCallback((): string | null => {
+    if (!storageKey || typeof window === "undefined") return null;
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.value !== "string") return null;
+      if (
+        typeof parsed.expiresAt === "number" &&
+        parsed.expiresAt < Date.now()
+      ) {
+        window.sessionStorage.removeItem(storageKey);
+        return null;
+      }
+      return parsed.value;
+    } catch {
+      return null;
+    }
+  }, [storageKey]);
+
+  const persistSelectedSite = React.useCallback(
+    (value: string) => {
+      if (!storageKey || typeof window === "undefined") return;
+      try {
+        const payload = {
+          value,
+          expiresAt: Date.now() + SELECTED_SITE_TTL_MS,
+        };
+        window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+      } catch {
+        // เงียบไว้ (เช่น quota เต็ม)
+      }
+    },
+    [storageKey]
+  );
+
+  React.useEffect(() => {
+    storedSiteRef.current = readStoredSite();
+  }, [readStoredSite]);
+
+  const setSelectedSite = React.useCallback(
+    (value: string) => {
+      setSelectedSiteState(value);
+      storedSiteRef.current = value;
+      persistSelectedSite(value);
+    },
+    [persistSelectedSite]
+  );
 
   const normalizeSiteToOption = React.useCallback((site: any): SiteOption | null => {
     if (!site || typeof site !== "object") return null;
@@ -81,6 +142,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       setSiteOptions([
         { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
       ]);
+      storedSiteRef.current = null;
       setSelectedSite("all");
       return;
     }
@@ -129,20 +191,38 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
 
         setSiteOptions(opts);
 
+        const stored = storedSiteRef.current;
+        const storedIsValid =
+          !!stored &&
+          (stored === "all"
+            ? isAdmin
+            : uniqueOptions.some((o) => o.value === stored));
+
+        if (stored && storedIsValid) {
+          setSelectedSite(stored);
+          return;
+        }
+
         // Default selected site: admin → all, others → first available
-        setSelectedSite((prev) => {
-          if (isAdmin) return "all";
-          if (!uniqueOptions.length) {
-            return prev && prev !== "all" ? prev : "";
-          }
-          if (!prev || prev === "all") {
-            return uniqueOptions[0]?.value ?? prev;
-          }
-          // keep previous if still exists
-          return uniqueOptions.some((o) => o.value === prev)
-            ? prev
-            : uniqueOptions[0]?.value ?? prev;
-        });
+        const prev = selectedSiteRef.current;
+        if (isAdmin) {
+          setSelectedSite("all");
+          return;
+        }
+        if (!uniqueOptions.length) {
+          setSelectedSite(prev && prev !== "all" ? prev : "");
+          return;
+        }
+        if (!prev || prev === "all") {
+          setSelectedSite(uniqueOptions[0]?.value ?? prev);
+          return;
+        }
+        if (!uniqueOptions.some((o) => o.value === prev)) {
+          setSelectedSite(uniqueOptions[0]?.value ?? prev);
+          return;
+        }
+        // keep previous
+        setSelectedSite(prev);
       } catch (e) {
         // fallback to only "all" if any failure
         setSiteOptions([
@@ -167,7 +247,16 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       searchSite,
       setSearchSite,
     }),
-    [date, setDate, dateTouched, resetDateTouched, selectedSite, siteOptions, searchSite]
+    [
+      date,
+      setDate,
+      dateTouched,
+      resetDateTouched,
+      selectedSite,
+      siteOptions,
+      searchSite,
+      setSelectedSite,
+    ]
   );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;

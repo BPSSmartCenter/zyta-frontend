@@ -1,5 +1,6 @@
 // src/pages/SiteManagement.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/SiteManagement/Navbar";
 import Content from "../components/SiteManagement/Content";
@@ -21,6 +22,7 @@ export default function SiteManagement() {
 }
 
 function SiteManagementGuarded() {
+  const { t } = useTranslation("siteManagement");
   const [allowed, setAllowed] = React.useState<boolean | null>(null);
   React.useEffect(() => {
     (async () => {
@@ -34,7 +36,11 @@ function SiteManagementGuarded() {
   }, []);
 
   if (allowed === null) {
-    return <div className="p-6">Loading…</div>;
+    return (
+      <div className="p-6">
+        {t("page.loading", { defaultValue: "Loading..." })}
+      </div>
+    );
   }
   if (!allowed) {
     if (typeof window !== "undefined") {
@@ -46,7 +52,39 @@ function SiteManagementGuarded() {
 }
 
 function SiteManagementInner() {
+  const { t } = useTranslation("siteManagement");
   const { show } = useToast();
+  const texts = React.useMemo(
+    () => ({
+      title: t("page.title", { defaultValue: "Site management" }),
+      toasts: {
+        listFailed: t("toasts.listFailed", {
+          defaultValue: "Unable to load sites",
+        }),
+        createSuccess: t("toasts.createSuccess", { defaultValue: "Site created" }),
+        createFailed: t("toasts.createFailed", { defaultValue: "Unable to create site" }),
+        updateSuccess: t("toasts.updateSuccess", {
+          defaultValue: "Site updated",
+        }),
+        updateFailed: t("toasts.updateFailed", {
+          defaultValue: "Unable to update site",
+        }),
+        deleteSuccess: t("toasts.deleteSuccess", { defaultValue: "Site deleted" }),
+        deleteFailed: t("toasts.deleteFailed", { defaultValue: "Unable to delete site" }),
+      },
+      confirmDelete: t("confirm.deleteSite", {
+        name: "{{name}}",
+        defaultValue: "Delete site {{name}}?",
+      }),
+    }),
+    [t]
+  );
+  const toastNode = React.useCallback(
+    (key: keyof typeof texts.toasts) => (
+      <span className="text-white font-semibold">{texts.toasts[key]}</span>
+    ),
+    [texts.toasts]
+  );
   const [rows, setRows] = React.useState<SiteRow[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [creating, setCreating] = React.useState(false);
@@ -117,14 +155,7 @@ function SiteManagementInner() {
     } catch (e) {
       console.error("listSites failed", e);
       setRows([]);
-      show({
-        variant: "error",
-        message: (
-          <span className="text-white font-semibold">
-            โหลดรายการไซต์ไม่สำเร็จ
-          </span>
-        ),
-      });
+      show({ variant: "error", message: toastNode("listFailed") });
       return [];
     } finally {
       setLoading(false);
@@ -163,20 +194,10 @@ function SiteManagementInner() {
           setViewing(match);
         }
         setCreating(false);
-        show({
-          variant: "success",
-          message: (
-            <span className="text-white font-semibold">สร้าง Site สำเร็จ</span>
-          ),
-        });
+        show({ variant: "success", message: toastNode("createSuccess") });
       } catch (e) {
         console.error("registerSite failed", e);
-        show({
-          variant: "error",
-          message: (
-            <span className="text-white font-semibold">สร้าง Site ไม่สำเร็จ</span>
-          ),
-        });
+        show({ variant: "error", message: toastNode("createFailed") });
       } finally {
         setLoading(false);
       }
@@ -209,20 +230,10 @@ function SiteManagementInner() {
           mapped.find((r) => r.id === editing.id) ?? editing;
         setViewing((prev) => (prev && prev.id === editing.id ? updated : prev));
         setEditing(null);
-        show({
-          variant: "success",
-          message: (
-            <span className="text-white font-semibold">บันทึกข้อมูลไซต์แล้ว</span>
-          ),
-        });
+        show({ variant: "success", message: toastNode("updateSuccess") });
       } catch (e) {
         console.error("updateSite failed", e);
-        show({
-          variant: "error",
-          message: (
-            <span className="text-white font-semibold">แก้ไข Site ไม่สำเร็จ</span>
-          ),
-        });
+        show({ variant: "error", message: toastNode("updateFailed") });
       } finally {
         setLoading(false);
       }
@@ -235,27 +246,22 @@ function SiteManagementInner() {
       const confirmed =
         typeof window === "undefined"
           ? true
-          : window.confirm(`ยืนยันลบไซต์ ${row.name}?`);
+          : window.confirm(
+              t("confirm.deleteSite", {
+                name: row.name,
+                defaultValue: "Delete site {{name}}?",
+              })
+            );
       if (!confirmed) return;
       try {
         setLoading(true);
         await deleteSite(row.id);
         await refresh();
         setViewing((prev) => (prev && prev.id === row.id ? null : prev));
-        show({
-          variant: "success",
-          message: (
-            <span className="text-white font-semibold">ลบ Site แล้ว</span>
-          ),
-        });
+        show({ variant: "success", message: toastNode("deleteSuccess") });
       } catch (e) {
         console.error("deleteSite failed", e);
-        show({
-          variant: "error",
-          message: (
-            <span className="text-white font-semibold">ลบ Site ไม่สำเร็จ</span>
-          ),
-        });
+        show({ variant: "error", message: toastNode("deleteFailed") });
       } finally {
         setLoading(false);
       }
@@ -265,7 +271,7 @@ function SiteManagementInner() {
 
   return (
     <div className="p-4 bg-[#F8FBFE] min-h-screen">
-      <Navbar title="Site management" />
+      <Navbar title={texts.title} />
       {creating ? (
         <ContentCreate
           loading={loading}

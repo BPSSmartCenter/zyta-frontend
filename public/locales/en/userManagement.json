@@ -1,0 +1,128 @@
+{
+  "page": {
+    "title": "User management",
+    "loading": "Loading..."
+  },
+  "toasts": {
+    "createSuccess": "Create success",
+    "createFailed": "Create failed",
+    "resetSuccess": "Password reset",
+    "resetFailed": "Reset failed",
+    "editSuccess": "Edit saved",
+    "editFailed": "Edit failed",
+    "deleteSuccess": "Deleted",
+    "deleteFailed": "Delete failed"
+  },
+  "content": {
+    "header": "Admin management",
+    "createButton": "Create admin",
+    "filters": {
+      "statusLabel": "Status",
+      "status": {
+        "all": "All status",
+        "active": "Active",
+        "inactive": "Inactive"
+      },
+      "roleLabel": "Role",
+      "role": {
+        "all": "All role",
+        "admin": "Admin",
+        "officer": "Officer",
+        "user": "User"
+      }
+    },
+    "table": {
+      "no": "NO",
+      "fullName": "FULL NAME",
+      "email": "EMAIL",
+      "role": "ROLE",
+      "addedDate": "ADDED DATE",
+      "lastAccess": "LAST ACCESS",
+      "status": "STATUS",
+      "action": "ACTION"
+    },
+    "actions": {
+      "edit": "Edit",
+      "resetPassword": "Reset password",
+      "delete": "Delete"
+    },
+    "pagination": {
+      "prev": "Prev",
+      "next": "Next"
+    }
+  },
+  "form": {
+    "labels": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "role": "Role",
+      "sites": "Sites access",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "fullName": "Full name"
+    },
+    "placeholders": {
+      "firstName": "Please enter first name",
+      "lastName": "Please enter last name",
+      "email": "Please enter email",
+      "role": "Please select role",
+      "password": "Please enter new password",
+      "confirmPassword": "Please confirm password"
+    },
+    "sitesHelper": "Choose one or more sites this user can access.",
+    "selectSites": "Select sites",
+    "sitesSelected": {
+      "one": "{{count}} site selected",
+      "other": "{{count}} sites selected"
+    },
+    "remove": "Remove",
+    "passwordHints": {
+      "min": "At least 10 characters long",
+      "complex": "Contains number, uppercase and lowercase letters"
+    },
+    "emailError": "Invalid email format.",
+    "confirmError": "Passwords do not match.",
+    "resetNote": "After confirmation, this user's password will change and they must log in again."
+  },
+  "create": {
+    "title": "Create admin",
+    "buttons": {
+      "cancel": "Cancel",
+      "submit": "Create"
+    }
+  },
+  "edit": {
+    "title": "Edit admin information",
+    "errors": {
+      "required": "Please fill in all required fields."
+    },
+    "duplicate": {
+      "title": "Edit failed",
+      "intro": "We found duplicate data:",
+      "email": "Email address is already in use.",
+      "fullName": "Full name already exists.",
+      "close": "OK"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "submit": "Save"
+    }
+  },
+  "reset": {
+    "title": "Reset password",
+    "buttons": {
+      "cancel": "Cancel",
+      "submit": "Reset"
+    }
+  },
+  "roles": {
+    "admin": "Admin",
+    "officer": "Officer",
+    "user": "User"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  }
+}

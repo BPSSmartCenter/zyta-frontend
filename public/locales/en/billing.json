@@ -1,0 +1,180 @@
+{
+  "overview": {
+    "title": "Billing Overview",
+    "subtitle": "Overall usage and billing data from backend",
+    "cards": {
+      "usage": "Total usage (kWh)",
+      "billing": "Bill amount this month",
+      "trend": "Monthly trend"
+    },
+    "realtime": {
+      "heading": "Real-Time Monitor",
+      "description": "Latest readings from gateway",
+      "searchPlaceholder": "Search readings...",
+      "buttons": {
+        "refresh": "Refresh",
+        "generate": "Generate Bills",
+        "monitor": "Monitor"
+      },
+      "table": {
+        "meter": "Meter",
+        "onPeak": "Energy On Peak (kWh)",
+        "offPeak": "Energy Off Peak (kWh)",
+        "timestamp": "Timestamp",
+        "actions": "Actions"
+      },
+      "loading": "Loading data...",
+      "empty": "No readings match the filters",
+      "siteLabel": "Site",
+      "defaultDevice": "Meter",
+      "fallbackMeterName": "Meter {{id}}"
+    },
+    "errors": {
+      "gateway": "Unable to load values from gateway",
+      "delete": "Unable to delete bill, please try again",
+      "fetchBilling": "Unable to fetch billing data right now"
+    },
+    "billing": {
+      "heading": "Billing Records",
+      "description": "Issued bills with saved documents",
+      "searchPlaceholder": "Search bills...",
+      "table": {
+        "meter": "Meter",
+        "billingPeriod": "Billing period",
+        "usage": "Usage (kWh)",
+        "cost": "Cost (THB)",
+        "timestamp": "Timestamp",
+        "actions": "Actions"
+      },
+      "loading": "Loading bills...",
+      "empty": "No bills found for this period",
+      "buttons": {
+        "preview": "Preview",
+        "delete": "Delete"
+      }
+    },
+    "trend": {
+      "chartTitle": "Monthly Trend Chart",
+      "tableTitle": "Monthly Trend Table",
+      "tableSubtitle": "Monthly electricity totals",
+      "searchPlaceholder": "Search month...",
+      "table": {
+        "month": "Month",
+        "cost": "Cost (THB)",
+        "usage": "Usage (kWh)",
+        "timestamp": "Timestamp"
+      },
+      "empty": "No monthly data available"
+    },
+    "siteGuard": {
+      "blocked": {
+        "title": "Billing is not available",
+        "message": "This site has no compatible devices. Please choose another site.",
+        "close": "Go back"
+      },
+      "select": {
+        "title": "Please select a site",
+        "message": "Choose a site from the navbar before using billing features.",
+        "close": "OK"
+      }
+    },
+    "modals": {
+      "delete": {
+        "title": "Delete this bill?",
+        "meterLabel": "Meter:",
+        "billingLabel": "Billing period:",
+        "warning": "This action cannot be undone",
+        "confirm": "Delete bill",
+        "cancel": "Cancel"
+      }
+    }
+  },
+  "generate": {
+    "back": "Back",
+    "title": "Generate electricity bill",
+    "branding": {
+      "previewAlt": "Site branding preview",
+      "siteFallback": "Site",
+      "addressLabel": "Address:",
+      "addressUnknown": "Not specified",
+      "upload": "Upload logo",
+      "change": "Change logo",
+      "clear": "Remove logo",
+      "errors": {
+        "invalidType": "Please select an image file",
+        "fileTooLarge": "File must be smaller than 2.5MB",
+        "readFail": "Unable to read the file"
+      }
+    },
+    "messages": {
+      "loadMeters": "Unable to load meters for this site",
+      "loadDashboard": "Unable to fetch meter data",
+      "loadingDashboard": "Loading data from meter...",
+      "loadingMetersList": "Loading meter list...",
+      "noMetersInSite": "No meters found in this site",
+      "summaryError": "Unable to load billing data for this period",
+      "createBillError": "Unable to create bill, please try again",
+      "selectMeterRequired": "Please select a meter before creating a bill",
+      "selectSiteRequired": "Please select a site before creating a bill"
+    },
+    "form": {
+      "billingType": "Billing type",
+      "monthly": "Monthly",
+      "daily": "Daily",
+      "selectMonthYear": "Select billing month/year",
+      "monthPlaceholder": "Select month",
+      "yearPlaceholder": "Select year",
+      "billingRangeLabel": "Billing period to generate:",
+      "selectDate": "Select billing date",
+      "dateHint": "System will calculate from 00:00 to the latest hour of that day.",
+      "selectMeter": "Select meter",
+      "meterSubtitle": "Choose the meter for billing",
+      "meterFallback": "Meter",
+      "searchPlaceholder": "Search meter name or serial...",
+      "noMeterMatch": "No meters match the search",
+      "baseOnPeak": "Base On Peak (THB/unit)",
+      "baseOffPeak": "Base Off Peak (THB/unit)",
+      "discountRate": "Discount Rate",
+      "autoFillLabel": "Values from database (auto-fill)",
+      "loadingPlaceholder": "Loading...",
+      "submit": "Calculate bill",
+      "submitting": "Generating bill..."
+    },
+    "summary": {
+      "monthlyTotal": "Month total",
+      "dailyTotal": "Day total",
+      "onPeak": "On Peak (kWh)",
+      "offPeak": "Off Peak (kWh)"
+    },
+    "siteGuard": {
+      "blocked": {
+        "title": "Billing not allowed for this site",
+        "message": "The selected site is not permitted to use billing. Please switch to an allowed site.",
+        "close": "Go back"
+      },
+      "select": {
+        "title": "Select a site first",
+        "message": "Choose a site from the navbar before generating bills.",
+        "close": "OK"
+      }
+    },
+    "modal": {
+      "errorTitle": "Cannot proceed",
+      "close": "Close"
+    },
+    "months": {
+      "01": "January",
+      "02": "February",
+      "03": "March",
+      "04": "April",
+      "05": "May",
+      "06": "June",
+      "07": "July",
+      "08": "August",
+      "09": "September",
+      "10": "October",
+      "11": "November",
+      "12": "December"
+    }
+  }
+}
