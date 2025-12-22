@@ -20,6 +20,7 @@ type DeviceCounts = {
   electricMeter: number;
   airSensor: number;
   zyta: number;
+  iot: number;
   caregiver: number;
 };
 
