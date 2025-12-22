@@ -1,6 +1,17 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="22" y="12" width="20" height="20" rx="10" stroke="#87CEEB" stroke-width="4"/>
-<path d="M12 52C12 40.9543 20.9543 32 32 32V32C43.0457 32 52 40.9543 52 52V60H12V52Z" stroke="#87CEEB" stroke-width="4"/>
-<path d="M28 22H36" stroke="#87CEEB" stroke-width="4" stroke-linecap="round"/>
-<path d="M32 18V26" stroke="#87CEEB" stroke-width="4" stroke-linecap="round"/>
+  <!-- Face/Head -->
+  <circle cx="32" cy="28" r="14" fill="#E0F7FA" stroke="#29B6F6" stroke-width="2"/>
+  
+  <!-- Nurse Cap -->
+  <path d="M16 18C16 18 20 6 32 6C44 6 48 18 48 18L16 18Z" fill="#FFFFFF" stroke="#29B6F6" stroke-width="2"/>
+  
+  <!-- Cross on Cap -->
+  <rect x="29" y="10" width="6" height="6" rx="1" fill="#FF5252"/>
+  <rect x="29" y="10" width="6" height="6" rx="1" transform="rotate(90 32 13)" fill="#FF5252"/>
+
+  <!-- Body -->
+  <path d="M12 56C12 44.9543 20.9543 36 32 36C43.0457 36 52 44.9543 52 56V62H12V56Z" fill="#E1F5FE" stroke="#29B6F6" stroke-width="2"/>
+  
+  <!-- Collar -->
+  <path d="M32 36L26 42M32 36L38 42" stroke="#29B6F6" stroke-width="2" stroke-linecap="round"/>
 </svg>
