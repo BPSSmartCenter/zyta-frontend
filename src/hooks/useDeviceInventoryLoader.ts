@@ -11,6 +11,7 @@ type DeviceCounts = Partial<{
   airSensor: number;
   zyta: number;
   iot: number;
+  caregiver: number;
 }>;
 
 type DeviceTotals = { online: number; offline: number };
@@ -179,6 +180,15 @@ export function useDeviceInventoryLoader({
             if (airCount > 0) {
               aggregated.air = airCount;
             }
+
+            // Count Medical devices for Caregiver
+            const medicalCount = iotDevices.filter((d) =>
+              String(d.type || "").toLowerCase() === "medical"
+            ).length;
+            if (medicalCount > 0) {
+              // @ts-ignore
+              aggregated.caregiver = medicalCount;
+            }
           }
         } catch (iotErr) {
           console.debug("Failed to sync IoT count", iotErr);
@@ -196,6 +206,8 @@ export function useDeviceInventoryLoader({
           electricMeter: aggregated.electric,
           airSensor: aggregated.air,
           iot: aggregated.iot,
+          // @ts-ignore
+          caregiver: aggregated.caregiver || 0,
         };
 
         const nextTotals: DeviceTotals = {

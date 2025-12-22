@@ -10,8 +10,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
-        "/api/devices": {
-          target: env.VITE_IOT_API_TARGET || "http://172.20.10.4:3000",
+        "/api": {
+          target: "http://203.159.95.162:3000",
           changeOrigin: true,
         },
       },

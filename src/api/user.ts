@@ -1,6 +1,6 @@
 // src/api/user.ts
 import { api } from "./axios";
-
+import { me as mockMe } from "../data/Dashboard/auth";
 
 export type MeResponse = {
   id: string;
@@ -12,8 +12,23 @@ export type MeResponse = {
 };
 
 export async function me(): Promise<MeResponse> {
-  const { data } = await api.get("/users/me");
-  return data;
+  try {
+    const { data } = await api.get("/users/me");
+    return data;
+  } catch (error) {
+    console.warn("API Me failed, trying mock...", error);
+    const u = mockMe();
+    if (!u) throw error;
+    // Map mock user to MeResponse
+    return {
+      id: u.id,
+      email: u.email,
+      role: u.role as any,
+      firstName: u.firstName || "",
+      lastName: u.lastName || "",
+      sites: [], // Mock sites defaults empty or need logic if crucial
+    };
+  }
 }
 
 export type UserStatsResponse = {

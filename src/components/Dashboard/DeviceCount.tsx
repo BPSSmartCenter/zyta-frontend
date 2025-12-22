@@ -6,6 +6,7 @@ import {
   windImage,
   waterTapImage,
   wifiImage,
+  nurseImage,
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -19,8 +20,7 @@ type DeviceCounts = {
   electricMeter: number;
   airSensor: number;
   zyta: number;
-  iot: number;
-
+  caregiver: number;
 };
 
 type Props = {
@@ -59,6 +59,7 @@ export default function DeviceCount({
   const labelAir = t("devices.air", { defaultValue: "Air" });
   // const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
   const labelIot = t("devices.iot", { defaultValue: "IoT" });
+  const labelCaregiver = t("devices.caregiver", { defaultValue: "Caregiver" });
 
   const CCTV_DISABLED = true;
 
@@ -77,6 +78,7 @@ export default function DeviceCount({
     airSensor: 0,
     zyta: 0,
     iot: 0,
+    caregiver: 0,
     ...(globalCounts || {}),
     ...(counts || {}),
   } as DeviceCounts;
@@ -236,8 +238,8 @@ export default function DeviceCount({
             aria-disabled={isZero(mergedCounts.waterMeter)}
             disabled={isZero(mergedCounts.waterMeter)}
             className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.waterMeter)
-                ? disabledBtnClass
-                : enabledBtnClass
+              ? disabledBtnClass
+              : enabledBtnClass
               }`}
             onClick={() =>
               !isZero(mergedCounts.waterMeter) && goDevices("watermeter")
@@ -274,8 +276,8 @@ export default function DeviceCount({
             aria-disabled={isZero(mergedCounts.electricMeter)}
             disabled={isZero(mergedCounts.electricMeter)}
             className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.electricMeter)
-                ? disabledBtnClass
-                : enabledBtnClass
+              ? disabledBtnClass
+              : enabledBtnClass
               }`}
             onClick={() =>
               !isZero(mergedCounts.electricMeter) && goDevices("electricmeter")
@@ -311,8 +313,8 @@ export default function DeviceCount({
             aria-disabled={isZero(mergedCounts.airSensor)}
             disabled={isZero(mergedCounts.airSensor)}
             className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.airSensor)
-                ? disabledBtnClass
-                : enabledBtnClass
+              ? disabledBtnClass
+              : enabledBtnClass
               }`}
             onClick={() =>
               !isZero(mergedCounts.airSensor) && goDevices("airsensor")
@@ -369,6 +371,39 @@ export default function DeviceCount({
                 <span className="text-red-500 font-semibold">
                   {statusByType.iot.off}
                 </span>
+                <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
+        </li>
+        {/* Caregiver */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={isZero(mergedCounts.caregiver)}
+            disabled={isZero(mergedCounts.caregiver)}
+            className={`w-full min-h-[56px] flex items-center gap-4 ${isZero(mergedCounts.caregiver) ? disabledBtnClass : enabledBtnClass
+              }`}
+            onClick={() =>
+              !isZero(mergedCounts.caregiver) &&
+              window.open("http://45.136.253.176:3000/", "_blank")
+            }
+          >
+            <img src={nurseImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelCaregiver}{" "}
+                <span className="text-black font-semibold">
+                  {mergedCounts.caregiver}
+                </span>
+              </span>
+              <span>
+                <span className="text-gray-500">(</span>
+                <span className="text-green-600 font-semibold">
+                  {mergedCounts.caregiver}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-red-500 font-semibold">0</span>
                 <span className="text-gray-500">)</span>
               </span>
             </span>

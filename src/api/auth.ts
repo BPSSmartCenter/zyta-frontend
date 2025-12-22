@@ -1,5 +1,6 @@
 // src/api/auth.ts
 import { api } from "./axios";
+import { login as mockLogin } from "../data/Dashboard/auth";
 
 
 export async function register(input: {
@@ -19,8 +20,15 @@ export async function login(
   password: string,
   remember?: boolean
 ) {
-  const { data } = await api.post("/auth/login", { email, password, remember });
-  return data.user;
+  try {
+    const { data } = await api.post("/auth/login", { email, password, remember });
+    return data.user;
+  } catch (error) {
+    console.warn("API Login failed, trying mock...", error);
+    const res = mockLogin({ email, password });
+    if ("error" in res) throw res.error; // หรือ throw error เดิม
+    return res.user;
+  }
 }
 
 export async function logout() {

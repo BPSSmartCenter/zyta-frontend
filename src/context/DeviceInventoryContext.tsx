@@ -17,6 +17,7 @@ export type DeviceCounts = Partial<{
   airSensor: number;
   zyta: number;
   iot: number;
+  caregiver: number;
 }>;
 
 type Ctx = {
