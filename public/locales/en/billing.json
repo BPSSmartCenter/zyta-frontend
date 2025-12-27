@@ -72,6 +72,11 @@
         "message": "This site has no compatible devices. Please choose another site.",
         "close": "Go back"
       },
+      "permission": {
+        "title": "Billing not allowed for this site",
+        "message": "The selected site has billing disabled. Please switch to an authorized site or contact your administrator.",
+        "close": "Go back"
+      },
       "select": {
         "title": "Please select a site",
         "message": "Choose a site from the navbar before using billing features.",
@@ -150,6 +155,11 @@
       "blocked": {
         "title": "Billing not allowed for this site",
         "message": "The selected site is not permitted to use billing. Please switch to an allowed site.",
+        "close": "Go back"
+      },
+      "permission": {
+        "title": "Billing not allowed for this site",
+        "message": "This site has billing disabled. Switch to another site or contact your administrator.",
         "close": "Go back"
       },
       "select": {

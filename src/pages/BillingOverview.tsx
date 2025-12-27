@@ -196,6 +196,16 @@ const BillingOverview: React.FC = () => {
           }),
           close: t("overview.siteGuard.blocked.close", { defaultValue: "Go back" }),
         },
+        permission: {
+          title: t("overview.siteGuard.permission.title", {
+            defaultValue: "Billing not allowed for this site",
+          }),
+          message: t("overview.siteGuard.permission.message", {
+            defaultValue:
+              "The selected site has billing disabled. Please switch to an authorized site.",
+          }),
+          close: t("overview.siteGuard.permission.close", { defaultValue: "Go back" }),
+        },
         select: {
           title: t("overview.siteGuard.select.title", {
             defaultValue: "Please select a site",
@@ -246,11 +256,14 @@ const BillingOverview: React.FC = () => {
     setSelectedSite,
     date,
     setDate,
+    billingGuard,
   } = useFilters();
   const navigate = useNavigate();
   const { abs } = useUserPath();
   const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
-  const [siteGuardType, setSiteGuardType] = React.useState<"none" | "select" | "blocked">("none");
+  const [siteGuardType, setSiteGuardType] = React.useState<
+    "none" | "select" | "blocked" | "permission"
+  >("none");
 
   const [activeCard, setActiveCard] = React.useState<string>("usage");
   const [tableSearch, setTableSearch] = React.useState("");
@@ -263,9 +276,18 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
+  const guardForSite =
+    billingGuard.siteCode && billingGuard.siteCode === normalizedSite
+      ? billingGuard
+      : null;
+  const blockedByPermission =
+    !requiresSiteSelection &&
+    normalizedSite !== "all" &&
+    guardForSite?.allowElectricBilling === false;
+  const inventoryEnabled = !requiresSiteSelection && !blockedByPermission;
   useDeviceInventoryLoader({
-    selectedSiteCode: !requiresSiteSelection ? normalizedSite : undefined,
-    enabled: !requiresSiteSelection,
+    selectedSiteCode: inventoryEnabled ? normalizedSite : undefined,
+    enabled: inventoryEnabled,
   });
 
   const {
@@ -273,7 +295,10 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
     loading,
     error,
     refresh,
-  } = useBillingOverviewData(requiresSiteSelection ? null : normalizedSite, fetchBillingError);
+  } = useBillingOverviewData(
+    requiresSiteSelection || blockedByPermission ? null : normalizedSite,
+    fetchBillingError
+  );
 
   const fetchRealtimeRowsForSite = React.useCallback(
     async (siteCode: string) => {
@@ -296,7 +321,7 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
   );
 
   React.useEffect(() => {
-    if (requiresSiteSelection) {
+    if (requiresSiteSelection || blockedByPermission) {
       setRealtimeRows([]);
       setRealtimeError(null);
       setRealtimeLoading(false);
@@ -322,7 +347,13 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
     return () => {
       cancelled = true;
     };
-  }, [requiresSiteSelection, normalizedSite, fetchRealtimeRowsForSite, realtimeGatewayError]);
+  }, [
+    requiresSiteSelection,
+    blockedByPermission,
+    normalizedSite,
+    fetchRealtimeRowsForSite,
+    realtimeGatewayError,
+  ]);
 
   const handleRefreshRealtime = React.useCallback(() => {
     if (requiresSiteSelection) return;
@@ -413,9 +444,10 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   React.useEffect(() => {
     if (requiresSiteSelection) setSiteGuardType("select");
+    else if (blockedByPermission) setSiteGuardType("permission");
     else if (noElectricAccess) setSiteGuardType("blocked");
     else setSiteGuardType("none");
-  }, [requiresSiteSelection, noElectricAccess]);
+  }, [requiresSiteSelection, blockedByPermission, noElectricAccess]);
   const siteGuardOpen = siteGuardType !== "none";
 
   const handleSiteGuardClose = React.useCallback(() => {
@@ -486,6 +518,8 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
   const siteGuardConfig =
     siteGuardType === "blocked"
       ? overviewText.siteGuard.blocked
+      : siteGuardType === "permission"
+      ? overviewText.siteGuard.permission
       : overviewText.siteGuard.select;
 
   return (

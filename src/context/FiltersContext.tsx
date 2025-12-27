@@ -4,12 +4,18 @@ import { useMatch } from "react-router-dom";
 import type { DateValue } from "../components/DateInput";
 import { today as defaultToday } from "../components/Dashboard/dashboard.constants";
 import { me as apiMe } from "../api/user";
-import { listSites } from "../api/sites";
+import { listSites, getSiteDetails } from "../api/sites";
 
 export type SiteOption = { label: string; value: string; i18nKey?: string };
 
 const SELECTED_SITE_STORAGE_PREFIX = "filters:selectedSite";
 const SELECTED_SITE_TTL_MS = 1000 * 60 * 15; // 15 นาทีพอให้ refresh แล้วยังจำได้ แต่ไม่ค้างนานเกินไป
+
+type BillingPermissionState = {
+  siteCode: string | null;
+  loading: boolean;
+  allowElectricBilling: boolean | null;
+};
 
 type FiltersState = {
   date: DateValue;
@@ -25,6 +31,8 @@ type FiltersState = {
 
   searchSite: string;
   setSearchSite: (v: string) => void;
+
+  billingGuard: BillingPermissionState;
 };
 
 const FiltersContext = React.createContext<FiltersState | undefined>(undefined);
@@ -45,8 +53,14 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
   const [searchSite, setSearchSite] = React.useState("");
+  const [billingGuard, setBillingGuard] = React.useState<BillingPermissionState>({
+    siteCode: null,
+    loading: false,
+    allowElectricBilling: null,
+  });
   const storedSiteRef = React.useRef<string | null>(null);
   const selectedSiteRef = React.useRef<string>("all");
+  const billingPermissionCacheRef = React.useRef<Map<string, boolean>>(new Map());
 
   React.useEffect(() => {
     selectedSiteRef.current = selectedSite;
@@ -91,6 +105,60 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     storedSiteRef.current = readStoredSite();
   }, [readStoredSite]);
+
+  React.useEffect(() => {
+    if (!selectedSite || selectedSite === "all") {
+      setBillingGuard({
+        siteCode: null,
+        loading: false,
+        allowElectricBilling: null,
+      });
+      return;
+    }
+    const code = selectedSite.trim();
+    const cached = billingPermissionCacheRef.current.get(code);
+    if (typeof cached === "boolean") {
+      setBillingGuard({
+        siteCode: code,
+        loading: false,
+        allowElectricBilling: cached,
+      });
+      return;
+    }
+    let cancelled = false;
+    setBillingGuard({
+      siteCode: code,
+      loading: true,
+      allowElectricBilling: null,
+    });
+    getSiteDetails(code)
+      .then((resp) => {
+        if (cancelled) return;
+        const raw = (resp as any)?.data ?? resp;
+        const site = raw?.site ?? raw ?? {};
+        const allowed = Boolean(
+          site.allowElectricBilling ?? site.allow_electric_billing
+        );
+        billingPermissionCacheRef.current.set(code, allowed);
+        setBillingGuard({
+          siteCode: code,
+          loading: false,
+          allowElectricBilling: allowed,
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        billingPermissionCacheRef.current.set(code, false);
+        setBillingGuard({
+          siteCode: code,
+          loading: false,
+          allowElectricBilling: false,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSite]);
 
   const setSelectedSite = React.useCallback(
     (value: string) => {
@@ -246,6 +314,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       setSiteOptions,
       searchSite,
       setSearchSite,
+      billingGuard,
     }),
     [
       date,
@@ -256,6 +325,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       siteOptions,
       searchSite,
       setSelectedSite,
+      billingGuard,
     ]
   );
 

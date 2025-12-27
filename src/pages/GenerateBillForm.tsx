@@ -187,6 +187,16 @@ const GenerateBillForm: React.FC = () => {
           }),
           close: t("generate.siteGuard.blocked.close", { defaultValue: "Go back" }),
         },
+        permission: {
+          title: t("generate.siteGuard.permission.title", {
+            defaultValue: "Billing not allowed for this site",
+          }),
+          message: t("generate.siteGuard.permission.message", {
+            defaultValue:
+              "This site has billing disabled. Switch to another site or contact your administrator.",
+          }),
+          close: t("generate.siteGuard.permission.close", { defaultValue: "Go back" }),
+        },
         select: {
           title: t("generate.siteGuard.select.title", { defaultValue: "Select a site first" }),
           message: t("generate.siteGuard.select.message", {
@@ -224,6 +234,7 @@ const GenerateBillForm: React.FC = () => {
     setSelectedSite,
     date,
     setDate,
+    billingGuard,
   } = useFilters();
   const defaultBillingPeriod = React.useMemo(
     () => getDefaultBillingPeriod(),
@@ -275,7 +286,7 @@ const GenerateBillForm: React.FC = () => {
   const { counts: inventoryCounts, loading: inventoryLoading } =
     useDeviceInventory();
   const [guardType, setGuardType] = React.useState<
-    "none" | "select" | "blocked"
+    "none" | "select" | "blocked" | "permission"
   >("none");
   const [errorModalMessage, setErrorModalMessage] = React.useState<
     string | null
@@ -323,13 +334,22 @@ const GenerateBillForm: React.FC = () => {
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
+  const guardForSite =
+    billingGuard.siteCode && billingGuard.siteCode === normalizedSite
+      ? billingGuard
+      : null;
+  const permissionBlocked =
+    !requiresSiteSelection &&
+    normalizedSite !== "all" &&
+    guardForSite?.allowElectricBilling === false;
   React.useEffect(() => {
     setCustomLogoDataUrl(null);
     setCustomLogoError(null);
   }, [normalizedSite]);
+  const inventoryEnabled = !requiresSiteSelection && !permissionBlocked;
   useDeviceInventoryLoader({
-    selectedSiteCode: !requiresSiteSelection ? normalizedSite : undefined,
-    enabled: !requiresSiteSelection,
+    selectedSiteCode: inventoryEnabled ? normalizedSite : undefined,
+    enabled: inventoryEnabled,
   });
   React.useEffect(() => {
     setMeterSearch("");
@@ -340,6 +360,7 @@ const GenerateBillForm: React.FC = () => {
   );
   const noElectricInventory =
     !requiresSiteSelection &&
+    !permissionBlocked &&
     normalizedSite !== "all" &&
     !inventoryLoading &&
     electricDeviceCount <= 0;
@@ -373,18 +394,22 @@ const GenerateBillForm: React.FC = () => {
   const meterId = formState.meterId;
 
   const noMeterOptions =
-    !requiresSiteSelection && !loadingOptions && meterOptions.length === 0;
+    !requiresSiteSelection &&
+    !permissionBlocked &&
+    !loadingOptions &&
+    meterOptions.length === 0;
   const meterSelectionDisabled = loadingOptions || meterOptions.length === 0;
 
   React.useEffect(() => {
     if (requiresSiteSelection) setGuardType("select");
+    else if (permissionBlocked) setGuardType("permission");
     else if (noElectricInventory || noMeterOptions) setGuardType("blocked");
     else setGuardType("none");
-  }, [requiresSiteSelection, noElectricInventory, noMeterOptions]);
+  }, [requiresSiteSelection, permissionBlocked, noElectricInventory, noMeterOptions]);
   const siteGuardOpen = guardType !== "none";
 
   React.useEffect(() => {
-    if (requiresSiteSelection) {
+    if (requiresSiteSelection || permissionBlocked) {
       setLoadingOptions(false);
       setMeterOptions([]);
       setSiteInfo(null);
@@ -511,9 +536,21 @@ const GenerateBillForm: React.FC = () => {
     return () => {
       canceled = true;
     };
-  }, [requiresSiteSelection, normalizedSite, loadMetersErrorText, meterFallbackLabel]);
+  }, [
+    requiresSiteSelection,
+    permissionBlocked,
+    normalizedSite,
+    loadMetersErrorText,
+    meterFallbackLabel,
+  ]);
 
   React.useEffect(() => {
+    if (requiresSiteSelection || permissionBlocked) {
+      setMeterDashboard(null);
+      setMeterDashboardError(null);
+      setLoadingDashboard(false);
+      return;
+    }
     if (!meterId) {
       setMeterDashboard(null);
       setMeterDashboardError(null);
@@ -552,6 +589,8 @@ const GenerateBillForm: React.FC = () => {
       canceled = true;
     };
   }, [
+    requiresSiteSelection,
+    permissionBlocked,
     meterId,
     billingMode,
     monthlyRequestRange?.startIso,
@@ -577,6 +616,12 @@ const GenerateBillForm: React.FC = () => {
   }, [meterDashboard]);
 
   React.useEffect(() => {
+    if (requiresSiteSelection || permissionBlocked) {
+      setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
+      setSummaryError(null);
+      setSummaryLoading(false);
+      return;
+    }
     if (!meterId) {
       setSummaryTotals({ onPeak: 0, offPeak: 0, total: 0 });
       setSummaryError(null);
@@ -638,6 +683,8 @@ const GenerateBillForm: React.FC = () => {
       canceled = true;
     };
   }, [
+    requiresSiteSelection,
+    permissionBlocked,
     meterId,
     billingMode,
     formState.billingMonth,
@@ -653,6 +700,8 @@ const GenerateBillForm: React.FC = () => {
   const siteGuardConfig =
     guardType === "blocked"
       ? generateText.siteGuard.blocked
+      : guardType === "permission"
+      ? generateText.siteGuard.permission
       : generateText.siteGuard.select;
 
   const siteBrandingLogo = siteInfo?.brandingLogoUrl ?? null;
