@@ -285,6 +285,24 @@ const formatTime = (h: number, m: number) => {
   return `${hh}:${mm} ${ampm}`;
 };
 
+const parseTimeLabel = (label?: string) => {
+  const fallback = { hours: 0, minutes: 0 };
+  if (!label) return fallback;
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(label.trim());
+  if (!match) return fallback;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const ap = match[3].toUpperCase();
+  if (ap === "PM" && hours !== 12) hours += 12;
+  if (ap === "AM" && hours === 12) hours = 0;
+  return { hours, minutes };
+};
+
+const minutesFromTimeLabel = (label?: string) => {
+  const { hours, minutes } = parseTimeLabel(label);
+  return hours * 60 + minutes;
+};
+
 export default function WaterMeterPanel({ siteCode }: Props) {
   const { t } = useTranslation("devices"); // ใช้คีย์แบบ devices.waterMeter.*
   const { selectedSite, siteOptions } = useFilters();
@@ -350,6 +368,23 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   // ค่าเริ่มต้นให้เหมือนภาพ
   const [fromTime, setFromTime] = useState<string>("12:00 AM");
   const [toTime, setToTime] = useState<string>("11:30 PM");
+  const fromMinutes = useMemo(() => minutesFromTimeLabel(fromTime), [fromTime]);
+  const toOptions = useMemo(() => {
+    const filtered = timeOptions.filter(
+      (opt) => minutesFromTimeLabel(opt.value) > fromMinutes
+    );
+    return filtered.length > 0 ? filtered : [];
+  }, [timeOptions, fromMinutes]);
+
+  useEffect(() => {
+    if (!toOptions.length) {
+      setToTime(fromTime);
+      return;
+    }
+    if (!toOptions.some((opt) => opt.value === toTime)) {
+      setToTime(toOptions[0].value);
+    }
+  }, [toOptions, toTime]);
 
   // ✅ state สำหรับ Thermostat ซ้าย/ขวา (อันละชุด)
   const [thermoLeft, setThermoLeft] = useState<{
@@ -617,7 +652,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
 
             {/* To */}
             <Dropdown
-              options={timeOptions}
+              options={toOptions.length > 0 ? toOptions : [{ label: fromTime, value: fromTime }]}
               value={toTime}
               onChange={(val) => setToTime(val)}
             >

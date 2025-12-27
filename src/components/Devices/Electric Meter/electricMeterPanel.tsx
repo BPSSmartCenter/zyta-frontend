@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
@@ -197,6 +197,26 @@ const formatTime = (h: number, m: number) => {
   const mm = m.toString().padStart(2, "0");
   return `${hh}:${mm} ${ampm}`;
 };
+const parseTimeLabel = (label?: string) => {
+  const fallback = { hours: 0, minutes: 0 };
+  if (!label) return fallback;
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(label.trim());
+  if (!match) return fallback;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const ap = match[3].toUpperCase();
+  if (ap === "PM" && hours !== 12) hours += 12;
+  if (ap === "AM" && hours === 12) hours = 0;
+  return { hours, minutes };
+};
+const minutesFromTimeLabel = (label?: string) => {
+  const { hours, minutes } = parseTimeLabel(label);
+  return hours * 60 + minutes;
+};
+const to24FromLabel = (label?: string) => {
+  const { hours, minutes } = parseTimeLabel(label);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
 
 import { fetchEquipmentTelemetry } from "../../../api/equipment";
 
@@ -341,6 +361,22 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
   const [fromTime, setFromTime] = useState<string>(defaultTimeRange.from);
   const [toTime, setToTime] = useState<string>(defaultTimeRange.to);
+  const fromMinutes = useMemo(() => minutesFromTimeLabel(fromTime), [fromTime]);
+  const toOptions = useMemo(() => {
+    const filtered = timeOptions.filter(
+      (opt) => minutesFromTimeLabel(opt.value) > fromMinutes
+    );
+    return filtered.length > 0 ? filtered : [];
+  }, [timeOptions, fromMinutes]);
+  useEffect(() => {
+    if (!toOptions.length) {
+      setToTime(fromTime);
+      return;
+    }
+    if (!toOptions.some((opt) => opt.value === toTime)) {
+      setToTime(toOptions[0].value);
+    }
+  }, [toOptions, toTime]);
   const [selectedComparisonKey, setSelectedComparisonKey] = useState<string | null>(
     null
   );
@@ -351,18 +387,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     const yyyy = base.getFullYear();
     const mm = String(base.getMonth() + 1).padStart(2, "0");
     const dd = String(base.getDate()).padStart(2, "0");
-    const to24 = (s: string) => {
-      const m = /^(\d{2}):(\d{2})\s*(AM|PM)$/i.exec(s.trim());
-      if (!m) return "00:00";
-      let h = parseInt(m[1], 10);
-      const min = m[2];
-      const ap = m[3].toUpperCase();
-      if (ap === "PM" && h !== 12) h += 12;
-      if (ap === "AM" && h === 12) h = 0;
-      return `${String(h).padStart(2, "0")}:${min}`;
-    };
-    const from = `${yyyy}-${mm}-${dd} ${to24(fromTime)}:00`;
-    const to = `${yyyy}-${mm}-${dd} ${to24(toTime)}:00`;
+    const from = `${yyyy}-${mm}-${dd} ${to24FromLabel(fromTime)}:00`;
+    const to = `${yyyy}-${mm}-${dd} ${to24FromLabel(toTime)}:00`;
     // Force same-date range even if to < from (per requirement)
     return { from, to };
   }, [fromTime, toTime, filtersDate]);
@@ -1008,7 +1034,11 @@ const [thermoOne, setThermoOne] = useState<{
 
             {/* To */}
             <Dropdown
-              options={timeOptions}
+              options={
+                toOptions.length > 0
+                  ? toOptions
+                  : [{ label: fromTime, value: fromTime }]
+              }
               value={toTime}
               onChange={(val) => setToTime(val)}
             >

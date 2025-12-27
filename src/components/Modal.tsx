@@ -1,11 +1,33 @@
 import React, { useEffect, useRef } from "react";
 
+let modalOpenCount = 0;
+let bodyOverflowCache: string | null = null;
+
+const lockBodyScroll = () => {
+  if (typeof document === "undefined") return;
+  if (modalOpenCount === 0) {
+    bodyOverflowCache = document.body.style.overflow || "";
+  }
+  modalOpenCount += 1;
+  document.body.style.overflow = "hidden";
+};
+
+const unlockBodyScroll = () => {
+  if (typeof document === "undefined") return;
+  modalOpenCount = Math.max(0, modalOpenCount - 1);
+  if (modalOpenCount === 0) {
+    document.body.style.overflow = bodyOverflowCache ?? "";
+    bodyOverflowCache = null;
+  }
+};
+
 type IconType = "warning" | "mail" | "cancel" | "check";
 
 export interface PrelineModalProps {
   open: boolean;
   id?: string;
   icon?: IconType;
+  hideIcon?: boolean;
   title: string;
   message?: string | React.ReactNode;
   closeLabel?: string; // ปุ่มเดี่ยว (เดิม)
@@ -15,6 +37,7 @@ export interface PrelineModalProps {
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm?: () => void;
+  footer?: React.ReactNode;
 }
 
 const ICON_MAP: Record<IconType, { name: string; color: string }> = {
@@ -28,6 +51,7 @@ export default function Modal({
   open,
   id = "hs-scale-animation-modal",
   icon = "cancel",
+  hideIcon = false,
   title,
   message,
   closeLabel = "ตกลง",
@@ -35,8 +59,19 @@ export default function Modal({
   confirmLabel,
   cancelLabel = "ยกเลิก",
   onConfirm,
+  footer,
 }: PrelineModalProps) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
+
+  const cleanupBackdrops = React.useCallback(() => {
+    try {
+      document
+        .querySelectorAll<HTMLElement>(
+          ".hs-overlay-backdrop, .preline-backdrop"
+        )
+        .forEach((b) => b.remove());
+    } catch {}
+  }, []);
 
   useEffect(() => {
     (window as any).HSStaticMethods?.autoInit?.();
@@ -63,8 +98,9 @@ export default function Modal({
       }
       el.classList.remove("open");
       el.classList.add("hidden", "pointer-events-none");
+      cleanupBackdrops();
     }
-  }, [open]);
+  }, [open, cleanupBackdrops]);
 
   useEffect(() => {
     if (!open) return;
@@ -83,10 +119,15 @@ export default function Modal({
   }, [open, onClose]);
 
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    if (open) document.body.style.overflow = "hidden";
+    if (open) {
+      lockBodyScroll();
+    } else {
+      unlockBodyScroll();
+    }
     return () => {
-      document.body.style.overflow = prev;
+      if (open) {
+        unlockBodyScroll();
+      }
     };
   }, [open]);
 
@@ -98,13 +139,7 @@ export default function Modal({
         if (el && HSO?.close) HSO.close(el);
       } catch {}
       // Fallback: remove any stray backdrops if present
-      try {
-        document
-          .querySelectorAll<HTMLElement>(
-            ".hs-overlay-backdrop, .preline-backdrop"
-          )
-          .forEach((b) => b.remove());
-      } catch {}
+      cleanupBackdrops();
       onClose();
     }
   };
@@ -127,14 +162,16 @@ export default function Modal({
         <div className="hs-overlay-animation-target hs-overlay-open:scale-100 hs-overlay-open:opacity-100 scale-95 opacity-0 ease-in-out transition-all w-[90%] max-w-[340px] sm:max-w-[360px] md:max-w-[400px] m-3 sm:mx-auto min-h-[calc(100%-56px)] flex items-center">
           <div className="w-full flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl pointer-events-auto">
             <div className="px-6 pb-6 mt-2">
-              <div className="w-full flex justify-center">
-                <i
-                  className={`material-icons-outlined text-[32px] modalIcon ${iconCfg.color}`}
-                  aria-hidden="true"
-                >
-                  {iconCfg.name}
-                </i>
-              </div>
+              {!hideIcon && (
+                <div className="w-full flex justify-center">
+                  <i
+                    className={`material-icons-outlined text-[32px] modalIcon ${iconCfg.color}`}
+                    aria-hidden="true"
+                  >
+                    {iconCfg.name}
+                  </i>
+                </div>
+              )}
 
               <div className="mt-4 text-center">
                 <h3
@@ -151,7 +188,9 @@ export default function Modal({
               </div>
 
               {/* Actions */}
-              {confirmLabel ? (
+              {footer !== undefined ? (
+                footer
+              ) : confirmLabel ? (
                 <div className="mt-5 flex justify-center gap-3">
                   <button
                     type="button"
@@ -162,13 +201,7 @@ export default function Modal({
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
                       } catch {}
-                      try {
-                        document
-                          .querySelectorAll<HTMLElement>(
-                            ".hs-overlay-backdrop, .preline-backdrop"
-                          )
-                          .forEach((b) => b.remove());
-                      } catch {}
+                      cleanupBackdrops();
                       onClose();
                     }}
                   >
@@ -184,13 +217,7 @@ export default function Modal({
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
                       } catch {}
-                      try {
-                        document
-                          .querySelectorAll<HTMLElement>(
-                            ".hs-overlay-backdrop, .preline-backdrop"
-                          )
-                          .forEach((b) => b.remove());
-                      } catch {}
+                      cleanupBackdrops();
                       onClose();
                     }}
                   >
@@ -208,13 +235,7 @@ export default function Modal({
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
                       } catch {}
-                      try {
-                        document
-                          .querySelectorAll<HTMLElement>(
-                            ".hs-overlay-backdrop, .preline-backdrop"
-                          )
-                          .forEach((b) => b.remove());
-                      } catch {}
+                      cleanupBackdrops();
                       onClose();
                     }}
                   >

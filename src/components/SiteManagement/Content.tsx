@@ -276,7 +276,7 @@ export default function Content({
       {pageCount > 1 && (
         <div className="mt-6 flex justify-center gap-2">
           <button
-            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40"
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             disabled={page === 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
@@ -286,7 +286,7 @@ export default function Content({
             {texts.pagination.label(page, pageCount)}
           </div>
           <button
-            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40"
+            className="px-3 py-1 border rounded-md text-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             disabled={page === pageCount}
             onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
           >

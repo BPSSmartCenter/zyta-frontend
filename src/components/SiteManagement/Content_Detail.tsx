@@ -15,6 +15,7 @@ import {
 import { useToast } from "../../hook/toastProvider";
 import type { BillingType, SiteBillingAccess } from "../../types/billing";
 import { buildBrandingLogoSrc } from "../../utils/branding";
+import Modal from "../Modal";
 
 type Props = {
   site: SiteRow;
@@ -176,6 +177,26 @@ export default function ContentDetail({
         }),
         electricHint: t("detail.billing.electric.hint", {
           defaultValue: "Enter base and discount values before enabling.",
+        }),
+        setupCta: t("detail.billing.electric.setupCta", {
+          defaultValue:
+            "Enable billing to configure electric rates for this site.",
+        }),
+        enabledNote: t("detail.billing.electric.enabledNote", {
+          defaultValue:
+            "Current billing rates applied to electric devices in this site.",
+        }),
+        editAction: t("detail.billing.electric.editAction", {
+          defaultValue: "Edit",
+        }),
+        disableAction: t("detail.billing.electric.disableAction", {
+          defaultValue: "Disable",
+        }),
+        modalEnableTitle: t("detail.billing.electric.modalEnableTitle", {
+          defaultValue: "Enable electric billing",
+        }),
+        modalEditTitle: t("detail.billing.electric.modalEditTitle", {
+          defaultValue: "Edit electric billing",
         }),
         waterTitle: t("detail.billing.water.title", {
           defaultValue: "Water Billing",
@@ -362,12 +383,21 @@ export default function ContentDetail({
     baseOffPeak: formatRateInput(site.billingOffPeakRate ?? null),
     discountRate: formatDiscountPercent(site.billingDiscountRate ?? null),
   }));
-  const [billingConfigSaving, setBillingConfigSaving] = React.useState(false);
+  const [billingModalOpen, setBillingModalOpen] = React.useState(false);
+  const [billingModalMode, setBillingModalMode] = React.useState<"enable" | "edit">(
+    "enable"
+  );
+  const [billingModalDraft, setBillingModalDraft] =
+    React.useState<BillingRateState | null>(null);
+  const [billingModalSubmitting, setBillingModalSubmitting] =
+    React.useState(false);
   const [activeDeviceType, setActiveDeviceType] = React.useState<DeviceTypeKey>(
     DEVICE_SECTIONS[0]?.key ?? "electric"
   );
   const [deviceSearch, setDeviceSearch] = React.useState("");
   const [devicePage, setDevicePage] = React.useState(1);
+  const [pendingDeviceDelete, setPendingDeviceDelete] = React.useState<DeviceEntry | null>(null);
+  const [deviceDeleteLoading, setDeviceDeleteLoading] = React.useState(false);
   const deviceSections = React.useMemo(
     () => [
       { key: "electric" as DeviceTypeKey, label: texts.deviceTabs.electric },
@@ -422,6 +452,19 @@ export default function ContentDetail({
   const brandingLogoSrc = React.useMemo(
     () => buildBrandingLogoSrc(siteInfo.brandingLogoUrl ?? null),
     [siteInfo.brandingLogoUrl]
+  );
+  const electricEnabled = Boolean(billingPrefs.electric);
+  const electricOnPeakDisplay = formatRateDisplay(
+    siteInfo.billingOnPeakRate,
+    billingRates.baseOnPeak
+  );
+  const electricOffPeakDisplay = formatRateDisplay(
+    siteInfo.billingOffPeakRate,
+    billingRates.baseOffPeak
+  );
+  const electricDiscountDisplay = formatDiscountDisplay(
+    siteInfo.billingDiscountRate,
+    billingRates.discountRate
   );
 
   const loadDetail = React.useCallback(async () => {
@@ -568,13 +611,6 @@ export default function ContentDetail({
     [show, texts.toasts]
   );
 
-  const handleRateInputChange =
-    (key: keyof BillingRateState) =>
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const { value } = event.target;
-      setBillingRates((prev) => ({ ...prev, [key]: value }));
-    };
-
   const handleDeviceTabChange = (type: DeviceTypeKey) => {
     setActiveDeviceType(type);
     setDeviceSearch("");
@@ -611,45 +647,53 @@ export default function ContentDetail({
     []
   );
 
-  const validateBillingRates = React.useCallback(() => {
-    const onPeak = Number(billingRates.baseOnPeak);
-    if (!Number.isFinite(onPeak) || onPeak <= 0) {
-      return { ok: false, message: texts.billingValidation.baseOn };
-    }
-    const offPeak = Number(billingRates.baseOffPeak);
-    if (!Number.isFinite(offPeak) || offPeak <= 0) {
-      return { ok: false, message: texts.billingValidation.baseOff };
-    }
-    const discountPercent = Number(billingRates.discountRate);
-    if (
-      !Number.isFinite(discountPercent) ||
-      discountPercent < 0 ||
-      discountPercent > 100
-    ) {
+  const validateBillingRates = React.useCallback(
+    (values?: BillingRateState) => {
+      const source = values ?? billingRates;
+      const onPeak = Number(source.baseOnPeak);
+      if (!Number.isFinite(onPeak) || onPeak <= 0) {
+        return { ok: false, message: texts.billingValidation.baseOn };
+      }
+      const offPeak = Number(source.baseOffPeak);
+      if (!Number.isFinite(offPeak) || offPeak <= 0) {
+        return { ok: false, message: texts.billingValidation.baseOff };
+      }
+      const discountPercent = Number(source.discountRate);
+      if (
+        !Number.isFinite(discountPercent) ||
+        discountPercent < 0 ||
+        discountPercent > 100
+      ) {
+        return {
+          ok: false,
+          message: texts.billingValidation.discount,
+        };
+      }
       return {
-        ok: false,
-        message: texts.billingValidation.discount,
+        ok: true,
+        values: {
+          billingOnPeakRate: Number(onPeak.toFixed(4)),
+          billingOffPeakRate: Number(offPeak.toFixed(4)),
+          billingDiscountRate: Number((discountPercent / 100).toFixed(4)),
+        },
       };
-    }
-    return {
-      ok: true,
-      values: {
-        billingOnPeakRate: Number(onPeak.toFixed(4)),
-        billingOffPeakRate: Number(offPeak.toFixed(4)),
-        billingDiscountRate: Number((discountPercent / 100).toFixed(4)),
-      },
-    };
-  }, [billingRates, texts.billingValidation]);
+    },
+    [billingRates, texts.billingValidation]
+  );
 
-  const handleBillingToggle = async (type: BillingType, next: boolean) => {
-    if (!siteIdentifier) return;
+  const handleBillingToggle = async (
+    type: BillingType,
+    next: boolean,
+    ratesOverride?: BillingRateState
+  ) => {
+    if (!siteIdentifier) return false;
     let pendingElectricRates: {
       billingOnPeakRate: number;
       billingOffPeakRate: number;
       billingDiscountRate: number;
     } | null = null;
     if (type === "electric" && next) {
-      const validation = validateBillingRates();
+      const validation = validateBillingRates(ratesOverride);
       if (!validation.ok || !validation.values) {
         setBillingPrefs((prev) => ({ ...prev, [type]: false }));
         show({
@@ -660,7 +704,7 @@ export default function ContentDetail({
             </span>
           ),
         });
-        return;
+        return false;
       }
       pendingElectricRates = validation.values;
     }
@@ -676,9 +720,10 @@ export default function ContentDetail({
       } else if (type === "water") {
         payload.allowWaterBilling = next;
       }
-      if (Object.keys(payload).length === 0) return;
+      if (Object.keys(payload).length === 0) return false;
       const data = await updateSiteBillingAccess(siteIdentifier, payload);
       applyBillingResponse(data);
+      return true;
     } catch (err) {
       console.error("[SiteDetail] billing toggle failed", err);
       setBillingPrefs((prev) => ({ ...prev, [type]: !next }));
@@ -690,14 +735,17 @@ export default function ContentDetail({
           </span>
         ),
       });
+      return false;
     } finally {
       setBillingSaving((prev) => ({ ...prev, [type]: false }));
     }
   };
 
-  const handleSaveBillingConfig = async () => {
-    if (!siteIdentifier) return;
-    const validation = validateBillingRates();
+  const handleSaveBillingConfig = async (
+    ratesOverride?: BillingRateState
+  ) => {
+    if (!siteIdentifier) return false;
+    const validation = validateBillingRates(ratesOverride);
     if (!validation.ok || !validation.values) {
       show({
         variant: "error",
@@ -707,11 +755,13 @@ export default function ContentDetail({
           </span>
         ),
       });
-      return;
+      return false;
     }
-    setBillingConfigSaving(true);
     try {
-      const data = await updateSiteBillingAccess(siteIdentifier, validation.values);
+      const data = await updateSiteBillingAccess(
+        siteIdentifier,
+        validation.values
+      );
       applyBillingResponse(data);
       show({
         variant: "success",
@@ -721,6 +771,7 @@ export default function ContentDetail({
           </span>
         ),
       });
+      return true;
     } catch (err) {
       console.error("[SiteDetail] save billing config failed", err);
       show({
@@ -731,20 +782,72 @@ export default function ContentDetail({
           </span>
         ),
       });
-    } finally {
-      setBillingConfigSaving(false);
+      return false;
     }
   };
 
-  const handleDeleteDevice = async (device: DeviceEntry) => {
-    if (!siteIdentifier) return;
-    const confirmed =
-      typeof window === "undefined"
-        ? true
-        : window.confirm(texts.confirm.deleteDevice(device.name));
-    if (!confirmed) return;
+  const openBillingModal = React.useCallback(
+    (mode: "enable" | "edit") => {
+      setBillingModalMode(mode);
+      setBillingModalDraft({
+        baseOnPeak: billingRates.baseOnPeak || "",
+        baseOffPeak: billingRates.baseOffPeak || "",
+        discountRate: billingRates.discountRate || "",
+      });
+      setBillingModalOpen(true);
+    },
+    [billingRates]
+  );
+
+  const closeBillingModal = React.useCallback(() => {
+    if (billingModalSubmitting) return;
+    setBillingModalOpen(false);
+    setBillingModalDraft(null);
+  }, [billingModalSubmitting]);
+
+  const handleBillingDraftChange = React.useCallback(
+    (field: keyof BillingRateState, value: string) => {
+      setBillingModalDraft((prev) =>
+        prev ? { ...prev, [field]: value } : prev
+      );
+    },
+    []
+  );
+
+  const handleBillingModalSubmit = React.useCallback(async () => {
+    if (!billingModalDraft) return;
+    setBillingModalSubmitting(true);
     try {
-      await deleteSiteDevice(siteIdentifier, device.id);
+      let success = false;
+      if (billingModalMode === "enable") {
+        success = await handleBillingToggle(
+          "electric",
+          true,
+          billingModalDraft
+        );
+      } else {
+        success = await handleSaveBillingConfig(billingModalDraft);
+      }
+      if (success) {
+        setBillingRates(billingModalDraft);
+        setBillingModalOpen(false);
+        setBillingModalDraft(null);
+      }
+    } finally {
+      setBillingModalSubmitting(false);
+    }
+  }, [
+    billingModalDraft,
+    billingModalMode,
+    handleBillingToggle,
+    handleSaveBillingConfig,
+  ]);
+
+  const confirmDeleteDevice = React.useCallback(async () => {
+    if (!siteIdentifier || !pendingDeviceDelete) return;
+    setDeviceDeleteLoading(true);
+    try {
+      await deleteSiteDevice(siteIdentifier, pendingDeviceDelete.id);
       show({
         variant: "success",
         message: (
@@ -764,8 +867,18 @@ export default function ContentDetail({
           </span>
         ),
       });
+    } finally {
+      setDeviceDeleteLoading(false);
+      setPendingDeviceDelete(null);
     }
-  };
+  }, [
+    loadDetail,
+    pendingDeviceDelete,
+    show,
+    siteIdentifier,
+    texts.toasts.deviceDeleteFailed,
+    texts.toasts.deviceDeleteSuccess,
+  ]);
 
   const handleSubmitDevice = async (
     type: DeviceTypeKey,
@@ -901,19 +1014,38 @@ export default function ContentDetail({
         </div>
       )}
 
-      {editor && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <DeviceForm
-            type={editor.type}
-            device={editor.device}
-            submitting={submitting}
-            onCancel={() => setEditor(null)}
-            onSubmit={(values) =>
-              handleSubmitDevice(editor.type, values, editor.device ?? null)
-            }
-          />
-        </div>
-      )}
+      <Modal
+        open={Boolean(editor)}
+        id="device-editor-modal"
+        icon="mail"
+        hideIcon
+        title={
+          editor
+            ? editor.device
+              ? texts.deviceForm.titleEdit
+              : texts.deviceForm.titleAdd
+            : ""
+        }
+        message={
+          editor ? (
+            <DeviceForm
+              type={editor.type}
+              device={editor.device}
+              submitting={submitting}
+              onCancel={() => setEditor(null)}
+              onSubmit={(values) =>
+                handleSubmitDevice(editor.type, values, editor.device ?? null)
+              }
+              showHeader={false}
+            />
+          ) : null
+        }
+        footer={null}
+        onClose={() => {
+          if (submitting) return;
+          setEditor(null);
+        }}
+      />
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap gap-2">
@@ -955,7 +1087,7 @@ export default function ContentDetail({
             onClick={() =>
               setEditor({ type: activeDeviceType, mode: "create" })
             }
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 cursor-pointer"
           >
             <i className="material-icons-outlined text-base">add</i>
             {texts.buttons.addDevice}
@@ -963,83 +1095,91 @@ export default function ContentDetail({
         </div>
 
         {activeBillingType === "electric" && (
-          <div className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-semibold text-cyan-900">
-                  {texts.billing.electricTitle}
-                </h4>
-                <p className="text-xs text-cyan-900/70">
-                  {texts.billing.electricHint}
-                </p>
+          <div className="mt-4 rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm">
+            {!electricEnabled ? (
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h4 className="text-base font-semibold text-cyan-900">
+                    {texts.billing.electricTitle}
+                  </h4>
+                  <p className="text-sm text-cyan-900/70">
+                    {texts.billing.setupCta}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openBillingModal("enable")}
+                  disabled={billingSaving.electric || billingModalSubmitting}
+                  className={[
+                    "rounded-xl px-4 py-2 text-sm font-semibold text-white transition cursor-pointer",
+                    billingSaving.electric || billingModalSubmitting
+                      ? "bg-cyan-200 cursor-not-allowed"
+                      : "bg-cyan-500 hover:bg-cyan-600",
+                  ].join(" ")}
+                >
+                  {billingSaving.electric
+                    ? texts.buttons.savingRates
+                    : texts.buttons.enableBilling}
+                </button>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-cyan-900 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={billingPrefs.electric}
-                  disabled={billingSaving.electric}
-                  onChange={(e) =>
-                    handleBillingToggle("electric", e.target.checked)
-                  }
-                />
-                <span>{texts.buttons.enableBilling}</span>
-              </label>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <label className="text-xs font-semibold text-cyan-900">
-                {texts.billing.baseOn}
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  value={billingRates.baseOnPeak}
-                  onChange={handleRateInputChange("baseOnPeak")}
-                />
-              </label>
-              <label className="text-xs font-semibold text-cyan-900">
-                {texts.billing.baseOff}
-                <input
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  value={billingRates.baseOffPeak}
-                  onChange={handleRateInputChange("baseOffPeak")}
-                />
-              </label>
-              <label className="text-xs font-semibold text-cyan-900">
-                {texts.billing.discount}
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                  value={billingRates.discountRate}
-                  onChange={handleRateInputChange("discountRate")}
-                />
-              </label>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-cyan-900/70">
-              <button
-                type="button"
-                onClick={handleSaveBillingConfig}
-                disabled={billingConfigSaving}
-                className={[
-                  "rounded-xl px-4 py-2 text-sm font-semibold text-white transition",
-                  billingConfigSaving
-                    ? "bg-cyan-200 cursor-not-allowed"
-                    : "bg-cyan-500 hover:bg-cyan-600",
-                ].join(" ")}
-              >
-                {billingConfigSaving
-                  ? texts.buttons.savingRates
-                  : texts.buttons.saveRates}
-              </button>
-              <span>{texts.billing.discountNote}</span>
-            </div>
+            ) : (
+              <div>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h4 className="text-base font-semibold text-cyan-900">
+                      {texts.billing.electricTitle}
+                    </h4>
+                    <p className="text-sm text-cyan-900/70">
+                      {texts.billing.enabledNote}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openBillingModal("edit")}
+                      className="rounded-xl border border-cyan-200 px-4 py-2 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={billingModalSubmitting || billingSaving.electric}
+                    >
+                      {texts.billing.editAction}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBillingToggle("electric", false)}
+                      className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={billingSaving.electric}
+                    >
+                      {texts.billing.disableAction}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.baseOn}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricOnPeakDisplay}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.baseOff}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricOffPeakDisplay}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.discount}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricDiscountDisplay}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1109,7 +1249,7 @@ export default function ContentDetail({
                               device: item,
                             })
                           }
-                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1 text-xs transition hover:bg-gray-50"
+                          className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1 text-xs transition hover:bg-gray-50 cursor-pointer"
                         >
                           <i className="material-icons-outlined text-xs">
                             edit
@@ -1118,8 +1258,8 @@ export default function ContentDetail({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteDevice(item)}
-                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1 text-xs text-red-600 transition hover:bg-red-50"
+                          onClick={() => setPendingDeviceDelete(item)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1 text-xs text-red-600 transition hover:bg-red-50 cursor-pointer"
                         >
                           <i className="material-icons-outlined text-xs">
                             delete
@@ -1129,7 +1269,7 @@ export default function ContentDetail({
                         <button
                           type="button"
                           onClick={() => handleShowDeviceId(item)}
-                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1 text-xs text-blue-600 transition hover:bg-blue-50"
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-3 py-1 text-xs text-blue-600 transition hover:bg-blue-50 cursor-pointer"
                         >
                           <i className="material-icons-outlined text-xs">
                             content_copy
@@ -1161,7 +1301,7 @@ export default function ContentDetail({
                 "rounded-md px-3 py-1 font-semibold transition",
                 devicePage <= 1
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300",
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer",
               ].join(" ")}
             >
               {texts.pagination.prev}
@@ -1176,7 +1316,7 @@ export default function ContentDetail({
                 "rounded-md px-3 py-1 font-semibold transition",
                 devicePage >= totalPages
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300",
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300 cursor-pointer",
               ].join(" ")}
             >
               {texts.pagination.next}
@@ -1184,6 +1324,71 @@ export default function ContentDetail({
           </div>
         </div>
       </div>
+      <Modal
+        open={billingModalOpen}
+        id="electric-billing-modal"
+        hideIcon
+        title={
+          billingModalMode === "enable"
+            ? texts.billing.modalEnableTitle
+            : texts.billing.modalEditTitle
+        }
+        message={
+          billingModalDraft ? (
+            <BillingRatesForm
+              values={billingModalDraft}
+              texts={texts.billing}
+              onChange={handleBillingDraftChange}
+            />
+          ) : null
+        }
+        footer={
+          <div className="mt-5 flex justify-center gap-3">
+            <button
+              type="button"
+              className="py-2.5 px-5 w-[140px] inline-flex items-center justify-center text-sm font-semibold rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:cursor-pointer"
+              onClick={closeBillingModal}
+              disabled={billingModalSubmitting}
+            >
+              {t("form.buttons.cancel", { defaultValue: "Cancel" })}
+            </button>
+            <button
+              type="button"
+              className="py-2.5 px-5 w-[160px] inline-flex items-center justify-center text-sm font-semibold rounded-lg bg-[#5397EE] text-white hover:bg-blue-700 hover:cursor-pointer disabled:opacity-60"
+              disabled={billingModalSubmitting}
+              onClick={handleBillingModalSubmit}
+            >
+              {billingModalMode === "enable"
+                ? texts.buttons.enableBilling
+                : texts.buttons.saveRates}
+            </button>
+          </div>
+        }
+        onClose={closeBillingModal}
+      />
+
+      <Modal
+        open={Boolean(pendingDeviceDelete)}
+        id="device-delete-confirm"
+        icon="warning"
+        title={t("confirm.deleteTitle", { defaultValue: "Confirm deletion" })}
+        message={
+          pendingDeviceDelete
+            ? texts.confirm.deleteDevice(pendingDeviceDelete.name)
+            : ""
+        }
+        confirmLabel={
+          deviceDeleteLoading
+            ? t("form.buttons.deleting", { defaultValue: "Deleting..." })
+            : t("form.buttons.delete", { defaultValue: "Delete" })
+        }
+        cancelLabel={t("form.buttons.cancel", { defaultValue: "Cancel" })}
+        onConfirm={deviceDeleteLoading ? undefined : confirmDeleteDevice}
+        onClose={() => {
+          if (deviceDeleteLoading) return;
+          setPendingDeviceDelete(null);
+        }}
+      />
     </div>
   );
 }
@@ -1254,6 +1459,7 @@ type DeviceFormProps = {
   submitting: boolean;
   onCancel: () => void;
   onSubmit: (values: Record<string, string>) => Promise<void>;
+  showHeader?: boolean;
 };
 
 function DeviceForm({
@@ -1262,6 +1468,7 @@ function DeviceForm({
   submitting,
   onCancel,
   onSubmit,
+  showHeader = true,
 }: DeviceFormProps) {
   const { t } = useTranslation("siteManagement");
   const texts = React.useMemo(
@@ -1359,18 +1566,20 @@ function DeviceForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">
-          {texts.title} ({texts.typeLabel})
-        </h3>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
-        >
-          {texts.buttons.cancel}
-        </button>
-      </div>
+      {showHeader && (
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">
+            {texts.title} ({texts.typeLabel})
+          </h3>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm text-gray-500 hover:text-gray-800 cursor-pointer"
+          >
+            {texts.buttons.cancel}
+          </button>
+        </div>
+      )}
 
       {isElectric ? (
         <div className="grid gap-4 md:grid-cols-2">
@@ -1509,4 +1718,91 @@ function extractCategory(model?: string): ElectricCategory | undefined {
 function formatCoord(value: number | null) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "-";
   return value.toFixed(4);
+}
+
+function formatRateDisplay(value?: number | null, fallback?: string) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value.toFixed(4);
+  }
+  const parsed =
+    typeof fallback === "string" && fallback.trim().length > 0
+      ? Number(fallback)
+      : NaN;
+  if (Number.isFinite(parsed)) {
+    return parsed.toFixed(4);
+  }
+  return "-";
+}
+
+function formatDiscountDisplay(value?: number | null, fallback?: string) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${(value * 100).toFixed(2)}%`;
+  }
+  const parsed =
+    typeof fallback === "string" && fallback.trim().length > 0
+      ? Number(fallback)
+      : NaN;
+  if (Number.isFinite(parsed)) {
+    return `${parsed.toFixed(2)}%`;
+  }
+  return "-";
+}
+
+type BillingRatesFormProps = {
+  values: BillingRateState;
+  texts: {
+    baseOn: string;
+    baseOff: string;
+    discount: string;
+    discountNote: string;
+  };
+  onChange: (field: keyof BillingRateState, value: string) => void;
+};
+
+function BillingRatesForm({
+  values,
+  texts,
+  onChange,
+}: BillingRatesFormProps) {
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="text-xs font-semibold text-cyan-900">
+          {texts.baseOn}
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.baseOnPeak}
+            onChange={(e) => onChange("baseOnPeak", e.target.value)}
+          />
+        </label>
+        <label className="text-xs font-semibold text-cyan-900">
+          {texts.baseOff}
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.baseOffPeak}
+            onChange={(e) => onChange("baseOffPeak", e.target.value)}
+          />
+        </label>
+        <label className="text-xs font-semibold text-cyan-900">
+          {texts.discount}
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.discountRate}
+            onChange={(e) => onChange("discountRate", e.target.value)}
+          />
+        </label>
+      </div>
+      <p className="text-xs text-cyan-900/70">{texts.discountNote}</p>
+    </div>
+  );
 }

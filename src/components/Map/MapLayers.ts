@@ -20,7 +20,10 @@ export function loadDistrictsForProvince(
     ringsDist?: L.LatLngExpression[][]
   ) => void,
   setDistrictsLayer: (layer: L.GeoJSON<any> | null) => void,
-  setSubdistrictsLayer: (layer: L.GeoJSON<any> | null) => void
+  setSubdistrictsLayer: (layer: L.GeoJSON<any> | null) => void,
+  beginAnimation?: () => boolean,
+  endAnimation?: () => void,
+  registerMoveEnd?: (cb: () => void) => void
 ) {
   if (!map) return;
 
@@ -59,6 +62,7 @@ export function loadDistrictsForProvince(
           // คลิกอำเภอ → เข้า “ทุกตำบลในอำเภอ”
           layer.on("click", () => {
             if (!ampCode) return;
+            if (beginAnimation && !beginAnimation()) return;
 
             const bb = (dLayer as any).getBounds() as L.LatLngBounds;
             const toLiteral: L.LatLngBoundsLiteral = [
@@ -84,7 +88,11 @@ export function loadDistrictsForProvince(
               animate: true,
               padding: [10, 10],
               maxZoom: 12,
+              duration: 0.6,
             });
+            const done = () => endAnimation?.();
+            if (registerMoveEnd) registerMoveEnd(done);
+            else map.once("moveend", done);
 
             loadSubdistrictsForDistrictCb(ampCode, ringsDist);
           });
@@ -102,7 +110,10 @@ export function loadSubdistrictsForDistrict(
   ringsDist: L.LatLngExpression[][] | undefined,
   pushView: (state: ViewState) => void,
   setMaskByRings: (rings: L.LatLngExpression[][]) => void,
-  setSubdistrictsLayer: (layer: L.GeoJSON<any> | null) => void
+  setSubdistrictsLayer: (layer: L.GeoJSON<any> | null) => void,
+  beginAnimation?: () => boolean,
+  endAnimation?: () => void,
+  registerMoveEnd?: (cb: () => void) => void
 ) {
   if (!map) return;
 
@@ -135,6 +146,7 @@ export function loadSubdistrictsForDistrict(
 
           // คลิกตำบล → zoom เจาะเฉพาะตำบล + ถมรอบข้างทั้งหมด
           layer.on("click", () => {
+            if (beginAnimation && !beginAnimation()) return;
             const ringsTam = extractRingsLatLng((feature as any).geometry);
             const bb = (sLayer as any).getBounds() as L.LatLngBounds;
             const toLiteral: L.LatLngBoundsLiteral = [
@@ -167,7 +179,11 @@ export function loadSubdistrictsForDistrict(
               animate: true,
               padding: [10, 10],
               maxZoom: 14,
+              duration: 0.6,
             });
+            const done = () => endAnimation?.();
+            if (registerMoveEnd) registerMoveEnd(done);
+            else map.once("moveend", done);
           });
         },
       }).addTo(map);

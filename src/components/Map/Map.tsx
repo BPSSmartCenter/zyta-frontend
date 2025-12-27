@@ -73,6 +73,7 @@ export default function Map({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
   const viewStackRef = useRef<ViewState[]>([]);
+  const currentLevelRef = useRef<ViewState["level"]>("country");
   // Guard to avoid resetting view on container resize
   const resizingGuardRef = useRef(false);
 
@@ -91,6 +92,20 @@ export default function Map({
   const [provincesLoaded, setProvincesLoaded] = useState(false);
   const [markersReady, setMarkersReady] = useState(false);
   const fitRetryRef = useRef(0);
+  const zoomAnimatingRef = useRef(false);
+  const pendingMoveEndHandlersRef = useRef<
+    Array<(ev?: LeafletEvent) => void>
+  >([]);
+
+  const beginZoomAnimation = () => {
+    if (zoomAnimatingRef.current) return false;
+    zoomAnimatingRef.current = true;
+    return true;
+  };
+
+  const endZoomAnimation = () => {
+    zoomAnimatingRef.current = false;
+  };
 
   // rings ที่ active อยู่ (ใช้กู้คืนตอน zoom out จากหมุด)
 
@@ -267,6 +282,40 @@ export default function Map({
     };
 
     setProvincesVariant(provinceVariantRef.current);
+  };
+  const hideLayerFromMap = (layer: L.Layer | null) => {
+    const map = mapRef.current;
+    if (!map || !layer) return;
+    if (map.hasLayer(layer)) layer.removeFrom(map);
+    else
+      try {
+        (layer as any).remove?.();
+        } catch {}
+      };
+
+  const hideSubdistrictsLayer = () =>
+    hideLayerFromMap(subdistrictsLayerRef.current);
+
+  const registerMoveEndHandler = (cb: () => void) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const handler = () => {
+      pendingMoveEndHandlersRef.current =
+        pendingMoveEndHandlersRef.current.filter((h) => h !== handler);
+      cb();
+    };
+    pendingMoveEndHandlersRef.current.push(handler);
+    map.once("moveend", handler);
+  };
+
+  const cancelPendingMoveEndHandlers = () => {
+    const map = mapRef.current;
+    const handlers = pendingMoveEndHandlersRef.current;
+    pendingMoveEndHandlersRef.current = [];
+    if (!map) return;
+    handlers.forEach((handler) => {
+      map.off("moveend", handler);
+    });
   };
 
   const BASE_HEIGHT_PX = 680;
@@ -504,7 +553,20 @@ export default function Map({
   };
 
   const pushView = (state: ViewState) => {
-    viewStackRef.current.push(state);
+    const stack = viewStackRef.current;
+    const prev = stack[stack.length - 1];
+    if (
+      prev &&
+      prev.level === state.level &&
+      prev.maxZoom === state.maxZoom &&
+      prev.padding?.[0] === state.padding?.[0] &&
+      prev.padding?.[1] === state.padding?.[1] &&
+      JSON.stringify(prev.bounds) === JSON.stringify(state.bounds)
+    ) {
+      return;
+    }
+    stack.push(state);
+    currentLevelRef.current = state.level;
 
     setCanZoomOut(viewStackRef.current.length > 0);
   };
@@ -540,8 +602,13 @@ export default function Map({
     const map = mapRef.current;
 
     if (!map || !countryLoaded) return;
+    cancelPendingMoveEndHandlers();
+    try {
+      map.stop?.();
+    } catch {}
 
     viewStackRef.current = [];
+    currentLevelRef.current = "country";
 
     setCanZoomOut(false);
 
@@ -572,6 +639,7 @@ export default function Map({
     setInnerShade(true);
 
     isDrillingRef.current = false;
+    endZoomAnimation();
 
     setProvincesVariant("strong");
 
@@ -582,10 +650,19 @@ export default function Map({
     const map = mapRef.current;
 
     if (!map) return;
+    if (!beginZoomAnimation()) return;
+    cancelPendingMoveEndHandlers();
+    try {
+      map.stop?.();
+    } catch {}
 
-    if (lockZoomOut && isAtProvinceView()) return;
+    if (lockZoomOut && isAtProvinceView()) {
+      endZoomAnimation();
+      return;
+    }
 
     const prev = popView();
+    currentLevelRef.current = prev?.level ?? "country";
 
     // หมด stack → กลับประเทศ + sync dropdown + ปิด tooltip
 
@@ -595,6 +672,7 @@ export default function Map({
       onProvinceChange?.("all");
 
       map.closeTooltip?.();
+      endZoomAnimation();
 
       return;
     }
@@ -603,16 +681,40 @@ export default function Map({
 
     reattachRegionLayersAfterPinView();
 
-    // ถ้า view ก่อนหน้าเป็น country หรือ province → กลับประเทศทันที (คลิกเดียว)
+    // ถ้า view ก่อนหน้าเป็น country → กลับประเทศทันที (คลิกเดียว)
 
-    if (prev.level === "country" || prev.level === "province") {
+    if (prev.level === "country") {
       resetToCountry(true);
 
       onProvinceChange?.("all"); // ให้ MapPanel ตั้ง All Location + remount
 
       map.closeTooltip?.(); // ปิด tooltip ที่ค้าง
+      endZoomAnimation();
 
       return;
+    }
+
+    // จัดการชั้น overlay ให้ตรงกับ level ที่เหลือใน stack (เป้าหมายหลังซูมออก)
+    const targetLevel = prev.level ?? "country";
+    if (targetLevel === "province") {
+      // กลับมาโฟกัสจังหวัด → เอาตำบลออก แต่เก็บชั้นอำเภอไว้
+      hideSubdistrictsLayer();
+      const districtsLayer = districtsLayerRef.current;
+      if (districtsLayer && map && !map.hasLayer(districtsLayer)) {
+        districtsLayer.addTo(map);
+      }
+      currentLevelRef.current = "province";
+    } else if (targetLevel === "district") {
+      // ยังอยู่ระดับตำบล → ให้แน่ใจว่าชั้นตำบลกลับมาแสดง
+      const subLayer = subdistrictsLayerRef.current;
+      if (subLayer && map && !map.hasLayer(subLayer)) {
+        subLayer.addTo(map);
+      }
+      currentLevelRef.current = "district";
+    } else {
+      // target เป็น null หรือระดับอื่น → ถอดตำบลออกเผื่อค้าง
+      hideSubdistrictsLayer();
+      currentLevelRef.current = targetLevel;
     }
 
     // ที่เหลือคือเคสซูมลึกจากหมุด ⇒ กู้ overlay ตาม rings เดิม
@@ -638,6 +740,11 @@ export default function Map({
       padding: prev.padding ?? [12, 12],
 
       maxZoom: prev.maxZoom ?? 19,
+      duration: 0.6,
+    });
+
+    registerMoveEndHandler(() => {
+      endZoomAnimation();
     });
   };
 
@@ -647,6 +754,7 @@ export default function Map({
     const map = mapRef.current;
 
     if (!map) return;
+    if (!beginZoomAnimation()) return;
 
     // เก็บสภาพก่อนซูม (รวม rings เดิมเพื่อกู้คืน)
 
@@ -678,7 +786,10 @@ export default function Map({
 
     const targetZoom = Math.min(18, map.getMaxZoom() ?? 19);
 
-    map.flyTo(ll as any, targetZoom, { animate: true });
+    map.flyTo(ll as any, targetZoom, { animate: true, duration: 0.6 });
+    registerMoveEndHandler(() => {
+      endZoomAnimation();
+    });
   };
 
   /** ---------- init map ---------- */
@@ -988,6 +1099,8 @@ export default function Map({
 
             const handleEnterProvince = (opts?: { fromDropdown?: boolean }) => {
               if (!proCode) return;
+              if (zoomAnimatingRef.current) return;
+              zoomAnimatingRef.current = true;
 
               pushView({
                 bounds: TH_BOUNDS as any,
@@ -1023,11 +1136,13 @@ export default function Map({
                 animate: true,
                 padding: [12, 12],
                 maxZoom: 10,
+                duration: 0.65,
               });
 
               // หลังซูมเสร็จ ค่อยเปิด hover กลับ + ย้ำ dim ให้ทุกจังหวัดอีกครั้ง
-              map.once("moveend", () => {
+              registerMoveEndHandler(() => {
                 isDrillingRef.current = false;
+                endZoomAnimation();
               });
 
               if (opts?.fromDropdown) {
@@ -1037,7 +1152,7 @@ export default function Map({
                 );
 
                 // และย้ำทั้งชั้นจังหวัดหลังกล้องหยุดเคลื่อน
-                map.once("moveend", () => {
+                registerMoveEndHandler(() => {
                   setProvincesVariant("dim"); // ทั้ง layer
                   (layer as L.Path).setStyle(
                     provinceDefaultStyleFor(feature, "dim")
@@ -1059,10 +1174,16 @@ export default function Map({
                     ringsDist,
                     pushView,
                     setMaskForLower,
-                    replaceSubdistrictsLayer
+                    replaceSubdistrictsLayer,
+                    beginZoomAnimation,
+                    endZoomAnimation,
+                    registerMoveEndHandler
                   ),
                 replaceDistrictsLayer,
-                replaceSubdistrictsLayer
+                replaceSubdistrictsLayer,
+                beginZoomAnimation,
+                endZoomAnimation,
+                registerMoveEndHandler
               );
             };
 
@@ -1224,7 +1345,7 @@ export default function Map({
       setProvincesVariant("dim"); // เริ่มด้วยทั้งชั้น dim
       matched.__enterProvince({ fromDropdown: true });
 
-      map.once("moveend", () => {
+      registerMoveEndHandler(() => {
         setProvincesVariant("dim"); // ย้ำทั้งชั้น dim อีกรอบ
         isDrillingRef.current = false;
       });

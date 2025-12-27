@@ -10,6 +10,7 @@ import ContentDetail from "../components/SiteManagement/Content_Detail";
 import { ToastProvider, useToast } from "../hook/toastProvider";
 import { listSites, registerSite, updateSite, deleteSite } from "../api/sites";
 import type { SiteRow } from "../components/SiteManagement/site.constant";
+import Modal from "../components/Modal";
 
 export default function SiteManagement() {
   return (
@@ -90,6 +91,7 @@ function SiteManagementInner() {
   const [creating, setCreating] = React.useState(false);
   const [editing, setEditing] = React.useState<SiteRow | null>(null);
   const [viewing, setViewing] = React.useState<SiteRow | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<SiteRow | null>(null);
 
   const mapSiteRow = React.useCallback((site: any): SiteRow => {
     const province =
@@ -241,33 +243,26 @@ function SiteManagementInner() {
     [editing, refresh, show]
   );
 
-  const handleDelete = React.useCallback(
-    async (row: SiteRow) => {
-      const confirmed =
-        typeof window === "undefined"
-          ? true
-          : window.confirm(
-              t("confirm.deleteSite", {
-                name: row.name,
-                defaultValue: "Delete site {{name}}?",
-              })
-            );
-      if (!confirmed) return;
-      try {
-        setLoading(true);
-        await deleteSite(row.id);
-        await refresh();
-        setViewing((prev) => (prev && prev.id === row.id ? null : prev));
-        show({ variant: "success", message: toastNode("deleteSuccess") });
-      } catch (e) {
-        console.error("deleteSite failed", e);
-        show({ variant: "error", message: toastNode("deleteFailed") });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [refresh, show]
-  );
+  const requestDelete = React.useCallback((row: SiteRow) => {
+    setPendingDelete(row);
+  }, []);
+
+  const confirmDelete = React.useCallback(async () => {
+    if (!pendingDelete) return;
+    try {
+      setLoading(true);
+      await deleteSite(pendingDelete.id);
+      await refresh();
+      setViewing((prev) => (prev && prev.id === pendingDelete.id ? null : prev));
+      show({ variant: "success", message: toastNode("deleteSuccess") });
+    } catch (e) {
+      console.error("deleteSite failed", e);
+      show({ variant: "error", message: toastNode("deleteFailed") });
+    } finally {
+      setLoading(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, refresh, show]);
 
   return (
     <div className="p-4 bg-[#F8FBFE] min-h-screen">
@@ -290,7 +285,7 @@ function SiteManagementInner() {
           site={viewing}
           onBack={() => setViewing(null)}
           onEdit={(row) => setEditing(row)}
-          onDelete={handleDelete}
+          onDelete={requestDelete}
         />
       ) : (
         <Content
@@ -301,6 +296,26 @@ function SiteManagementInner() {
           onDetail={(row) => setViewing(row)}
         />
       )}
+      <Modal
+        open={Boolean(pendingDelete)}
+        id="site-delete-confirm"
+        icon="warning"
+        title={t("confirm.deleteTitle", {
+          defaultValue: "Confirm deletion",
+        })}
+        message={
+          pendingDelete
+            ? t("confirm.deleteSite", {
+                name: pendingDelete.name,
+                defaultValue: "Delete site {{name}}?",
+              })
+            : ""
+        }
+        confirmLabel={t("form.buttons.delete", { defaultValue: "Delete" })}
+        cancelLabel={t("form.buttons.cancel", { defaultValue: "Cancel" })}
+        onConfirm={confirmDelete}
+        onClose={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

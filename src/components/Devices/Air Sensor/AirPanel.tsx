@@ -153,6 +153,11 @@ const parseTimeLabel = (label?: string) => {
   return { hours, minutes };
 };
 
+const minutesFromTimeLabel = (label?: string) => {
+  const { hours, minutes } = parseTimeLabel(label);
+  return hours * 60 + minutes;
+};
+
 const buildDateWithTime = (baseDay: Date, label: string) => {
   const { hours, minutes } = parseTimeLabel(label);
   const next = new Date(baseDay);
@@ -310,6 +315,13 @@ export default function AirPanel({ timeRange }: Props) {
 
   const [fromTime, setFromTime] = useState<string>(defaultTimeRange.from);
   const [toTime, setToTime] = useState<string>(defaultTimeRange.to);
+  const fromMinutes = useMemo(() => minutesFromTimeLabel(fromTime), [fromTime]);
+  const toOptions = useMemo(() => {
+    const filtered = timeOptions.filter(
+      (opt) => minutesFromTimeLabel(opt.value) > fromMinutes
+    );
+    return filtered.length > 0 ? filtered : [];
+  }, [timeOptions, fromMinutes]);
 
   useEffect(() => {
     if (timeRange?.from && timeRange?.to) {
@@ -317,6 +329,16 @@ export default function AirPanel({ timeRange }: Props) {
       setToTime(timeRange.to);
     }
   }, [timeRange?.from, timeRange?.to]);
+
+  useEffect(() => {
+    if (!toOptions.length) {
+      setToTime(fromTime);
+      return;
+    }
+    if (!toOptions.some((opt) => opt.value === toTime)) {
+      setToTime(toOptions[0].value);
+    }
+  }, [toOptions, toTime]);
 
   const [airConfig, setAirConfig] = useState<{
     key: AirKpiKey;
@@ -698,7 +720,7 @@ export default function AirPanel({ timeRange }: Props) {
 
             {/* To */}
             <Dropdown
-              options={timeOptions}
+              options={toOptions.length > 0 ? toOptions : [{ label: fromTime, value: fromTime }]}
               value={toTime}
               onChange={(val) => setToTime(val)}
             >
