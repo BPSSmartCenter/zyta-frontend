@@ -168,9 +168,6 @@ export function useDeviceInventoryLoader({
         // (Removed early return)
 
         // Fetch real IoT count
-        // Capture static counts from sites before we overwrite them with real data
-        const staticIoT = aggregated.iot;
-        const staticAir = aggregated.air;
 
         // Track the *real* additions to online/offline so we can adjust the total
         let realOnlineOfNewDevices = 0;
@@ -273,8 +270,16 @@ export function useDeviceInventoryLoader({
           // Remove static components from total, add real components
           // We assume aggregated.total initially included staticIoT and staticAir.
           // aggregated.total is (counters.devices_total).
-          const baseTotal = aggregated.total - staticIoT - staticAir;
-          finalOnline = baseTotal + realOnlineOfNewDevices;
+
+          // FIX: Explicitly sum static components to avoid backend total mismatch
+          const staticBaseCheck =
+            aggregated.cameras +
+            aggregated.intercom +
+            aggregated.water +
+            aggregated.electric +
+            ((aggregated as any).zyta || 0);
+
+          finalOnline = staticBaseCheck + realOnlineOfNewDevices;
           finalOffline = realOfflineOfNewDevices;
         }
 

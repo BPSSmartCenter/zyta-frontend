@@ -41,7 +41,8 @@ export interface PrelineModalProps {
 }
 
 const ICON_MAP: Record<IconType, { name: string; color: string }> = {
-  warning: { name: "warning_amber", color: "text-[#EC0357]" },
+  warning: { name: "", color: "text-[#EC0357]" },
+  // "warning_amber"
   cancel: { name: "cancel", color: "text-[#EC0357]" },
   mail: { name: "mail", color: "text-blue-600" },
   check: { name: "check_circle", color: "text-green-600" },
@@ -70,7 +71,7 @@ export default function Modal({
           ".hs-overlay-backdrop, .preline-backdrop"
         )
         .forEach((b) => b.remove());
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function Modal({
       if (HSO?.open) {
         try {
           HSO.open(el);
-        } catch {}
+        } catch { }
       }
       el.classList.add("open");
       el.classList.remove("hidden", "pointer-events-none", "opacity-0");
@@ -94,7 +95,7 @@ export default function Modal({
       if (HSO?.close) {
         try {
           HSO.close(el);
-        } catch {}
+        } catch { }
       }
       el.classList.remove("open");
       el.classList.add("hidden", "pointer-events-none");
@@ -110,7 +111,7 @@ export default function Modal({
           const el = overlayRef.current;
           const HSO = (window as any).HSOverlay;
           if (el && HSO?.close) HSO.close(el);
-        } catch {}
+        } catch { }
         onClose();
       }
     };
@@ -137,7 +138,7 @@ export default function Modal({
         const el = overlayRef.current;
         const HSO = (window as any).HSOverlay;
         if (el && HSO?.close) HSO.close(el);
-      } catch {}
+      } catch { }
       // Fallback: remove any stray backdrops if present
       cleanupBackdrops();
       onClose();
@@ -200,7 +201,7 @@ export default function Modal({
                         const el = overlayRef.current;
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
-                      } catch {}
+                      } catch { }
                       cleanupBackdrops();
                       onClose();
                     }}
@@ -216,7 +217,7 @@ export default function Modal({
                         const el = overlayRef.current;
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
-                      } catch {}
+                      } catch { }
                       cleanupBackdrops();
                       onClose();
                     }}
@@ -234,7 +235,7 @@ export default function Modal({
                         const el = overlayRef.current;
                         const HSO = (window as any).HSOverlay;
                         if (el && HSO?.close) HSO.close(el);
-                      } catch {}
+                      } catch { }
                       cleanupBackdrops();
                       onClose();
                     }}

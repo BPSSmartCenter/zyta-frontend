@@ -1,5 +1,6 @@
-import axios from "axios";
+import { api } from "./axios";
 
+// Use .env variable as requested by user
 const IOT_API_URL = `${import.meta.env.VITE_API_BASE_URL || "/api"}/devices`;
 export interface IoTDevice {
     id?: string | number;
@@ -18,7 +19,11 @@ export interface IoTDevice {
 export async function getIoTDevices(): Promise<IoTDevice[]> {
     try {
         // Add timestamp to prevent caching
-        const { data } = await axios.get(`${IOT_API_URL}?t=${Date.now()}`, { timeout: 5000 });
+        // Override baseURL to empty string so axios doesn't prepend "/api"
+        const { data } = await api.get(`${IOT_API_URL}?t=${Date.now()}`, {
+            timeout: 5000,
+            baseURL: ""
+        });
         console.log("[IoT API] Raw response:", data);
         // Ensure we return an array
         if (Array.isArray(data)) {
