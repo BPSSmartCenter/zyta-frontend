@@ -138,15 +138,9 @@ export function useDeviceInventoryLoader({
       }
     };
 
-    const firstLoad = React.useRef(true);
-
     const syncCounts = async () => {
-      // Only show global loading on first fetch to prevent UI flickering
-      if (firstLoad.current) {
-        setLocalLoading(true);
-        setLoading(true);
-      }
-
+      setLocalLoading(true);
+      setLoading(true);
       try {
         const allSites = await resolveSites();
         const validSites = allSites.filter((s) => s.code || s.id);
@@ -306,11 +300,8 @@ export function useDeviceInventoryLoader({
         }
       } finally {
         if (!cancelled) {
-          if (firstLoad.current) {
-            setLocalLoading(false);
-            setLoading(false);
-            firstLoad.current = false;
-          }
+          setLocalLoading(false);
+          setLoading(false);
         }
       }
     };
