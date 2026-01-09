@@ -178,7 +178,9 @@ export function useDeviceInventoryLoader({
         let fetchedRealData = false;
 
         try {
+          console.log("[useDeviceInventoryLoader] Fetching IoT devices...");
           const iotDevices = await getIoTDevices();
+          console.log("[useDeviceInventoryLoader] Fetched IoT devices:", iotDevices?.length);
           if (Array.isArray(iotDevices)) {
             // Count "IoT" devices exactly (inclusive check)
             const iotDevicesList = iotDevices.filter((d) =>

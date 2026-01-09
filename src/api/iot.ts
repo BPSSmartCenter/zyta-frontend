@@ -1,7 +1,6 @@
 import axios from "axios";
 
-// Use /iot-api proxy to reach http://203.159.95.162:3000
-const IOT_API_URL = "/iot-api/api/devices";
+const IOT_API_URL = `${import.meta.env.VITE_API_BASE_URL || "/api"}/devices`;
 export interface IoTDevice {
     id?: string | number;
     deviceId?: string;
