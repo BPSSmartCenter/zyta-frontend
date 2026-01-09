@@ -7,6 +7,7 @@ import {
   waterTapImage,
   wifiImage,
   nurseImage,
+  intercomeImage,
 } from "../../assets/index";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +22,9 @@ type DeviceCounts = {
   airSensor: number;
   zyta: number;
   iot: number;
+  iotOffline?: number;
   caregiver: number;
+  caregiverOffline?: number;
 };
 
 type Props = {
@@ -61,6 +64,7 @@ export default function DeviceCount({
   // const labelAlert = t("devices.zyta", { defaultValue: "Red Box" });
   const labelIot = t("devices.iot", { defaultValue: "IoT" });
   const labelCaregiver = t("devices.caregiver", { defaultValue: "Caregiver" });
+  const labelDigitalTwin = t("devices.digitalTwinCard", { defaultValue: "Digital Twin" });
 
   const CCTV_DISABLED = true;
 
@@ -79,7 +83,9 @@ export default function DeviceCount({
     airSensor: 0,
     zyta: 0,
     iot: 0,
+    iotOffline: 0,
     caregiver: 0,
+    caregiverOffline: 0,
     ...(globalCounts || {}),
     ...(counts || {}),
   } as DeviceCounts;
@@ -366,11 +372,11 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {mergedCounts.iot}
+                  {mergedCounts.iot - (mergedCounts.iotOffline || 0)}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">
-                  {statusByType.iot.off}
+                  {mergedCounts.iotOffline || 0}
                 </span>
                 <span className="text-gray-500">)</span>
               </span>
@@ -401,11 +407,30 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {mergedCounts.caregiver}
+                  {mergedCounts.caregiver - (mergedCounts.caregiverOffline || 0)}
                 </span>
                 <span className="text-gray-500">/</span>
-                <span className="text-red-500 font-semibold">0</span>
+                <span className="text-red-500 font-semibold">
+                  {mergedCounts.caregiverOffline || 0}
+                </span>
                 <span className="text-gray-500">)</span>
+              </span>
+            </span>
+          </button>
+        </li>
+        {/* Digital Twin */}
+        <li>
+          <button
+            type="button"
+            aria-disabled={true} // Enabled later when data source exists
+            disabled={false} // Always enabled per user request (Step 319 concept)
+            className={`w-full min-h-[56px] flex items-center gap-4 ${enabledBtnClass}`}
+            onClick={() => window.open("https://bpstech.online/login", "_blank")}
+          >
+            <img src={intercomeImage} alt="" width={36} />
+            <span className="flex flex-col leading-tight text-left min-w-0">
+              <span className="min-w-[125px] truncate">
+                {labelDigitalTwin}
               </span>
             </span>
           </button>

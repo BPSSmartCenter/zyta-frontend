@@ -1,17 +1,11 @@
 
 // src/api/sites.ts
 import { api } from "./axios";
-import { SITES } from "../data/Dashboard/data";
 import type { SiteBillingAccess } from "../types/billing";
 
 export async function listSites() {
-  try {
-    const { data } = await api.get("/sites");
-    return data;
-  } catch (error) {
-    console.warn("API listSites failed, using mock...", error);
-    return SITES;
-  }
+  const { data } = await api.get("/sites");
+  return data;
 }
 
 export async function getSiteInventory(siteId: string) {
@@ -27,28 +21,8 @@ export async function getSiteInventory(siteId: string) {
 }
 
 export async function getSiteDetails(siteIdOrCode: string) {
-  try {
-    const { data } = await api.get(`/site/${encodeURIComponent(siteIdOrCode)}/details`);
-    return data;
-  } catch (error) {
-    console.warn("API getSiteDetails failed, trying mock...", error);
-    const s = SITES.find(
-      (x) => x.id === siteIdOrCode || x.code === siteIdOrCode
-    );
-    if (!s) throw error;
-    return {
-      ...s,
-      counters: {
-        devices_total: s.devices_total,
-        devices_camera: s.devices_camera,
-        devices_intercom: s.devices_intercom,
-        devices_water: s.devices_water,
-        devices_electric: s.devices_electric,
-        devices_air: s.devices_air,
-        devices_iot: s.devices_iot,
-      },
-    };
-  }
+  const { data } = await api.get(`/site/${encodeURIComponent(siteIdOrCode)}/details`);
+  return data;
 }
 
 export type RegisterSiteInput = {

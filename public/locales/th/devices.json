@@ -10,7 +10,8 @@
     "waterCard": "มิเตอร์น้ำ",
     "electricCard": "มิเตอร์ไฟ",
     "airCard": "อากาศ",
-    "iotCard": "IoT"
+    "iotCard": "IoT",
+    "digitalTwinCard": "Digital Twin"
   },
   "table": {
     "title": "ตารางการแจ้งเตือนแบบรวม",

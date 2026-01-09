@@ -10,8 +10,13 @@ export default defineConfig(() => {
     server: {
       proxy: {
         "/api": {
+          target: "http://localhost:3001",
+          changeOrigin: true,
+        },
+        "/iot-api": {
           target: "http://203.159.95.162:3000",
           changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/iot-api/, ""),
         },
       },
     },

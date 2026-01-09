@@ -29,6 +29,8 @@ const TYPE_TO_ID: Record<string, string> = {
   electricmeter: "electric-1",
   airsensor: "air-1",
   iot: "iot-1",
+  caregiver: "caregiver-1",
+  digitaltwin: "digitaltwin-1",
 };
 
 const ID_TO_TYPE: Record<string, string> = Object.entries(TYPE_TO_ID).reduce(
@@ -82,13 +84,14 @@ export default function Content({ }: Props) {
   const availableTypes = (Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>).filter(
     (k) =>
       !DISABLED_DEVICE_TYPES.has(k) &&
-      getCountForType(inventoryCounts as any, k as any) > 0
+      (k === "iot" || k === "caregiver" || k === "digitaltwin" || getCountForType(inventoryCounts as any, k as any) > 0)
   );
   const selectedCount = getCountForType(inventoryCounts as any, urlType as any);
 
   if (typeof window !== "undefined") {
     const isDisabledType = DISABLED_DEVICE_TYPES.has(urlType);
-    const isZero = selectedCount <= 0;
+    const isExternal = urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
+    const isZero = !isExternal && selectedCount <= 0;
     if ((isDisabledType || isZero) && availableTypes.length > 0) {
       const nextType = availableTypes[0];
       const params = new URLSearchParams(location.search);
@@ -111,6 +114,18 @@ export default function Content({ }: Props) {
   // เปลี่ยนการ์ด → อัปเดต URL (เปลี่ยนเฉพาะ search เพื่อลดการกระพริบ)
   const handleChange = (ids: string[]) => {
     const nextId = ids[0];
+
+    // Intercept Caregiver click
+    if (nextId === "caregiver-1") {
+      window.open("http://45.136.253.176:3000/", "_blank");
+      return;
+    }
+    // Intercept Digital Twin click
+    if (nextId === "digitaltwin-1") {
+      window.open("https://bpstech.online/login", "_blank");
+      return;
+    }
+
     const nextType = nextId ? ID_TO_TYPE[nextId] : undefined;
     if (!nextType || nextType === urlType) return;
     if (DISABLED_DEVICE_TYPES.has(nextType as keyof typeof TYPE_TO_ID)) return;
@@ -199,12 +214,14 @@ export default function Content({ }: Props) {
     }, 0);
   }, [inventoryCounts]);
   useEffect(() => {
-    if (hasSpecificSite && !inventoryLoading && totalDeviceCount <= 0) {
+    // If we are viewing IoT or Caregiver, do NOT block even if internal inventory is empty
+    const isExternal = urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
+    if (hasSpecificSite && !inventoryLoading && totalDeviceCount <= 0 && !isExternal) {
       setSiteDeviceGuardOpen(true);
     } else {
       setSiteDeviceGuardOpen(false);
     }
-  }, [hasSpecificSite, inventoryLoading, totalDeviceCount]);
+  }, [hasSpecificSite, inventoryLoading, totalDeviceCount, urlType]);
   const handleDeviceGuardClose = useCallback(() => {
     setSiteDeviceGuardOpen(false);
     if (window.history.length > 1) {
@@ -250,7 +267,9 @@ export default function Content({ }: Props) {
       <StatCardGroup
         selectionMode="single"
         activeIds={
-          selectedId && !DISABLED_DEVICE_TYPES.has(urlType) && selectedCount > 0
+          selectedId &&
+            !DISABLED_DEVICE_TYPES.has(urlType) &&
+            (urlType === "iot" || urlType === "caregiver" || selectedCount > 0)
             ? [selectedId]
             : []
         }
@@ -260,9 +279,16 @@ export default function Content({ }: Props) {
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
           {DEVICE_CARDS.map((c) => {
             const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
-            const countVal = type ? getCountForType(inventoryCounts as any, type as any) : 0;
+            // Force count 1 for external types so they serve as "Active" in UI
+            let countVal = 0;
+            if (type === "iot" || type === "caregiver" || type === "digitaltwin") {
+              countVal = 1;
+            } else if (type) {
+              countVal = getCountForType(inventoryCounts as any, type as any);
+            }
             const typeDisabled = type ? DISABLED_DEVICE_TYPES.has(type) : false;
-            const disabled = typeDisabled || !type || countVal <= 0;
+            const isExternal = type === "iot" || type === "caregiver" || type === "digitaltwin";
+            const disabled = typeDisabled || !type || (!isExternal && countVal <= 0);
             return (
               <li key={c.id}>
                 <StatCard

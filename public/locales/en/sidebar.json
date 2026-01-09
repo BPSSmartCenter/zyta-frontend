@@ -19,6 +19,8 @@
     "devices_electricmeter": "Electric Meter",
     "devices_airsensor": "Air Sensor",
     "devices_iot": "IoT",
+    "devices_caregiver": "Caregiver",
+    "devices_digitaltwin": "Digital Twin",
     "alerts_fire": "Fire detected",
     "alerts_motion": "Motion detected",
     "alerts_offline": "Cameras offline",

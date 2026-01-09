@@ -19,7 +19,9 @@ export default function IoTPanel() {
             try {
                 const data = await getIoTDevices();
                 if (mounted) {
-                    setDevices(data);
+                    // Filter for only type "IoT" (inclusive)
+                    const filtered = data.filter(d => String(d.type || "").toLowerCase().includes("iot"));
+                    setDevices(filtered);
                 }
             } catch (err) {
                 if (mounted) {

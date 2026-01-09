@@ -7,7 +7,8 @@ export type DeviceTypeKey =
   | "airsensor"
   | "intercom"
   | "zyta"
-  | "iot";
+  | "iot"
+  | "caregiver";
 
 export type DeviceCounts = Partial<{
   cameras: number;
@@ -17,7 +18,9 @@ export type DeviceCounts = Partial<{
   airSensor: number;
   zyta: number;
   iot: number;
+  iotOffline: number;
   caregiver: number;
+  caregiverOffline: number;
 }>;
 
 type Ctx = {
@@ -69,6 +72,8 @@ export function getCountForType(map: DeviceCounts, type: DeviceTypeKey): number 
       return Number(map.zyta ?? 0);
     case "iot":
       return Number(map.iot ?? 0);
+    case "caregiver":
+      return Number(map.caregiver ?? 0);
     default:
       return 0;
   }

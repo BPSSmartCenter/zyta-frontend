@@ -10,7 +10,8 @@
     "waterCard": "Water Meter",
     "electricCard": "Electric Meter",
     "airCard": "Air Sensor",
-    "iotCard": "IoT"
+    "iotCard": "IoT",
+    "digitalTwinCard": "Digital Twin"
   },
   "table": {
     "title": "Consolidated Alert Log",

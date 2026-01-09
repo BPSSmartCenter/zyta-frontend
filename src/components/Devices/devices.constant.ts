@@ -1,8 +1,8 @@
 import {
   cctvImage,
   cctvSelected,
-  // intercomeImage,
-  // intercomeSelected,
+  intercomeImage,
+  intercomeSelected,
   waterTapImage,
   waterTapSelected,
   solarImage,
@@ -11,6 +11,7 @@ import {
   windSelected,
   wifiImage,
   wifiSelected,
+  nurseImage,
 } from "../../assets";
 import type { AxisSeries } from "../../types/apexSeries";
 
@@ -59,6 +60,18 @@ export const DEVICE_CARDS: DeviceCard[] = [
     label: "header.iotCard",
     img: wifiImage,
     activeImg: wifiSelected,
+  },
+  {
+    id: "caregiver-1",
+    label: "Caregiver",
+    img: nurseImage,
+    activeImg: nurseImage, // Reuse until a separate active image is available
+  },
+  {
+    id: "digitaltwin-1",
+    label: "header.digitalTwinCard",
+    img: intercomeImage,
+    activeImg: intercomeSelected,
   },
 ];
 

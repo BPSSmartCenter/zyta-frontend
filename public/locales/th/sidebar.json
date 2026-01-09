@@ -1,5 +1,7 @@
 {
-  "search": { "placeholder": "ค้นหา" },
+  "search": {
+    "placeholder": "ค้นหา"
+  },
   "aria": {
     "toggleSidebar": "สลับแถบข้าง",
     "sidebarLabel": "แถบข้าง",
@@ -16,6 +18,9 @@
     "devices_watermeter": "มิเตอร์น้ำ",
     "devices_electricmeter": "มิเตอร์ไฟ",
     "devices_airsensor": "อากาศ",
+    "devices_iot": "IoT",
+    "devices_caregiver": "Caregiver",
+    "devices_digitaltwin": "Digital Twin",
     "alerts_fire": "ตรวจพบไฟไหม้",
     "alerts_motion": "ตรวจพบการเคลื่อนไหว",
     "alerts_offline": "จำนวนกล้อง",
@@ -24,12 +29,17 @@
     "user_management": "การจัดการผู้ใช้",
     "site_management": "การจัดการไซต์"
   },
-  "account": { "logout": "ออกจากระบบ" },
+  "account": {
+    "logout": "ออกจากระบบ"
+  },
   "logout": {
     "title": "ออกจากระบบ",
     "message": "คุณต้องการออกจากระบบใช่ไหม?"
   },
-  "actions": { "cancel": "ยกเลิก", "signOut": "ออกจากระบบ" },
+  "actions": {
+    "cancel": "ยกเลิก",
+    "signOut": "ออกจากระบบ"
+  },
   "footer": {
     "support": "ช่วยเหลือ",
     "setting": "การตั้งค่า",

@@ -11,7 +11,9 @@ type DeviceCounts = Partial<{
   airSensor: number;
   zyta: number;
   iot: number;
+  iotOffline: number;
   caregiver: number;
+  caregiverOffline: number;
 }>;
 
 type DeviceTotals = { online: number; offline: number };
@@ -148,31 +150,51 @@ export function useDeviceInventoryLoader({
             ? validSites
             : validSites.filter((s) => s.code === selectedKey || s.id === selectedKey);
 
-        if (targetSites.length === 0) {
-          if (!cancelled) {
-            setCountsState({});
-            setTotalsState(EMPTY_TOTALS);
-            setCounts(() => ({}));
-          }
-          return;
+        // Initialize aggregation with zeros
+        let aggregated = { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 };
+
+        if (targetSites.length > 0) {
+          const detailsList = await Promise.all(
+            targetSites.map((site) => fetchSiteDetailsFor(site))
+          );
+
+          aggregated = detailsList.reduce(
+            reduceDeviceCounters,
+            { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 }
+          );
         }
 
-        const detailsList = await Promise.all(
-          targetSites.map((site) => fetchSiteDetailsFor(site))
-        );
-
-        const aggregated = detailsList.reduce(
-          reduceDeviceCounters,
-          { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 }
-        );
+        // Proceed to fetch IoT even if no sites found
+        // (Removed early return)
 
         // Fetch real IoT count
+        // Capture static counts from sites before we overwrite them with real data
+        const staticIoT = aggregated.iot;
+        const staticAir = aggregated.air;
+
+        // Track the *real* additions to online/offline so we can adjust the total
+        let realOnlineOfNewDevices = 0;
+        let realOfflineOfNewDevices = 0;
+        let fetchedRealData = false;
+
         try {
           const iotDevices = await getIoTDevices();
           if (Array.isArray(iotDevices)) {
-            aggregated.iot = iotDevices.length;
+            // Count "IoT" devices exactly (inclusive check)
+            const iotDevicesList = iotDevices.filter((d) =>
+              String(d.type || "").toLowerCase().includes("iot")
+            );
+            const iotCount = iotDevicesList.length;
+            aggregated.iot = iotCount;
+
+            // Calculate offline count for IoT
+            const iotOfflineCount = iotDevicesList.filter(d =>
+              String(d.status || "").toLowerCase() === "offline"
+            ).length;
 
             // Count devices that look like Air Sensors (have pm25 or eco2 in snapshot)
+            // Note: If they also have type='IoT', they might be double counted if we aren't careful, 
+            // but for now we follow the existing logic for Air Sensors which relies on snapshot fields.
             const airCount = iotDevices.filter(d =>
               d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
             ).length;
@@ -181,20 +203,50 @@ export function useDeviceInventoryLoader({
               aggregated.air = airCount;
             }
 
-            // Count Medical devices for Caregiver
-            const medicalCount = iotDevices.filter((d) =>
-              String(d.type || "").toLowerCase() === "medical"
+            // Count Medical devices for Caregiver (inclusive check)
+            const medicalDevicesList = iotDevices.filter((d) =>
+              String(d.type || "").toLowerCase().includes("medical")
+            );
+            const medicalCount = medicalDevicesList.length;
+
+            // Calculate offline count for Medical
+            const medicalOfflineCount = medicalDevicesList.filter(d =>
+              String(d.status || "").toLowerCase() === "offline"
             ).length;
+
+            // Only update caregiver count if we found medical devices
             if (medicalCount > 0) {
               // @ts-ignore
               aggregated.caregiver = medicalCount;
+              // @ts-ignore
+              aggregated.caregiverOffline = medicalOfflineCount;
             }
+
+            // Assign IoT Offline
+            // @ts-ignore
+            aggregated.iotOffline = iotOfflineCount;
+
+            fetchedRealData = true;
+            const iotOnlineCount = iotDevicesList.length - iotOfflineCount;
+
+            // Re-calculate Air components
+            const airDevs = iotDevices.filter(d =>
+              d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
+            );
+            const airOff = airDevs.filter(d => String(d.status || "").toLowerCase() === "offline").length;
+            const airOn = airDevs.length - airOff;
+
+            // Re-calculate Medical components
+            const medDevs = iotDevices.filter((d) => String(d.type || "").toLowerCase() === "medical");
+            const medOff = medDevs.filter(d => String(d.status || "").toLowerCase() === "offline").length;
+            const medOn = medDevs.length - medOff;
+
+            realOnlineOfNewDevices = iotOnlineCount + airOn + medOn;
+            realOfflineOfNewDevices = iotOfflineCount + airOff + medOff;
           }
         } catch (iotErr) {
           console.debug("Failed to sync IoT count", iotErr);
-          // keep default aggregated.iot (from sites) if fail, or set to 0?
-          // User prefers real data, so if fail, maybe 0 or keep static. 
-          // Let's keep existing aggregation as fallback or just log error.
+          // keep default aggregated.iot (from sites) if fail
         }
 
         if (cancelled) return;
@@ -206,13 +258,27 @@ export function useDeviceInventoryLoader({
           electricMeter: aggregated.electric,
           airSensor: aggregated.air,
           iot: aggregated.iot,
+          iotOffline: (aggregated as any).iotOffline || 0,
           // @ts-ignore
           caregiver: aggregated.caregiver || 0,
+          caregiverOffline: (aggregated as any).caregiverOffline || 0,
         };
 
+        let finalOnline = aggregated.total;
+        let finalOffline = 0;
+
+        if (fetchedRealData) {
+          // Remove static components from total, add real components
+          // We assume aggregated.total initially included staticIoT and staticAir.
+          // aggregated.total is (counters.devices_total).
+          const baseTotal = aggregated.total - staticIoT - staticAir;
+          finalOnline = baseTotal + realOnlineOfNewDevices;
+          finalOffline = realOfflineOfNewDevices;
+        }
+
         const nextTotals: DeviceTotals = {
-          online: aggregated.total,
-          offline: 0,
+          online: finalOnline,
+          offline: finalOffline,
         };
 
         setCountsState(nextCounts);

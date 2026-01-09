@@ -481,6 +481,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                       { key: "electricmeter", label: t("menu.devices_electricmeter", { defaultValue: "Electric Meter" }) },
                       { key: "airsensor", label: t("menu.devices_airsensor", { defaultValue: "Air Sensor" }) },
                       { key: "iot", label: t("menu.devices_iot", { defaultValue: "IoT" }) },
+                      { key: "caregiver", label: t("menu.devices_caregiver", { defaultValue: "Caregiver" }) },
+                      { key: "digitaltwin", label: t("menu.devices_digitaltwin", { defaultValue: "Digital Twin" }) },
                     ] as const;
                     const matched = !q ? items : items.filter((it) => it.label.toLowerCase().includes(q));
                     const showSection = !q || headerLabel.toLowerCase().includes(q) || matched.length > 0;
@@ -543,13 +545,22 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                             {matched.map((it) => {
                               const zero = getCountForType(inventoryCounts as any, it.key as any) <= 0;
                               const hardDisabled = DISABLED_DEVICE_TYPES.has(it.key);
-                              const disabled = zero || hardDisabled;
+                              const isExternal = it.key === "iot" || it.key === "caregiver" || it.key === "digitaltwin";
+                              const disabled = (!isExternal && zero) || hardDisabled;
                               return (
                                 <li key={it.key}>
                                   <a
                                     aria-disabled={disabled}
                                     onClick={() => {
                                       if (disabled) return;
+                                      if (it.key === "caregiver") {
+                                        window.open("http://45.136.253.176:3000/", "_blank");
+                                        return;
+                                      }
+                                      if (it.key === "digitaltwin") {
+                                        window.open("https://bpstech.online/login", "_blank");
+                                        return;
+                                      }
                                       goSiteOrGlobal(`/devices?type=${it.key}`);
                                     }}
                                     className={cx(

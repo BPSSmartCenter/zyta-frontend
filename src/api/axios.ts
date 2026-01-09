@@ -4,7 +4,8 @@ import { isAxiosError } from "axios";
 
 export const api = axios.create({
   // baseURL: "/api",
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  // Force using proxy to avoid CORS
+  baseURL: "/api",
   withCredentials: true, // ให้ส่ง/รับ cookie (token) ไปกับ request
   headers: { "Content-Type": "application/json" },
 });
