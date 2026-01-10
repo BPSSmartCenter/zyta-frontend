@@ -268,11 +268,11 @@ const BillingOverview: React.FC = () => {
   const [activeCard, setActiveCard] = React.useState<string>("usage");
   const [tableSearch, setTableSearch] = React.useState("");
   const [realtimeRows, setRealtimeRows] = React.useState<RealtimeRow[]>([]);
-const [realtimeLoading, setRealtimeLoading] = React.useState(false);
-const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
-const [monthlySearch, setMonthlySearch] = React.useState("");
-const [billingSearch, setBillingSearch] = React.useState("");
-const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
+  const [realtimeLoading, setRealtimeLoading] = React.useState(false);
+  const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
+  const [monthlySearch, setMonthlySearch] = React.useState("");
+  const [billingSearch, setBillingSearch] = React.useState("");
+  const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
@@ -413,6 +413,12 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
   const cardItems = React.useMemo(() => {
     const cards = billingData?.cards;
+    // Calculate total from the actual rows to match the table
+    const totalBillingAmount = (billingData?.billingRows ?? []).reduce(
+      (sum, row) => sum + (row.billingCost ?? 0),
+      0
+    );
+
     return CARD_CONFIG.map((card) => {
       const label = t(card.labelKey, { defaultValue: card.defaultLabel });
       let valueDisplay = loading ? "..." : "-";
@@ -421,7 +427,8 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
           maximumFractionDigits: 2,
         });
       } else if (card.id === "billing") {
-        const billAmount = cards?.billAmountThisMonth ?? 0;
+        // Use the calculated total from rows instead of backend's "this month" only
+        const billAmount = totalBillingAmount;
         valueDisplay = billAmount.toLocaleString(locale, {
           style: "currency",
           currency: "THB",
@@ -519,8 +526,8 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
     siteGuardType === "blocked"
       ? overviewText.siteGuard.blocked
       : siteGuardType === "permission"
-      ? overviewText.siteGuard.permission
-      : overviewText.siteGuard.select;
+        ? overviewText.siteGuard.permission
+        : overviewText.siteGuard.select;
 
   return (
     <Sidebar>
@@ -582,220 +589,220 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
 
           {activeCard === "usage" && (
             <div className="mt-8 rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {overviewText.realtime.heading}
-                </h2>
-                <p className="text-sm text-slate-500">{overviewText.realtime.description}</p>
-              </div>
-              <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
-                <div className="md:w-64">
-                  <SearchInput
-                    value={tableSearch}
-                    onChange={setTableSearch}
-                    placeholder={overviewText.realtime.searchPlaceholder}
-                    disableMenu={true}
-                  />
+              <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {overviewText.realtime.heading}
+                  </h2>
+                  <p className="text-sm text-slate-500">{overviewText.realtime.description}</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
-                    onClick={handleRefreshRealtime}
-                  >
-                    {overviewText.realtime.buttons.refresh}
-                  </button>
-                  <button
-                    className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(abs("/electric/generate-bill"))}
-                  >
-                    {overviewText.realtime.buttons.generate}
-                  </button>
+                <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+                  <div className="md:w-64">
+                    <SearchInput
+                      value={tableSearch}
+                      onChange={setTableSearch}
+                      placeholder={overviewText.realtime.searchPlaceholder}
+                      disableMenu={true}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
+                      onClick={handleRefreshRealtime}
+                    >
+                      {overviewText.realtime.buttons.refresh}
+                    </button>
+                    <button
+                      className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => navigate(abs("/electric/generate-bill"))}
+                    >
+                      {overviewText.realtime.buttons.generate}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] table-fixed">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.meter}</th>
-                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.onPeak}</th>
-                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.offPeak}</th>
-                    <th className="px-6 py-3 text-left">{overviewText.realtime.table.timestamp}</th>
-                    <th className="px-6 py-3 text-center">{overviewText.realtime.table.actions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {realtimeLoading && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
-                        {overviewText.realtime.loading}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] table-fixed">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.meter}</th>
+                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.onPeak}</th>
+                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.offPeak}</th>
+                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.timestamp}</th>
+                      <th className="px-6 py-3 text-center">{overviewText.realtime.table.actions}</th>
                     </tr>
-                  )}
-                  {!realtimeLoading &&
-                    filteredRealtimeRows.map((row) => {
-                      const onPeakDisplay =
-                        row.onPeak !== null ? formatRealtimeValue(row.onPeak, locale) : "-";
-                      const offPeakDisplay =
-                        row.offPeak !== null ? formatRealtimeValue(row.offPeak, locale) : "-";
-                      const timestampDisplay = formatRealtimeTimestamp(row.timestamp, locale);
-                      return (
-                        <tr
-                          key={row.meterId}
-                          className="border-t border-gray-100 text-sm text-slate-700"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex flex-col">
-                             <span className="font-semibold text-slate-900">{row.meter}</span>
-                              <span className="text-xs text-slate-500">
-                                {overviewText.realtime.siteLabel}: {row.site ?? "-"}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-slate-900">{onPeakDisplay}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="font-semibold text-slate-900">{offPeakDisplay}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="font-semibold text-slate-900">
-                              {timestampDisplay}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center">
-                              <button
-                                className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50"
-                                onClick={() => handleRowSelect(row)}
-                              >
-                                {overviewText.realtime.buttons.monitor}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-          {!realtimeLoading && filteredRealtimeRows.length === 0 && (
-            <tr>
-              <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
-                {overviewText.realtime.empty}
-              </td>
-            </tr>
-          )}
-        </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {realtimeLoading && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
+                          {overviewText.realtime.loading}
+                        </td>
+                      </tr>
+                    )}
+                    {!realtimeLoading &&
+                      filteredRealtimeRows.map((row) => {
+                        const onPeakDisplay =
+                          row.onPeak !== null ? formatRealtimeValue(row.onPeak, locale) : "-";
+                        const offPeakDisplay =
+                          row.offPeak !== null ? formatRealtimeValue(row.offPeak, locale) : "-";
+                        const timestampDisplay = formatRealtimeTimestamp(row.timestamp, locale);
+                        return (
+                          <tr
+                            key={row.meterId}
+                            className="border-t border-gray-100 text-sm text-slate-700"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-slate-900">{row.meter}</span>
+                                <span className="text-xs text-slate-500">
+                                  {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-slate-900">{onPeakDisplay}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="font-semibold text-slate-900">{offPeakDisplay}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-semibold text-slate-900">
+                                {timestampDisplay}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-center">
+                                <button
+                                  className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50"
+                                  onClick={() => handleRowSelect(row)}
+                                >
+                                  {overviewText.realtime.buttons.monitor}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {!realtimeLoading && filteredRealtimeRows.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
+                          {overviewText.realtime.empty}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
           )}
 
           {activeCard === "billing" && (
             <div className="mt-10 rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {overviewText.billing.heading}
-                </h2>
-                <p className="text-sm text-slate-500">{overviewText.billing.description}</p>
+              <div className="flex flex-col gap-2 border-b border-gray-100 px-6 py-5 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {overviewText.billing.heading}
+                  </h2>
+                  <p className="text-sm text-slate-500">{overviewText.billing.description}</p>
+                </div>
+                <div className="md:w-64">
+                  <SearchInput
+                    value={billingSearch}
+                    onChange={setBillingSearch}
+                    placeholder={overviewText.billing.searchPlaceholder}
+                    disableMenu={true}
+                  />
+                </div>
               </div>
-              <div className="md:w-64">
-                <SearchInput
-                  value={billingSearch}
-                  onChange={setBillingSearch}
-                  placeholder={overviewText.billing.searchPlaceholder}
-                  disableMenu={true}
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] table-fixed">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-6 py-3 text-left">{overviewText.billing.table.meter}</th>
-                    <th className="px-6 py-3 text-left">
-                      {overviewText.billing.table.billingPeriod}
-                    </th>
-                    <th className="px-6 py-3 text-left">{overviewText.billing.table.usage}</th>
-                    <th className="px-6 py-3 text-left">{overviewText.billing.table.cost}</th>
-                    <th className="px-6 py-3 text-left">
-                      {overviewText.billing.table.timestamp}
-                    </th>
-                    <th className="px-6 py-3 text-center">
-                      {overviewText.billing.table.actions}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && !billingData && (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
-                        {overviewText.billing.loading}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[800px] table-fixed">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-6 py-3 text-left">{overviewText.billing.table.meter}</th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.billing.table.billingPeriod}
+                      </th>
+                      <th className="px-6 py-3 text-left">{overviewText.billing.table.usage}</th>
+                      <th className="px-6 py-3 text-left">{overviewText.billing.table.cost}</th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.billing.table.timestamp}
+                      </th>
+                      <th className="px-6 py-3 text-center">
+                        {overviewText.billing.table.actions}
+                      </th>
                     </tr>
-                  )}
-                  {filteredBillingRows.map((row) => (
-                    <tr key={row.id} className="border-t border-gray-100 text-sm text-slate-700">
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900">{row.meter}</span>
-                          <span className="text-xs text-slate-500">
-                            {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                  </thead>
+                  <tbody>
+                    {loading && !billingData && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
+                          {overviewText.billing.loading}
+                        </td>
+                      </tr>
+                    )}
+                    {filteredBillingRows.map((row) => (
+                      <tr key={row.id} className="border-t border-gray-100 text-sm text-slate-700">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-900">{row.meter}</span>
+                            <span className="text-xs text-slate-500">
+                              {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {formatBillingPeriod(row, locale)}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-900">
-                          {formatBillingPeriod(row, locale)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-900">
-                          {formatValue(row.usageKwh ?? 0, locale)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-900">
-                          {formatCurrency(row.billingCost ?? 0, locale)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-semibold text-slate-900">
-                          {row.timestamp ?? "-"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                            onClick={() => handleBillingPreview(row)}
-                            disabled={!row.id}
-                          >
-                            {overviewText.billing.buttons.preview}
-                          </button>
-                          <button
-                            className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                            onClick={() => handleDeleteRequest(row)}
-                            disabled={!row.id}
-                          >
-                            {overviewText.billing.buttons.delete}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {!loading && filteredBillingRows.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
-                        {overviewText.billing.empty}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {formatValue(row.usageKwh ?? 0, locale)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {formatCurrency(row.billingCost ?? 0, locale)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-semibold text-slate-900">
+                            {row.timestamp ?? "-"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              onClick={() => handleBillingPreview(row)}
+                              disabled={!row.id}
+                            >
+                              {overviewText.billing.buttons.preview}
+                            </button>
+                            <button
+                              className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              onClick={() => handleDeleteRequest(row)}
+                              disabled={!row.id}
+                            >
+                              {overviewText.billing.buttons.delete}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {!loading && filteredBillingRows.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
+                          {overviewText.billing.empty}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
           )}
 
           {activeCard === "trend" && (
@@ -807,11 +814,14 @@ const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
                 <MonthlyChart
                   categories={billingData?.monthlyChart?.categories}
                   series={billingData?.monthlyChart?.series}
-                  meta={monthlyList.map((row) => ({
-                    month: row.month,
-                    cost: row.cost,
-                    usage: row.usageTotalKwh,
-                  }))}
+                  meta={monthlyList
+                    .slice()
+                    .reverse()
+                    .map((row) => ({
+                      month: row.month,
+                      cost: row.cost,
+                      usage: row.usageTotalKwh,
+                    }))}
                 />
               </div>
               <div className="rounded-3xl border border-gray-200 bg-white shadow-[0_20px_35px_rgba(15,23,42,0.08)]">

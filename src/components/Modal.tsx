@@ -43,7 +43,8 @@ export interface PrelineModalProps {
 const ICON_MAP: Record<IconType, { name: string; color: string }> = {
   warning: { name: "", color: "text-[#EC0357]" },
   // "warning_amber"
-  cancel: { name: "cancel", color: "text-[#EC0357]" },
+  cancel: { name: "", color: "text-[#EC0357]" },
+  //"cancel"
   mail: { name: "mail", color: "text-blue-600" },
   check: { name: "check_circle", color: "text-green-600" },
 };
