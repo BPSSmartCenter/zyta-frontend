@@ -8,7 +8,7 @@ import SnapshotChartSection from "../components/Chart";
 import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../api/user";
 import { listSites } from "../api/sites";
-import { notis as mockNotis, ZYTA_NOTIS } from "../data/Dashboard/notis";
+import { notis as mockNotis } from "../data/Dashboard/notis";
 import { statItems } from "../components/Dashboard/dashboard.constants";
 import { useFilters } from "../context/FiltersContext";
 import { useNotisFeed } from "../context/NotisContext";
@@ -76,6 +76,11 @@ const isWellBeingNoti = (n: Noti): boolean => {
   if (!bag) return false;
   if (includesAny(bag, EXCLUDED_KEYWORDS)) return false;
   return includesAny(bag, FALL_KEYWORDS) || includesAny(bag, SLEEP_KEYWORDS);
+};
+
+const isZytaNoti = (n: Noti): boolean => {
+  const key = String(n.titleKey || "").toLowerCase();
+  return key.startsWith("zytanotis.");
 };
 
 export default function Dashboard() {
@@ -258,11 +263,11 @@ export default function Dashboard() {
   }, [searchFR, faceRecognizeItems]);
   const filterZYTA = React.useMemo(() => {
     const q = searchZYTA.toLowerCase().trim();
-    const src = ZYTA_NOTIS as unknown as any[];
+    const src = dateScopedNotis.filter(isZytaNoti);
     return src.filter((n) =>
       q ? JSON.stringify(n).toLowerCase().includes(q) : true
     );
-  }, [searchZYTA]);
+  }, [searchZYTA, dateScopedNotis]);
 
   const contentLayoutProps = React.useMemo(
     () => ({

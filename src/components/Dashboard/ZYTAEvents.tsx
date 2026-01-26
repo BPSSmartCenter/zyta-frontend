@@ -1,6 +1,7 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import { useTranslation } from "react-i18next";
+import { alertImage, insuranceImage } from "../../assets";
 
 type Noti = {
   type: string;
@@ -54,18 +55,28 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
             </div>
           ) : (
             items.map((n, i) => {
-              const title = n.titleKey
+              const key = String(n.titleKey || "").toLowerCase();
+              const isSos = key === "zytanotis.sos";
+              const isAssistant = key === "zytanotis.assistant";
+              const title = isSos || isAssistant
+                ? n.title
+                : n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+              const img = isSos
+                ? n.img || alertImage
+                : isAssistant
+                ? n.img || insuranceImage
+                : n.img;
 
               return (
                 <NotiCard
                   key={i}
                   type={n.type as any}
                   titleKey={n.titleKey as string | undefined}
-                  img={n.img}
+                  img={img}
                   title={title}
                   site={site}
                   date={dateText}

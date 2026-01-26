@@ -45,7 +45,7 @@ type ApiNoti = {
 
 const normalizeType = (value?: string): NotiType => {
   const t = (value || "").toLowerCase();
-  if (t === "alert" || t === "warning" || t === "info" || t === "normal" || t === "offline") return t;
+  if (t === "alert" || t === "warning" || t === "info" || t === "normal" || t === "offline" || t === "success") return t;
   return "info";
 };
 

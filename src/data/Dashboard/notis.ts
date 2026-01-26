@@ -28,7 +28,7 @@ export {
   fireNoti,
 };
 
-export type NotiType = "alert" | "warning" | "info" | "normal" | "offline";
+export type NotiType = "alert" | "warning" | "info" | "normal" | "offline" | "success";
 
 export type Severity = "low" | "medium" | "critical";
 

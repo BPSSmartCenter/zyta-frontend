@@ -541,7 +541,7 @@ Use this endpoint to push alert payloads into the dashboard. It is unauthenticat
 - **Body Fields**
   | Field         | Type         | Required | Notes |
   |---------------|--------------|----------|-------|
-  | `type`        | string       | yes      | One of `alert`, `warning`, `info`, `normal`. |
+| `type`        | string       | yes      | One of `alert`, `warning`, `info`, `normal`, `success`. |
   | `severity`    | string       | no       | One of `low`, `medium`, `critical` (defaults to `low`). |
   | `titleKey`    | string       | semi     | Provide either `titleKey` (i18n key) or `title` (plain string). |
   | `title`       | string       | semi     | Plain-text headline if you are not using translation keys. |
@@ -553,6 +553,38 @@ Use this endpoint to push alert payloads into the dashboard. It is unauthenticat
   | `meta`        | object       | no       | Any JSON payload. Entire request body is stored if `meta` is missing or invalid JSON. |
 
 ### 3.1 Sample Payloads
+
+**ZYTA SOS (critical)**
+```bash
+curl -X POST http://localhost:3000/webhooks/notis \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "alert",
+    "severity": "critical",
+    "titleKey": "zytaNotis.sos",
+    "title": "SOS",
+    "siteId": "c20a7c8e-8c2a-4909-b901-1aff0d149e21",
+    "deviceId": "ad19175b-bbc3-11f0-972d-003f5612f1cc",
+    "date": "2026-01-26T03:15:00Z",
+    "meta": {}
+  }'
+```
+
+**ZYTA Assistant (success)**
+```bash
+curl -X POST http://localhost:3000/webhooks/notis \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "success",
+    "severity": "low",
+    "titleKey": "zytaNotis.assistant",
+    "title": "Assistant",
+    "siteId": "c20a7c8e-8c2a-4909-b901-1aff0d149e21",
+    "deviceId": "ad19175b-bbc3-11f0-972d-003f5612f1cc",
+    "date": "2026-01-26T03:15:00Z",
+    "meta": {}
+  }'
+```
 
 **Critical alert – person fell**
 ```bash
