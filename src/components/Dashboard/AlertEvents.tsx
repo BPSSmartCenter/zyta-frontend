@@ -84,7 +84,11 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
             </div>
           ) : (
             list.map((n, i) => {
-              const title = n.titleKey
+              const key = String(n.titleKey || "").toLowerCase();
+              const isZyta = key.startsWith("zytanotis.");
+              const title = isZyta
+                ? n.title
+                : n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
