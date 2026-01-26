@@ -8,6 +8,7 @@ import sleepingNoti from "../assets/sleepingnoti.svg";
 import alertImage from "../assets/alert.png";
 import faceImage from "../assets/face.png";
 import plateImage from "../assets/plate.png";
+import insuranceImage from "../assets/insurance.png";
 import { resolveAlertEventKey } from "../utils/notis";
 
 type NotiType = "alert" | "warning" | "offline" | "normal" | "success" | "info";
@@ -114,6 +115,8 @@ const fallbackImgFor = (
   eventHint?: string
 ) => {
   const normalizedKey = (titleKey || "").toLowerCase();
+  if (normalizedKey === "zytanotis.sos") return alertImage;
+  if (normalizedKey === "zytanotis.assistant") return insuranceImage;
   const normalizedTitle = (title || "").toLowerCase();
   const normalizedDetail = (detail || "").toLowerCase();
   const blob = `${type} ${normalizedKey} ${normalizedTitle} ${normalizedDetail}`;

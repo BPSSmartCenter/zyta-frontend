@@ -110,6 +110,7 @@ const ringClass = (n: Noti) => {
     return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
   if (t === "warning")
     return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
+  if (t === "success") return "ring-[#22C55E]";
   return "ring-[#AFEAFF]";
 };
 

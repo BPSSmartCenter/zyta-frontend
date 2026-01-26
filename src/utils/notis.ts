@@ -7,6 +7,7 @@ import {
   deviceNoti,
   motionNoti,
   alertImage,
+  insuranceImage,
   faceImage,
   plateImage,
 } from "../assets/index";
@@ -385,6 +386,10 @@ export const resolveFaceRecKind = (
 };
 
 export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
+  const key = String(n.titleKey || "").toLowerCase();
+  if (key === "zytanotis.sos") return alertImage;
+  if (key === "zytanotis.assistant") return insuranceImage;
+
   const eventKey = resolveAlertEventKey(n);
   if (eventKey === "fire") return fireNoti;
   if (eventKey === "motion") return motionNoti;
@@ -394,7 +399,6 @@ export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   if (eventKey === "face") return faceImage;
   if (eventKey === "plate") return plateImage;
 
-  const key = String(n.titleKey || "").toLowerCase();
   const title = String(n.title || "").toLowerCase();
   const bag = matchBag(n);
   const type = String(n.type || "").toLowerCase();
