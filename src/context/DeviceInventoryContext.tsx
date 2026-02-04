@@ -15,6 +15,8 @@ export type DeviceCounts = Partial<{
   intercom: number;
   waterMeter: number;
   electricMeter: number;
+  electricOnline: number;
+  electricOffline: number;
   airSensor: number;
   zyta: number;
   iot: number;

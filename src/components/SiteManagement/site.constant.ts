@@ -2,6 +2,8 @@ export type SiteRow = {
   id: string;
   name: string;
   code: string;
+  groupId?: string | null;
+  groupLabel?: string | null;
   provinceLabel: string;
   lat: number | null;
   lng: number | null;

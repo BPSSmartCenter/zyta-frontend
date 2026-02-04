@@ -43,6 +43,7 @@ export default function Content({
       },
       table: {
         site: t("content.table.site", { defaultValue: "Site" }),
+        group: t("content.table.group", { defaultValue: "Group" }),
         code: t("content.table.code", { defaultValue: "Code" }),
         address: t("content.table.address", { defaultValue: "Address" }),
         devices: t("content.table.devices", { defaultValue: "Devices" }),
@@ -74,7 +75,9 @@ export default function Content({
   const provinces = React.useMemo(() => {
     const list = new Set<string>();
     rows.forEach((row) => {
-      if (row.provinceLabel) list.add(row.provinceLabel);
+      const label = (row.provinceLabel || "").trim();
+      if (!label || label === "-" || label === "0") return;
+      list.add(label);
     });
     return ["all", ...Array.from(list).sort((a, b) => a.localeCompare(b, "th"))];
   }, [rows]);
@@ -88,7 +91,8 @@ export default function Content({
         !q ||
         row.name.toLowerCase().includes(q) ||
         row.code.toLowerCase().includes(q) ||
-        row.provinceLabel.toLowerCase().includes(q);
+        row.provinceLabel.toLowerCase().includes(q) ||
+        (row.groupLabel ?? "").toLowerCase().includes(q);
       return matchProvince && matchSearch;
     });
   }, [rows, search, provinceFilter]);
@@ -214,6 +218,7 @@ export default function Content({
           <thead>
             <tr className="text-left text-gray-500 text-xs uppercase tracking-wide">
               <th className="pb-3">{texts.table.site}</th>
+              <th className="pb-3">{texts.table.group}</th>
               <th className="pb-3">{texts.table.code}</th>
               <th className="pb-3">{texts.table.address}</th>
               <th className="pb-3 text-center">{texts.table.devices}</th>
@@ -224,13 +229,13 @@ export default function Content({
           <tbody className="divide-y divide-gray-100 text-sm">
             {loading ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-gray-500">
+                <td colSpan={7} className="py-10 text-center text-gray-500">
                   {texts.status.loading}
                 </td>
               </tr>
             ) : rowsPage.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-gray-500">
+                <td colSpan={7} className="py-10 text-center text-gray-500">
                   {texts.status.empty}
                 </td>
               </tr>
@@ -241,6 +246,9 @@ export default function Content({
                     <div className="font-semibold text-gray-900">
                       {row.name || "-"}
                     </div>
+                  </td>
+                  <td className="py-4 text-gray-700">
+                    {row.groupLabel || "-"}
                   </td>
                   <td className="py-4 text-gray-700">{row.code || "-"}</td>
                   <td className="py-4 text-gray-700 max-w-[220px]">

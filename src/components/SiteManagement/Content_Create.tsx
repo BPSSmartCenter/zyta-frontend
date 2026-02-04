@@ -1,11 +1,13 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { lookupThaiAddress } from "../../api/thaiAddress";
+import { useSiteGroups } from "../../hooks/useSiteGroups";
 import Dropdown from "../Dropdown";
 
 type CreatePayload = {
   name: string;
   code?: string;
+  siteGroupId?: string;
   lat?: number;
   lng?: number;
   zipcode?: string;
@@ -42,6 +44,8 @@ export default function ContentCreate({
         siteName: t("form.labels.siteName", { defaultValue: "Site name" }),
         brandingLogo: t("form.labels.brandingLogo", { defaultValue: "Branding logo" }),
         siteCode: t("form.labels.siteCode", { defaultValue: "Site code" }),
+        siteGroup: t("form.labels.siteGroup", { defaultValue: "Site group" }),
+        siteGroupCreate: t("form.labels.siteGroupCreate", { defaultValue: "Create new group" }),
         solarEdgeTitle: t("form.labels.solarEdgeTitle", {
           defaultValue: "SolarEdge Credentials",
         }),
@@ -64,6 +68,8 @@ export default function ContentCreate({
         siteCode: t("form.placeholders.siteCode", {
           defaultValue: "Leave empty to auto generate",
         }),
+        siteGroup: t("form.placeholders.siteGroup", { defaultValue: "Select group" }),
+        siteGroupCreate: t("form.placeholders.siteGroupCreate", { defaultValue: "e.g. Chula Hospital" }),
         solarEdgeSiteId: t("form.placeholders.solarEdgeSiteId", {
           defaultValue: "e.g. 3078000",
         }),
@@ -145,6 +151,11 @@ export default function ContentCreate({
         cancel: t("form.buttons.cancel", { defaultValue: "Cancel" }),
         submit: t("create.buttons.submit", { defaultValue: "Save site" }),
         submitting: t("create.buttons.submitting", { defaultValue: "Saving..." }),
+        createGroup: t("form.buttons.createGroup", { defaultValue: "Create group" }),
+      },
+      group: {
+        none: t("form.group.none", { defaultValue: "No group" }),
+        loading: t("form.group.loading", { defaultValue: "Loading groups..." }),
       },
     }),
     [t]
@@ -152,9 +163,12 @@ export default function ContentCreate({
   const [form, setForm] = React.useState<CreatePayload>({
     name: "",
     code: "",
+    siteGroupId: "",
     solaredgeSiteId: "",
     solaredgeApiKey: "",
   });
+  const [newGroupName, setNewGroupName] = React.useState("");
+  const { groups, loading: groupsLoading, create: createGroup } = useSiteGroups();
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
   const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);
   const [logoError, setLogoError] = React.useState<string | null>(null);
@@ -194,6 +208,14 @@ export default function ContentCreate({
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const groupOptions = React.useMemo(
+    () => [
+      { value: "", label: texts.group.none },
+      ...groups.map((g) => ({ value: g.id, label: g.name })),
+    ],
+    [groups, texts.group.none]
+  );
+
   const handleNumber = (field: "lat" | "lng", value: string) => {
     const trimmed = value.trim();
     const num = trimmed === "" ? undefined : Number(trimmed);
@@ -213,6 +235,7 @@ export default function ContentCreate({
     await onCreate({
       name: form.name.trim(),
       code: form.code?.trim() || undefined,
+      siteGroupId: form.siteGroupId?.trim() || undefined,
       lat: form.lat,
       lng: form.lng,
       zipcode: form.zipcode?.trim() || undefined,
@@ -403,6 +426,90 @@ export default function ContentCreate({
           {errors.code && (
             <p className="text-xs text-red-500 mt-1">{errors.code}</p>
           )}
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            {texts.labels.siteGroup}
+          </label>
+          <Dropdown
+            options={groupOptions}
+            value={form.siteGroupId ?? ""}
+            onChange={(val) => handleChange("siteGroupId", val)}
+          >
+            {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
+              <div className="relative">
+                <button
+                  {...getButtonProps({
+                    className:
+                      "h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                  })}
+                >
+                  <span className="truncate">
+                    {selected?.label ?? texts.group.none}
+                  </span>
+                  <i className="material-icons leading-none">
+                    {open ? "arrow_drop_up" : "arrow_drop_down"}
+                  </i>
+                </button>
+                <div
+                  {...getMenuProps({
+                    className: [
+                      "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto",
+                      open ? "block" : "hidden",
+                    ].join(" "),
+                  })}
+                >
+                  {groupsLoading && (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      {texts.group.loading}
+                    </div>
+                  )}
+                  {options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      {...getItemProps(opt, {
+                        className:
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
+                      })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Dropdown>
+
+          <div className="mt-3">
+            <label className="text-xs font-semibold block mb-2 text-gray-600">
+              {texts.labels.siteGroupCreate}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="flex-1 h-10 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder={texts.placeholders.siteGroupCreate}
+              />
+              <button
+                type="button"
+                className="h-10 px-3 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
+                onClick={async () => {
+                  const trimmed = newGroupName.trim();
+                  if (!trimmed) return;
+                  const created = await createGroup(trimmed);
+                  if (created?.id) {
+                    handleChange("siteGroupId", created.id);
+                  }
+                  setNewGroupName("");
+                }}
+              >
+                {texts.buttons.createGroup}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 p-4">

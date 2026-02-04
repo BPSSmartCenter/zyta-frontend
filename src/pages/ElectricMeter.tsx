@@ -37,7 +37,6 @@ const DEFAULT_ENERGY_DATA = [
   420, 460, 510, 430, 480, 520, 610, 720, 640, 590, 980, 1180, 760, 600, 540,
   580, 620, 560, 610, 640, 670, 690, 620, 580,
 ];
-
 export const ElectricMeter: React.FC = () => {
   const {
     searchSite,

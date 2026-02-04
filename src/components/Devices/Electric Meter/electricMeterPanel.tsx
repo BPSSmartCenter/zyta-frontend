@@ -7,14 +7,16 @@ import boltWhiteIcon from "../../../assets/bolt.png";
 import voltageIcon from "../../../assets/Voltage.png";
 import IletterIcon from "../../../assets/i.png";
 import plugIcon from "../../../assets/plug-cable.png";
-import waterSupplieIcon from "../../../assets/water-supply.png";
 import wavesineIcon from "../../../assets/wave-sine.png";
 import transformIcon from "../../../assets/transformer-bolt.png";
 import plugWhiteIcon from "../../../assets/plug.png";
 import { ElectricRadialBasic } from "../../RadialBar";
 import { ElectricLineBasicChart } from "../../Chart";
 import { useFilters } from "../../../context/FiltersContext";
-import { updateElectricOverview, getElectricDevices } from "../../../api/electric";
+import {
+  getElectricOverview,
+  getElectricDevices,
+} from "../../../api/electric";
 
 type Props = {
   siteCode?: string;
@@ -65,6 +67,53 @@ const DEVICE_CATEGORY_SET: ReadonlySet<DeviceCategory> = new Set([
 ]);
 
 const DEFAULT_INVERTER_SN = "7B0C44D5-A0";
+const OVERVIEW_DEVICE_ID = "__OVERVIEW__";
+const TELEMETRY_CACHE_TTL_MS = 10 * 60 * 1000;
+
+const readSessionJson = <T,>(key: string): T | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionJson = (key: string, value: unknown) => {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore storage errors
+  }
+};
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  task: (item: T) => Promise<R>
+): Promise<Array<PromiseSettledResult<R>>> {
+  const capped = Math.max(1, Math.floor(limit || 1));
+  const results: Array<PromiseSettledResult<R>> = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(capped, items.length) }, async () => {
+    while (true) {
+      const idx = cursor;
+      cursor += 1;
+      if (idx >= items.length) return;
+      try {
+        const value = await task(items[idx]);
+        results[idx] = { status: "fulfilled", value };
+      } catch (reason) {
+        results[idx] = { status: "rejected", reason };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
   if (!Array.isArray(items)) return [];
@@ -80,6 +129,14 @@ function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
     } else if (rawModel) {
       modelIdentifier = rawModel;
     }
+    const detailName = String(item?.meta?.details?.name ?? "");
+    const detailModel = String(item?.meta?.details?.model ?? "");
+    const gatewayHint = `${detailName} ${detailModel} ${rawModel}`.toUpperCase();
+    const forcedGateway =
+      gatewayHint.includes("GATEWAY") ||
+      gatewayHint.includes("SE1000-CCG") ||
+      gatewayHint.includes("SE1000-FFG");
+
     const rawCategory =
       item?.meta?.deviceCategory ??
       item?.meta?.device_category ??
@@ -87,7 +144,8 @@ function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
       modelCategory;
     const categoryUpper =
       typeof rawCategory === "string" ? rawCategory.trim().toUpperCase() : "";
-    if (!DEVICE_CATEGORY_SET.has(categoryUpper as DeviceCategory)) continue;
+    const normalizedCategory = forcedGateway ? "GATEWAY" : categoryUpper;
+    if (!DEVICE_CATEGORY_SET.has(normalizedCategory as DeviceCategory)) continue;
 
     const snCandidates = [
       item?.meta?.details?.serialNumber,
@@ -116,17 +174,17 @@ function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
         .map((candidate) =>
           typeof candidate === "string" ? candidate.trim() : ""
         )
-        .find((value) => value.length > 0) || `${categoryUpper} ${sn}`;
+        .find((value) => value.length > 0) || `${normalizedCategory} ${sn}`;
     const id =
       typeof item?.id === "string" && item.id.trim().length > 0
         ? item.id
-        : `${categoryUpper}:${sn}`.toUpperCase();
+        : `${normalizedCategory}:${sn}`.toUpperCase();
 
     options.push({
       id,
       label,
       sn,
-      category: categoryUpper as DeviceCategory,
+      category: normalizedCategory as DeviceCategory,
       status: item?.status ?? null,
     });
   }
@@ -172,7 +230,7 @@ function SideCardValue({ img, value, valueLabel, unit }: SideCardValueProps) {
     value === null || value === undefined
       ? "-"
       : typeof value === "number" && Number.isFinite(value)
-      ? value.toLocaleString("en-US")
+      ? Math.round(value).toLocaleString("en-US")
       : value;
 
   return (
@@ -315,10 +373,10 @@ const formatDateLabel = (date: Date, locale = "th-TH") =>
   }).format(date);
 
 const sanitizeSeries = (arr: number[]) =>
-  arr.map((value) => (Number.isFinite(value) ? Number(value.toFixed(2)) : 0));
+  arr.map((value) => (Number.isFinite(value) ? Math.round(value) : 0));
 
 export default function ElectricMeterPanel({ siteCode }: Props) {
-  const { selectedSite, date: filtersDate } = useFilters();
+  const { selectedSite, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
   const locale = React.useMemo(
     () => (i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
@@ -351,7 +409,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     if (to.getTime() > now.getTime()) {
       to.setMinutes(to.getMinutes() - 30);
     }
-    const from = new Date(to.getTime() - 30 * 60 * 1000);
+    const from = new Date(now);
+    if (now.getHours() >= 9) {
+      from.setHours(9, 0, 0, 0);
+    } else {
+      // Before 09:00 use midnight->now to avoid querying future windows.
+      from.setHours(0, 0, 0, 0);
+    }
     const makeLabel = (d: Date) => formatTime(d.getHours(), d.getMinutes());
     return {
       from: makeLabel(from),
@@ -431,18 +495,37 @@ const [thermoOne, setThermoOne] = useState<{
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
+    OVERVIEW_DEVICE_ID
+  );
   const qs = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const urlDeviceSN = qs?.get("inverterSN") || qs?.get("deviceSn") || undefined;
+  const isAllSitesSelected = String(selectedSite || "")
+    .trim()
+    .toLowerCase() === "all";
+  const allSiteTargets = React.useMemo(() => {
+    const values = (siteOptions || [])
+      .map((opt) => String(opt?.value || "").trim())
+      .filter((value) => value.length > 0 && value.toLowerCase() !== "all");
+    return Array.from(new Set(values));
+  }, [siteOptions]);
   const siteForApi =
-    selectedSite && selectedSite !== "all"
+    !isAllSitesSelected && selectedSite
       ? String(selectedSite)
-      : siteCode && /^\d+$/.test(String(siteCode))
+      : siteCode && String(siteCode).trim().length > 0
       ? String(siteCode)
-      : "3078000";
+      : allSiteTargets[0] || "3078000";
+  const siteTargets = isAllSitesSelected ? allSiteTargets : [siteForApi];
+  const siteTargetsKey = siteTargets.join("|");
   const fallbackDeviceSn = urlDeviceSN || DEFAULT_INVERTER_SN;
 
   React.useEffect(() => {
+    if (isAllSitesSelected) {
+      setDeviceOptions([]);
+      setSelectedDeviceId(OVERVIEW_DEVICE_ID);
+      setDeviceOptionsLoading(false);
+      return;
+    }
     let cancelled = false;
     setDeviceOptionsLoading(true);
     (async () => {
@@ -455,9 +538,12 @@ const [thermoOne, setThermoOne] = useState<{
           : [];
         if (cancelled) return;
         const normalized = normalizeElectricDeviceOptions(items);
-        const filtered = normalized.filter((opt) => opt.category !== "METER");
+        const filtered = normalized
+          .filter((opt) => opt.category === "INVERTER")
+          .sort((a, b) => a.sn.localeCompare(b.sn, undefined, { numeric: true }));
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
+          if (prev === OVERVIEW_DEVICE_ID) return prev;
           if (prev && filtered.some((opt) => opt.id === prev)) return prev;
           const matchSn =
             urlDeviceSN &&
@@ -465,15 +551,12 @@ const [thermoOne, setThermoOne] = useState<{
               (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
             );
           if (matchSn) return matchSn.id;
-          const preferred =
-            filtered.find((opt) => opt.category === "INVERTER") ??
-            filtered[0] ??
-            null;
-          return preferred?.id ?? null;
+          return OVERVIEW_DEVICE_ID;
         });
       } catch {
         if (cancelled) return;
         setDeviceOptions([]);
+        setSelectedDeviceId(OVERVIEW_DEVICE_ID);
       } finally {
         if (!cancelled) {
           setDeviceOptionsLoading(false);
@@ -483,87 +566,322 @@ const [thermoOne, setThermoOne] = useState<{
     return () => {
       cancelled = true;
     };
-  }, [siteForApi, urlDeviceSN]);
+  }, [siteForApi, urlDeviceSN, isAllSitesSelected]);
+
+  const isOverviewSelected =
+    isAllSitesSelected || selectedDeviceId === OVERVIEW_DEVICE_ID;
 
   const selectedDevice = React.useMemo(() => {
-    if (!selectedDeviceId) return null;
+    if (!selectedDeviceId || isOverviewSelected || isAllSitesSelected) return null;
     return deviceOptions.find((opt) => opt.id === selectedDeviceId) ?? null;
-  }, [deviceOptions, selectedDeviceId]);
+  }, [deviceOptions, selectedDeviceId, isOverviewSelected, isAllSitesSelected]);
+
+  const selectedDeviceStatus = (selectedDevice?.status || "").toLowerCase();
+  const offlineDevices = React.useMemo(
+    () =>
+      deviceOptions.filter(
+        (opt) => String(opt.status || "").toLowerCase() === "offline"
+      ),
+    [deviceOptions]
+  );
+  const hasOfflineDevices = offlineDevices.length > 0;
+  const deviceStatusById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const opt of deviceOptions) {
+      map.set(opt.id, String(opt.status || "").toLowerCase());
+    }
+    return map;
+  }, [deviceOptions]);
+  const statusBadge =
+    selectedDeviceStatus === "online"
+      ? { dot: "bg-emerald-500", text: "text-emerald-600", label: "Online" }
+      : selectedDeviceStatus === "offline"
+      ? { dot: "bg-rose-500", text: "text-rose-600", label: "Offline" }
+      : { dot: "bg-slate-300", text: "text-slate-500", label: "Unknown" };
 
   const deviceSN =
-    (selectedDevice?.sn || fallbackDeviceSn || DEFAULT_INVERTER_SN).trim() ||
-    DEFAULT_INVERTER_SN;
-  const deviceCategory = selectedDevice?.category ?? "INVERTER";
+    isAllSitesSelected || isOverviewSelected
+      ? OVERVIEW_DEVICE_ID
+      : (selectedDevice?.sn || fallbackDeviceSn || DEFAULT_INVERTER_SN).trim() ||
+        DEFAULT_INVERTER_SN;
+  const deviceCategory = "INVERTER";
   const deviceDropdownOptions = React.useMemo(
-    () =>
-      deviceOptions.map((opt) => ({
+    () => [
+      {
+        value: OVERVIEW_DEVICE_ID,
+        label: t("devices.electric.deviceSelector.overview", {
+          defaultValue: "Overview",
+        }),
+      },
+      ...deviceOptions.map((opt, idx) => ({
         value: opt.id,
-        label: `${opt.label} (${opt.sn})`,
+        label: `Inverter ${idx + 1} (${opt.sn})`,
       })),
-    [deviceOptions]
+    ],
+    [deviceOptions, t]
   );
 
   React.useEffect(() => {
     let active = true;
     (async () => {
-      const daysToFetch = 8; // today + previous 7 days
-      const entries: DailySeries[] = [];
-      for (let i = 0; i < daysToFetch; i++) {
-        const base = new Date();
-        base.setHours(0, 0, 0, 0);
-        base.setDate(base.getDate() - i);
-        const dayStart = startOfDay(base);
-        const dayEnd = endOfDay(base);
+      const hasUsage = (entries: DailySeries[]) =>
+        entries.some(
+          (item) =>
+            (Number(item.totalWh) || 0) > 0 ||
+            item.halfHourSeries.some((v) => Number(v) > 0)
+        );
+      const fromCachedEntries = (
+        entries: Array<{
+          key: string;
+          dateISO: string;
+          isToday: boolean;
+          totalWh: number;
+          totalKwh: number;
+          halfHourSeries: number[];
+        }>
+      ): DailySeries[] =>
+        entries.map((item) => ({
+          key: item.key,
+          date: new Date(item.dateISO),
+          isToday: !!item.isToday,
+          totalWh: Number(item.totalWh) || 0,
+          totalKwh: Number(item.totalKwh) || 0,
+          halfHourSeries: Array.isArray(item.halfHourSeries)
+            ? item.halfHourSeries
+            : HALF_HOUR_SLOTS.map(() => 0),
+        }));
 
-        try {
+      const daysToFetch = 8; // today + previous 7 days
+      const todayStart = startOfDay(new Date());
+      const rangeStart = new Date(todayStart);
+      rangeStart.setDate(rangeStart.getDate() - (daysToFetch - 1));
+      const rangeEnd = endOfDay(new Date());
+      const rangeStartKey = formatDateTimeForApi(rangeStart).slice(0, 10);
+      const rangeEndKey = formatDateTimeForApi(rangeEnd).slice(0, 10);
+      const cacheSiteKey = isAllSitesSelected ? `all:${siteTargetsKey}` : siteForApi;
+      const cacheKey = `db:telemetry-window:${cacheSiteKey}:${deviceSN}:${rangeStartKey}:${rangeEndKey}`;
+      const stickyKey = `db:telemetry-window:sticky:${cacheSiteKey}:${deviceSN}`;
+      const cached = readSessionJson<{
+        fetchedAt: number;
+        entries: Array<{
+          key: string;
+          dateISO: string;
+          isToday: boolean;
+          totalWh: number;
+          totalKwh: number;
+          halfHourSeries: number[];
+        }>;
+      }>(cacheKey);
+      if (
+        cached &&
+        typeof cached.fetchedAt === "number" &&
+        Date.now() - cached.fetchedAt <= TELEMETRY_CACHE_TTL_MS &&
+        Array.isArray(cached.entries)
+      ) {
+        const mapped = fromCachedEntries(cached.entries);
+        const hasAnyUsage = hasUsage(mapped);
+        // Ignore stale all-zero cache to avoid locking the 7-day chart at zero.
+        if (hasAnyUsage) {
+          setDailySeries(mapped);
+          return;
+        }
+        const sticky = readSessionJson<{
+          fetchedAt: number;
+          entries: Array<{
+            key: string;
+            dateISO: string;
+            isToday: boolean;
+            totalWh: number;
+            totalKwh: number;
+            halfHourSeries: number[];
+          }>;
+        }>(stickyKey);
+        if (sticky && Array.isArray(sticky.entries)) {
+          const stickyMapped = fromCachedEntries(sticky.entries);
+          if (hasUsage(stickyMapped)) {
+            setDailySeries(stickyMapped);
+            return;
+          }
+        }
+      }
+
+      try {
+        const startTime = formatDateTimeForApi(rangeStart);
+        const endTime = formatDateTimeForApi(rangeEnd);
+        let points: DailyTelemetryPoint[] = [];
+        if (isAllSitesSelected) {
+          const targets = siteTargets;
+          if (!targets.length) {
+            points = [];
+          } else {
+            const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
+              fetchEquipmentTelemetry({
+                siteIdOrCode,
+                sn: OVERVIEW_DEVICE_ID,
+                startTime,
+                endTime,
+                category: deviceCategory,
+              })
+            );
+            const sumByTs = new Map<number, number>();
+            for (const result of settled) {
+              if (result.status !== "fulfilled") continue;
+              const list: any[] = (result.value?.data as any)?.telemetries ?? [];
+              for (const item of list) {
+                const ts = new Date(item?.date ?? 0).getTime();
+                const total = Number(item?.totalEnergy ?? 0);
+                if (!Number.isFinite(ts) || !Number.isFinite(total)) continue;
+                sumByTs.set(ts, (sumByTs.get(ts) ?? 0) + total);
+              }
+            }
+            const merged = Array.from(sumByTs.entries())
+              .sort((a, b) => a[0] - b[0])
+              .map(([ts, totalEnergy]) => ({
+                date: new Date(ts).toISOString(),
+                totalEnergy,
+              }));
+            points = normalizeTelemetries(merged);
+          }
+        } else {
           const res = await fetchEquipmentTelemetry({
             siteIdOrCode: siteForApi,
             sn: deviceSN,
-            startTime: formatDateTimeForApi(dayStart),
-            endTime: formatDateTimeForApi(dayEnd),
+            startTime,
+            endTime,
             category: deviceCategory,
           });
           const list: any[] = (res?.data as any)?.telemetries ?? [];
-          const points = normalizeTelemetries(list);
-          const halfHourSeries = buildHalfHourSeries(points, dayStart);
-          const dayKwh = halfHourSeries.length
+          points = normalizeTelemetries(list);
+        }
+        const entries: DailySeries[] = [];
+        for (let i = 0; i < daysToFetch; i++) {
+          const dayStart = new Date(todayStart);
+          dayStart.setDate(dayStart.getDate() - i);
+          const dayEnd = endOfDay(dayStart);
+          const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
+          const dayPoints = points.filter(
+            (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
+          );
+          const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
+          const totalWh =
+            dayPoints.length > 1
+              ? Math.max(
+                  0,
+                  dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
+                )
+              : 0;
+          const totalKwh = halfHourSeries.length
             ? halfHourSeries[halfHourSeries.length - 1]
             : 0;
           entries.push({
-            key: formatDateTimeForApi(dayStart).slice(0, 10),
+            key: dayKey,
             date: dayStart,
             isToday: i === 0,
-            totalWh:
-              points.length > 1
-                ? Math.max(0, points[points.length - 1].totalWh - points[0].totalWh)
-                : 0,
-            totalKwh: dayKwh,
+            totalWh,
+            totalKwh,
             halfHourSeries,
           });
-        } catch {
-          entries.push({
+        }
+        entries.sort((a, b) => b.date.getTime() - a.date.getTime());
+        if (!active) return;
+        const usable = hasUsage(entries);
+        if (usable) {
+          setDailySeries(entries);
+        } else {
+          const sticky = readSessionJson<{
+            fetchedAt: number;
+            entries: Array<{
+              key: string;
+              dateISO: string;
+              isToday: boolean;
+              totalWh: number;
+              totalKwh: number;
+              halfHourSeries: number[];
+            }>;
+          }>(stickyKey);
+          if (sticky && Array.isArray(sticky.entries)) {
+            const stickyMapped = fromCachedEntries(sticky.entries);
+            if (hasUsage(stickyMapped)) {
+              setDailySeries(stickyMapped);
+            } else {
+              setDailySeries(entries);
+            }
+          } else {
+            setDailySeries(entries);
+          }
+        }
+        writeSessionJson(cacheKey, {
+          fetchedAt: Date.now(),
+          entries: entries.map((item) => ({
+            key: item.key,
+            dateISO: item.date.toISOString(),
+            isToday: item.isToday,
+            totalWh: item.totalWh,
+            totalKwh: item.totalKwh,
+            halfHourSeries: item.halfHourSeries,
+          })),
+        });
+        if (usable) {
+          writeSessionJson(stickyKey, {
+            fetchedAt: Date.now(),
+            entries: entries.map((item) => ({
+              key: item.key,
+              dateISO: item.date.toISOString(),
+              isToday: item.isToday,
+              totalWh: item.totalWh,
+              totalKwh: item.totalKwh,
+              halfHourSeries: item.halfHourSeries,
+            })),
+          });
+        }
+      } catch {
+        if (!active) return;
+        const sticky = readSessionJson<{
+          fetchedAt: number;
+          entries: Array<{
+            key: string;
+            dateISO: string;
+            isToday: boolean;
+            totalWh: number;
+            totalKwh: number;
+            halfHourSeries: number[];
+          }>;
+        }>(stickyKey);
+        if (sticky && Array.isArray(sticky.entries)) {
+          const stickyMapped = fromCachedEntries(sticky.entries);
+          if (hasUsage(stickyMapped)) {
+            setDailySeries(stickyMapped);
+            return;
+          }
+        }
+        const empty = Array.from({ length: daysToFetch }, (_, i) => {
+          const dayStart = new Date(todayStart);
+          dayStart.setDate(dayStart.getDate() - i);
+          return {
             key: formatDateTimeForApi(dayStart).slice(0, 10),
             date: dayStart,
             isToday: i === 0,
             totalWh: 0,
             totalKwh: 0,
             halfHourSeries: HALF_HOUR_SLOTS.map(() => 0),
-          });
-        }
+          } as DailySeries;
+        });
+        empty.sort((a, b) => b.date.getTime() - a.date.getTime());
+        setDailySeries(empty);
       }
-
-      if (!active) return;
-      entries.sort((a, b) => b.date.getTime() - a.date.getTime());
-      setDailySeries(entries);
     })();
 
     return () => {
       active = false;
     };
-  }, [siteForApi, deviceSN, deviceCategory]);
+  }, [siteForApi, deviceSN, deviceCategory, isAllSitesSelected, siteTargetsKey]);
 
   const todaySeriesData = React.useMemo(
     () => dailySeries.find((item) => item.isToday) ?? null,
+    [dailySeries]
+  );
+  const yesterdaySeriesData = React.useMemo(
+    () => dailySeries.find((item) => !item.isToday) ?? null,
     [dailySeries]
   );
 
@@ -594,7 +912,7 @@ const [thermoOne, setThermoOne] = useState<{
 
     return ranked.map(({ date, percentage, ...rest }) => {
       const formattedPercent = Number.isFinite(percentage)
-        ? `${percentage % 1 === 0 ? percentage.toFixed(0) : percentage.toFixed(1)}%`
+        ? `${percentage.toFixed(0)}%`
         : "-";
       return {
         ...rest,
@@ -650,21 +968,156 @@ const [thermoOne, setThermoOne] = useState<{
         const range = computeRange();
         console.debug("[FE] fetch equipment", {
           siteForApi,
+          isAllSitesSelected,
+          siteTargets,
           sn: deviceSN,
           category: deviceCategory,
           range,
         });
-        const res = await fetchEquipmentTelemetry({
-          siteIdOrCode: siteForApi,
-          sn: deviceSN,
-          startTime: range.from,
-          endTime: range.to,
-          category: deviceCategory,
-        });
-        const list: any[] = (res?.data as any)?.telemetries ?? [];
-        const t1: any = (res?.data as any)?.telemetryFirst ?? list[0] ?? null;
-        const t2: any = (res?.data as any)?.telemetryLast ?? (list.length ? list[list.length-1] : null);
+        let res: any = null;
+        if (isAllSitesSelected) {
+          const targets = siteTargets;
+          const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
+            fetchEquipmentTelemetry({
+              siteIdOrCode,
+              sn: OVERVIEW_DEVICE_ID,
+              startTime: range.from,
+              endTime: range.to,
+              category: deviceCategory,
+            })
+          );
+          const summaries = settled
+            .filter(
+              (item): item is PromiseFulfilledResult<any> =>
+                item.status === "fulfilled"
+            )
+            .map((item) => (item.value as any)?.data?.summary)
+            .filter((summary) => summary && typeof summary === "object");
+          const sum = (items: any[], picker: (x: any) => number) =>
+            items.reduce((acc, cur) => acc + picker(cur), 0);
+          const numOrNaN = (value: unknown) =>
+            value === null || value === undefined ? Number.NaN : Number(value);
+          const weightedAvg = (
+            items: any[],
+            picker: (x: any) => number,
+            weightPicker: (x: any) => number,
+            valueValidator?: (value: number) => boolean
+          ): number | null => {
+            let valueSum = 0;
+            let weightSum = 0;
+            for (const item of items) {
+              const value = picker(item);
+              if (!Number.isFinite(value)) continue;
+              if (valueValidator && !valueValidator(value)) continue;
+              const weight = Number(weightPicker(item));
+              if (!Number.isFinite(weight) || weight <= 0) continue;
+              valueSum += value * weight;
+              weightSum += weight;
+            }
+            return weightSum > 0 ? valueSum / weightSum : null;
+          };
+          const voltageAvg = weightedAvg(
+            summaries,
+            (s) => numOrNaN(s?.voltageAvg),
+            (s) => Number(s?.partialData?.invertersWithTelemetry ?? 0),
+            (v) => v > 0
+          );
+          const currentAvg = weightedAvg(
+            summaries,
+            (s) => numOrNaN(s?.currentAvg),
+            (s) => Number(s?.partialData?.invertersWithTelemetry ?? 0),
+            (v) => v > 0
+          );
+          const frequencyAvg = weightedAvg(
+            summaries,
+            (s) => numOrNaN(s?.frequencyAvg),
+            (s) => Number(s?.partialData?.invertersWithTelemetry ?? 0),
+            (v) => v > 0
+          );
+          const temperatureAvg = weightedAvg(
+            summaries,
+            (s) => numOrNaN(s?.temperatureC),
+            (s) => Number(s?.partialData?.invertersWithTelemetry ?? 0),
+            (v) => v > 0
+          );
+          const aggregatedSummary = {
+            usageKwh: sum(summaries, (s) => Number(s?.usageKwh ?? 0) || 0),
+            accumulatedKwh: sum(
+              summaries,
+              (s) => Number(s?.accumulatedKwh ?? 0) || 0
+            ),
+            productionTodayKwh: sum(
+              summaries,
+              (s) => Number(s?.productionTodayKwh ?? 0) || 0
+            ),
+            productionMonthKwh: sum(
+              summaries,
+              (s) => Number(s?.productionMonthKwh ?? 0) || 0
+            ),
+            voltageAvg: voltageAvg ?? 0,
+            currentAvg: currentAvg ?? 0,
+            frequencyAvg: frequencyAvg ?? 0,
+            temperatureC: temperatureAvg,
+          };
+          res = { data: { summary: aggregatedSummary, telemetries: [] } };
+        } else {
+          res = await fetchEquipmentTelemetry({
+            siteIdOrCode: siteForApi,
+            sn: deviceSN,
+            startTime: range.from,
+            endTime: range.to,
+            category: deviceCategory,
+          });
+        }
+        const payload: any = (res as any)?.data ?? {};
+        const summary = payload?.summary ?? null;
+        const list: any[] = payload?.telemetries ?? [];
+        const t1: any = payload?.telemetryFirst ?? list[0] ?? null;
+        const t2: any = payload?.telemetryLast ?? (list.length ? list[list.length - 1] : null);
         console.debug("[FE] rangeRes", { count: list.length });
+
+        if (summary && typeof summary === "object") {
+          const voltage = Math.round(Number(summary?.voltageAvg ?? 0) || 0);
+          const current = Math.round(Number(summary?.currentAvg ?? 0) || 0);
+          const frequency = Math.round(Number(summary?.frequencyAvg ?? 0) || 0);
+          const consumptionKwh = Math.round(
+            Number(summary?.usageKwh ?? 0) || 0
+          );
+          const lifetimeKwh = Math.round(
+            Number(summary?.accumulatedKwh ?? 0) || 0
+          );
+          const temperature =
+            summary?.temperatureC === null || summary?.temperatureC === undefined
+              ? null
+              : Math.round(Number(summary.temperatureC));
+          setMetrics((m) => ({
+            ...m,
+            voltage,
+            current,
+            frequency,
+            consumptionKwh,
+            lifetimeKwh,
+          }));
+          setTemperatureC(
+            typeof temperature === "number" && Number.isFinite(temperature)
+              ? temperature
+              : null
+          );
+          if (!isOverviewSelected) {
+            const todayProd = Number(summary?.productionTodayKwh);
+            const monthProd = Number(summary?.productionMonthKwh);
+            setOverviewTodayValue(
+              Number.isFinite(todayProd) ? Math.round(todayProd) : null
+            );
+            setOverviewMonthValue(
+              Number.isFinite(monthProd) ? Math.round(monthProd) : null
+            );
+            if (Number.isFinite(monthProd)) {
+              setMetrics((m) => ({ ...m, monthKwh: Math.round(monthProd) }));
+            }
+          }
+          return;
+        }
 
         const last: any = (t2 || t1 || {});
         const phaseVs = [last?.L1Data?.acVoltage, last?.L2Data?.acVoltage, last?.L3Data?.acVoltage].filter((v: any) => Number.isFinite(Number(v))) as number[];
@@ -686,17 +1139,32 @@ const [thermoOne, setThermoOne] = useState<{
           null;
         const temperature =
           tempRaw === null || tempRaw === undefined ? null : Number(tempRaw);
-        setMetrics((m) => ({ ...m, voltage, current, frequency, consumptionKwh, lifetimeKwh }));
+        setMetrics((m) => ({
+          ...m,
+          voltage: Math.round(voltage),
+          current: Math.round(current),
+          frequency: Math.round(frequency),
+          consumptionKwh: Math.round(consumptionKwh),
+          lifetimeKwh: Math.round(lifetimeKwh),
+        }));
         setTemperatureC(
           typeof temperature === "number" && Number.isFinite(temperature)
-            ? temperature
+            ? Math.round(temperature)
             : null
         );
       } catch (e) {
         // ignore
       }
     })();
-  }, [computeRange, siteForApi, deviceSN, deviceCategory]);
+  }, [
+    computeRange,
+    siteForApi,
+    deviceSN,
+    deviceCategory,
+    isOverviewSelected,
+    isAllSitesSelected,
+    siteTargetsKey,
+  ]);
 
 
   const cardItems = React.useMemo(
@@ -736,13 +1204,6 @@ const [thermoOne, setThermoOne] = useState<{
         valueLabel: t("devices.electric.cards.frequency"),
         valueLabel2: t("devices.electric.units.hz"),
       },
-      {
-        id: "humidity",
-        img: waterSupplieIcon,
-        value: 0,
-        valueLabel: t("devices.electric.cards.humidity"),
-        valueLabel2: t("devices.electric.units.gm3"),
-      },
     ],
     [metrics, t]
   );
@@ -781,95 +1242,78 @@ const [thermoOne, setThermoOne] = useState<{
     });
   }, [cardItems]);
 
-  // Ensure device.meta overview is refreshed and consumed for side cards / max bound
+  // Overview side cards come from backend aggregate only.
   React.useEffect(() => {
     let active = true;
     (async () => {
-      try {
-        await updateElectricOverview(siteForApi, deviceSN, {
-          category: deviceCategory,
-        });
-      } catch {
-        // ignore updater failures; still attempt to read cached meta
-      }
-
-      try {
-        const res = await getElectricDevices(siteForApi);
-        const items: any[] = Array.isArray((res as any)?.items)
-          ? (res as any).items
-          : Array.isArray((res as any)?.data?.items)
-          ? (res as any).data.items
-          : [];
-        const identity = `${deviceCategory}:${deviceSN}`.toUpperCase();
-        const device = items.find((item) => {
-          const model = String(item?.model ?? "");
-          return model.toUpperCase() === identity;
-        });
-        const overviewMeta = device?.meta?.overview;
-        if (!active) return;
-        if (!overviewMeta) {
+      if (isOverviewSelected) {
+        try {
+          let data: any = {};
+          if (isAllSitesSelected) {
+            const settled = await runWithConcurrency(siteTargets, 4, async (siteIdOrCode) =>
+              getElectricOverview(siteIdOrCode)
+            );
+            const rows = settled
+              .filter(
+                (item): item is PromiseFulfilledResult<any> =>
+                  item.status === "fulfilled"
+              )
+              .map((item) => (item.value as any)?.data ?? item.value ?? {});
+            const sumField = (key: string) =>
+              rows.reduce((acc, row) => acc + (Number(row?.[key] ?? 0) || 0), 0);
+            data = {
+              today_kwh: sumField("today_kwh"),
+              month_kwh: sumField("month_kwh"),
+              lifetime_kwh: sumField("lifetime_kwh"),
+            };
+          } else {
+            const resp = await getElectricOverview(siteForApi);
+            data = (resp as any)?.data ?? resp ?? {};
+          }
+          if (!active) return;
+          const today = Number(data?.today_kwh);
+          const month = Number(data?.month_kwh);
+          const lifetime = Number(data?.lifetime_kwh);
+          setOverviewTodayValue(Number.isFinite(today) ? Math.round(today) : null);
+          setOverviewMonthValue(Number.isFinite(month) ? Math.round(month) : null);
+          setOverviewLifetimeValue(
+            Number.isFinite(lifetime) ? Math.round(lifetime) : null
+          );
+          if (Number.isFinite(month)) {
+            setMetrics((m) => ({ ...m, monthKwh: Math.round(month) }));
+          }
+        } catch {
+          if (!active) return;
           setOverviewTodayValue(null);
           setOverviewMonthValue(null);
           setOverviewLifetimeValue(null);
-          return;
         }
-        const toNum = (value: any): number | null => {
-          if (typeof value === "number") return Number.isFinite(value) ? value : null;
-          const parsed = Number(value);
-          return Number.isFinite(parsed) ? parsed : null;
-        };
-
-        const toKwh = (kwhCandidate: any, ...whCandidates: any[]): number | null => {
-          const kwh = toNum(kwhCandidate);
-          if (kwh !== null) return kwh;
-          for (const whSource of whCandidates) {
-            const wh = toNum(whSource);
-            if (wh !== null) {
-              return wh / 1000;
-            }
-          }
-          return null;
-        };
-
-        const dayKwh = toKwh(
-          overviewMeta.lastDayKwh ?? overviewMeta.today_kwh,
-          overviewMeta.lastDayWh,
-          overviewMeta.lastDayData?.energy,
-          overviewMeta.todayWh
-        );
-        const monthKwh = toKwh(
-          overviewMeta.lastMonthKwh,
-          overviewMeta.lastMonthWh,
-          overviewMeta.lastMonthData?.energy
-        );
-        const lifetimeKwh = toKwh(
-          overviewMeta.lifeTimeKwh ?? overviewMeta.lifetimeKwh,
-          overviewMeta.lifeTimeWh,
-          overviewMeta.lifeTimeData?.energy,
-          overviewMeta.lifetimeWh
-        );
-
-        setOverviewTodayValue(dayKwh);
-        setOverviewMonthValue(monthKwh);
-        setOverviewLifetimeValue(lifetimeKwh);
-        if (monthKwh !== null) {
-          setMetrics((m) => ({ ...m, monthKwh }));
-        }
-      } catch {
-        if (!active) return;
-        setOverviewTodayValue(null);
-        setOverviewMonthValue(null);
-        setOverviewLifetimeValue(null);
+        return;
       }
+      if (!active) return;
+      setOverviewTodayValue(null);
+      setOverviewMonthValue(null);
+      setOverviewLifetimeValue(null);
     })();
     return () => {
       active = false;
     };
-  }, [siteForApi, deviceSN, deviceCategory]);
+  }, [
+    siteForApi,
+    deviceSN,
+    deviceCategory,
+    isOverviewSelected,
+    isAllSitesSelected,
+    siteTargetsKey,
+  ]);
 
   const lifetimeMaxValue =
     typeof overviewLifetimeValue === "number" && Number.isFinite(overviewLifetimeValue)
       ? overviewLifetimeValue
+      : null;
+  const yesterdayMaxValue =
+    yesterdaySeriesData && Number.isFinite(yesterdaySeriesData.totalKwh)
+      ? Math.max(1, Number(yesterdaySeriesData.totalKwh))
       : null;
   const sideCardTodayValue =
     overviewTodayValue !== null && overviewTodayValue !== undefined
@@ -890,92 +1334,138 @@ const [thermoOne, setThermoOne] = useState<{
       <div className="grid grid-cols-1 lg-1355:grid-cols-5 gap-3 mt-6">
         <div className="col-span-5 lg-1355:col-span-4 flex flex-col justify-center items-center bg-white rounded-xl gap-10 p-6 w-full">
           <div className="w-full flex flex-col gap-2">
-            <span className="text-sm font-semibold text-gray-600">
-              {t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
-            </span>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <Dropdown
-                options={deviceDropdownOptions}
-                value={selectedDeviceId ?? ""}
-                onChange={(value) => setSelectedDeviceId(value || null)}
-              >
-                {({
-                  open,
-                  selected,
-                  getButtonProps,
-                  getMenuProps,
-                  getItemProps,
-                  options,
-                }) => {
-                  const disabled = options.length === 0;
-                  return (
-                    <div className="relative w-full sm:w-64">
-                      <button
-                        {...getButtonProps({
-                          disabled,
-                          className: [
-                            "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium transition",
-                            disabled
-                              ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
-                              : "bg-[#F6FBFF] text-cyan hover:bg-cyan-300 hover:text-white border-transparent",
-                          ].join(" "),
-                        })}
-                      >
-                        <span className="truncate">
-                          {selected?.label ??
-                            (disabled
-                              ? t("devices.electric.deviceSelector.emptyShort", {
-                                  defaultValue: "ไม่มีอุปกรณ์",
-                                })
-                              : t("devices.electric.deviceSelector.placeholder", {
-                                  defaultValue: "เลือกอุปกรณ์",
-                                }))}
-                        </span>
-                        <i className="material-icons text-base text-current">
-                          {open ? "expand_less" : "expand_more"}
-                        </i>
-                      </button>
-                      {open && !disabled && (
-                        <div
-                          {...getMenuProps({
-                            className:
-                              "absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-64 overflow-auto",
-                          })}
-                        >
-                          {options.map((opt) => (
-                            <button
-                              key={opt.value}
-                              {...getItemProps(opt, {
+            {isAllSitesSelected ? (
+              <>
+                <span className="text-sm font-semibold text-gray-600">
+                  {t("devices.electric.deviceSelector.overview", {
+                    defaultValue: "Overview",
+                  })}
+                </span>
+                <p className="text-xs text-gray-500">
+                  {t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" })} ·{" "}
+                  {t("devices.electric.deviceSelector.overviewHint", {
+                    defaultValue: "Site-level overview",
+                  })}
+                </p>
+              </>
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-gray-600">
+                  {t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
+                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <Dropdown
+                    options={deviceDropdownOptions}
+                    value={selectedDeviceId ?? ""}
+                    onChange={(value) => setSelectedDeviceId(value || null)}
+                  >
+                    {({
+                      open,
+                      selected,
+                      getButtonProps,
+                      getMenuProps,
+                      getItemProps,
+                      options,
+                    }) => {
+                      const disabled = options.length === 0;
+                      return (
+                        <div className="relative w-full sm:w-64">
+                          <button
+                            {...getButtonProps({
+                              disabled,
+                              className: [
+                                "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium transition",
+                                disabled
+                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
+                                  : "bg-[#F6FBFF] text-cyan hover:bg-cyan-300 hover:text-white border-transparent",
+                              ].join(" "),
+                            })}
+                          >
+                            <span className="truncate whitespace-nowrap">
+                              {selected?.label ??
+                                (disabled
+                                  ? t("devices.electric.deviceSelector.emptyShort", {
+                                      defaultValue: "ไม่มีอุปกรณ์",
+                                    })
+                                  : t("devices.electric.deviceSelector.placeholder", {
+                                      defaultValue: "เลือกอุปกรณ์",
+                                    }))}
+                            </span>
+                            <i className="material-icons text-base text-current">
+                              {open ? "expand_less" : "expand_more"}
+                            </i>
+                          </button>
+                          {open && !disabled && (
+                            <div
+                              {...getMenuProps({
                                 className:
-                                  "w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer",
+                                  "absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-64 overflow-auto",
                               })}
                             >
-                              {opt.label}
-                            </button>
-                          ))}
+                              {options.map((opt) => {
+                                const status = deviceStatusById.get(opt.value);
+                                const isOfflineOpt = status === "offline";
+                                return (
+                                  <button
+                                    key={opt.value}
+                                    {...getItemProps(opt, {
+                                      className: `w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center justify-between ${
+                                        isOfflineOpt ? "text-rose-600 bg-rose-50" : ""
+                                      }`,
+                                    })}
+                                  >
+                                    <span className="truncate whitespace-nowrap">
+                                      {opt.label}
+                                    </span>
+                                    {isOfflineOpt ? (
+                                      <span className="ml-2 inline-flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse" />
+                                    ) : null}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      );
+                    }}
+                  </Dropdown>
+                  {selectedDevice && !isOverviewSelected && (
+                    <div className="flex items-center gap-2 text-xs font-semibold">
+                      <span className={`h-2.5 w-2.5 rounded-full ${statusBadge.dot}`} />
+                      <span className={statusBadge.text}>{statusBadge.label}</span>
                     </div>
-                  );
-                }}
-              </Dropdown>
-              {deviceOptionsLoading && (
-                <span className="text-xs text-gray-500">
-                  {t("devices.electric.loadingDevices", { defaultValue: "กำลังโหลด..." })}
-                </span>
-              )}
-            </div>
-            {selectedDevice && (
-              <p className="text-xs text-gray-500">
-                {selectedDevice.category} · SN: {selectedDevice.sn}
-              </p>
-            )}
-            {!deviceOptionsLoading && deviceOptions.length === 0 && (
-              <p className="text-xs text-red-500">
-                {t("devices.electric.noDevices", {
-                  defaultValue: "ยังไม่พบอุปกรณ์ไฟฟ้าสำหรับไซต์นี้",
-                })}
-              </p>
+                  )}
+                  {deviceOptionsLoading && (
+                    <span className="text-xs text-gray-500">
+                      {t("devices.electric.loadingDevices", { defaultValue: "กำลังโหลด..." })}
+                    </span>
+                  )}
+                  {hasOfflineDevices && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600">
+                      <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                      Offline {offlineDevices.length}
+                    </span>
+                  )}
+                </div>
+                {isOverviewSelected ? (
+                  <p className="text-xs text-gray-500">
+                    {t("devices.electric.deviceSelector.overviewHint", {
+                      defaultValue: "Site-level overview",
+                    })}
+                  </p>
+                ) : selectedDevice ? (
+                  <p className="text-xs text-gray-500">
+                    {selectedDevice.category} · SN: {selectedDevice.sn}
+                  </p>
+                ) : null}
+                {!deviceOptionsLoading && deviceOptions.length === 0 && (
+                  <p className="text-xs text-red-500">
+                    {t("devices.electric.noDevices", {
+                      defaultValue: "ยังไม่พบอุปกรณ์ไฟฟ้าสำหรับไซต์นี้",
+                    })}
+                  </p>
+                )}
+              </>
             )}
           </div>
           {/* Time Range (Dropdown x2) */}
@@ -1008,7 +1498,7 @@ const [thermoOne, setThermoOne] = useState<{
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-20 mt-2 max-h-64 w-32 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -1016,7 +1506,7 @@ const [thermoOne, setThermoOne] = useState<{
                           key={opt.value}
                           {...getItemProps(opt, {
                             className:
-                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer",
+                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap leading-none",
                           })}
                         >
                           {opt.label}
@@ -1064,7 +1554,7 @@ const [thermoOne, setThermoOne] = useState<{
                     <div
                       {...getMenuProps({
                         className:
-                          "absolute z-10 mt-2 max-h-64 w-27 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
+                          "absolute z-20 mt-2 max-h-64 w-32 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
                       })}
                     >
                       {options.map((opt) => (
@@ -1072,7 +1562,7 @@ const [thermoOne, setThermoOne] = useState<{
                           key={opt.value}
                           {...getItemProps(opt, {
                             className:
-                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer",
+                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap leading-none",
                           })}
                         >
                           {opt.label}
@@ -1093,9 +1583,10 @@ const [thermoOne, setThermoOne] = useState<{
                 key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}-${thermoOne.useLifetimeMax ? 'l' : 'n'}`}
                 initialValue={thermoOne.initialValue}
                 max={
-                  thermoOne.useLifetimeMax
-                    ? Math.max(1, lifetimeMaxValue ?? thermoOne.initialValue)
-                    : 450
+                  Math.max(
+                    1,
+                    yesterdayMaxValue ?? lifetimeMaxValue ?? thermoOne.initialValue
+                  )
                 }
                 maxLabel={thermoOne.maxLabel}
                 valueLabel={thermoOne.valueLabel}

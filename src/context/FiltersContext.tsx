@@ -6,7 +6,13 @@ import { today as defaultToday } from "../components/Dashboard/dashboard.constan
 import { me as apiMe } from "../api/user";
 import { listSites, getSiteDetails } from "../api/sites";
 
-export type SiteOption = { label: string; value: string; i18nKey?: string };
+export type SiteOption = {
+  label: string;
+  value: string;
+  i18nKey?: string;
+  groupLabel?: string | null;
+  groupId?: string | null;
+};
 
 const SELECTED_SITE_STORAGE_PREFIX = "filters:selectedSite";
 const SELECTED_SITE_TTL_MS = 1000 * 60 * 15; // 15 นาทีพอให้ refresh แล้วยังจำได้ แต่ไม่ค้างนานเกินไป
@@ -173,10 +179,21 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     if (!site || typeof site !== "object") return null;
     const rawLabel = site.name ?? site.code ?? site.id ?? "";
     const rawValue = site.code ?? site.id ?? site.name ?? "";
+    const groupFromApi =
+      site?.site_group ??
+      site?.site_groups ??
+      site?.siteGroup ??
+      site?.group ??
+      null;
     const label = rawLabel ? String(rawLabel).trim() : "";
     const value = rawValue ? String(rawValue).trim() : "";
     if (!value) return null;
-    return { label: label || value, value };
+    return {
+      label: label || value,
+      value,
+      groupLabel: groupFromApi?.name ?? null,
+      groupId: groupFromApi?.id ?? null,
+    };
   }, []);
 
   const fetchSitesFromApi = React.useCallback(async (): Promise<SiteOption[]> => {

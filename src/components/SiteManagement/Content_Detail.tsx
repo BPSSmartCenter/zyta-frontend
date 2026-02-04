@@ -140,6 +140,7 @@ export default function ContentDetail({
       },
       summary: {
         code: t("detail.summary.code", { defaultValue: "Code:" }),
+        group: t("detail.summary.group", { defaultValue: "Group:" }),
         address: t("detail.summary.address", { defaultValue: "Address:" }),
         latLng: t("detail.summary.latLng", { defaultValue: "Lat / Lng:" }),
         zipcode: t("detail.summary.zipcode", { defaultValue: "Zipcode:" }),
@@ -486,10 +487,25 @@ export default function ContentDetail({
       const payload = (detailRes as any)?.data ?? detailRes;
       const s = payload?.site ?? payload;
       if (s) {
-        setSiteInfo((prev) => ({
+        setSiteInfo((prev) => {
+          const groupFromApi =
+            s?.site_group ??
+            s?.site_groups ??
+            s?.siteGroup ??
+            s?.group ??
+            null;
+          const groupId =
+            groupFromApi?.id ??
+            s?.site_group_id ??
+            s?.siteGroupId ??
+            prev.groupId ??
+            null;
+          return {
           ...prev,
           name: s.name ?? prev.name,
           code: s.code ?? prev.code,
+          groupLabel: groupFromApi?.name ?? prev.groupLabel,
+          groupId,
           provinceLabel:
             s.address_province ?? s.province_code ?? prev.provinceLabel,
           lat: typeof s.lat === "number" ? s.lat : prev.lat,
@@ -521,7 +537,8 @@ export default function ContentDetail({
             typeof s.billingDiscountRate === "number"
               ? s.billingDiscountRate
               : prev.billingDiscountRate,
-        }));
+          };
+        });
         setBillingPrefs({
           electric: Boolean(
             s.allowElectricBilling ?? site.allowElectricBilling ?? false
@@ -964,6 +981,9 @@ export default function ContentDetail({
           <h2 className="text-xl font-semibold">{siteInfo.name}</h2>
           <p className="text-sm text-gray-500">
             {texts.summary.code} {siteInfo.code}
+          </p>
+          <p className="text-sm text-gray-500">
+            {texts.summary.group} {siteInfo.groupLabel ?? "-"}
           </p>
           {brandingLogoSrc && (
             <div className="mt-4 flex justify-start">

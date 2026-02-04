@@ -19,6 +19,8 @@ type DeviceCounts = {
   intercom: number;
   waterMeter: number;
   electricMeter: number;
+  electricOnline?: number;
+  electricOffline?: number;
   airSensor: number;
   zyta: number;
   iot: number;
@@ -96,7 +98,17 @@ export default function DeviceCount({
     cameras: { on: 0, off: 0 },
     intercom: { on: 0, off: 0 },
     waterMeter: { on: 0, off: 0 },
-    electricMeter: { on: 0, off: 0 },
+    electricMeter: {
+      on:
+        typeof mergedCounts.electricOnline === "number"
+          ? mergedCounts.electricOnline
+          : Math.max(
+              0,
+              Number(mergedCounts.electricMeter || 0) -
+                Number(mergedCounts.electricOffline || 0)
+            ),
+      off: Number(mergedCounts.electricOffline || 0),
+    },
     airSensor: { on: 0, off: 0 },
     zyta: { on: 0, off: 0 },
     iot: { on: 0, off: 0 },
@@ -301,7 +313,7 @@ export default function DeviceCount({
               <span>
                 <span className="text-gray-500">(</span>
                 <span className="text-green-600 font-semibold">
-                  {mergedCounts.electricMeter}
+                  {statusByType.electricMeter.on}
                 </span>
                 <span className="text-gray-500">/</span>
                 <span className="text-red-500 font-semibold">

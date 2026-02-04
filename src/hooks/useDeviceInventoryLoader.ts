@@ -8,6 +8,8 @@ type DeviceCounts = Partial<{
   intercom: number;
   waterMeter: number;
   electricMeter: number;
+  electricOnline: number;
+  electricOffline: number;
   airSensor: number;
   zyta: number;
   iot: number;
@@ -62,7 +64,17 @@ async function fetchSiteDetailsFor(site: SiteSummary): Promise<any | null> {
 }
 
 const reduceDeviceCounters = (
-  acc: { total: number; cameras: number; intercom: number; water: number; electric: number; air: number; iot: number },
+  acc: {
+    total: number;
+    cameras: number;
+    intercom: number;
+    water: number;
+    electric: number;
+    electricOnline: number;
+    electricOffline: number;
+    air: number;
+    iot: number;
+  },
   item: any | null
 ) => {
   if (!item) return acc;
@@ -73,6 +85,10 @@ const reduceDeviceCounters = (
     intercom: acc.intercom + Number(counters.devices_intercom ?? 0),
     water: acc.water + Number(counters.devices_water ?? 0),
     electric: acc.electric + Number(counters.devices_electric ?? 0),
+    electricOnline:
+      acc.electricOnline + Number(counters.devices_electric_online ?? 0),
+    electricOffline:
+      acc.electricOffline + Number(counters.devices_electric_offline ?? 0),
     air: acc.air + Number(counters.devices_air ?? 0),
     iot: acc.iot + Number(counters.devices_iot ?? 0),
   };
@@ -151,7 +167,17 @@ export function useDeviceInventoryLoader({
             : validSites.filter((s) => s.code === selectedKey || s.id === selectedKey);
 
         // Initialize aggregation with zeros
-        let aggregated = { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 };
+        let aggregated = {
+          total: 0,
+          cameras: 0,
+          intercom: 0,
+          water: 0,
+          electric: 0,
+          electricOnline: 0,
+          electricOffline: 0,
+          air: 0,
+          iot: 0,
+        };
 
         if (targetSites.length > 0) {
           const detailsList = await Promise.all(
@@ -160,7 +186,17 @@ export function useDeviceInventoryLoader({
 
           aggregated = detailsList.reduce(
             reduceDeviceCounters,
-            { total: 0, cameras: 0, intercom: 0, water: 0, electric: 0, air: 0, iot: 0 }
+            {
+              total: 0,
+              cameras: 0,
+              intercom: 0,
+              water: 0,
+              electric: 0,
+              electricOnline: 0,
+              electricOffline: 0,
+              air: 0,
+              iot: 0,
+            }
           );
         }
 
@@ -255,6 +291,8 @@ export function useDeviceInventoryLoader({
           intercom: aggregated.intercom,
           waterMeter: aggregated.water,
           electricMeter: aggregated.electric,
+          electricOnline: aggregated.electricOnline,
+          electricOffline: aggregated.electricOffline,
           airSensor: aggregated.air,
           iot: aggregated.iot,
           iotOffline: (aggregated as any).iotOffline || 0,
@@ -263,8 +301,9 @@ export function useDeviceInventoryLoader({
           caregiverOffline: (aggregated as any).caregiverOffline || 0,
         };
 
-        let finalOnline = aggregated.total;
-        let finalOffline = 0;
+        const electricOffline = Number(aggregated.electricOffline ?? 0);
+        let finalOnline = Math.max(0, aggregated.total - electricOffline);
+        let finalOffline = electricOffline;
 
         if (fetchedRealData) {
           // Remove static components from total, add real components
@@ -279,8 +318,15 @@ export function useDeviceInventoryLoader({
             aggregated.electric +
             ((aggregated as any).zyta || 0);
 
-          finalOnline = staticBaseCheck + realOnlineOfNewDevices;
-          finalOffline = realOfflineOfNewDevices;
+          const electricOnline = Math.max(
+            0,
+            Number(aggregated.electric ?? 0) - electricOffline
+          );
+          finalOnline =
+            (staticBaseCheck - Number(aggregated.electric ?? 0)) +
+            electricOnline +
+            realOnlineOfNewDevices;
+          finalOffline = electricOffline + realOfflineOfNewDevices;
         }
 
         const nextTotals: DeviceTotals = {

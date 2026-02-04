@@ -9,6 +9,7 @@ import ContentEdit from "../components/SiteManagement/Content_Edit";
 import ContentDetail from "../components/SiteManagement/Content_Detail";
 import { ToastProvider, useToast } from "../hook/toastProvider";
 import { listSites, registerSite, updateSite, deleteSite } from "../api/sites";
+import { PROVINCE_CODE_TO_TH } from "../data/Dashboard/data";
 import type { SiteRow } from "../components/SiteManagement/site.constant";
 import Modal from "../components/Modal";
 
@@ -101,13 +102,32 @@ function SiteManagementInner() {
       site?.province_code ??
       site?.provinceCode ??
       "-";
+    const provinceKey = String(province ?? "").trim();
+    const normalizedProvince =
+      provinceKey === "0"
+        ? "-"
+        : PROVINCE_CODE_TO_TH[provinceKey] ?? (provinceKey || "-");
     const lat = typeof site.lat === "number" ? site.lat : null;
     const lng = typeof site.lng === "number" ? site.lng : null;
+    const groupFromApi =
+      site?.site_group ??
+      site?.site_groups ??
+      site?.siteGroup ??
+      site?.group ??
+      null;
+    const groupLabel = groupFromApi?.name ?? null;
+    const groupId =
+      groupFromApi?.id ??
+      site?.site_group_id ??
+      site?.siteGroupId ??
+      null;
     return {
       id: site.id ?? site.code ?? site.name,
       name: site.name ?? site.code ?? "-",
       code: site.code ?? "-",
-      provinceLabel: String(province || "-"),
+      groupId: groupId ?? null,
+      groupLabel: groupLabel ?? null,
+      provinceLabel: normalizedProvince,
       lat,
       lng,
       zipcode: site.zipcode ?? site.postcode ?? null,
@@ -172,6 +192,7 @@ function SiteManagementInner() {
     async (payload: {
       name: string;
       code?: string;
+      siteGroupId?: string;
       lat?: number;
       lng?: number;
       zipcode?: string;
@@ -211,6 +232,8 @@ function SiteManagementInner() {
     async (payload: {
       name?: string;
       code?: string;
+      siteGroupId?: string;
+      removeSiteGroup?: boolean;
       lat?: number;
       lng?: number;
       zipcode?: string;

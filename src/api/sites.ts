@@ -28,6 +28,8 @@ export async function getSiteDetails(siteIdOrCode: string) {
 export type RegisterSiteInput = {
   name: string;
   code?: string;
+  siteGroupId?: string;
+  siteGroupName?: string;
   lat?: number;
   lng?: number;
   zipcode?: string;
@@ -45,6 +47,8 @@ export async function registerSite(input: RegisterSiteInput) {
     name: input.name,
   };
   if (input.code) payload.code = input.code;
+  if (input.siteGroupId) payload.siteGroupId = input.siteGroupId;
+  if (input.siteGroupName) payload.siteGroupName = input.siteGroupName;
   if (typeof input.lat === "number") payload.lat = input.lat;
   if (typeof input.lng === "number") payload.lng = input.lng;
   if (input.zipcode) payload.zipcode = input.zipcode;
@@ -68,6 +72,9 @@ export async function registerSite(input: RegisterSiteInput) {
 export type UpdateSiteInput = {
   name?: string;
   code?: string;
+  siteGroupId?: string;
+  siteGroupName?: string;
+  removeSiteGroup?: boolean;
   lat?: number;
   lng?: number;
   zipcode?: string;
@@ -88,6 +95,15 @@ function normalizeSitePayload(input: UpdateSiteInput) {
   }
   if (typeof input.code === "string" && input.code.trim()) {
     payload.code = input.code.trim();
+  }
+  if (typeof input.siteGroupId === "string" && input.siteGroupId.trim()) {
+    payload.siteGroupId = input.siteGroupId.trim();
+  }
+  if (typeof input.siteGroupName === "string" && input.siteGroupName.trim()) {
+    payload.siteGroupName = input.siteGroupName.trim();
+  }
+  if (typeof input.removeSiteGroup === "boolean") {
+    payload.removeSiteGroup = input.removeSiteGroup;
   }
   if (typeof input.lat === "number" && Number.isFinite(input.lat)) {
     payload.lat = input.lat;

@@ -2,12 +2,15 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import { lookupThaiAddress } from "../../api/thaiAddress";
+import { useSiteGroups } from "../../hooks/useSiteGroups";
 import Dropdown from "../Dropdown";
 import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type UpdatePayload = {
   name?: string;
   code?: string;
+  siteGroupId?: string;
+  removeSiteGroup?: boolean;
   lat?: number;
   lng?: number;
   zipcode?: string;
@@ -47,6 +50,8 @@ export default function ContentEdit({
       labels: {
         siteName: t("form.labels.siteName", { defaultValue: "Site name" }),
         siteCode: t("form.labels.siteCode", { defaultValue: "Site code" }),
+        siteGroup: t("form.labels.siteGroup", { defaultValue: "Site group" }),
+        siteGroupCreate: t("form.labels.siteGroupCreate", { defaultValue: "Create new group" }),
         solarEdgeTitle: t("form.labels.solarEdgeTitle", {
           defaultValue: "SolarEdge Credentials",
         }),
@@ -70,6 +75,8 @@ export default function ContentEdit({
         siteCode: t("form.placeholders.siteCodeEdit", {
           defaultValue: "Internal code",
         }),
+        siteGroup: t("form.placeholders.siteGroup", { defaultValue: "Select group" }),
+        siteGroupCreate: t("form.placeholders.siteGroupCreate", { defaultValue: "e.g. Chula Hospital" }),
         solarEdgeSiteId: t("form.placeholders.solarEdgeSiteId", {
           defaultValue: "e.g. 3078000",
         }),
@@ -146,6 +153,11 @@ export default function ContentEdit({
         cancel: t("form.buttons.cancel", { defaultValue: "Cancel" }),
         submit: t("edit.buttons.submit", { defaultValue: "Save changes" }),
         submitting: t("edit.buttons.submitting", { defaultValue: "Saving..." }),
+        createGroup: t("form.buttons.createGroup", { defaultValue: "Create group" }),
+      },
+      group: {
+        none: t("form.group.none", { defaultValue: "No group" }),
+        loading: t("form.group.loading", { defaultValue: "Loading groups..." }),
       },
     }),
     [t, site.name]
@@ -153,6 +165,7 @@ export default function ContentEdit({
   const [form, setForm] = React.useState({
     name: site.name ?? "",
     code: site.code ?? "",
+    siteGroupId: site.groupId ?? "",
     lat: site.lat ?? undefined,
     lng: site.lng ?? undefined,
     zipcode: site.zipcode ?? "",
@@ -163,6 +176,8 @@ export default function ContentEdit({
     solaredgeSiteId: site.solaredgeSiteId ?? "",
     solaredgeApiKey: site.solaredgeApiKey ?? "",
   });
+  const [newGroupName, setNewGroupName] = React.useState("");
+  const { groups, loading: groupsLoading, create: createGroup } = useSiteGroups();
   const [logoPreview, setLogoPreview] = React.useState<string | null>(
     site.brandingLogoUrl ?? null
   );
@@ -201,6 +216,14 @@ export default function ContentEdit({
     }
     return list;
   }, [subDistrictOptions, form.addressSubDistrict]);
+
+  const groupOptions = React.useMemo(
+    () => [
+      { value: "", label: texts.group.none },
+      ...groups.map((g) => ({ value: g.id, label: g.name })),
+    ],
+    [groups, texts.group.none]
+  );
 
   const displayLogoSrc = React.useMemo(
     () => buildBrandingLogoSrc(logoPreview),
@@ -263,6 +286,12 @@ export default function ContentEdit({
     const prevApiKey = site.solaredgeApiKey?.trim() ?? "";
     if (nextApiKey !== prevApiKey) {
       payload.solaredgeApiKey = nextApiKey;
+    }
+    const nextGroupId = form.siteGroupId?.trim() ?? "";
+    const prevGroupId = site.groupId?.trim() ?? "";
+    if (nextGroupId !== prevGroupId) {
+      if (nextGroupId) payload.siteGroupId = nextGroupId;
+      else payload.removeSiteGroup = true;
     }
     await onSave(payload);
   };
@@ -359,7 +388,7 @@ export default function ContentEdit({
       <div className="flex items-center gap-3 pb-4 border-b">
         <button
           type="button"
-          className="text-gray-500 hover:text-gray-700"
+          className="text-gray-500 hover:text-gray-700 cursor-pointer"
           onClick={onCancel}
         >
           <i className="material-icons-outlined">arrow_back</i>
@@ -398,6 +427,90 @@ export default function ContentEdit({
             className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
             placeholder={texts.placeholders.siteCode}
           />
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
+            {texts.labels.siteGroup}
+          </label>
+          <Dropdown
+            options={groupOptions}
+            value={form.siteGroupId ?? ""}
+            onChange={(val) => setForm((prev) => ({ ...prev, siteGroupId: val }))}
+          >
+            {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
+              <div className="relative">
+                <button
+                  {...getButtonProps({
+                    className:
+                      "h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                  })}
+                >
+                  <span className="truncate">
+                    {selected?.label ?? texts.group.none}
+                  </span>
+                  <i className="material-icons leading-none">
+                    {open ? "arrow_drop_up" : "arrow_drop_down"}
+                  </i>
+                </button>
+                <div
+                  {...getMenuProps({
+                    className: [
+                      "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto",
+                      open ? "block" : "hidden",
+                    ].join(" "),
+                  })}
+                >
+                  {groupsLoading && (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      {texts.group.loading}
+                    </div>
+                  )}
+                  {options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      {...getItemProps(opt, {
+                        className:
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
+                      })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Dropdown>
+
+          <div className="mt-3">
+            <label className="text-xs font-semibold block mb-2 text-gray-600">
+              {texts.labels.siteGroupCreate}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="flex-1 h-10 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder={texts.placeholders.siteGroupCreate}
+              />
+              <button
+                type="button"
+                className="h-10 px-3 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50 cursor-pointer"
+                onClick={async () => {
+                  const trimmed = newGroupName.trim();
+                  if (!trimmed) return;
+                  const created = await createGroup(trimmed);
+                  if (created?.id) {
+                    setForm((prev) => ({ ...prev, siteGroupId: created.id }));
+                  }
+                  setNewGroupName("");
+                }}
+              >
+                {texts.buttons.createGroup}
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3 rounded-xl border border-slate-200 p-4">
@@ -715,7 +828,7 @@ export default function ContentEdit({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
+            className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50 cursor-pointer"
             disabled={loading}
           >
             {texts.buttons.cancel}
@@ -723,7 +836,7 @@ export default function ContentEdit({
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60"
+            className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60 cursor-pointer"
           >
             {loading ? texts.buttons.submitting : texts.buttons.submit}
           </button>

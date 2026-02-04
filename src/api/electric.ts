@@ -11,6 +11,18 @@ export async function getElectricDevices(siteCode: string, opts?: { from?: strin
   return data;
 }
 
+export async function syncElectricInventory(
+  siteCode: string,
+  opts?: { category?: "INVERTER" | "METER" | "GATEWAY" | "SENSOR" }
+) {
+  const params = new URLSearchParams();
+  if (opts?.category) params.set("category", opts.category);
+  const q = params.toString();
+  const url = `/site/${encodeURIComponent(siteCode)}/electric/inventory/sync${q ? `?${q}` : ""}`;
+  const { data } = await api.post(url);
+  return data;
+}
+
 export async function getElectricOverview(siteCode: string) {
   const { data } = await api.get(`/site/${encodeURIComponent(siteCode)}/electric/overview`);
   return data;

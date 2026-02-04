@@ -1,7 +1,7 @@
 ﻿import React from "react";
 import { brandImage } from "../../assets/index";
 import SearchInput from "../../components/SearchInput";
-import Dropdown from "../../components/Dropdown";
+import SiteDropdownGrouped from "../../components/Shared/SiteDropdownGrouped";
 import DatePicker from "../../components/DateInput";
 import type { DateValue } from "../../components/DateInput";
 import searchIcon from "../../assets/search.png";
@@ -52,6 +52,10 @@ export default function Navbar({
       return t(`sites.${val}`, { defaultValue: opt.label as string });
     },
     [t, i18n.language]
+  );
+  const getSiteLabelStrict = React.useCallback(
+    (opt: SiteOption) => getSiteLabel(opt),
+    [getSiteLabel]
   );
 
   const canFilterSites = siteOptions.length > 1;
@@ -117,78 +121,15 @@ export default function Navbar({
                   setSearchSite(label);
                 }}
               />
-              <Dropdown
+              <SiteDropdownGrouped
                 options={siteOptions as any}
                 value={selectedSite}
                 onChange={setSelectedSite}
-              >
-                {({
-                  open,
-                  selected,
-                  options,
-                  getButtonProps,
-                  getMenuProps,
-                  getItemProps,
-                }) => {
-                  const siteOptionList = options as SiteOption[];
-                  const fallbackOption =
-                    selected ??
-                    siteOptionList.find((opt) => opt.value === selectedSite) ??
-                    siteOptionList[0];
-                  const selectedLabel = fallbackOption
-                    ? getSiteLabel(fallbackOption)
-                    : t("navbar.allSites");
-
-                  return (
-                    <>
-                      <button
-                        {...getButtonProps({
-                          className:
-                            "inline-flex h-10 min-w-[105px] items-center justify-around rounded-md border border-gray-300 px-1 text-sm hover:cursor-pointer focus:bg-gray-50",
-                        })}
-                      >
-                        <span className="truncate">{selectedLabel}</span>
-                        <i className="material-icons leading-none">
-                          {open ? "arrow_drop_up" : "arrow_drop_down"}
-                        </i>
-                      </button>
-
-                      <div
-                        {...getMenuProps({
-                          className: [
-                            "absolute z-10 mt-12 min-w-[200px] rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap",
-                            "transition-all duration-150",
-                            open
-                              ? "opacity-100 translate-y-0 pointer-events-auto"
-                              : "opacity-0 -translate-y-1 pointer-events-none",
-                            "max-h-80 overflow-y-auto",
-                          ].join(" "),
-                        })}
-                      >
-                        {siteOptionList.map((opt) => {
-                          const active =
-                            opt.value === (selected?.value ?? selectedSite);
-                          return (
-                            <button
-                              key={opt.value}
-                              {...getItemProps(opt, {
-                                className: [
-                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                                  active
-                                    ? "bg-gray-100 text-gray-900 font-medium"
-                                    : "text-gray-800",
-                                ].join(" "),
-                              })}
-                            >
-                              {getSiteLabel(opt)}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                }}
-              </Dropdown>
+                getLabel={getSiteLabelStrict}
+                showUngrouped={true}
+                buttonClassName="inline-flex h-10 min-w-[180px] max-w-[320px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
+                menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap"
+              />
             </>
           ) : (
             <div className="min-w-[160px] rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
@@ -242,77 +183,16 @@ export default function Navbar({
 
                     {/* Site dropdown */}
                     <div className="col-span-1">
-                      <Dropdown
+                      <SiteDropdownGrouped
                         options={siteOptions as any}
                         value={selectedSite}
                         onChange={setSelectedSite}
-                      >
-                        {({
-                          open,
-                          selected,
-                          options,
-                          getButtonProps,
-                          getMenuProps,
-                          getItemProps,
-                        }) => {
-                          const siteOptionList = options as SiteOption[];
-                          const fallbackOption =
-                            selected ??
-                            siteOptionList.find((opt) => opt.value === selectedSite) ??
-                            siteOptionList[0];
-                          const selectedLabel = fallbackOption
-                            ? getSiteLabel(fallbackOption)
-                            : t("navbar.allSites");
-                          return (
-                            <div className="relative inline-block w-full">
-                              <button
-                                {...getButtonProps({
-                                  className:
-                                    "inline-flex h-10 min-w-[105px] items-center justify-between rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50",
-                                })}
-                              >
-                                <span className="truncate">{selectedLabel}</span>
-                                <i className="material-icons leading-none">
-                                  {open ? "arrow_drop_up" : "arrow_drop_down"}
-                                </i>
-                              </button>
-
-                              <div
-                                {...getMenuProps({
-                                  className: [
-                                    "absolute z-50 mt-2 min-w-[200px] whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md",
-                                    "transition-all duration-150",
-                                    open
-                                      ? "opacity-100 translate-y-0 pointer-events-auto"
-                                      : "opacity-0 -translate-y-1 pointer-events-none",
-                                    "max-h-80 overflow-y-auto",
-                                  ].join(" "),
-                                })}
-                              >
-                                {siteOptionList.map((opt) => {
-                                  const active =
-                                    opt.value === (selected?.value ?? selectedSite);
-                                  return (
-                                    <button
-                                      key={opt.value}
-                                      {...getItemProps(opt, {
-                                        className: [
-                                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                                          active
-                                            ? "bg-gray-100 text-gray-900 font-medium"
-                                            : "text-gray-800",
-                                        ].join(" "),
-                                      })}
-                                    >
-                                      {getSiteLabel(opt)}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        }}
-                      </Dropdown>
+                        getLabel={getSiteLabelStrict}
+                        showUngrouped={true}
+                        rootClassName="relative inline-block w-full"
+                        buttonClassName="inline-flex h-10 min-w-[180px] max-w-[320px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
+                        menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md"
+                      />
                     </div>
                   </>
                 ) : (
