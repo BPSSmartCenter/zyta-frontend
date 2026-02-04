@@ -446,7 +446,7 @@ export default function ContentEdit({
                       "h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
                   })}
                 >
-                  <span className="truncate">
+                  <span className="whitespace-nowrap">
                     {selected?.label ?? texts.group.none}
                   </span>
                   <i className="material-icons leading-none">
@@ -456,7 +456,7 @@ export default function ContentEdit({
                 <div
                   {...getMenuProps({
                     className: [
-                      "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto",
+                      "absolute left-0 z-50 mt-1 min-w-full w-max max-w-[92vw] rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto overflow-x-visible",
                       open ? "block" : "hidden",
                     ].join(" "),
                   })}
@@ -471,10 +471,13 @@ export default function ContentEdit({
                       key={opt.value}
                       {...getItemProps(opt, {
                         className:
-                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer whitespace-nowrap",
                       })}
+                      title={opt.label}
                     >
-                      {opt.label}
+                      <span className="block whitespace-nowrap">
+                        {opt.label}
+                      </span>
                     </button>
                   ))}
                 </div>

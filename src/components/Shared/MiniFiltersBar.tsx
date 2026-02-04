@@ -52,7 +52,7 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
         value={selectedSite}
         onChange={onChangeSite}
         showUngrouped={true}
-        buttonClassName="inline-flex h-10 min-w-[180px] max-w-[320px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
+        buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
         menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md"
       />
 

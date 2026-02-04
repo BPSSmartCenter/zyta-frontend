@@ -115,6 +115,7 @@ function DropdownBase({
   });
 
   const getItemProps: RenderCtx["getItemProps"] = (opt, extra) => ({
+    type: "button",
     role: "menuitem",
     "aria-selected": opt.value === currentValue,
     onClick: (e) => {

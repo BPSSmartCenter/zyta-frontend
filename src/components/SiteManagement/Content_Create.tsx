@@ -336,7 +336,7 @@ export default function ContentCreate({
       <div className="flex items-center gap-3 pb-4 border-b">
         <button
           type="button"
-          className="text-gray-500 hover:text-gray-700"
+          className="text-gray-500 hover:text-gray-700 cursor-pointer"
           onClick={onCancel}
         >
           <i className="material-icons-outlined">arrow_back</i>
@@ -445,7 +445,7 @@ export default function ContentCreate({
                       "h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
                   })}
                 >
-                  <span className="truncate">
+                  <span className="whitespace-nowrap">
                     {selected?.label ?? texts.group.none}
                   </span>
                   <i className="material-icons leading-none">
@@ -455,7 +455,7 @@ export default function ContentCreate({
                 <div
                   {...getMenuProps({
                     className: [
-                      "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto",
+                      "absolute left-0 z-50 mt-1 min-w-full w-max max-w-[92vw] rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto overflow-x-visible",
                       open ? "block" : "hidden",
                     ].join(" "),
                   })}
@@ -470,10 +470,13 @@ export default function ContentCreate({
                       key={opt.value}
                       {...getItemProps(opt, {
                         className:
-                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer whitespace-nowrap",
                       })}
+                      title={opt.label}
                     >
-                      {opt.label}
+                      <span className="block whitespace-nowrap">
+                        {opt.label}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -495,7 +498,7 @@ export default function ContentCreate({
               />
               <button
                 type="button"
-                className="h-10 px-3 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
+                className="h-10 px-3 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50 cursor-pointer"
                 onClick={async () => {
                   const trimmed = newGroupName.trim();
                   if (!trimmed) return;
@@ -779,7 +782,7 @@ export default function ContentCreate({
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50"
+            className="px-4 py-2 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50 cursor-pointer disabled:cursor-not-allowed"
             disabled={loading}
           >
             {texts.buttons.cancel}
@@ -787,7 +790,7 @@ export default function ContentCreate({
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 disabled:opacity-60"
+            className="px-5 py-2 rounded-md bg-cyan text-white text-sm font-semibold hover:bg-cyan-400 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? texts.buttons.submitting : texts.buttons.submit}
           </button>
