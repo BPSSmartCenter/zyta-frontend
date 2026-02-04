@@ -6,7 +6,10 @@ import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
 import { StatCardGroup } from "../components/StatCard";
 import StatCard from "../components/StatCard";
-import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
+import {
+  useDeviceInventory,
+  getCountForType,
+} from "../context/DeviceInventoryContext";
 import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import {
   cyanBolt,
@@ -52,7 +55,7 @@ const CARD_CONFIG: CardConfig[] = [
     defaultLabel: "Bill amount this month",
     img: cyanBaht,
     activeImg: whiteBaht,
-    labelClassName: "text-[10px] uppercase tracking-wide",
+    labelClassName: "text-[10px] tracking-wide",
   },
   {
     id: "trend",
@@ -77,8 +80,11 @@ type BillingRow = BillingMonitorRow;
 const BillingOverview: React.FC = () => {
   const { t, i18n } = useTranslation(["billing"]);
   const locale = React.useMemo(
-    () => ((i18n.language || "th").toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
-    [i18n.language]
+    () =>
+      (i18n.language || "th").toLowerCase().startsWith("th")
+        ? "th-TH"
+        : "en-US",
+    [i18n.language],
   );
   const overviewText = React.useMemo(
     () => ({
@@ -87,7 +93,9 @@ const BillingOverview: React.FC = () => {
         defaultValue: "Overall usage and billing data from backend",
       }),
       realtime: {
-        heading: t("overview.realtime.heading", { defaultValue: "Real-Time Monitor" }),
+        heading: t("overview.realtime.heading", {
+          defaultValue: "Real-Time Monitor",
+        }),
         description: t("overview.realtime.description", {
           defaultValue: "Latest readings from gateway",
         }),
@@ -95,11 +103,15 @@ const BillingOverview: React.FC = () => {
           defaultValue: "Search readings...",
         }),
         buttons: {
-          refresh: t("overview.realtime.buttons.refresh", { defaultValue: "Refresh" }),
+          refresh: t("overview.realtime.buttons.refresh", {
+            defaultValue: "Refresh",
+          }),
           generate: t("overview.realtime.buttons.generate", {
             defaultValue: "Generate Bills",
           }),
-          monitor: t("overview.realtime.buttons.monitor", { defaultValue: "Monitor" }),
+          monitor: t("overview.realtime.buttons.monitor", {
+            defaultValue: "Monitor",
+          }),
         },
         table: {
           meter: t("overview.realtime.table.meter", { defaultValue: "Meter" }),
@@ -112,7 +124,9 @@ const BillingOverview: React.FC = () => {
           timestamp: t("overview.realtime.table.timestamp", {
             defaultValue: "Timestamp",
           }),
-          actions: t("overview.realtime.table.actions", { defaultValue: "Actions" }),
+          actions: t("overview.realtime.table.actions", {
+            defaultValue: "Actions",
+          }),
         },
         loading: t("overview.realtime.loading", {
           defaultValue: "Loading data...",
@@ -121,7 +135,9 @@ const BillingOverview: React.FC = () => {
           defaultValue: "No readings match the filters",
         }),
         siteLabel: t("overview.realtime.siteLabel", { defaultValue: "Site" }),
-        defaultDevice: t("overview.realtime.defaultDevice", { defaultValue: "Meter" }),
+        defaultDevice: t("overview.realtime.defaultDevice", {
+          defaultValue: "Meter",
+        }),
         fallbackDeviceName: t("overview.realtime.fallbackMeterName", {
           defaultValue: "Meter {{id}}",
           id: "",
@@ -139,7 +155,9 @@ const BillingOverview: React.FC = () => {
         }),
       },
       billing: {
-        heading: t("overview.billing.heading", { defaultValue: "Billing Records" }),
+        heading: t("overview.billing.heading", {
+          defaultValue: "Billing Records",
+        }),
         description: t("overview.billing.description", {
           defaultValue: "Issued bills with saved documents",
         }),
@@ -151,10 +169,18 @@ const BillingOverview: React.FC = () => {
           billingPeriod: t("overview.billing.table.billingPeriod", {
             defaultValue: "Billing period",
           }),
-          usage: t("overview.billing.table.usage", { defaultValue: "Usage (kWh)" }),
-          cost: t("overview.billing.table.cost", { defaultValue: "Cost (THB)" }),
-          timestamp: t("overview.billing.table.timestamp", { defaultValue: "Timestamp" }),
-          actions: t("overview.billing.table.actions", { defaultValue: "Actions" }),
+          usage: t("overview.billing.table.usage", {
+            defaultValue: "Usage (kWh)",
+          }),
+          cost: t("overview.billing.table.cost", {
+            defaultValue: "Cost (THB)",
+          }),
+          timestamp: t("overview.billing.table.timestamp", {
+            defaultValue: "Timestamp",
+          }),
+          actions: t("overview.billing.table.actions", {
+            defaultValue: "Actions",
+          }),
         },
         loading: t("overview.billing.loading", {
           defaultValue: "Loading bills...",
@@ -163,13 +189,21 @@ const BillingOverview: React.FC = () => {
           defaultValue: "No bills found for this period",
         }),
         buttons: {
-          preview: t("overview.billing.buttons.preview", { defaultValue: "Preview" }),
-          delete: t("overview.billing.buttons.delete", { defaultValue: "Delete" }),
+          preview: t("overview.billing.buttons.preview", {
+            defaultValue: "Preview",
+          }),
+          delete: t("overview.billing.buttons.delete", {
+            defaultValue: "Delete",
+          }),
         },
       },
       trend: {
-        chartTitle: t("overview.trend.chartTitle", { defaultValue: "Monthly Trend Chart" }),
-        tableTitle: t("overview.trend.tableTitle", { defaultValue: "Monthly Trend Table" }),
+        chartTitle: t("overview.trend.chartTitle", {
+          defaultValue: "Monthly Trend Chart",
+        }),
+        tableTitle: t("overview.trend.tableTitle", {
+          defaultValue: "Monthly Trend Table",
+        }),
         tableSubtitle: t("overview.trend.tableSubtitle", {
           defaultValue: "Monthly electricity totals",
         }),
@@ -179,8 +213,12 @@ const BillingOverview: React.FC = () => {
         table: {
           month: t("overview.trend.table.month", { defaultValue: "Month" }),
           cost: t("overview.trend.table.cost", { defaultValue: "Cost (THB)" }),
-          usage: t("overview.trend.table.usage", { defaultValue: "Usage (kWh)" }),
-          timestamp: t("overview.trend.table.timestamp", { defaultValue: "Timestamp" }),
+          usage: t("overview.trend.table.usage", {
+            defaultValue: "Usage (kWh)",
+          }),
+          timestamp: t("overview.trend.table.timestamp", {
+            defaultValue: "Timestamp",
+          }),
         },
         empty: t("overview.trend.table.empty", {
           defaultValue: "No monthly data available",
@@ -192,9 +230,12 @@ const BillingOverview: React.FC = () => {
             defaultValue: "Billing is not available",
           }),
           message: t("overview.siteGuard.blocked.message", {
-            defaultValue: "This site has no compatible devices. Please choose another site.",
+            defaultValue:
+              "This site has no compatible devices. Please choose another site.",
           }),
-          close: t("overview.siteGuard.blocked.close", { defaultValue: "Go back" }),
+          close: t("overview.siteGuard.blocked.close", {
+            defaultValue: "Go back",
+          }),
         },
         permission: {
           title: t("overview.siteGuard.permission.title", {
@@ -204,14 +245,17 @@ const BillingOverview: React.FC = () => {
             defaultValue:
               "The selected site has billing disabled. Please switch to an authorized site.",
           }),
-          close: t("overview.siteGuard.permission.close", { defaultValue: "Go back" }),
+          close: t("overview.siteGuard.permission.close", {
+            defaultValue: "Go back",
+          }),
         },
         select: {
           title: t("overview.siteGuard.select.title", {
             defaultValue: "Please select a site",
           }),
           message: t("overview.siteGuard.select.message", {
-            defaultValue: "Choose a site from the navbar before using billing features.",
+            defaultValue:
+              "Choose a site from the navbar before using billing features.",
           }),
           close: t("overview.siteGuard.select.close", { defaultValue: "OK" }),
         },
@@ -220,22 +264,26 @@ const BillingOverview: React.FC = () => {
         title: t("overview.modals.delete.title", {
           defaultValue: "Delete this bill?",
         }),
-        meterLabel: t("overview.modals.delete.meterLabel", { defaultValue: "Meter:" }),
+        meterLabel: t("overview.modals.delete.meterLabel", {
+          defaultValue: "Meter:",
+        }),
         billingLabel: t("overview.modals.delete.billingLabel", {
           defaultValue: "Billing period:",
         }),
         warning: t("overview.modals.delete.warning", {
           defaultValue: "This action cannot be undone",
         }),
-        confirm: t("overview.modals.delete.confirm", { defaultValue: "Delete bill" }),
+        confirm: t("overview.modals.delete.confirm", {
+          defaultValue: "Delete bill",
+        }),
         cancel: t("overview.modals.delete.cancel", { defaultValue: "Cancel" }),
       },
     }),
-    [t]
+    [t],
   );
   const fallbackDeviceLabel = React.useMemo(
     () => t("overview.realtime.defaultDevice", { defaultValue: "Meter" }),
-    [t]
+    [t],
   );
   const fallbackMeterName = React.useCallback(
     (id: string) =>
@@ -243,7 +291,7 @@ const BillingOverview: React.FC = () => {
         id,
         defaultValue: "Meter {{id}}",
       }),
-    [t]
+    [t],
   );
   const realtimeGatewayError = overviewText.errors.gateway;
   const fetchBillingError = overviewText.errors.fetch;
@@ -260,7 +308,8 @@ const BillingOverview: React.FC = () => {
   } = useFilters();
   const navigate = useNavigate();
   const { abs } = useUserPath();
-  const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
+  const { counts: inventoryCounts, loading: inventoryLoading } =
+    useDeviceInventory();
   const [siteGuardType, setSiteGuardType] = React.useState<
     "none" | "select" | "blocked" | "permission"
   >("none");
@@ -272,7 +321,9 @@ const BillingOverview: React.FC = () => {
   const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
   const [monthlySearch, setMonthlySearch] = React.useState("");
   const [billingSearch, setBillingSearch] = React.useState("");
-  const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<BillingRow | null>(
+    null,
+  );
 
   const normalizedSite = (selectedSite ?? "").trim();
   const requiresSiteSelection = !normalizedSite || normalizedSite === "all";
@@ -297,7 +348,7 @@ const BillingOverview: React.FC = () => {
     refresh,
   } = useBillingOverviewData(
     requiresSiteSelection || blockedByPermission ? null : normalizedSite,
-    fetchBillingError
+    fetchBillingError,
   );
 
   const fetchRealtimeRowsForSite = React.useCallback(
@@ -306,7 +357,7 @@ const BillingOverview: React.FC = () => {
       const deviceItems = normalizeDeviceList(devicesResp, fallbackDeviceLabel);
       if (!deviceItems.length) return [];
       const dashboards = await Promise.allSettled(
-        deviceItems.map((device) => getMeterDashboard(device.id))
+        deviceItems.map((device) => getMeterDashboard(device.id)),
       );
       const rows: RealtimeRow[] = [];
       dashboards.forEach((result) => {
@@ -317,7 +368,7 @@ const BillingOverview: React.FC = () => {
       rows.sort((a, b) => compareTimestampDesc(a.timestamp, b.timestamp));
       return rows;
     },
-    [fallbackDeviceLabel, fallbackMeterName]
+    [fallbackDeviceLabel, fallbackMeterName],
   );
 
   React.useEffect(() => {
@@ -392,7 +443,10 @@ const BillingOverview: React.FC = () => {
     }, 0);
   }, [realtimeRows]);
 
-  const billingRows = React.useMemo(() => billingData?.billingRows ?? [], [billingData]);
+  const billingRows = React.useMemo(
+    () => billingData?.billingRows ?? [],
+    [billingData],
+  );
   const filteredBillingRows = React.useMemo(() => {
     const term = billingSearch.trim().toLowerCase();
     if (!term) return billingRows;
@@ -404,7 +458,10 @@ const BillingOverview: React.FC = () => {
     });
   }, [billingRows, billingSearch]);
 
-  const monthlyList = React.useMemo(() => billingData?.monthlyList ?? [], [billingData]);
+  const monthlyList = React.useMemo(
+    () => billingData?.monthlyList ?? [],
+    [billingData],
+  );
   const filteredMonthlyList = React.useMemo(() => {
     const term = monthlySearch.trim().toLowerCase();
     if (!term) return monthlyList;
@@ -416,7 +473,7 @@ const BillingOverview: React.FC = () => {
     // Calculate total from the actual rows to match the table
     const totalBillingAmount = (billingData?.billingRows ?? []).reduce(
       (sum, row) => sum + (row.billingCost ?? 0),
-      0
+      0,
     );
 
     return CARD_CONFIG.map((card) => {
@@ -442,7 +499,10 @@ const BillingOverview: React.FC = () => {
     });
   }, [billingData, loading, realtimeUsageTotal, t, locale]);
 
-  const electricDeviceCount = getCountForType(inventoryCounts as any, "electricmeter" as any);
+  const electricDeviceCount = getCountForType(
+    inventoryCounts as any,
+    "electricmeter" as any,
+  );
   const noElectricAccess =
     !requiresSiteSelection &&
     normalizedSite !== "all" &&
@@ -466,11 +526,11 @@ const BillingOverview: React.FC = () => {
     (row: RealtimeRow) => {
       if (!row.meterId) return;
       const target = `${abs("/electric/meter")}?meterId=${encodeURIComponent(
-        row.meterId
+        row.meterId,
       )}`;
       navigate(target);
     },
-    [navigate, abs]
+    [navigate, abs],
   );
 
   const handleBillingPreview = React.useCallback(
@@ -486,9 +546,11 @@ const BillingOverview: React.FC = () => {
       if (typeof row.billingPeriodYear === "number") {
         params.set("billingYear", String(row.billingPeriodYear));
       }
-      navigate(`${abs("/electric/generate-bill/preview")}?${params.toString()}`);
+      navigate(
+        `${abs("/electric/generate-bill/preview")}?${params.toString()}`,
+      );
     },
-    [navigate, abs]
+    [navigate, abs],
   );
   const handleDeleteRequest = React.useCallback((row: BillingRow) => {
     if (!row?.id) return;
@@ -506,13 +568,11 @@ const BillingOverview: React.FC = () => {
         })
         .catch((err) => {
           const message =
-            err instanceof Error
-              ? err.message
-              : deleteBillingError;
+            err instanceof Error ? err.message : deleteBillingError;
           alert(message || deleteBillingError);
         });
     },
-    [deleteTarget, refresh, deleteBillingError]
+    [deleteTarget, refresh, deleteBillingError],
   );
   const handleDeleteCancel = React.useCallback(() => {
     setDeleteTarget(null);
@@ -574,7 +634,7 @@ const BillingOverview: React.FC = () => {
                   activeBg="bg-[#1db5ff]"
                   inactiveBg="bg-white"
                   labelClassName={
-                    card.labelClassName ?? "text-[12px] uppercase tracking-wide"
+                    card.labelClassName ?? "text-[12px] tracking-wide"
                   }
                 />
               ))}
@@ -594,7 +654,9 @@ const BillingOverview: React.FC = () => {
                   <h2 className="text-lg font-semibold text-slate-900">
                     {overviewText.realtime.heading}
                   </h2>
-                  <p className="text-sm text-slate-500">{overviewText.realtime.description}</p>
+                  <p className="text-sm text-slate-500">
+                    {overviewText.realtime.description}
+                  </p>
                 </div>
                 <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
                   <div className="md:w-64">
@@ -625,18 +687,31 @@ const BillingOverview: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px] table-fixed">
                   <thead>
-                    <tr className="text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.meter}</th>
-                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.onPeak}</th>
-                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.offPeak}</th>
-                      <th className="px-6 py-3 text-left">{overviewText.realtime.table.timestamp}</th>
-                      <th className="px-6 py-3 text-center">{overviewText.realtime.table.actions}</th>
+                    <tr className="text-xs tracking-wide text-slate-500">
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.realtime.table.meter}
+                      </th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.realtime.table.onPeak}
+                      </th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.realtime.table.offPeak}
+                      </th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.realtime.table.timestamp}
+                      </th>
+                      <th className="px-6 py-3 text-center">
+                        {overviewText.realtime.table.actions}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {realtimeLoading && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
+                        <td
+                          colSpan={5}
+                          className="px-6 py-6 text-center text-sm text-slate-500"
+                        >
                           {overviewText.realtime.loading}
                         </td>
                       </tr>
@@ -644,10 +719,17 @@ const BillingOverview: React.FC = () => {
                     {!realtimeLoading &&
                       filteredRealtimeRows.map((row) => {
                         const onPeakDisplay =
-                          row.onPeak !== null ? formatRealtimeValue(row.onPeak, locale) : "-";
+                          row.onPeak !== null
+                            ? formatRealtimeValue(row.onPeak, locale)
+                            : "-";
                         const offPeakDisplay =
-                          row.offPeak !== null ? formatRealtimeValue(row.offPeak, locale) : "-";
-                        const timestampDisplay = formatRealtimeTimestamp(row.timestamp, locale);
+                          row.offPeak !== null
+                            ? formatRealtimeValue(row.offPeak, locale)
+                            : "-";
+                        const timestampDisplay = formatRealtimeTimestamp(
+                          row.timestamp,
+                          locale,
+                        );
                         return (
                           <tr
                             key={row.meterId}
@@ -655,17 +737,24 @@ const BillingOverview: React.FC = () => {
                           >
                             <td className="px-6 py-4">
                               <div className="flex flex-col">
-                                <span className="font-semibold text-slate-900">{row.meter}</span>
+                                <span className="font-semibold text-slate-900">
+                                  {row.meter}
+                                </span>
                                 <span className="text-xs text-slate-500">
-                                  {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                                  {overviewText.realtime.siteLabel}:{" "}
+                                  {row.site ?? "-"}
                                 </span>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <p className="font-semibold text-slate-900">{onPeakDisplay}</p>
+                              <p className="font-semibold text-slate-900">
+                                {onPeakDisplay}
+                              </p>
                             </td>
                             <td className="px-6 py-4">
-                              <p className="font-semibold text-slate-900">{offPeakDisplay}</p>
+                              <p className="font-semibold text-slate-900">
+                                {offPeakDisplay}
+                              </p>
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-semibold text-slate-900">
@@ -687,7 +776,10 @@ const BillingOverview: React.FC = () => {
                       })}
                     {!realtimeLoading && filteredRealtimeRows.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-6 text-center text-sm text-slate-500">
+                        <td
+                          colSpan={5}
+                          className="px-6 py-6 text-center text-sm text-slate-500"
+                        >
                           {overviewText.realtime.empty}
                         </td>
                       </tr>
@@ -705,7 +797,9 @@ const BillingOverview: React.FC = () => {
                   <h2 className="text-lg font-semibold text-slate-900">
                     {overviewText.billing.heading}
                   </h2>
-                  <p className="text-sm text-slate-500">{overviewText.billing.description}</p>
+                  <p className="text-sm text-slate-500">
+                    {overviewText.billing.description}
+                  </p>
                 </div>
                 <div className="md:w-64">
                   <SearchInput
@@ -719,13 +813,19 @@ const BillingOverview: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px] table-fixed">
                   <thead>
-                    <tr className="text-xs uppercase tracking-wide text-slate-500">
-                      <th className="px-6 py-3 text-left">{overviewText.billing.table.meter}</th>
+                    <tr className="text-xs tracking-wide text-slate-500">
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.billing.table.meter}
+                      </th>
                       <th className="px-6 py-3 text-left">
                         {overviewText.billing.table.billingPeriod}
                       </th>
-                      <th className="px-6 py-3 text-left">{overviewText.billing.table.usage}</th>
-                      <th className="px-6 py-3 text-left">{overviewText.billing.table.cost}</th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.billing.table.usage}
+                      </th>
+                      <th className="px-6 py-3 text-left">
+                        {overviewText.billing.table.cost}
+                      </th>
                       <th className="px-6 py-3 text-left">
                         {overviewText.billing.table.timestamp}
                       </th>
@@ -737,18 +837,27 @@ const BillingOverview: React.FC = () => {
                   <tbody>
                     {loading && !billingData && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
+                        <td
+                          colSpan={6}
+                          className="px-6 py-6 text-center text-sm text-slate-500"
+                        >
                           {overviewText.billing.loading}
                         </td>
                       </tr>
                     )}
                     {filteredBillingRows.map((row) => (
-                      <tr key={row.id} className="border-t border-gray-100 text-sm text-slate-700">
+                      <tr
+                        key={row.id}
+                        className="border-t border-gray-100 text-sm text-slate-700"
+                      >
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
-                            <span className="font-semibold text-slate-900">{row.meter}</span>
+                            <span className="font-semibold text-slate-900">
+                              {row.meter}
+                            </span>
                             <span className="text-xs text-slate-500">
-                              {overviewText.realtime.siteLabel}: {row.site ?? "-"}
+                              {overviewText.realtime.siteLabel}:{" "}
+                              {row.site ?? "-"}
                             </span>
                           </div>
                         </td>
@@ -794,7 +903,10 @@ const BillingOverview: React.FC = () => {
                     ))}
                     {!loading && filteredBillingRows.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-6 text-center text-sm text-slate-500">
+                        <td
+                          colSpan={6}
+                          className="px-6 py-6 text-center text-sm text-slate-500"
+                        >
                           {overviewText.billing.empty}
                         </td>
                       </tr>
@@ -830,7 +942,9 @@ const BillingOverview: React.FC = () => {
                     <h2 className="text-lg font-semibold text-slate-900">
                       {overviewText.trend.tableTitle}
                     </h2>
-                    <p className="text-sm text-slate-500">{overviewText.trend.tableSubtitle}</p>
+                    <p className="text-sm text-slate-500">
+                      {overviewText.trend.tableSubtitle}
+                    </p>
                   </div>
                   <div className="md:w-64">
                     <SearchInput
@@ -844,10 +958,16 @@ const BillingOverview: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[700px] table-fixed">
                     <thead>
-                      <tr className="text-xs uppercase tracking-wide text-slate-500">
-                        <th className="px-6 py-3 text-left">{overviewText.trend.table.month}</th>
-                        <th className="px-6 py-3 text-left">{overviewText.trend.table.cost}</th>
-                        <th className="px-6 py-3 text-left">{overviewText.trend.table.usage}</th>
+                      <tr className="text-xs tracking-wide text-slate-500">
+                        <th className="px-6 py-3 text-left">
+                          {overviewText.trend.table.month}
+                        </th>
+                        <th className="px-6 py-3 text-left">
+                          {overviewText.trend.table.cost}
+                        </th>
+                        <th className="px-6 py-3 text-left">
+                          {overviewText.trend.table.usage}
+                        </th>
                         <th className="px-6 py-3 text-left">
                           {overviewText.trend.table.timestamp}
                         </th>
@@ -855,9 +975,14 @@ const BillingOverview: React.FC = () => {
                     </thead>
                     <tbody>
                       {filteredMonthlyList.map((row) => (
-                        <tr key={row.id} className="border-t border-gray-100 text-sm text-slate-700">
+                        <tr
+                          key={row.id}
+                          className="border-t border-gray-100 text-sm text-slate-700"
+                        >
                           <td className="px-6 py-4">
-                            <span className="font-semibold text-slate-900">{row.month}</span>
+                            <span className="font-semibold text-slate-900">
+                              {row.month}
+                            </span>
                           </td>
                           <td className="px-6 py-4">
                             <span className="font-semibold text-slate-900">
@@ -883,7 +1008,10 @@ const BillingOverview: React.FC = () => {
                       ))}
                       {filteredMonthlyList.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-6 text-center text-sm text-slate-500">
+                          <td
+                            colSpan={4}
+                            className="px-6 py-6 text-center text-sm text-slate-500"
+                          >
                             {overviewText.trend.empty}
                           </td>
                         </tr>
@@ -894,7 +1022,6 @@ const BillingOverview: React.FC = () => {
               </div>
             </div>
           )}
-
         </div>
       </div>
       <Modal
@@ -916,10 +1043,13 @@ const BillingOverview: React.FC = () => {
             <div className="text-sm text-slate-600 space-y-1">
               <p>
                 {overviewText.modal.meterLabel}{" "}
-                <span className="font-semibold">{deleteTarget.meter ?? "-"}</span>
+                <span className="font-semibold">
+                  {deleteTarget.meter ?? "-"}
+                </span>
               </p>
               <p>
-                {overviewText.modal.billingLabel} {formatBillingPeriod(deleteTarget, locale)}
+                {overviewText.modal.billingLabel}{" "}
+                {formatBillingPeriod(deleteTarget, locale)}
               </p>
               <p className="text-red-600">{overviewText.modal.warning}</p>
             </div>
@@ -973,11 +1103,7 @@ function formatCurrency(value: number, locale: string) {
 
 function normalizeDeviceList(payload: any, fallbackName: string) {
   const source =
-    payload?.items ??
-    payload?.data?.items ??
-    payload?.data ??
-    payload ??
-    [];
+    payload?.items ?? payload?.data?.items ?? payload?.data ?? payload ?? [];
   if (!Array.isArray(source)) return [];
   return source
     .map((item) => {
@@ -987,7 +1113,7 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
       const meta = (item?.meta ?? {}) as Record<string, any>;
       const details = (meta.details ?? {}) as Record<string, any>;
       const category = String(
-        meta.deviceCategory ?? meta.device_type ?? item?.category ?? ""
+        meta.deviceCategory ?? meta.device_type ?? item?.category ?? "",
       ).toLowerCase();
       if (category && category !== "meter") return null;
       const fallback =
@@ -996,11 +1122,7 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
           : undefined;
       return {
         id: normalizedId,
-        name:
-          details.name ??
-          item?.name ??
-          fallback ??
-          fallbackName,
+        name: details.name ?? item?.name ?? fallback ?? fallbackName,
         siteName: item?.siteName ?? details.site ?? undefined,
       };
     })
@@ -1009,7 +1131,7 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
 
 function dashboardToRealtimeRow(
   dashboard: MeterDashboard,
-  fallbackMeterName: (id: string) => string
+  fallbackMeterName: (id: string) => string,
 ): RealtimeRow | null {
   if (!dashboard?.device?.id) return null;
   const realtime = dashboard.realtime ?? dashboard.lastReading ?? null;
