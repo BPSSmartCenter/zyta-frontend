@@ -29,6 +29,23 @@ import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 import { FaceRecProvider } from "./context/FaceRecContext";
 import { NotisProvider } from "./context/NotisContext";
 
+const AUTH_BOOT_TIMEOUT_MS = 8000;
+
+async function meWithTimeout(timeoutMs = AUTH_BOOT_TIMEOUT_MS) {
+  return Promise.race([
+    apiMe(),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+  ]);
+}
+
+function AppBootLoading() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-slate-50 text-slate-500 text-sm">
+      Loading...
+    </div>
+  );
+}
+
 function App() {
   console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
   return (
@@ -96,17 +113,23 @@ function App() {
 function LegacyDashboardRedirect() {
   const [to, setTo] = useState<string | null>(null);
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const user = await apiMe();
-        if (user?.id) setTo(`/u/${user.id}/dashboard`);
+        const user = await meWithTimeout();
+        if (!alive) return;
+        if (user && (user as any)?.id) setTo(`/u/${(user as any).id}/dashboard`);
         else setTo("/");
       } catch {
+        if (!alive) return;
         setTo("/");
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, []);
-  if (!to) return null;
+  if (!to) return <AppBootLoading />;
   return <Navigate to={to} replace />;
 }
 
@@ -117,17 +140,23 @@ function LegacyDashboardRedirect() {
 function RootLoginOrDashboard() {
   const [to, setTo] = useState<string | null>(null);
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const user = await apiMe();
-        if (user?.id) setTo(`/u/${user.id}/dashboard`);
+        const user = await meWithTimeout();
+        if (!alive) return;
+        if (user && (user as any)?.id) setTo(`/u/${(user as any).id}/dashboard`);
         else setTo("/");
       } catch {
+        if (!alive) return;
         setTo("/");
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, []);
-  if (!to) return null;
+  if (!to) return <AppBootLoading />;
   if (to === "/") return <Login />;
   return <Navigate to={to} replace />;
 }

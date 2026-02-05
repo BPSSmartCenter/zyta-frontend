@@ -9,7 +9,7 @@ interface LoginPageProps {
     email: string,
     password: string,
     opts?: { remember: boolean }
-  ) => void;
+  ) => void | Promise<void>;
 }
 
 export default function LoginPage({ onSubmit }: LoginPageProps) {
@@ -18,6 +18,7 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
   const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isEmailValid = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -25,10 +26,15 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
   const emailValid = isEmailValid(email);
   const emailInvalid = emailTouched && !emailValid;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailValid) return;
-    onSubmit?.(email, password, { remember });
+    if (!emailValid || submitting) return;
+    try {
+      setSubmitting(true);
+      await onSubmit?.(email, password, { remember });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -143,9 +149,11 @@ export default function LoginPage({ onSubmit }: LoginPageProps) {
           <div className="w-full flex flex-col gap-3 mt-6">
             <button
               className="bg-cyan w-full font-bold text-white px-4 py-2 rounded-sm hover:bg-blue hover:cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
-              disabled={!emailValid}
+              disabled={!emailValid || submitting}
             >
-              {t("actions.signin")}
+              {submitting
+                ? t("actions.signing_in", { defaultValue: "กำลังเข้าสู่ระบบ" })
+                : t("actions.signin")}
             </button>
             <button className="w-full font-bold border-2 border-gray-200 px-4 py-2 rounded-sm hover:bg-gray-300 hover:cursor-pointer">
               {t("actions.signin_google")}

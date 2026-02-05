@@ -142,7 +142,9 @@ export const ElectricMeter: React.FC = () => {
       const siteLabel =
         siteOptions.find((opt) => opt.value === normalizedSite)?.label ??
         "Site";
-      const mapped = items.map((item: any) =>
+      const mapped = items
+        .filter((item: any) => isMeterDevice(item))
+        .map((item: any) =>
         mapDeviceToMeterOption(item, siteLabel)
       );
       setMeterOptions(mapped);
@@ -777,6 +779,17 @@ function mapDeviceToMeterOption(device: any, siteLabel: string): MeterOption {
     billingDueDate: undefined,
     trendDirection: "up",
   };
+}
+
+function isMeterDevice(item: any) {
+  const meta = (item?.meta ?? {}) as Record<string, any>;
+  const category = String(
+    meta.deviceCategory ?? meta.device_type ?? item?.category ?? ""
+  ).toLowerCase();
+  if (category) return category === "meter";
+
+  const model = String(item?.model ?? "").toUpperCase();
+  return model.startsWith("METER:");
 }
 
 function formatDateTime(value: string | Date) {
