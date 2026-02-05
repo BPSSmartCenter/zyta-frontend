@@ -1313,8 +1313,14 @@ const [thermoOne, setThermoOne] = useState<{
       : null;
   const yesterdayMaxValue =
     yesterdaySeriesData && Number.isFinite(yesterdaySeriesData.totalKwh)
-      ? Math.max(1, Number(yesterdaySeriesData.totalKwh))
+      ? Number(yesterdaySeriesData.totalKwh)
       : null;
+  const thermoOneMax = Math.max(
+    1,
+    Number(yesterdayMaxValue ?? 0),
+    Number(lifetimeMaxValue ?? 0),
+    Number(thermoOne.initialValue ?? 0)
+  );
   const sideCardTodayValue =
     overviewTodayValue !== null && overviewTodayValue !== undefined
       ? overviewTodayValue
@@ -1582,12 +1588,7 @@ const [thermoOne, setThermoOne] = useState<{
               <Thermostat
                 key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}-${thermoOne.useLifetimeMax ? 'l' : 'n'}`}
                 initialValue={thermoOne.initialValue}
-                max={
-                  Math.max(
-                    1,
-                    yesterdayMaxValue ?? lifetimeMaxValue ?? thermoOne.initialValue
-                  )
-                }
+                max={thermoOneMax}
                 maxLabel={thermoOne.maxLabel}
                 valueLabel={thermoOne.valueLabel}
               />
