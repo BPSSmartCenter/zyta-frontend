@@ -12,13 +12,13 @@ import {
 } from "../context/DeviceInventoryContext";
 import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import { useUserPath } from "../routes/useUserPath";
-import { getElectricDevices } from "../api/electric";
+import { listSiteDevices } from "../api/devices";
 import { getSiteDetails } from "../api/sites";
 import {
   getMeterDashboard,
   type MeterDashboard,
 } from "../api/meter";
-import { createBill, getBillingReadingsData } from "../api/billing";
+import { getBillingReadingsData } from "../api/billing";
 import Dropdown from "../components/Dropdown";
 import DatePicker, { type DateValue } from "../components/DateInput";
 import { buildBrandingLogoSrc } from "../utils/branding";
@@ -30,6 +30,10 @@ type ManualFormState = {
   ereOffPeak: string;
   baseOnPeak: string;
   baseOffPeak: string;
+  billingDiscountRate: string;
+  billingFtRate: string;
+  billingCo2Factor: string;
+  billingTreeFactor: string;
   billingMonth: string;
   billingYear: string;
 };
@@ -63,6 +67,10 @@ const DEFAULT_FORM_STATE: ManualFormState = {
   ereOffPeak: "",
   baseOnPeak: "",
   baseOffPeak: "",
+  billingDiscountRate: "",
+  billingFtRate: "",
+  billingCo2Factor: "",
+  billingTreeFactor: "",
   billingMonth: "",
   billingYear: "",
 };
@@ -214,7 +222,6 @@ const GenerateBillForm: React.FC = () => {
   const loadMetersErrorText = generateText.messages.loadMeters;
   const loadDashboardErrorText = generateText.messages.loadDashboard;
   const summaryErrorText = generateText.messages.summaryError;
-  const createBillErrorText = generateText.messages.createBillError;
   const selectMeterRequiredText = generateText.messages.selectMeterRequired;
   const selectSiteRequiredText = generateText.messages.selectSiteRequired;
   const meterFallbackLabel = generateText.form.meterFallback;
@@ -277,10 +284,15 @@ const GenerateBillForm: React.FC = () => {
   const [meterDashboardError, setMeterDashboardError] = React.useState<
     string | null
   >(null);
-  const discountPercentLabel =
-    typeof meterDashboard?.cost?.rates?.discountRate === "number"
-      ? `${(meterDashboard.cost.rates.discountRate * 100).toFixed(2)}%`
-      : null;
+  const discountPercentLabel = React.useMemo(() => {
+    if (typeof meterDashboard?.cost?.rates?.discountRate === "number") {
+      return `${(meterDashboard.cost.rates.discountRate * 100).toFixed(2)}%`;
+    }
+    const raw = Number(formState.billingDiscountRate);
+    if (!Number.isFinite(raw)) return null;
+    const normalized = raw > 1 ? raw / 100 : raw;
+    return `${(normalized * 100).toFixed(2)}%`;
+  }, [meterDashboard?.cost?.rates?.discountRate, formState.billingDiscountRate]);
   const lastPrefillIdRef = React.useRef<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const { counts: inventoryCounts, loading: inventoryLoading } =
@@ -427,7 +439,7 @@ const GenerateBillForm: React.FC = () => {
       try {
         const [siteResp, devicesResp] = await Promise.all([
           getSiteDetails(normalizedSite),
-          getElectricDevices(normalizedSite),
+          listSiteDevices(normalizedSite, "electric"),
         ]);
         if (canceled) return;
 
@@ -450,6 +462,37 @@ const GenerateBillForm: React.FC = () => {
               siteData.brandingLogoUrl ?? siteData.brand_logo_url ?? null
             ),
           });
+          const formatRateValue = (value?: number | string | null) => {
+            const numeric = Number(value);
+            return Number.isFinite(numeric) ? numeric.toFixed(4) : "";
+          };
+          setFormState((prev) => ({
+            ...prev,
+            baseOnPeak:
+              prev.baseOnPeak?.trim().length > 0
+                ? prev.baseOnPeak
+                : formatRateValue(siteData.billingOnPeakRate),
+            baseOffPeak:
+              prev.baseOffPeak?.trim().length > 0
+                ? prev.baseOffPeak
+                : formatRateValue(siteData.billingOffPeakRate),
+            billingDiscountRate:
+              prev.billingDiscountRate?.trim().length > 0
+                ? prev.billingDiscountRate
+                : formatRateValue(siteData.billingDiscountRate),
+            billingFtRate:
+              prev.billingFtRate?.trim().length > 0
+                ? prev.billingFtRate
+                : formatRateValue(siteData.billingFtRate),
+            billingCo2Factor:
+              prev.billingCo2Factor?.trim().length > 0
+                ? prev.billingCo2Factor
+                : formatRateValue(siteData.billingCo2Factor),
+            billingTreeFactor:
+              prev.billingTreeFactor?.trim().length > 0
+                ? prev.billingTreeFactor
+                : formatRateValue(siteData.billingTreeFactor),
+          }));
         } else {
           setSiteInfo(null);
         }
@@ -469,7 +512,10 @@ const GenerateBillForm: React.FC = () => {
               meta.deviceCategory ??
               meta.device_type ??
               (item?.category ?? details?.category ?? "");
-            if (!categoryRaw) return true;
+            if (!categoryRaw) {
+              const model = String(item?.model ?? "").toUpperCase();
+              return model.startsWith("METER:");
+            }
             return String(categoryRaw).toLowerCase() === "meter";
           })
           .map((item) => {
@@ -612,6 +658,10 @@ const GenerateBillForm: React.FC = () => {
       meterId: prev.meterId || meterDashboard.device.id,
       baseOnPeak: rateFormatter(meterDashboard.cost?.rates?.baseOnPeak),
       baseOffPeak: rateFormatter(meterDashboard.cost?.rates?.baseOffPeak),
+      billingDiscountRate: rateFormatter(meterDashboard.cost?.rates?.discountRate),
+      billingFtRate: rateFormatter(meterDashboard.cost?.rates?.ftRate),
+      billingCo2Factor: rateFormatter(meterDashboard.cost?.rates?.co2Factor),
+      billingTreeFactor: rateFormatter(meterDashboard.cost?.rates?.treeFactor),
     }));
   }, [meterDashboard]);
 
@@ -789,22 +839,17 @@ const GenerateBillForm: React.FC = () => {
           dailyDate: mode === "daily" ? dailyDate.toISOString() : undefined,
           customLogoDataUrl: customLogoDataUrl ?? undefined,
         };
-        const payload = {
-          ...formState,
-          meterLabel: selectedMeter?.label,
-          meterSerial: selectedMeter?.serial,
-          brandingLogoDataUrl: customLogoDataUrl ?? undefined,
-        };
-        const bill = await createBill(normalizedSite, payload);
-        const billId = bill?.billId;
-        if (!billId) {
-          throw new Error("bill id missing");
-        }
         const params = new URLSearchParams();
-        params.set("billId", billId);
         params.set("mode", mode);
         if (mode === "daily") {
           params.set("dailyDate", dailyDate.toISOString());
+        } else {
+          if (formState.billingMonth) {
+            params.set("billingMonth", formState.billingMonth);
+          }
+          if (formState.billingYear) {
+            params.set("billingYear", formState.billingYear);
+          }
         }
         navigate(
           `${abs("/electric/generate-bill/preview")}?${params.toString()}`,
@@ -827,8 +872,8 @@ const GenerateBillForm: React.FC = () => {
           }
         );
       } catch (err) {
-        console.error("[GenerateBillForm] create bill failed", err);
-        setErrorModalMessage(createBillErrorText);
+        console.error("[GenerateBillForm] preview bill failed", err);
+        setErrorModalMessage(summaryErrorText);
       } finally {
         setSubmitting(false);
       }
@@ -844,7 +889,6 @@ const GenerateBillForm: React.FC = () => {
       siteInfo,
       meterDashboard,
       customLogoDataUrl,
-      createBillErrorText,
       selectMeterRequiredText,
       selectSiteRequiredText,
     ]
@@ -1146,8 +1190,13 @@ const GenerateBillForm: React.FC = () => {
                     value={dateToValue(dailyDate)}
                     max={dateToValue(new Date())}
                     onChange={(next) => {
-                      if (next)
-                        setDailyDate(dateValueToDate(next as DateValue));
+                      if (!next) return;
+                      setDailyDate((prev) => {
+                        const day = next.d ?? prev.getDate();
+                        const daysInMonth = new Date(next.y, next.m, 0).getDate();
+                        const safeDay = Math.min(Math.max(day, 1), daysInMonth);
+                        return new Date(next.y, next.m - 1, safeDay);
+                      });
                     }}
                   />
                   <p className="mt-2 text-xs font-normal text-slate-500">
@@ -1315,6 +1364,15 @@ const GenerateBillForm: React.FC = () => {
                 <span className="text-xs font-normal text-slate-500">
                   {generateText.form.discountRate}: {discountPercentLabel ?? "-"}
                 </span>
+                <span className="text-xs font-normal text-slate-500">
+                  FT: {formatOptionalRate(formState.billingFtRate)} THB/kWh
+                </span>
+                <span className="text-xs font-normal text-slate-500">
+                  CO2: {formatOptionalRate(formState.billingCo2Factor)} kg/kWh
+                </span>
+                <span className="text-xs font-normal text-slate-500">
+                  Tree: {formatOptionalRate(formState.billingTreeFactor)} tree/kWh
+                </span>
               </label>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
@@ -1402,6 +1460,12 @@ function formatDisplayNumber(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatOptionalRate(value?: string) {
+  if (!value || !value.trim()) return "-";
+  const num = Number(value);
+  return Number.isFinite(num) ? num.toFixed(4) : "-";
 }
 
 function formatInputNumber(value: number) {
@@ -1529,6 +1593,3 @@ function dateToValue(date: Date): DateValue {
   };
 }
 
-function dateValueToDate(value: DateValue) {
-  return new Date(value.y, value.m - 1, value.d);
-}

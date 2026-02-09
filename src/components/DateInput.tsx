@@ -50,10 +50,11 @@ export default function DatePicker({
 
   const today = useMemo(() => fromDate(new Date()), []);
   const selected = value;
+  const selectedKey = selected ? `${selected.y}-${selected.m}-${selected.d}` : "";
   const [cursor, setCursor] = useState<Date>(() => toDate(selected ?? today)); // เดือนที่กำลังดู
   useEffect(() => {
     if (selected) setCursor(toDate(selected));
-  }, [selected]);
+  }, [selectedKey]);
 
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -299,3 +300,4 @@ export default function DatePicker({
     </div>
   );
 }
+

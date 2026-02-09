@@ -2,7 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import { getSiteDetails, updateSiteBillingAccess } from "../../api/sites";
-import { registerElectricDevice } from "../../api/electric";
+import { getElectricDevices, registerElectricDevice } from "../../api/electric";
 import {
   registerAirSensorDevice,
   registerCctvDevice,
@@ -72,12 +72,19 @@ function toDeviceEntries(list: any[], type: DeviceTypeKey): DeviceEntry[] {
       (typeof item?.model === "string"
         ? String(item.model).split(":").pop()
         : "-");
+    const statusRaw = String(item?.status ?? "offline").toLowerCase();
+    const normalizedStatus =
+      statusRaw === "online"
+        ? "online"
+        : statusRaw === "maintenance"
+          ? "maintenance"
+          : "offline";
     return {
       id: item?.id ?? `${item?.model ?? "device"}-${idx}`,
       name: details?.name ?? item?.model ?? "-",
       model: item?.model ?? "-",
       serial: serial ? String(serial) : "-",
-      status: item?.status ?? "-",
+      status: normalizedStatus,
       type,
       deviceKey: item?.model ?? "",
       ipAddress: item?.ip_address ?? null,
@@ -98,6 +105,9 @@ type BillingRateState = {
   baseOnPeak: string;
   baseOffPeak: string;
   discountRate: string;
+  ftRate: string;
+  co2Factor: string;
+  treeFactor: string;
 };
 
 function formatRateInput(value?: number | null) {
@@ -214,6 +224,15 @@ export default function ContentDetail({
         discount: t("detail.billing.fields.discount", {
           defaultValue: "Discount rate (%) 0-100",
         }),
+        ftRate: t("detail.billing.fields.ftRate", {
+          defaultValue: "FT rate (THB/kWh)",
+        }),
+        co2Factor: t("detail.billing.fields.co2Factor", {
+          defaultValue: "CO2 factor (kg/kWh)",
+        }),
+        treeFactor: t("detail.billing.fields.treeFactor", {
+          defaultValue: "Tree factor (tree/kWh)",
+        }),
         discountNote: t("detail.billing.discountNote", {
           defaultValue: "Example: discount 30 = 30% off",
         }),
@@ -292,6 +311,15 @@ export default function ContentDetail({
         }),
         discount: t("detail.billing.validation.discount", {
           defaultValue: "Discount rate must be between 0 and 100",
+        }),
+        ftRate: t("detail.billing.validation.ftRate", {
+          defaultValue: "FT rate must be 0 or greater",
+        }),
+        co2Factor: t("detail.billing.validation.co2Factor", {
+          defaultValue: "CO2 factor must be 0 or greater",
+        }),
+        treeFactor: t("detail.billing.validation.treeFactor", {
+          defaultValue: "Tree factor must be 0 or greater",
         }),
         generic: t("detail.billing.validation.generic", {
           defaultValue: "Please complete billing rates",
@@ -383,6 +411,9 @@ export default function ContentDetail({
     baseOnPeak: formatRateInput(site.billingOnPeakRate ?? null),
     baseOffPeak: formatRateInput(site.billingOffPeakRate ?? null),
     discountRate: formatDiscountPercent(site.billingDiscountRate ?? null),
+    ftRate: formatRateInput(site.billingFtRate ?? null),
+    co2Factor: formatRateInput(site.billingCo2Factor ?? null),
+    treeFactor: formatRateInput(site.billingTreeFactor ?? null),
   }));
   const [billingModalOpen, setBillingModalOpen] = React.useState(false);
   const [billingModalMode, setBillingModalMode] = React.useState<"enable" | "edit">(
@@ -467,6 +498,18 @@ export default function ContentDetail({
     siteInfo.billingDiscountRate,
     billingRates.discountRate
   );
+  const electricFtDisplay = formatRateDisplay(
+    siteInfo.billingFtRate,
+    billingRates.ftRate
+  );
+  const electricCo2Display = formatRateDisplay(
+    siteInfo.billingCo2Factor,
+    billingRates.co2Factor
+  );
+  const electricTreeDisplay = formatRateDisplay(
+    siteInfo.billingTreeFactor,
+    billingRates.treeFactor
+  );
 
   const loadDetail = React.useCallback(async () => {
     if (!siteKey) return;
@@ -475,6 +518,10 @@ export default function ContentDetail({
     try {
       const detailPromise = getSiteDetails(siteKey);
       const devicePromises = DEVICE_TYPES.map(async (type) => {
+        if (type === "electric") {
+          const res = await getElectricDevices(siteKey);
+          return [type, toDeviceEntries(flattenItems(res), type)] as const;
+        }
         const res = await listSiteDevices(siteKey, type);
         return [type, toDeviceEntries(flattenItems(res), type)] as const;
       });
@@ -537,6 +584,18 @@ export default function ContentDetail({
             typeof s.billingDiscountRate === "number"
               ? s.billingDiscountRate
               : prev.billingDiscountRate,
+          billingFtRate:
+            typeof s.billingFtRate === "number"
+              ? s.billingFtRate
+              : (prev as any).billingFtRate,
+          billingCo2Factor:
+            typeof s.billingCo2Factor === "number"
+              ? s.billingCo2Factor
+              : (prev as any).billingCo2Factor,
+          billingTreeFactor:
+            typeof s.billingTreeFactor === "number"
+              ? s.billingTreeFactor
+              : (prev as any).billingTreeFactor,
           };
         });
         setBillingPrefs({
@@ -556,6 +615,15 @@ export default function ContentDetail({
           ),
           discountRate: formatDiscountPercent(
             (s as any).billingDiscountRate ?? site.billingDiscountRate ?? null
+          ),
+          ftRate: formatRateInput(
+            (s as any).billingFtRate ?? site.billingFtRate ?? null
+          ),
+          co2Factor: formatRateInput(
+            (s as any).billingCo2Factor ?? site.billingCo2Factor ?? null
+          ),
+          treeFactor: formatRateInput(
+            (s as any).billingTreeFactor ?? site.billingTreeFactor ?? null
           ),
         });
       }
@@ -651,6 +719,9 @@ export default function ContentDetail({
         baseOnPeak: formatRateInput(data.billingOnPeakRate),
         baseOffPeak: formatRateInput(data.billingOffPeakRate),
         discountRate: formatDiscountPercent(data.billingDiscountRate),
+        ftRate: formatRateInput(data.billingFtRate),
+        co2Factor: formatRateInput(data.billingCo2Factor),
+        treeFactor: formatRateInput(data.billingTreeFactor),
       });
       setSiteInfo((prev) => ({
         ...prev,
@@ -659,6 +730,9 @@ export default function ContentDetail({
         billingOnPeakRate: data.billingOnPeakRate,
         billingOffPeakRate: data.billingOffPeakRate,
         billingDiscountRate: data.billingDiscountRate,
+        billingFtRate: data.billingFtRate ?? null,
+        billingCo2Factor: data.billingCo2Factor ?? null,
+        billingTreeFactor: data.billingTreeFactor ?? null,
       }));
     },
     []
@@ -686,12 +760,36 @@ export default function ContentDetail({
           message: texts.billingValidation.discount,
         };
       }
+      const ftRate = Number(source.ftRate);
+      if (!Number.isFinite(ftRate) || ftRate < 0) {
+        return {
+          ok: false,
+          message: texts.billingValidation.ftRate ?? texts.billingValidation.generic,
+        };
+      }
+      const co2Factor = Number(source.co2Factor);
+      if (!Number.isFinite(co2Factor) || co2Factor < 0) {
+        return {
+          ok: false,
+          message: texts.billingValidation.co2Factor ?? texts.billingValidation.generic,
+        };
+      }
+      const treeFactor = Number(source.treeFactor);
+      if (!Number.isFinite(treeFactor) || treeFactor < 0) {
+        return {
+          ok: false,
+          message: texts.billingValidation.treeFactor ?? texts.billingValidation.generic,
+        };
+      }
       return {
         ok: true,
         values: {
           billingOnPeakRate: Number(onPeak.toFixed(4)),
           billingOffPeakRate: Number(offPeak.toFixed(4)),
           billingDiscountRate: Number((discountPercent / 100).toFixed(4)),
+          billingFtRate: Number(ftRate.toFixed(4)),
+          billingCo2Factor: Number(co2Factor.toFixed(4)),
+          billingTreeFactor: Number(treeFactor.toFixed(4)),
         },
       };
     },
@@ -708,6 +806,9 @@ export default function ContentDetail({
       billingOnPeakRate: number;
       billingOffPeakRate: number;
       billingDiscountRate: number;
+      billingFtRate: number;
+      billingCo2Factor: number;
+      billingTreeFactor: number;
     } | null = null;
     if (type === "electric" && next) {
       const validation = validateBillingRates(ratesOverride);
@@ -810,6 +911,9 @@ export default function ContentDetail({
         baseOnPeak: billingRates.baseOnPeak || "",
         baseOffPeak: billingRates.baseOffPeak || "",
         discountRate: billingRates.discountRate || "",
+        ftRate: billingRates.ftRate || "",
+        co2Factor: billingRates.co2Factor || "",
+        treeFactor: billingRates.treeFactor || "",
       });
       setBillingModalOpen(true);
     },
@@ -1197,6 +1301,30 @@ export default function ContentDetail({
                       {electricDiscountDisplay}
                     </div>
                   </div>
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.ftRate}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricFtDisplay}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.co2Factor}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricCo2Display}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-cyan-50 bg-cyan-50/60 p-4">
+                    <div className="text-xs font-semibold text-cyan-800">
+                      {texts.billing.treeFactor}
+                    </div>
+                    <div className="mt-1 text-xl font-bold text-cyan-900">
+                      {electricTreeDisplay}
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1550,6 +1678,7 @@ function DeviceForm({
     [device, t, type]
   );
   const isElectric = type === "electric";
+  const statusDisabled = true;
   const defaultCategory = normalizeElectricCategory(
     extractCategory(device?.model)
   );
@@ -1653,7 +1782,13 @@ function DeviceForm({
           <select
             value={form.status}
             onChange={(e) => handleChange("status", e.target.value)}
-            className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+            disabled={statusDisabled}
+            className={[
+              "w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden",
+              statusDisabled
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                : "bg-white",
+            ].join(" ")}
           >
             {texts.statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -1661,6 +1796,9 @@ function DeviceForm({
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-gray-500">
+            สถานะซิงค์จากอุปกรณ์ และไม่สามารถแก้ไขได้ที่นี่
+          </p>
         </div>
         <div>
           <label className="text-sm font-semibold block mb-2">
@@ -1774,6 +1912,9 @@ type BillingRatesFormProps = {
     baseOn: string;
     baseOff: string;
     discount: string;
+    ftRate: string;
+    co2Factor: string;
+    treeFactor: string;
     discountNote: string;
   };
   onChange: (field: keyof BillingRateState, value: string) => void;
@@ -1787,8 +1928,8 @@ function BillingRatesForm({
   return (
     <div className="mt-4 space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
-        <label className="text-xs font-semibold text-cyan-900">
-          {texts.baseOn}
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.baseOn}</span>
           <input
             type="number"
             min="0"
@@ -1798,8 +1939,8 @@ function BillingRatesForm({
             onChange={(e) => onChange("baseOnPeak", e.target.value)}
           />
         </label>
-        <label className="text-xs font-semibold text-cyan-900">
-          {texts.baseOff}
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.baseOff}</span>
           <input
             type="number"
             min="0"
@@ -1809,8 +1950,8 @@ function BillingRatesForm({
             onChange={(e) => onChange("baseOffPeak", e.target.value)}
           />
         </label>
-        <label className="text-xs font-semibold text-cyan-900">
-          {texts.discount}
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.discount}</span>
           <input
             type="number"
             min="0"
@@ -1819,6 +1960,41 @@ function BillingRatesForm({
             className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
             value={values.discountRate}
             onChange={(e) => onChange("discountRate", e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.ftRate}</span>
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.ftRate}
+            onChange={(e) => onChange("ftRate", e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.co2Factor}</span>
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.co2Factor}
+            onChange={(e) => onChange("co2Factor", e.target.value)}
+          />
+        </label>
+        <label className="flex flex-col text-xs font-semibold text-cyan-900">
+          <span className="min-h-[32px]">{texts.treeFactor}</span>
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            className="mt-1 w-full rounded-xl border border-cyan-100 bg-white p-2 text-sm text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+            value={values.treeFactor}
+            onChange={(e) => onChange("treeFactor", e.target.value)}
           />
         </label>
       </div>

@@ -6,4 +6,7 @@ export type SiteBillingAccess = {
   billingOnPeakRate: number | null;
   billingOffPeakRate: number | null;
   billingDiscountRate: number | null;
+  billingFtRate: number | null;
+  billingCo2Factor: number | null;
+  billingTreeFactor: number | null;
 };

@@ -1,0 +1,157 @@
+﻿[
+    {
+        "timestamp":  "2026-01-01 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  25
+    },
+    {
+        "timestamp":  "2026-01-02 00:00:00",
+        "kWhOnPeak":  12,
+        "kWhOffPeak":  0
+    },
+    {
+        "timestamp":  "2026-01-03 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  19
+    },
+    {
+        "timestamp":  "2026-01-04 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  12
+    },
+    {
+        "timestamp":  "2026-01-05 00:00:00",
+        "kWhOnPeak":  268,
+        "kWhOffPeak":  15
+    },
+    {
+        "timestamp":  "2026-01-06 00:00:00",
+        "kWhOnPeak":  219,
+        "kWhOffPeak":  9
+    },
+    {
+        "timestamp":  "2026-01-07 00:00:00",
+        "kWhOnPeak":  192,
+        "kWhOffPeak":  4
+    },
+    {
+        "timestamp":  "2026-01-08 00:00:00",
+        "kWhOnPeak":  214,
+        "kWhOffPeak":  4
+    },
+    {
+        "timestamp":  "2026-01-09 00:00:00",
+        "kWhOnPeak":  156,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-10 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  113
+    },
+    {
+        "timestamp":  "2026-01-11 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  77
+    },
+    {
+        "timestamp":  "2026-01-12 00:00:00",
+        "kWhOnPeak":  261,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-13 00:00:00",
+        "kWhOnPeak":  216,
+        "kWhOffPeak":  15
+    },
+    {
+        "timestamp":  "2026-01-14 00:00:00",
+        "kWhOnPeak":  178,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-15 00:00:00",
+        "kWhOnPeak":  226,
+        "kWhOffPeak":  13
+    },
+    {
+        "timestamp":  "2026-01-16 00:00:00",
+        "kWhOnPeak":  78,
+        "kWhOffPeak":  3
+    },
+    {
+        "timestamp":  "2026-01-17 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  23
+    },
+    {
+        "timestamp":  "2026-01-18 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  42
+    },
+    {
+        "timestamp":  "2026-01-19 00:00:00",
+        "kWhOnPeak":  251,
+        "kWhOffPeak":  11
+    },
+    {
+        "timestamp":  "2026-01-20 00:00:00",
+        "kWhOnPeak":  241,
+        "kWhOffPeak":  9
+    },
+    {
+        "timestamp":  "2026-01-21 00:00:00",
+        "kWhOnPeak":  260,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-22 00:00:00",
+        "kWhOnPeak":  277,
+        "kWhOffPeak":  13
+    },
+    {
+        "timestamp":  "2026-01-23 00:00:00",
+        "kWhOnPeak":  218,
+        "kWhOffPeak":  9
+    },
+    {
+        "timestamp":  "2026-01-24 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  20
+    },
+    {
+        "timestamp":  "2026-01-25 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  30
+    },
+    {
+        "timestamp":  "2026-01-26 00:00:00",
+        "kWhOnPeak":  287,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-27 00:00:00",
+        "kWhOnPeak":  263,
+        "kWhOffPeak":  14
+    },
+    {
+        "timestamp":  "2026-01-28 00:00:00",
+        "kWhOnPeak":  232,
+        "kWhOffPeak":  7
+    },
+    {
+        "timestamp":  "2026-01-29 00:00:00",
+        "kWhOnPeak":  259,
+        "kWhOffPeak":  12
+    },
+    {
+        "timestamp":  "2026-01-30 00:00:00",
+        "kWhOnPeak":  274,
+        "kWhOffPeak":  12
+    },
+    {
+        "timestamp":  "2026-01-31 00:00:00",
+        "kWhOnPeak":  0,
+        "kWhOffPeak":  22
+    }
+]

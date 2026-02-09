@@ -76,6 +76,18 @@ export type BillDetailPayload = {
   period: { month: number; year: number; label: string };
   totals: { totalKwh: number; onPeakKwh: number; offPeakKwh: number };
   cost: { total: number; onPeak: number; offPeak: number };
+  summary?: {
+    financialSaving: number;
+    ftSaving: number;
+    co2Reduction: number;
+    treeSaving: number;
+    baseOnPeak: number;
+    baseOffPeak: number;
+    discountRate: number;
+    ftRate: number;
+    co2Factor: number;
+    treeFactor: number;
+  };
   rows: Array<{
     label?: string;
     timestamp: string;
@@ -129,6 +141,34 @@ export async function downloadBillExcel(billId: string) {
   const response = await api.get(`/billing/bills/${encodeURIComponent(billId)}/excel`, {
     responseType: "blob",
   });
+  return response.data as Blob;
+}
+
+export type PreviewBillExcelPayload = {
+  meterId: string;
+  billingMode?: "daily" | "monthly";
+  dailyDate?: string;
+  billingMonth?: number | string;
+  billingYear?: number | string;
+  baseOnPeak?: string;
+  baseOffPeak?: string;
+  billingDiscountRate?: string | number;
+  billingFtRate?: string | number;
+  billingCo2Factor?: string | number;
+  billingTreeFactor?: string | number;
+  brandingLogoDataUrl?: string | null;
+  customLogoDataUrl?: string | null;
+};
+
+export async function downloadPreviewBillExcel(
+  siteId: string,
+  payload: PreviewBillExcelPayload
+) {
+  const response = await api.post(
+    `/site/${encodeURIComponent(siteId)}/billing/preview/excel`,
+    payload,
+    { responseType: "blob" }
+  );
   return response.data as Blob;
 }
 

@@ -37,7 +37,7 @@ const Thermostat: React.FC<ThermostatProps> = ({
     valueDisplay
   ) : (
     <>
-      {Math.round(safeValue)}
+      {Math.round(safeValue).toLocaleString()}
       {unit}
     </>
   );

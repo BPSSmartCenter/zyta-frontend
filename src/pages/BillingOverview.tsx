@@ -28,7 +28,7 @@ import {
   type BillingMonitorRow,
   type BillingOverviewPayload,
 } from "../api/billing";
-import { getElectricDevices } from "../api/electric";
+import { listSiteDevices } from "../api/devices";
 import { getMeterDashboard, type MeterDashboard } from "../api/meter";
 import { MonthlyChart } from "../components/Chart";
 
@@ -353,17 +353,30 @@ const BillingOverview: React.FC = () => {
 
   const fetchRealtimeRowsForSite = React.useCallback(
     async (siteCode: string) => {
-      const devicesResp = await getElectricDevices(siteCode);
+      const devicesResp = await listSiteDevices(siteCode, "electric");
       const deviceItems = normalizeDeviceList(devicesResp, fallbackDeviceLabel);
       if (!deviceItems.length) return [];
       const dashboards = await Promise.allSettled(
         deviceItems.map((device) => getMeterDashboard(device.id)),
       );
       const rows: RealtimeRow[] = [];
-      dashboards.forEach((result) => {
-        if (result.status !== "fulfilled") return;
-        const mapped = dashboardToRealtimeRow(result.value, fallbackMeterName);
-        if (mapped) rows.push(mapped);
+      dashboards.forEach((result, index) => {
+        const device = deviceItems[index];
+        if (result.status === "fulfilled") {
+          const mapped = dashboardToRealtimeRow(result.value, fallbackMeterName);
+          if (mapped) {
+            rows.push(mapped);
+            return;
+          }
+        }
+        rows.push({
+          meterId: device.id,
+          meter: device.name ?? fallbackMeterName(device.id),
+          site: device.siteName,
+          onPeak: 0,
+          offPeak: 0,
+          timestamp: null,
+        });
       });
       rows.sort((a, b) => compareTimestampDesc(a.timestamp, b.timestamp));
       return rows;
@@ -1115,7 +1128,12 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
       const category = String(
         meta.deviceCategory ?? meta.device_type ?? item?.category ?? "",
       ).toLowerCase();
-      if (category && category !== "meter") return null;
+      if (category) {
+        if (category !== "meter") return null;
+      } else {
+        const model = String(item?.model ?? "").toUpperCase();
+        if (!model.startsWith("METER:")) return null;
+      }
       const fallback =
         typeof normalizedId === "string"
           ? normalizedId.split(":").pop()

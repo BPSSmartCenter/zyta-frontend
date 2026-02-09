@@ -21,6 +21,9 @@ export type SiteRow = {
   billingOnPeakRate?: number | null;
   billingOffPeakRate?: number | null;
   billingDiscountRate?: number | null;
+  billingFtRate?: number | null;
+  billingCo2Factor?: number | null;
+  billingTreeFactor?: number | null;
   solaredgeSiteId?: string | null;
   solaredgeApiKey?: string | null;
 };

@@ -459,8 +459,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
   // fetched data
 
+  const consumptionLabel = t("devices.electric.cards.consumption", {
+    defaultValue: "Power consumption",
+  });
+  const kwhUnitLabel = t("devices.electric.units.kwh", { defaultValue: "(kWh)" });
+
   // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
-const [thermoOne, setThermoOne] = useState<{
+  const [thermoOne, setThermoOne] = useState<{
     initialValue: number;
     valueLabel: string;
     maxLabel: string;
@@ -469,8 +474,8 @@ const [thermoOne, setThermoOne] = useState<{
     cardKey?: string;
   }>({
     initialValue: 0,
-    valueLabel: t("devices.electric.cards.consumption"),
-    maxLabel: t("devices.electric.units.kwh"),
+    valueLabel: consumptionLabel,
+    maxLabel: kwhUnitLabel,
     useLifetimeMax: false,
     source: "auto",
     cardKey: undefined,
@@ -1218,6 +1223,16 @@ const [thermoOne, setThermoOne] = useState<{
       return { ...prev, initialValue: nextValue };
     });
   }, [metrics.consumptionKwh]);
+
+  React.useEffect(() => {
+    setThermoOne((prev) => {
+      if (prev.source !== "auto") return prev;
+      if (prev.valueLabel === consumptionLabel && prev.maxLabel === kwhUnitLabel) {
+        return prev;
+      }
+      return { ...prev, valueLabel: consumptionLabel, maxLabel: kwhUnitLabel };
+    });
+  }, [consumptionLabel, kwhUnitLabel]);
 
   // Keep card-driven Thermostat in sync with live card values
   React.useEffect(() => {

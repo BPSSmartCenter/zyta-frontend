@@ -36,6 +36,15 @@ export type MeterDashboard = {
       discountedOnPeak: number;
       discountedOffPeak: number;
       discountRate: number;
+      ftRate?: number;
+      co2Factor?: number;
+      treeFactor?: number;
+      configuredBaseOnPeak?: number | null;
+      configuredBaseOffPeak?: number | null;
+      configuredDiscountRate?: number | null;
+      configuredFtRate?: number | null;
+      configuredCo2Factor?: number | null;
+      configuredTreeFactor?: number | null;
     };
   };
   chart: {

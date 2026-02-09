@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import Modal from "../components/Modal";
@@ -15,8 +15,8 @@ import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
 import type { MeterDashboard } from "../api/meter";
 import {
-  createBill,
   downloadBillExcel,
+  downloadPreviewBillExcel,
   getBillDetailApi,
   getBillingReadingsData,
   uploadBillPdf,
@@ -45,6 +45,10 @@ type PreviewFormState = {
   ereOffPeak: string;
   baseOnPeak: string;
   baseOffPeak: string;
+  billingDiscountRate?: string;
+  billingFtRate?: string;
+  billingCo2Factor?: string;
+  billingTreeFactor?: string;
   billingMonth: string;
   billingYear: string;
   billingMode?: BillingMode;
@@ -126,7 +130,6 @@ const BillPdfPreview: React.FC = () => {
     billIdParam
   );
   const lastExcelContextRef = React.useRef<string | null>(null);
-  const [savingBill, setSavingBill] = React.useState(false);
   const [billingReadings, setBillingReadings] =
     React.useState<BillingReadingsPayload | null>(null);
   const [billingReadingsError, setBillingReadingsError] = React.useState<
@@ -415,18 +418,28 @@ const BillPdfPreview: React.FC = () => {
     [displayTableRows]
   );
 
-  const displayRowCount = displayTableRows.length || 1;
-
-  const hasSavedBill = Boolean(currentBillId);
-
   const totalEnergy = tableTotals.production;
   const onPeakKwhValue = tableTotals.onPeak;
   const offPeakKwhValue = tableTotals.offPeak;
   const rateOnPeak = toNumber(formValues.baseOnPeak);
   const rateOffPeak = toNumber(formValues.baseOffPeak);
-  const onPeakCost = onPeakKwhValue * rateOnPeak;
-  const offPeakCost = offPeakKwhValue * rateOffPeak;
+  const discountRateRaw = toNumber(formValues.billingDiscountRate);
+  const discountRate =
+    discountRateRaw > 1 ? discountRateRaw / 100 : discountRateRaw;
+  const discountedOnPeak = rateOnPeak * (1 - discountRate);
+  const discountedOffPeak = rateOffPeak * (1 - discountRate);
+  const onPeakCost = onPeakKwhValue * discountedOnPeak;
+  const offPeakCost = offPeakKwhValue * discountedOffPeak;
   const totalCost = onPeakCost + offPeakCost;
+  const baseTotalCost =
+    onPeakKwhValue * rateOnPeak + offPeakKwhValue * rateOffPeak;
+  const financialSaving = baseTotalCost - totalCost;
+  const ftRate = toNumber(formValues.billingFtRate);
+  const co2Factor = toNumber(formValues.billingCo2Factor);
+  const treeFactor = toNumber(formValues.billingTreeFactor);
+  const ftSaving = totalEnergy * ftRate;
+  const co2Reduction = totalEnergy * co2Factor;
+  const treeSaving = totalEnergy * treeFactor;
 
   const chartSourceRows = React.useMemo(() => {
     if (reportMode !== "daily") {
@@ -558,68 +571,6 @@ const BillPdfPreview: React.FC = () => {
     }
     setPreviewScale(computeAutoPreviewScale(window.innerWidth));
   }, []);
-  const handleSaveBill = React.useCallback(async () => {
-    if (hasSavedBill) return;
-    if (!previewForm) {
-      alert("ไม่พบข้อมูลที่จะบันทึก กรุณากลับไปกรอกฟอร์มใหม่");
-      return;
-    }
-    if (!siteCodeForCreate || siteCodeForCreate === "all") {
-      alert("กรุณาเลือก Site ก่อนบันทึกบิล");
-      return;
-    }
-    const targetMeterId = previewForm.meterId || preview?.meter?.id;
-    if (!targetMeterId) {
-      alert("ไม่พบข้อมูลมิเตอร์สำหรับบันทึกบิล");
-      return;
-    }
-    setSavingBill(true);
-    try {
-      const payload = {
-        meterId: targetMeterId,
-        meterLabel: preview?.meter?.name,
-        meterSerial: preview?.meter?.serial,
-        billingMonth: previewForm.billingMonth,
-        billingYear: previewForm.billingYear,
-        ereOnPeak: previewForm.ereOnPeak,
-        ereOffPeak: previewForm.ereOffPeak,
-        baseOnPeak: previewForm.baseOnPeak,
-        baseOffPeak: previewForm.baseOffPeak,
-      };
-      const bill = await createBill(siteCodeForCreate, payload);
-      const newBillId = bill?.billId;
-      if (!newBillId) throw new Error("missing bill id");
-      setCurrentBillId(newBillId);
-      setHasStoredExcel(false);
-      const params = new URLSearchParams(location.search);
-      params.set("billId", newBillId);
-      const modeValue = previewForm.billingMode ?? "monthly";
-      params.set("mode", modeValue);
-      if (modeValue === "daily") {
-        const dateValue = previewForm.dailyDate ?? dailyDateParam ?? "";
-        if (dateValue) params.set("dailyDate", dateValue);
-      }
-      navigate(`${location.pathname}?${params.toString()}`, {
-        replace: true,
-        state: { preview },
-      });
-    } catch (err) {
-      console.error("[BillPdfPreview] save bill failed", err);
-      alert("ไม่สามารถบันทึกบิลได้ กรุณาลองใหม่อีกครั้ง");
-    } finally {
-      setSavingBill(false);
-    }
-  }, [
-    hasSavedBill,
-    previewForm,
-    siteCodeForCreate,
-    preview,
-    location.search,
-    location.pathname,
-    dailyDateParam,
-    navigate,
-  ]);
-
   const handleBack = React.useCallback(() => {
     if (window.history.length > 1) {
       navigate(-1);
@@ -654,8 +605,33 @@ const BillPdfPreview: React.FC = () => {
     });
   }, []);
 
+  const reportFileBase = React.useMemo(() => {
+    if (reportMode === "daily") {
+      const raw = resolvedDailyDate ?? (formValues.dailyDate as string | undefined);
+      const date = raw ? new Date(raw) : new Date();
+      const formatted = Number.isNaN(date.getTime())
+        ? new Date().toLocaleDateString("th-TH", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })
+        : date.toLocaleDateString("th-TH", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          });
+      return `report เก็บค่าไฟ วันที่ ${formatted}`.replace(/[\\/]/g, "-");
+    }
+    const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+    const ref = new Date(period.year, period.month - 1, 1);
+    const formatted = ref.toLocaleDateString("th-TH", {
+      month: "long",
+      year: "numeric",
+    });
+    return `report เก็บค่าไฟ เดือน ${formatted}`.replace(/[\\/]/g, "-");
+  }, [reportMode, resolvedDailyDate, formValues, monthlyPeriod, billDetail]);
+
   const handleExportPdf = React.useCallback(async () => {
-    if (!currentBillId) return;
     const node = pdfRef.current;
     if (!node) return;
     setExporting(true);
@@ -735,7 +711,8 @@ const BillPdfPreview: React.FC = () => {
         await uploadBillPdf(currentBillId, pdfBase64);
       }
 
-      pdf.save(`bill-${currentBillId}.pdf`);
+      const fileName = `${reportFileBase}.pdf`;
+      pdf.save(fileName);
     } catch (err) {
       console.error("[BillPdfPreview] export pdf failed", err);
       alert("ไม่สามารถสร้างไฟล์ PDF ได้ กรุณาลองใหม่อีกครั้ง");
@@ -761,12 +738,46 @@ const BillPdfPreview: React.FC = () => {
     currentPreviewPage,
     previewPageOptions,
     waitForNextFrame,
+    reportFileBase,
   ]);
 
   const handleDownloadExcel = React.useCallback(async () => {
-    if (!currentBillId) return;
     setDownloadingExcel(true);
     try {
+      if (!currentBillId) {
+        if (!siteCodeForCreate || siteCodeForCreate === "all") {
+          throw new Error("missing site for preview export");
+        }
+        if (!preferredDeviceId) {
+          throw new Error("missing meter for preview export");
+        }
+        const period =
+          reportMode === "monthly"
+            ? monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues)
+            : null;
+        const previewPayload = {
+          meterId: preferredDeviceId,
+          billingMode: reportMode,
+          dailyDate: reportMode === "daily" ? resolvedDailyDate ?? undefined : undefined,
+          billingMonth: period?.month,
+          billingYear: period?.year,
+          baseOnPeak: String(formValues.baseOnPeak ?? ""),
+          baseOffPeak: String(formValues.baseOffPeak ?? ""),
+          billingDiscountRate: formValues.billingDiscountRate,
+          billingFtRate: formValues.billingFtRate,
+          billingCo2Factor: formValues.billingCo2Factor,
+          billingTreeFactor: formValues.billingTreeFactor,
+          brandingLogoDataUrl:
+            preview?.customLogoDataUrl ?? preferredData?.site?.brandingLogoUrl ?? null,
+          customLogoDataUrl: preview?.customLogoDataUrl ?? null,
+        };
+        const blob = await downloadPreviewBillExcel(
+          siteCodeForCreate,
+          previewPayload
+        );
+        saveBlobAsFile(blob, `${reportFileBase}.xlsx`);
+        return;
+      }
       let excelPayload: Parameters<typeof generateBillExcelApi>[1] | undefined;
       if (reportMode === "daily" && resolvedDailyDate) {
         excelPayload = { mode: "daily", dailyDate: resolvedDailyDate };
@@ -790,7 +801,7 @@ const BillPdfPreview: React.FC = () => {
         lastExcelContextRef.current = payloadKey;
       }
       const blob = await downloadBillExcel(currentBillId);
-      saveBlobAsFile(blob, `bill-${currentBillId}.xlsx`);
+      saveBlobAsFile(blob, `${reportFileBase}.xlsx`);
     } catch (err) {
       console.error("[BillPdfPreview] download excel failed", err);
       alert("ไม่สามารถดาวน์โหลดไฟล์ Excel ได้ กรุณาลองใหม่อีกครั้ง");
@@ -799,12 +810,17 @@ const BillPdfPreview: React.FC = () => {
     }
   }, [
     currentBillId,
+    siteCodeForCreate,
+    preferredDeviceId,
+    preferredData?.site?.brandingLogoUrl,
+    preview?.customLogoDataUrl,
     hasStoredExcel,
     reportMode,
     resolvedDailyDate,
     monthlyPeriod,
     billDetail,
     formValues,
+    reportFileBase,
   ]);
 
   const reportDate = React.useMemo(() => {
@@ -856,20 +872,13 @@ const BillPdfPreview: React.FC = () => {
     return values.length ? Math.max(...values, 10) : 10;
   }, [chartPointsData]);
 
-  const primaryButtonLabel = hasSavedBill
-    ? exporting
-      ? "กำลังสร้างไฟล์..."
-      : "ดาวน์โหลด PDF"
-    : savingBill
-    ? "กำลังบันทึก..."
-    : "บันทึก";
-  const primaryButtonDisabled = hasSavedBill
-    ? exporting
-    : savingBill || !previewForm;
-  const primaryButtonHandler = hasSavedBill ? handleExportPdf : handleSaveBill;
+  const primaryButtonLabel = exporting
+    ? "กำลังสร้างไฟล์..."
+    : "ดาวน์โหลด PDF";
+  const primaryButtonDisabled = exporting;
+  const primaryButtonHandler = handleExportPdf;
   const showZoomControls = isMobileViewport;
   const zoomPercentage = Math.round(previewScale * 100);
-
   return (
     <Sidebar>
       <div className="min-h-screen bg-[#e9eef5]">
@@ -1024,8 +1033,14 @@ const BillPdfPreview: React.FC = () => {
                       label="Energy Production (Off Peak)"
                       value={`${formatValue(offPeakKwhValue)} kWh`}
                     />
-                    <SummaryRow label="CO₂ Reduction" value="- kg" />
-                    <SummaryRow label="Tree Saving" value="- Trees" />
+                    <SummaryRow
+                      label="CO2 Reduction"
+                      value={`${formatValue(co2Reduction)} kg`}
+                    />
+                    <SummaryRow
+                      label="Tree Saving"
+                      value={`${formatValue(treeSaving)} Trees`}
+                    />
                   </div>
                   <div className="space-y-1">
                     <SummaryRow
@@ -1040,8 +1055,14 @@ const BillPdfPreview: React.FC = () => {
                       label="Energy Charge (Off Peak)"
                       value={`${formatValue(offPeakCost)} THB`}
                     />
-                    <SummaryRow label="Financial Saving" value="-" />
-                    <SummaryRow label="Financial Saving (FT)" value="-" />
+                    <SummaryRow
+                      label="Financial Saving"
+                      value={`${formatValue(financialSaving)} THB`}
+                    />
+                    <SummaryRow
+                      label="Financial Saving (FT)"
+                      value={`${formatValue(ftSaving)} THB`}
+                    />
                   </div>
                 </div>
 
@@ -1068,17 +1089,14 @@ const BillPdfPreview: React.FC = () => {
                             {reportMode === "monthly" ? "Date" : "Time"}
                           </th>
                           <th className="py-2 px-2 border">
-                            Energy Production (kWh)
+                            Energy Production (<span className="normal-case">kWh</span>)
                           </th>
                           <th className="py-2 px-2 border">
-                            Energy On Peak (kWh)
+                            Energy On Peak (<span className="normal-case">kWh</span>)
                           </th>
                           <th className="py-2 px-2 border">
-                            Energy Off Peak (kWh)
+                            Energy Off Peak (<span className="normal-case">kWh</span>)
                           </th>
-                          <th className="py-2 px-2 border">Irradiance (Wh/m²)</th>
-                          <th className="py-2 px-2 border">Ambient Temp. (°C)</th>
-                          <th className="py-2 px-2 border">Module Temp. (°C)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1101,15 +1119,6 @@ const BillPdfPreview: React.FC = () => {
                             <td className="text-[15px] border">
                               {formatValue(row.energyOffPeak)}
                             </td>
-                            <td className="text-[15px] border">
-                              {formatValue(row.irradiance)}
-                            </td>
-                            <td className="text-[15px] border">
-                              {formatValue(row.ambientTemp)}
-                            </td>
-                            <td className="text-[15px] border">
-                              {formatValue(row.moduleTemp)}
-                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1126,19 +1135,6 @@ const BillPdfPreview: React.FC = () => {
                           </td>
                           <td className="text-[15px] border">
                             {formatValue(displayTableTotals.offPeak)}
-                          </td>
-                          <td className="text-[15px] border">
-                            {formatValue(displayTableTotals.irradiance)}
-                          </td>
-                          <td className="text-[15px] border">
-                            {formatValue(
-                              displayTableTotals.ambient / displayRowCount
-                            )}
-                          </td>
-                          <td className="text-[15px] border">
-                            {formatValue(
-                              displayTableTotals.module / displayRowCount
-                            )}
                           </td>
                         </tr>
                       </tfoot>
@@ -1221,22 +1217,20 @@ const BillPdfPreview: React.FC = () => {
                 >
                   {primaryButtonLabel}
                 </button>
-                {hasSavedBill && (
-                  <button
-                    onClick={handleDownloadExcel}
-                    disabled={downloadingExcel}
-                    className={[
-                      "rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1cb5ff]/30 transition",
-                      downloadingExcel
-                        ? "bg-[#9bdfff] cursor-not-allowed"
-                        : "bg-[#1cb5ff] hover:bg-[#0f9eda] cursor-pointer",
-                    ].join(" ")}
-                  >
-                    {downloadingExcel
-                      ? "กำลังดาวน์โหลด Excel..."
-                      : "ดาวน์โหลด Excel"}
-                  </button>
-                )}
+                <button
+                  onClick={handleDownloadExcel}
+                  disabled={downloadingExcel}
+                  className={[
+                    "rounded-2xl px-8 py-3 text-base font-semibold text-white shadow-lg shadow-[#1cb5ff]/30 transition",
+                    downloadingExcel
+                      ? "bg-[#9bdfff] cursor-not-allowed"
+                      : "bg-[#1cb5ff] hover:bg-[#0f9eda] cursor-pointer",
+                  ].join(" ")}
+                >
+                  {downloadingExcel
+                    ? "กำลังดาวน์โหลด Excel..."
+                    : "ดาวน์โหลด Excel"}
+                </button>
               </div>
             </div>
           </div>
@@ -1258,7 +1252,10 @@ const BillPdfPreview: React.FC = () => {
 export default BillPdfPreview;
 
 function formatValue(value: number) {
-  return Number(value ?? 0).toFixed(2);
+  return Number(value ?? 0).toLocaleString("th-TH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function getPreviewMeterDescription(
