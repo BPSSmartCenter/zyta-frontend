@@ -196,6 +196,7 @@ export const ElectricMeter: React.FC = () => {
     dashboard?.totals.energyUsageKwh ??
     rangeOnPeakValue +
       rangeOffPeakValue;
+  const previousMonthKwh = dashboard?.totals.previousMonthKwh ?? 0;
   const todayBaseKwh =
     dashboard?.realtime?.totalKwh ?? dashboard?.totals.todayKwh ?? 0;
   const realtimeOnPeakValue =
@@ -258,7 +259,7 @@ export const ElectricMeter: React.FC = () => {
     ? `${meterDetailData.siteName} - ${meterDetailData.name}`
     : "กรุณาเลือกมิเตอร์";
   const trendDirection = dashboard
-    ? heroUsageValue >= todayBaseKwh
+    ? heroUsageValue >= previousMonthKwh
       ? "up"
       : "down"
     : "up";

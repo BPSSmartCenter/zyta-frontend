@@ -18,6 +18,7 @@ export type MeterDashboard = {
     todayKwh: number;
     todayOnPeakKwh?: number;
     todayOffPeakKwh?: number;
+    previousMonthKwh?: number;
   };
   realtime?: {
     totalKwh: number;
