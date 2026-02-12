@@ -1,5 +1,5 @@
 // src/components/Devices/Content.tsx
-import { useMemo, useCallback, useState, useEffect } from "react";
+import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
 import StatCard, { StatCardGroup } from "../StatCard";
@@ -213,6 +213,23 @@ export default function Content({ }: Props) {
       return sum + num;
     }, 0);
   }, [inventoryCounts]);
+  const [siteSwitchLoading, setSiteSwitchLoading] = useState<boolean>(false);
+  const lastSiteKeyRef = useRef<string>("");
+  useEffect(() => {
+    const nextKey = String(effectiveSiteCode ?? selectedSite ?? "all");
+    // Show loading only when user switches site/group context, not for background polling.
+    if (lastSiteKeyRef.current !== nextKey) {
+      lastSiteKeyRef.current = nextKey;
+      setSiteSwitchLoading(true);
+    }
+  }, [effectiveSiteCode, selectedSite, lastSiteKeyRef]);
+  useEffect(() => {
+    if (!siteSwitchLoading) return;
+    if (!inventoryLoading) {
+      setSiteSwitchLoading(false);
+    }
+  }, [siteSwitchLoading, inventoryLoading]);
+  const isDeviceInventoryLoading = siteSwitchLoading;
   useEffect(() => {
     // If we are viewing IoT or Caregiver, do NOT block even if internal inventory is empty
     const isExternal = urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
@@ -264,6 +281,7 @@ export default function Content({ }: Props) {
       </nav>
 
       {/* กลุ่มการ์ด: single select */}
+      
       <StatCardGroup
         selectionMode="single"
         activeIds={
@@ -276,34 +294,41 @@ export default function Content({ }: Props) {
         onChange={handleChange}
         className="mt-5"
       >
-        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-          {DEVICE_CARDS.map((c) => {
-            const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
-            // Force count 1 for external types so they serve as "Active" in UI
-            let countVal = 0;
-            if (type === "iot" || type === "caregiver" || type === "digitaltwin") {
-              countVal = 1;
-            } else if (type) {
-              countVal = getCountForType(inventoryCounts as any, type as any);
-            }
-            const typeDisabled = type ? DISABLED_DEVICE_TYPES.has(type) : false;
-            const isExternal = type === "iot" || type === "caregiver" || type === "digitaltwin";
-            const disabled = typeDisabled || !type || (!isExternal && countVal <= 0);
-            return (
-              <li key={c.id}>
-                <StatCard
-                  id={c.id}
-                  variant="boxWithSwitch"
-                  img={c.img}
-                  activeImg={c.activeImg}
-                  label={tDevices(c.label)}
-                  val={countVal}
-                  disabled={disabled}
-                />
-              </li>
-            );
-          })}
-        </ul>
+        <div className="relative">
+          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+            {DEVICE_CARDS.map((c) => {
+              const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
+              // Force count 1 for external types so they serve as "Active" in UI
+              let countVal = 0;
+              if (type === "iot" || type === "caregiver" || type === "digitaltwin") {
+                countVal = 1;
+              } else if (type) {
+                countVal = getCountForType(inventoryCounts as any, type as any);
+              }
+              const typeDisabled = type ? DISABLED_DEVICE_TYPES.has(type) : false;
+              const isExternal = type === "iot" || type === "caregiver" || type === "digitaltwin";
+              const disabled =
+                isDeviceInventoryLoading ||
+                typeDisabled ||
+                !type ||
+                (!isExternal && countVal <= 0);
+              return (
+                <li key={c.id}>
+                  <StatCard
+                    id={c.id}
+                    variant="boxWithSwitch"
+                    img={c.img}
+                    activeImg={c.activeImg}
+                    label={tDevices(c.label)}
+                    val={countVal}
+                    disabled={disabled}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+          
+        </div>
       </StatCardGroup>
 
       {/* Panel/Table ตาม selectedId (คอมโพเนนต์คงตัว ไม่รี-mount จาก key/state) */}
@@ -385,6 +410,17 @@ export default function Content({ }: Props) {
         closeLabel="รับทราบ"
         onClose={() => setBillingDisabledOpen(false)}
       />
+      {isDeviceInventoryLoading && (
+        <div className="fixed inset-0 z-[1000] bg-white/55 backdrop-blur-[2px] flex items-center justify-center">
+          <div className="rounded-2xl border border-cyan-200 bg-white px-6 py-5 shadow-xl flex items-center gap-3 text-cyan-700">
+            <i className="material-icons text-2xl animate-spin">autorenew</i>
+            <span className="text-sm font-semibold">
+              {tDevices("loadingDevices", { defaultValue: "Loading devices..." })}
+            </span>
+          </div>
+        </div>
+      )}
     </>
   );
 }
+

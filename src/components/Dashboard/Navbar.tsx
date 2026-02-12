@@ -6,6 +6,7 @@ import DatePicker from "../../components/DateInput";
 import type { DateValue } from "../../components/DateInput";
 import searchIcon from "../../assets/search.png";
 import { useTranslation } from "react-i18next";
+import type { SelectedGroupSite } from "../../context/FiltersContext";
 
 type Props = {
   searchSite: string;
@@ -13,6 +14,9 @@ type Props = {
   siteOptions: SiteOption[];
   selectedSite: string;
   setSelectedSite: (v: string) => void;
+  selectedGroupSite?: SelectedGroupSite;
+  setSelectedGroupSite?: (group: SelectedGroupSite) => void;
+  enableGroupSiteSelection?: boolean;
   date: DateValue;
   setDate: (v: DateValue) => void;
 };
@@ -29,6 +33,9 @@ export default function Navbar({
   siteOptions,
   selectedSite,
   setSelectedSite,
+  selectedGroupSite = null,
+  setSelectedGroupSite,
+  enableGroupSiteSelection = false,
   date,
   setDate,
 }: Props) {
@@ -125,6 +132,15 @@ export default function Navbar({
                 options={siteOptions as any}
                 value={selectedSite}
                 onChange={setSelectedSite}
+                selectedGroup={selectedGroupSite}
+                onSelectGroup={
+                  enableGroupSiteSelection
+                    ? (group) => {
+                        setSelectedSite("all");
+                        setSelectedGroupSite?.(group);
+                      }
+                    : undefined
+                }
                 getLabel={getSiteLabelStrict}
                 showUngrouped={true}
                 buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
@@ -187,6 +203,15 @@ export default function Navbar({
                         options={siteOptions as any}
                         value={selectedSite}
                         onChange={setSelectedSite}
+                        selectedGroup={selectedGroupSite}
+                        onSelectGroup={
+                          enableGroupSiteSelection
+                            ? (group) => {
+                                setSelectedSite("all");
+                                setSelectedGroupSite?.(group);
+                              }
+                            : undefined
+                        }
                         getLabel={getSiteLabelStrict}
                         showUngrouped={true}
                         rootClassName="relative inline-block w-full"

@@ -56,6 +56,8 @@ type ElectricDeviceOption = {
   label: string;
   sn: string;
   category: DeviceCategory;
+  siteIdOrCode?: string;
+  siteLabel?: string;
   status?: string | null;
 };
 
@@ -68,6 +70,7 @@ const DEVICE_CATEGORY_SET: ReadonlySet<DeviceCategory> = new Set([
 
 const DEFAULT_INVERTER_SN = "7B0C44D5-A0";
 const OVERVIEW_DEVICE_ID = "__OVERVIEW__";
+const UNGROUPED_GROUP_OPTION_ID = "__UNGROUPED_GROUP__";
 const TELEMETRY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 const readSessionJson = <T,>(key: string): T | null => {
@@ -376,7 +379,7 @@ const sanitizeSeries = (arr: number[]) =>
   arr.map((value) => (Number.isFinite(value) ? Math.round(value) : 0));
 
 export default function ElectricMeterPanel({ siteCode }: Props) {
-  const { selectedSite, siteOptions, date: filtersDate } = useFilters();
+  const { selectedSite, selectedGroupSite, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
   const locale = React.useMemo(
     () => (i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
@@ -508,6 +511,58 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const isAllSitesSelected = String(selectedSite || "")
     .trim()
     .toLowerCase() === "all";
+  const isGroupSiteSelected = Boolean(selectedGroupSite?.id);
+  const isGlobalAllOverview = isAllSitesSelected && !isGroupSiteSelected;
+  const siteLabelByCode = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const option of siteOptions || []) {
+      const code = String(option?.value || "").trim();
+      if (!code || code.toLowerCase() === "all") continue;
+      const label = String(option?.label || code).trim() || code;
+      map.set(code, label);
+    }
+    return map;
+  }, [siteOptions]);
+  const groupSiteEntries = React.useMemo(() => {
+    const map = new Map<string, { label: string; siteCodes: string[] }>();
+    const ungrouped: string[] = [];
+    for (const option of siteOptions || []) {
+      const siteCode = String(option?.value || "").trim();
+      if (!siteCode || siteCode.toLowerCase() === "all") continue;
+      const groupIdRaw = String(option?.groupId || "").trim();
+      const groupLabelRaw = String(option?.groupLabel || "").trim();
+      const groupLabel = groupLabelRaw || groupIdRaw;
+      if (!groupLabel) {
+        ungrouped.push(siteCode);
+        continue;
+      }
+      const groupId = groupIdRaw || groupLabel;
+      const key = `${groupId}::${groupLabel}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.siteCodes.push(siteCode);
+      } else {
+        map.set(key, { label: groupLabel, siteCodes: [siteCode] });
+      }
+    }
+    const entries = Array.from(map.entries())
+      .map(([id, item]) => ({
+        id,
+        label: item.label,
+        siteCodes: Array.from(new Set(item.siteCodes)),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, "th"));
+    if (ungrouped.length > 0) {
+      entries.push({
+        id: UNGROUPED_GROUP_OPTION_ID,
+        label: t("devices.electric.groupSelector.ungrouped", {
+          defaultValue: "Ungrouped",
+        }),
+        siteCodes: Array.from(new Set(ungrouped)),
+      });
+    }
+    return entries;
+  }, [siteOptions, t]);
   const allSiteTargets = React.useMemo(() => {
     const values = (siteOptions || [])
       .map((opt) => String(opt?.value || "").trim())
@@ -520,32 +575,72 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       : siteCode && String(siteCode).trim().length > 0
       ? String(siteCode)
       : allSiteTargets[0] || "3078000";
-  const siteTargets = isAllSitesSelected ? allSiteTargets : [siteForApi];
+  const siteTargets = React.useMemo(() => {
+    if (!isAllSitesSelected) return [siteForApi];
+    if (!selectedGroupSite?.id) return allSiteTargets;
+    const selectedGroup = groupSiteEntries.find(
+      (entry) => entry.id === selectedGroupSite.id || entry.label === selectedGroupSite.label
+    );
+    return selectedGroup?.siteCodes ?? allSiteTargets;
+  }, [
+    isAllSitesSelected,
+    siteForApi,
+    selectedGroupSite,
+    allSiteTargets,
+    groupSiteEntries,
+  ]);
   const siteTargetsKey = siteTargets.join("|");
   const fallbackDeviceSn = urlDeviceSN || DEFAULT_INVERTER_SN;
 
   React.useEffect(() => {
-    if (isAllSitesSelected) {
+    if (isGlobalAllOverview || !siteTargets.length) {
       setDeviceOptions([]);
       setSelectedDeviceId(OVERVIEW_DEVICE_ID);
       setDeviceOptionsLoading(false);
       return;
     }
     let cancelled = false;
+    // Immediately reset stale device list while fetching next site's devices.
+    setDeviceOptions([]);
+    setSelectedDeviceId(OVERVIEW_DEVICE_ID);
     setDeviceOptionsLoading(true);
     (async () => {
       try {
-        const res = await getElectricDevices(siteForApi);
-        const items: any[] = Array.isArray((res as any)?.items)
-          ? (res as any).items
-          : Array.isArray((res as any)?.data?.items)
-          ? (res as any).data.items
-          : [];
+        const settled = await runWithConcurrency(siteTargets, 4, async (siteIdOrCode) => {
+          const res = await getElectricDevices(siteIdOrCode);
+          const items: any[] = Array.isArray((res as any)?.items)
+            ? (res as any).items
+            : Array.isArray((res as any)?.data?.items)
+            ? (res as any).data.items
+            : [];
+          return { siteIdOrCode, items };
+        });
         if (cancelled) return;
-        const normalized = normalizeElectricDeviceOptions(items);
+        const normalized = settled
+          .filter(
+            (result): result is PromiseFulfilledResult<{ siteIdOrCode: string; items: any[] }> =>
+              result.status === "fulfilled"
+          )
+          .flatMap((result) => {
+            const siteIdOrCode = result.value.siteIdOrCode;
+            const siteLabel = siteLabelByCode.get(siteIdOrCode) ?? siteIdOrCode;
+            return normalizeElectricDeviceOptions(result.value.items).map((item) => ({
+              ...item,
+              id: `${siteIdOrCode}::${item.id}`,
+              siteIdOrCode,
+              siteLabel,
+            }));
+          });
         const filtered = normalized
           .filter((opt) => opt.category === "INVERTER")
-          .sort((a, b) => a.sn.localeCompare(b.sn, undefined, { numeric: true }));
+          .sort((a, b) => {
+            const bySite = String(a.siteLabel || "").localeCompare(
+              String(b.siteLabel || ""),
+              "th"
+            );
+            if (bySite !== 0) return bySite;
+            return a.sn.localeCompare(b.sn, undefined, { numeric: true });
+          });
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
           if (prev === OVERVIEW_DEVICE_ID) return prev;
@@ -571,25 +666,16 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [siteForApi, urlDeviceSN, isAllSitesSelected]);
+  }, [siteTargetsKey, urlDeviceSN, siteLabelByCode, isGlobalAllOverview]);
 
-  const isOverviewSelected =
-    isAllSitesSelected || selectedDeviceId === OVERVIEW_DEVICE_ID;
+  const isOverviewSelected = selectedDeviceId === OVERVIEW_DEVICE_ID;
 
   const selectedDevice = React.useMemo(() => {
-    if (!selectedDeviceId || isOverviewSelected || isAllSitesSelected) return null;
+    if (!selectedDeviceId || isOverviewSelected) return null;
     return deviceOptions.find((opt) => opt.id === selectedDeviceId) ?? null;
-  }, [deviceOptions, selectedDeviceId, isOverviewSelected, isAllSitesSelected]);
+  }, [deviceOptions, selectedDeviceId, isOverviewSelected]);
 
   const selectedDeviceStatus = (selectedDevice?.status || "").toLowerCase();
-  const offlineDevices = React.useMemo(
-    () =>
-      deviceOptions.filter(
-        (opt) => String(opt.status || "").toLowerCase() === "offline"
-      ),
-    [deviceOptions]
-  );
-  const hasOfflineDevices = offlineDevices.length > 0;
   const deviceStatusById = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const opt of deviceOptions) {
@@ -605,25 +691,31 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       : { dot: "bg-slate-300", text: "text-slate-500", label: "Unknown" };
 
   const deviceSN =
-    isAllSitesSelected || isOverviewSelected
+    isOverviewSelected
       ? OVERVIEW_DEVICE_ID
       : (selectedDevice?.sn || fallbackDeviceSn || DEFAULT_INVERTER_SN).trim() ||
         DEFAULT_INVERTER_SN;
+  const selectedDeviceSiteForApi = selectedDevice?.siteIdOrCode || siteForApi;
   const deviceCategory = "INVERTER";
   const deviceDropdownOptions = React.useMemo(
-    () => [
-      {
-        value: OVERVIEW_DEVICE_ID,
-        label: t("devices.electric.deviceSelector.overview", {
-          defaultValue: "Overview",
-        }),
-      },
-      ...deviceOptions.map((opt, idx) => ({
-        value: opt.id,
-        label: `Inverter ${idx + 1} (${opt.sn})`,
-      })),
-    ],
-    [deviceOptions, t]
+    () => {
+      const overviewLabel = t("devices.electric.deviceSelector.overview", {
+            defaultValue: "Overview",
+          });
+      return [
+        {
+          value: OVERVIEW_DEVICE_ID,
+          label: overviewLabel,
+        },
+        ...deviceOptions.map((opt, idx) => ({
+          value: opt.id,
+          label: isGroupSiteSelected
+            ? `${opt.siteLabel || opt.siteIdOrCode || "-"} (${opt.sn})`
+            : `Inverter ${idx + 1} (${opt.sn})`,
+        })),
+      ];
+    },
+    [deviceOptions, t, isGroupSiteSelected]
   );
 
   React.useEffect(() => {
@@ -663,7 +755,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       const rangeEnd = endOfDay(new Date());
       const rangeStartKey = formatDateTimeForApi(rangeStart).slice(0, 10);
       const rangeEndKey = formatDateTimeForApi(rangeEnd).slice(0, 10);
-      const cacheSiteKey = isAllSitesSelected ? `all:${siteTargetsKey}` : siteForApi;
+      const cacheSiteKey =
+        isAllSitesSelected && isOverviewSelected
+          ? `group:${siteTargetsKey}`
+          : selectedDeviceSiteForApi;
       const cacheKey = `db:telemetry-window:${cacheSiteKey}:${deviceSN}:${rangeStartKey}:${rangeEndKey}`;
       const stickyKey = `db:telemetry-window:sticky:${cacheSiteKey}:${deviceSN}`;
       const cached = readSessionJson<{
@@ -714,7 +809,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const startTime = formatDateTimeForApi(rangeStart);
         const endTime = formatDateTimeForApi(rangeEnd);
         let points: DailyTelemetryPoint[] = [];
-        if (isAllSitesSelected) {
+        if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           if (!targets.length) {
             points = [];
@@ -749,7 +844,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           }
         } else {
           const res = await fetchEquipmentTelemetry({
-            siteIdOrCode: siteForApi,
+            siteIdOrCode: selectedDeviceSiteForApi,
             sn: deviceSN,
             startTime,
             endTime,
@@ -879,7 +974,14 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return () => {
       active = false;
     };
-  }, [siteForApi, deviceSN, deviceCategory, isAllSitesSelected, siteTargetsKey]);
+  }, [
+    deviceSN,
+    deviceCategory,
+    isAllSitesSelected,
+    isOverviewSelected,
+    siteTargetsKey,
+    selectedDeviceSiteForApi,
+  ]);
 
   const todaySeriesData = React.useMemo(
     () => dailySeries.find((item) => item.isToday) ?? null,
@@ -980,7 +1082,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           range,
         });
         let res: any = null;
-        if (isAllSitesSelected) {
+        if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
             fetchEquipmentTelemetry({
@@ -1067,7 +1169,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           res = { data: { summary: aggregatedSummary, telemetries: [] } };
         } else {
           res = await fetchEquipmentTelemetry({
-            siteIdOrCode: siteForApi,
+            siteIdOrCode: selectedDeviceSiteForApi,
             sn: deviceSN,
             startTime: range.from,
             endTime: range.to,
@@ -1163,12 +1265,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     })();
   }, [
     computeRange,
-    siteForApi,
     deviceSN,
     deviceCategory,
     isOverviewSelected,
     isAllSitesSelected,
     siteTargetsKey,
+    selectedDeviceSiteForApi,
   ]);
 
 
@@ -1344,6 +1446,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     overviewMonthValue !== null && overviewMonthValue !== undefined
       ? overviewMonthValue
       : metrics.monthKwh;
+  const selectedGroupLabel = React.useMemo(() => {
+    if (!isAllSitesSelected || !selectedGroupSite?.label) {
+      return t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" });
+    }
+    return selectedGroupSite.label;
+  }, [isAllSitesSelected, selectedGroupSite, t]);
   const hasTemperature = typeof temperatureC === "number" && Number.isFinite(temperatureC);
   const temperatureValue = hasTemperature ? Math.round(Number(temperatureC)) : 0;
   const temperatureDisplay = hasTemperature
@@ -1355,26 +1463,22 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       <div className="grid grid-cols-1 lg-1355:grid-cols-5 gap-3 mt-6">
         <div className="col-span-5 lg-1355:col-span-4 flex flex-col justify-center items-center bg-white rounded-xl gap-10 p-6 w-full">
           <div className="w-full flex flex-col gap-2">
-            {isAllSitesSelected ? (
-              <>
-                <span className="text-sm font-semibold text-gray-600">
-                  {t("devices.electric.deviceSelector.overview", {
+            <span className="text-sm font-semibold text-gray-600">
+              {isGlobalAllOverview
+                ? t("devices.electric.deviceSelector.overview", {
                     defaultValue: "Overview",
-                  })}
-                </span>
-                <p className="text-xs text-gray-500">
-                  {t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" })} ·{" "}
-                  {t("devices.electric.deviceSelector.overviewHint", {
-                    defaultValue: "Site-level overview",
-                  })}
-                </p>
-              </>
-            ) : (
-              <>
-                <span className="text-sm font-semibold text-gray-600">
-                  {t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
-                </span>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  })
+                : t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
+            </span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              {isGlobalAllOverview ? (
+                <>
+                  <p className="text-xs text-gray-500">
+                    {t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" })}
+                  </p>
+                </>
+              ) : (
+                <>
                   <Dropdown
                     options={deviceDropdownOptions}
                     value={selectedDeviceId ?? ""}
@@ -1389,8 +1493,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                       options,
                     }) => {
                       const disabled = options.length === 0;
-                      return (
-                        <div className="relative w-full sm:w-64">
+                  return (
+                    <div className="relative w-full sm:w-[520px]">
                           <button
                             {...getButtonProps({
                               disabled,
@@ -1402,14 +1506,18 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                               ].join(" "),
                             })}
                           >
-                            <span className="truncate whitespace-nowrap">
-                              {selected?.label ??
+                            <span className="whitespace-nowrap">
+                              {deviceOptionsLoading
+                                ? t("devices.electric.loadingDevices", {
+                                    defaultValue: "Loading devices...",
+                                  })
+                                : selected?.label ??
                                 (disabled
                                   ? t("devices.electric.deviceSelector.emptyShort", {
-                                      defaultValue: "ไม่มีอุปกรณ์",
+                                      defaultValue: "No devices",
                                     })
                                   : t("devices.electric.deviceSelector.placeholder", {
-                                      defaultValue: "เลือกอุปกรณ์",
+                                      defaultValue: "Select device",
                                     }))}
                             </span>
                             <i className="material-icons text-base text-current">
@@ -1430,14 +1538,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                                   <button
                                     key={opt.value}
                                     {...getItemProps(opt, {
-                                      className: `w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center justify-between ${
-                                        isOfflineOpt ? "text-rose-600 bg-rose-50" : ""
-                                      }`,
-                                    })}
-                                  >
-                                    <span className="truncate whitespace-nowrap">
-                                      {opt.label}
-                                    </span>
+                                  className: `w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center justify-between ${
+                                    isOfflineOpt ? "text-rose-600 bg-rose-50" : ""
+                                  }`,
+                                })}
+                              >
+                                    <span className="whitespace-nowrap">{opt.label}</span>
                                     {isOfflineOpt ? (
                                       <span className="ml-2 inline-flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse" />
                                     ) : null}
@@ -1457,36 +1563,39 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                     </div>
                   )}
                   {deviceOptionsLoading && (
-                    <span className="text-xs text-gray-500">
-                      {t("devices.electric.loadingDevices", { defaultValue: "กำลังโหลด..." })}
+                    <span className="inline-flex items-center gap-2 text-xs text-cyan font-medium">
+                      <i className="material-icons text-sm animate-spin">autorenew</i>
+                      {t("devices.electric.loadingDevices", {
+                        defaultValue: "Loading devices...",
+                      })}
                     </span>
                   )}
-                  {hasOfflineDevices && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-600">
-                      <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                      Offline {offlineDevices.length}
-                    </span>
-                  )}
-                </div>
-                {isOverviewSelected ? (
-                  <p className="text-xs text-gray-500">
-                    {t("devices.electric.deviceSelector.overviewHint", {
-                      defaultValue: "Site-level overview",
+                </>
+              )}
+            </div>
+            {!isGlobalAllOverview && (isOverviewSelected ? (
+              <p className="text-xs text-gray-500">
+                {isGroupSiteSelected
+                  ? selectedGroupLabel
+                  : siteLabelByCode.get(siteForApi) ?? siteForApi}
+              </p>
+            ) : selectedDevice ? (
+              <p className="text-xs text-gray-500">
+                {selectedDevice.siteLabel ??
+                  siteLabelByCode.get(siteForApi) ??
+                  siteForApi}
+              </p>
+            ) : null)}
+            {!isGlobalAllOverview && !deviceOptionsLoading && deviceOptions.length === 0 && (
+              <p className="text-xs text-red-500">
+                {isGroupSiteSelected
+                  ? t("devices.electric.noDevicesForGroup", {
+                      defaultValue: "No electric devices found in this group",
+                    })
+                  : t("devices.electric.noDevices", {
+                      defaultValue: "No electric devices found for this site",
                     })}
-                  </p>
-                ) : selectedDevice ? (
-                  <p className="text-xs text-gray-500">
-                    {selectedDevice.category} · SN: {selectedDevice.sn}
-                  </p>
-                ) : null}
-                {!deviceOptionsLoading && deviceOptions.length === 0 && (
-                  <p className="text-xs text-red-500">
-                    {t("devices.electric.noDevices", {
-                      defaultValue: "ยังไม่พบอุปกรณ์ไฟฟ้าสำหรับไซต์นี้",
-                    })}
-                  </p>
-                )}
-              </>
+              </p>
             )}
           </div>
           {/* Time Range (Dropdown x2) */}

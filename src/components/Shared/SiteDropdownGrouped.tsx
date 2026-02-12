@@ -19,6 +19,8 @@ type GroupedSiteDropdownProps = {
   menuOffsetClassName?: string;
   rootClassName?: string;
   showUngrouped?: boolean;
+  selectedGroup?: { id: string; label: string } | null;
+  onSelectGroup?: (group: { id: string; label: string }) => void;
 };
 
 type GroupedSite = {
@@ -62,6 +64,8 @@ export default function SiteDropdownGrouped({
   menuOffsetClassName = "",
   rootClassName,
   showUngrouped = false,
+  selectedGroup = null,
+  onSelectGroup,
 }: GroupedSiteDropdownProps) {
   const [activeGroupId, setActiveGroupId] = React.useState<string | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -145,11 +149,15 @@ export default function SiteDropdownGrouped({
           : siteOptionList[0]
           ? displayLabel(siteOptionList[0])
           : "";
+        const buttonLabel =
+          selectedGroup && normalizeKey(value) === "all"
+            ? selectedGroup.label
+            : selectedLabel;
 
         return (
           <>
             <button {...getButtonProps({ className: buttonClassName })}>
-              <span className="whitespace-nowrap">{selectedLabel}</span>
+              <span className="whitespace-nowrap">{buttonLabel}</span>
               <i className="material-icons leading-none">
                 {open ? "arrow_drop_up" : "arrow_drop_down"}
               </i>
@@ -167,6 +175,7 @@ export default function SiteDropdownGrouped({
                   menuOffsetClassName,
                 ].join(" "),
               })}
+              onMouseLeave={() => setActiveGroupId(null)}
             >
               {allOption && (
                 <button
@@ -180,7 +189,13 @@ export default function SiteDropdownGrouped({
               )}
 
               {groups.map((group) => (
-                  <div key={group.id} className="relative">
+                  <div
+                    key={group.id}
+                    className="relative"
+                    onMouseLeave={() =>
+                      setActiveGroupId((prev) => (prev === group.id ? null : prev))
+                    }
+                  >
                     <button
                       type="button"
                       className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer"
@@ -194,7 +209,11 @@ export default function SiteDropdownGrouped({
                       }}
                       onClick={(e) => {
                         e.preventDefault();
-                        setActiveGroupId((prev) => (prev === group.id ? null : group.id));
+                        if (onSelectGroup) {
+                          onSelectGroup({ id: group.id, label: group.label });
+                          return;
+                        }
+                        setActiveGroupId(group.id);
                       }}
                     >
                       <span className="whitespace-nowrap">{group.label}</span>
@@ -215,16 +234,15 @@ export default function SiteDropdownGrouped({
                         submenuSide === "right"
                           ? {
                               left: "100%",
-                              marginLeft: SUBMENU_GAP,
+                              marginLeft: 0,
                               maxWidth: `${submenuMaxWidth}px`,
                             }
                           : {
                               right: "100%",
-                              marginRight: SUBMENU_GAP,
+                              marginRight: 0,
                               maxWidth: `${submenuMaxWidth}px`,
                             }
                       }
-                      onMouseLeave={() => setActiveGroupId(null)}
                     >
                       <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">
                         {group.label}

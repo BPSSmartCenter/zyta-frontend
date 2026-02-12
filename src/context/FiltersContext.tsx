@@ -23,6 +23,11 @@ type BillingPermissionState = {
   allowElectricBilling: boolean | null;
 };
 
+export type SelectedGroupSite = {
+  id: string;
+  label: string;
+} | null;
+
 type FiltersState = {
   date: DateValue;
   setDate: (v: DateValue) => void;
@@ -31,6 +36,8 @@ type FiltersState = {
 
   selectedSite: string;
   setSelectedSite: (v: string) => void;
+  selectedGroupSite: SelectedGroupSite;
+  setSelectedGroupSite: (group: SelectedGroupSite) => void;
 
   siteOptions: SiteOption[];
   setSiteOptions: (opts: SiteOption[]) => void;
@@ -55,6 +62,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const [date, setDateState] = React.useState<DateValue>(defaultToday);
   const [dateTouched, setDateTouched] = React.useState<boolean>(false);
   const [selectedSite, setSelectedSiteState] = React.useState<string>("all");
+  const [selectedGroupSite, setSelectedGroupSiteState] = React.useState<SelectedGroupSite>(null);
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
@@ -169,11 +177,15 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const setSelectedSite = React.useCallback(
     (value: string) => {
       setSelectedSiteState(value);
+      setSelectedGroupSiteState(null);
       storedSiteRef.current = value;
       persistSelectedSite(value);
     },
     [persistSelectedSite]
   );
+  const setSelectedGroupSite = React.useCallback((group: SelectedGroupSite) => {
+    setSelectedGroupSiteState(group);
+  }, []);
 
   const normalizeSiteToOption = React.useCallback((site: any): SiteOption | null => {
     if (!site || typeof site !== "object") return null;
@@ -327,6 +339,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       resetDateTouched,
       selectedSite,
       setSelectedSite,
+      selectedGroupSite,
+      setSelectedGroupSite,
       siteOptions,
       setSiteOptions,
       searchSite,
@@ -339,9 +353,11 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       dateTouched,
       resetDateTouched,
       selectedSite,
+      selectedGroupSite,
       siteOptions,
       searchSite,
       setSelectedSite,
+      setSelectedGroupSite,
       billingGuard,
     ]
   );
