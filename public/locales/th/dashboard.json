@@ -122,7 +122,8 @@
     "sleepDetected": "ตรวจพบการนอนหลับ",
     "fallDetected": "ตรวจพบคนล้ม",
     "faceDetected": "ตรวจพบใบหน้า",
-    "plateDetected": "ตรวจพบเลขทะเบียนรถยนต์"
+    "plateDetected": "ตรวจพบเลขทะเบียนรถยนต์",
+    "electricLowPower": "กำลังไฟต่ำกว่าเกณฑ์"
   },
   "faceNotis": {
     "faceDetected": "ตรวจพบใบหน้า",

@@ -13,6 +13,7 @@
       "searchPlaceholder": "ค้นหารายการ...",
       "buttons": {
         "refresh": "รีเฟรช",
+        "monitoring": "มอนิเตอร์",
         "generate": "สร้างบิล",
         "monitor": "ดูข้อมูล"
       },
@@ -26,6 +27,7 @@
       "loading": "กำลังโหลดข้อมูล...",
       "empty": "ไม่พบข้อมูลสำหรับเงื่อนไขปัจจุบัน",
       "siteLabel": "ไซต์",
+      "buildingLabel": "อาคาร",
       "defaultDevice": "มิเตอร์",
       "fallbackMeterName": "มิเตอร์ {{id}}"
     },
@@ -121,6 +123,11 @@
       "createBillError": "ไม่สามารถสร้างบิลได้ กรุณาลองใหม่",
       "selectMeterRequired": "กรุณาเลือกมิเตอร์ก่อนสร้างบิล",
       "selectSiteRequired": "กรุณาเลือกไซต์ก่อนสร้างบิล"
+    },
+    "meters": {
+      "overallLabel": "สรุปรวมทุกมิเตอร์",
+      "overallDescription": "รวมผลมิเตอร์ทั้งหมดภายในไซต์นี้",
+      "buildingDescription": "รวมผลมิเตอร์ทั้งหมดภายในอาคารนี้"
     },
     "form": {
       "billingType": "ประเภทบิล",

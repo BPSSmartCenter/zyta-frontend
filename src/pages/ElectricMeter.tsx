@@ -1,9 +1,10 @@
-// src/pages/ElectricMeter.tsx
+﻿// src/pages/ElectricMeter.tsx
 import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import type { AxisSeries } from "../types/apexSeries";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
@@ -16,9 +17,11 @@ import Modal from "../components/Modal";
 import { useUserPath } from "../routes/useUserPath";
 import type { MeterOption } from "../types/meter";
 import { getElectricDevices } from "../api/electric";
-import { getMeterDashboard, type MeterDashboard } from "../api/meter";
+import { getMeterDashboard, getSiteMetersDashboard, type MeterDashboard } from "../api/meter";
 import { downloadBillPdf } from "../api/billing";
 import { saveBlobAsFile } from "../utils/download";
+
+const OVERVIEW_METER_ID = "overview";
 
 const C = {
   cardBg: "#05172c",
@@ -38,6 +41,12 @@ const DEFAULT_ENERGY_DATA = [
   580, 620, 560, 610, 640, 670, 690, 620, 580,
 ];
 export const ElectricMeter: React.FC = () => {
+  const { t, i18n } = useTranslation(["electricMeter"]);
+  const locale = React.useMemo(
+    () =>
+      (i18n.language || "th").toLowerCase().startsWith("th") ? "th-TH" : "en-US",
+    [i18n.language]
+  );
   const {
     searchSite,
     setSearchSite,
@@ -55,15 +64,80 @@ export const ElectricMeter: React.FC = () => {
   const meterIdParam = searchParams.get("meterId");
   const [meterOptions, setMeterOptions] = React.useState<MeterOption[]>([]);
   const [selectedMeter, setSelectedMeter] = React.useState<MeterOption | null>(null);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [pickerSearch, setPickerSearch] = React.useState("");
   const [dashboard, setDashboard] = React.useState<MeterDashboard | null>(null);
   const [loadingMeter, setLoadingMeter] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
   const [guardType, setGuardType] = React.useState<"none" | "select" | "blocked">("none");
   const [downloadingHistoryId, setDownloadingHistoryId] = React.useState<string | null>(null);
-  const [rangeLabel, setRangeLabel] = React.useState(() => computeFixedRange().label);
+  const [rangeLabel, setRangeLabel] = React.useState(() =>
+    computeFixedRange({
+      locale,
+      thisMonthLabel: t("range.thisMonth", { defaultValue: "This month" }),
+      lastMonthLabel: t("range.lastMonth", { defaultValue: "Last month" }),
+      toPresentLabel: t("range.toPresent", { defaultValue: "(to present)" }),
+    }).label
+  );
   const navigate = useNavigate();
   const { abs } = useUserPath();
+  const deferredPickerSearch = React.useDeferredValue(pickerSearch);
+  const pickSearchLower = deferredPickerSearch.trim().toLowerCase();
+
+  const filteredMeterPickerOptions = React.useMemo(() => {
+    if (!pickSearchLower) return meterOptions;
+    return meterOptions.filter((opt) => {
+      const buildingTag = (opt.tags ?? []).find((tag) =>
+        String(tag).toLowerCase().startsWith("building:")
+      );
+      const buildingName = buildingTag
+        ? String(buildingTag).slice("building:".length).trim()
+        : "";
+      const haystack = [
+        opt.name,
+        opt.siteName,
+        opt.description ?? "",
+        opt.location ?? "",
+        buildingName,
+        opt.id,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(pickSearchLower);
+    });
+  }, [meterOptions, pickSearchLower]);
+
+  const groupedPickerOptions = React.useMemo(() => {
+    const overview = filteredMeterPickerOptions.filter(
+      (opt) => opt.scope === "overview" || Boolean(opt.isOverall)
+    );
+    const buildings = filteredMeterPickerOptions.filter((opt) => opt.scope === "tag");
+    const meters = filteredMeterPickerOptions.filter(
+      (opt) => !opt.scope || opt.scope === "meter"
+    );
+    return { overview, buildings, meters };
+  }, [filteredMeterPickerOptions]);
+
+  const handlePickMeter = React.useCallback(
+    (opt: MeterOption) => {
+      setSelectedMeter(opt);
+      setPickerOpen(false);
+      setPickerSearch("");
+
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.set("meterId", opt.id);
+      const nextSearch = nextParams.toString();
+      navigate(
+        {
+          pathname: location.pathname,
+          search: nextSearch ? `?${nextSearch}` : "",
+        },
+        { replace: true }
+      );
+    },
+    [location.pathname, location.search, navigate]
+  );
   React.useEffect(() => {
     if (!meterOptions.length) {
       setSelectedMeter(null);
@@ -108,12 +182,37 @@ export const ElectricMeter: React.FC = () => {
     } catch (err) {
       console.error("[ElectricMeter] dashboard failed", err);
       setDashboard(null);
-      setError("ไม่สามารถโหลดข้อมูลมิเตอร์ได้");
+      setError(t("errors.loadMeter", { defaultValue: "Unable to load meter data" }));
     } finally {
       setLoadingMeter(false);
     }
     },
-    []
+    [t]
+  );
+
+  const loadSiteDashboard = React.useCallback(
+    async (
+      siteIdOrCode: string,
+      params?: { startDate?: string; endDate?: string; tag?: string }
+    ) => {
+      setLoadingMeter(true);
+      try {
+        setError(null);
+        const data = await getSiteMetersDashboard(siteIdOrCode, params);
+        setDashboard(data);
+      } catch (err) {
+        console.error("[ElectricMeter] site dashboard failed", err);
+        setDashboard(null);
+        setError(
+          t("errors.loadOverview", {
+            defaultValue: "Unable to load aggregated meter data",
+          })
+        );
+      } finally {
+        setLoadingMeter(false);
+      }
+    },
+    [t]
   );
 
   const handleDownloadHistoryPdf = React.useCallback(async (billId: string) => {
@@ -123,11 +222,11 @@ export const ElectricMeter: React.FC = () => {
       saveBlobAsFile(blob, `bill-${billId}.pdf`);
     } catch (err) {
       console.error("[ElectricMeter] download bill history failed", err);
-      alert("ไม่สามารถดาวน์โหลดไฟล์ PDF สำหรับบิลนี้ได้");
+      alert(t("errors.downloadPdf", { defaultValue: "Unable to download PDF" }));
     } finally {
       setDownloadingHistoryId(null);
     }
-  }, []);
+  }, [t]);
 
   const loadMeterOptions = React.useCallback(async () => {
     if (!normalizedSite || normalizedSite === "all") return;
@@ -145,15 +244,78 @@ export const ElectricMeter: React.FC = () => {
       const mapped = items
         .filter((item: any) => isMeterDevice(item))
         .map((item: any) =>
-        mapDeviceToMeterOption(item, siteLabel)
+        mapDeviceToMeterOption(item, siteLabel, locale)
       );
-      setMeterOptions(mapped);
+      const buildingTags = Array.from(
+        new Set(
+          mapped
+            .flatMap((m) => m.tags ?? [])
+            .filter((tag) => String(tag).toLowerCase().startsWith("building:"))
+        )
+      );
+      const buildingOptions: MeterOption[] = buildingTags.map((tag) => {
+        const metersInTag = mapped.filter((m) => (m.tags ?? []).includes(tag));
+        const status: MeterOption["status"] = metersInTag.some((m) => m.status === "online")
+          ? "online"
+          : metersInTag.some((m) => m.status === "warning")
+          ? "warning"
+          : "offline";
+        const label = tag.replace(/^building:/i, "").trim() || tag;
+        return {
+          id: `tag:${tag}`,
+          name: label,
+          siteName: siteLabel,
+          description: t("picker.meta.building", { name: label, defaultValue: "Building: " + label }),
+          location: "-",
+          status,
+          lastReading: "-",
+          lastSync: "-",
+          todayKwh: 0,
+          scope: "tag",
+          tag,
+          includedMeters: metersInTag.length,
+          billingMonth: new Date().toLocaleString(locale, {
+            month: "long",
+            year: "numeric",
+          }),
+          billingStatus: "pending",
+          billingOutstandingMonth: t("range.lastMonth", { defaultValue: "Last month" }),
+          trendDirection: "up",
+        };
+      });
+      const overallStatus: MeterOption["status"] = mapped.some((m) => m.status === "online")
+        ? "online"
+        : mapped.some((m) => m.status === "warning")
+        ? "warning"
+        : "offline";
+      const overallOption: MeterOption = {
+        id: OVERVIEW_METER_ID,
+        name: t("view.overallLabel", { defaultValue: "All meters summary" }),
+        siteName: siteLabel,
+        description: t("picker.meta.included", {
+          defaultValue: "Includes {{count}} meters",
+          count: mapped.length,
+        }),
+        location: "-",
+        status: overallStatus,
+        lastReading: "-",
+        lastSync: "-",
+        todayKwh: 0,
+        isOverall: true,
+        scope: "overview",
+        includedMeters: mapped.length,
+        billingMonth: new Date().toLocaleString(locale, { month: "long", year: "numeric" }),
+        billingStatus: "pending",
+        billingOutstandingMonth: t("range.lastMonth", { defaultValue: "Last month" }),
+        trendDirection: "up",
+      };
+      setMeterOptions([overallOption, ...buildingOptions, ...mapped]);
     } catch (err) {
       console.error("[ElectricMeter] load meters failed", err);
-      setError("ไม่สามารถโหลดรายการมิเตอร์ได้");
+      setError(t("errors.loadMeters", { defaultValue: "Unable to load meter list" }));
       setMeterOptions([]);
     }
-  }, [normalizedSite, siteOptions]);
+  }, [normalizedSite, siteOptions, locale, t]);
 
   React.useEffect(() => {
     if (requiresSiteSelection) return;
@@ -165,13 +327,24 @@ export const ElectricMeter: React.FC = () => {
       setDashboard(null);
       return;
     }
-    const fixedRange = computeFixedRange();
-    setRangeLabel(fixedRange.label);
-    loadMeterDashboard(selectedMeter.id, {
-      startDate: fixedRange.startIso,
-      endDate: fixedRange.endIso,
+    const fixedRange = computeFixedRange({
+      locale,
+      thisMonthLabel: t("range.thisMonth", { defaultValue: "This month" }),
+      lastMonthLabel: t("range.lastMonth", { defaultValue: "Last month" }),
+      toPresentLabel: t("range.toPresent", { defaultValue: "(to present)" }),
     });
-  }, [selectedMeter, loadMeterDashboard]);
+    setRangeLabel(fixedRange.label);
+    const params = { startDate: fixedRange.startIso, endDate: fixedRange.endIso };
+    if (selectedMeter.scope === "overview" || selectedMeter.isOverall) {
+      loadSiteDashboard(normalizedSite, params);
+      return;
+    }
+    if (selectedMeter.scope === "tag" && selectedMeter.tag) {
+      loadSiteDashboard(normalizedSite, { ...params, tag: selectedMeter.tag });
+      return;
+    }
+    loadMeterDashboard(selectedMeter.id, params);
+  }, [selectedMeter, loadMeterDashboard, loadSiteDashboard, normalizedSite, locale, t]);
 
   const handleSiteGuardClose = React.useCallback(() => {
     setGuardType("none");
@@ -180,14 +353,22 @@ export const ElectricMeter: React.FC = () => {
   const siteGuardConfig =
     guardType === "blocked"
       ? {
-          title: "ไม่สามารถใช้งาน Electric Dashboard ได้",
-          message: "Site นี้ยังไม่มีอุปกรณ์ไฟฟ้าที่รองรับ กรุณาเลือก Site อื่น",
-          closeLabel: "ย้อนกลับ",
+          title: t("guard.blockedTitle", {
+            defaultValue: "Electric Dashboard is not available",
+          }),
+          message: t("guard.blockedMessage", {
+            defaultValue:
+              "This site has no compatible electric meter devices. Please choose another site.",
+          }),
+          closeLabel: t("guard.closeBack", { defaultValue: "Go back" }),
         }
       : {
-          title: "กรุณาเลือก Site ก่อนใช้งาน",
-          message: "โปรดเลือก Site จากเมนูด้านบน (Navbar) เพื่อใช้งานฟีเจอร์ไฟฟ้า",
-          closeLabel: "โอเค",
+          title: t("guard.selectTitle", { defaultValue: "Please select a site" }),
+          message: t("guard.selectMessage", {
+            defaultValue:
+              "Choose a site from the navbar before using electric features.",
+          }),
+          closeLabel: t("guard.closeOk", { defaultValue: "OK" }),
         };
 
   const rangeOnPeakValue = dashboard?.totals.onPeakKwh ?? 0;
@@ -240,7 +421,7 @@ export const ElectricMeter: React.FC = () => {
           })} kWh`
         : selectedMeter.lastReading ?? "-";
     const lastSyncText = dashboard.lastReading
-      ? formatDateTime(dashboard.lastReading.timestamp)
+      ? formatDateTime(dashboard.lastReading.timestamp, locale)
       : selectedMeter.lastSync ?? "-";
     const todayRealtimeValue = dashboard.realtime ? realtimeTotalValue : undefined;
     return {
@@ -257,7 +438,7 @@ export const ElectricMeter: React.FC = () => {
 
   const heroTitle = meterDetailData
     ? `${meterDetailData.siteName} - ${meterDetailData.name}`
-    : "กรุณาเลือกมิเตอร์";
+    : t("view.noSelection", { defaultValue: "Please select a meter" });
   const trendDirection = dashboard
     ? heroUsageValue >= previousMonthKwh
       ? "up"
@@ -312,15 +493,15 @@ export const ElectricMeter: React.FC = () => {
   const energySeries = React.useMemo<AxisSeries>(
     () => [
       {
-        name: "เดือนนี้",
+        name: t("chart.thisMonth", { defaultValue: "This month" }),
         data: currentEnergyData,
       },
       {
-        name: "เดือนที่แล้ว",
+        name: t("chart.lastMonth", { defaultValue: "Last month" }),
         data: lastMonthEnergyData,
       },
     ],
-    [currentEnergyData, lastMonthEnergyData]
+    [currentEnergyData, lastMonthEnergyData, t]
   );
 
   const energyChartOptions = React.useMemo<ApexOptions>(
@@ -397,7 +578,7 @@ export const ElectricMeter: React.FC = () => {
         <div className="mx-auto w-full max-w-[1300px] px-6 pb-16">
           <div className="mt-6 mb-5 flex flex-wrap items-center gap-3">
             <h2 className="text-[20px] font-semibold text-[#0F172A]">
-              Electric Meter Dashboard
+              {t("title", { defaultValue: "Electric Meter Dashboard" })}
             </h2>
             {meterDetailData && (
               <span className="inline-flex items-center rounded-full border border-[#1b3c58] px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-[#1b3c58]">
@@ -413,7 +594,7 @@ export const ElectricMeter: React.FC = () => {
           )}
           {loadingMeter && (
             <div className="mb-4 text-sm text-[#0F172A] opacity-70">
-              กำลังโหลดข้อมูลมิเตอร์...
+              {t("loading.dashboard", { defaultValue: "Loading meter data..." })}
             </div>
           )}
 
@@ -425,7 +606,7 @@ export const ElectricMeter: React.FC = () => {
 
           <MeterDetail
             meter={meterDetailData}
-            onChange={() => navigate(abs("/electric"))}
+            onChange={() => setPickerOpen(true)}
           />
 
           <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -435,7 +616,9 @@ export const ElectricMeter: React.FC = () => {
             >
               <div className="flex flex-col justify-between gap-4">
                 <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
-                  TOTAL ENERGY USAGE
+                  {t("cards.totalEnergyUsage", {
+                    defaultValue: "TOTAL ENERGY USAGE",
+                  })}
                 </div>
                 <div className="flex items-end gap-3">
                   <div
@@ -454,11 +637,13 @@ export const ElectricMeter: React.FC = () => {
                     style={{ color: trendColor }}
                   >
                     {trendArrowIcon}
-                    This Month
+                    {t("cards.thisMonth", { defaultValue: "This Month" })}
                   </span>
-                  <span className="opacity-60">vs</span>
+                  <span className="opacity-60">
+                    {t("cards.vs", { defaultValue: "vs" })}
+                  </span>
                   <span className="opacity-90" style={{ color: C.lastMonth }}>
-                    Last Month
+                    {t("cards.lastMonth", { defaultValue: "Last Month" })}
                   </span>
                 </div>
               </div>
@@ -493,10 +678,10 @@ export const ElectricMeter: React.FC = () => {
             >
               <div className="flex flex-col justify-between gap-3">
                 <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
-                  TOTAL COST
+                  {t("cards.totalCost", { defaultValue: "TOTAL COST" })}
                 </div>
                 <div className="flex items-end gap-3">
-                  <div className="text-[32px]  leading-[1] font-bold">฿</div>
+                  <div className="text-[32px] leading-[1] font-bold">฿</div>
                   <div
                     className="font-semibold leading-[1]"
                     style={{ color: C.num, fontSize: "56px" }}
@@ -513,11 +698,13 @@ export const ElectricMeter: React.FC = () => {
                     style={{ color: trendColor }}
                   >
                     {trendArrowIcon}
-                    This Month
+                    {t("cards.thisMonth", { defaultValue: "This Month" })}
                   </span>
-                  <span className="opacity-60">vs</span>
+                  <span className="opacity-60">
+                    {t("cards.vs", { defaultValue: "vs" })}
+                  </span>
                   <span className="opacity-90" style={{ color: C.lastMonth }}>
-                    Last Month
+                    {t("cards.lastMonth", { defaultValue: "Last Month" })}
                   </span>
                 </div>
               </div>
@@ -561,9 +748,11 @@ export const ElectricMeter: React.FC = () => {
                       className="mt-3 text-[14px] font-semibold uppercase leading-relaxed tracking-wide"
                       style={{ color: C.energyCost }}
                     >
-                      ENERGY COST
+                      {t("cards.energyCost", { defaultValue: "ENERGY COST" })}
                       <br />
-                      EXCEEDED THRESHOLD
+                      {t("cards.exceededThreshold", {
+                        defaultValue: "EXCEEDED THRESHOLD",
+                      })}
                     </p>
                   </div>
                 </div>
@@ -587,7 +776,9 @@ export const ElectricMeter: React.FC = () => {
               <div className="items-center grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1.1fr_1.1fr]">
                 <div className="flex flex-col justify-center gap-3 h-full mb-[50px]">
                   <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
-                    ENERGY USAGE (Realtime)
+                    {t("cards.energyUsageRealtime", {
+                      defaultValue: "ENERGY USAGE (Realtime)",
+                    })}
                   </div>
 
                   <div className="flex items-end gap-3">
@@ -603,10 +794,12 @@ export const ElectricMeter: React.FC = () => {
                   </div>
 
                   <div className="text-sm font-medium text-white/70">
-                    อัปเดตล่าสุด:{" "}
+                    {t("cards.updatedAt", { defaultValue: "Updated:" })}{" "}
                     {realtimeTimestamp
-                      ? formatDateTime(realtimeTimestamp)
-                      : "ยังไม่มีข้อมูลวันนี้"}
+                      ? formatDateTime(realtimeTimestamp, locale)
+                      : t("cards.noDataToday", {
+                          defaultValue: "No data for today yet",
+                        })}
                   </div>
                 </div>
 
@@ -614,7 +807,7 @@ export const ElectricMeter: React.FC = () => {
                 <div className="flex flex-col justify-center gap-4 h-full">
                   <div>
                     <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
-                      ON PEAK (kWh)
+                      {t("cards.onPeak", { defaultValue: "ON PEAK (kWh)" })}
                     </div>
                     <div className="flex items-end gap-3">
                       <div
@@ -630,7 +823,7 @@ export const ElectricMeter: React.FC = () => {
                   </div>
                   <div className="rounded-[16px] bg-gradient-to-r from-[#0c243a] to-[#08192a] p-4 shadow-inner">
                     <p className="text-sm font-semibold text-white/70">
-                      OFF PEAK (kWh)
+                      {t("cards.offPeak", { defaultValue: "OFF PEAK (kWh)" })}
                     </p>
                     <div className="mt-1 flex items-end gap-2">
                       <span
@@ -676,15 +869,19 @@ export const ElectricMeter: React.FC = () => {
                       </svg>
                     </div>
                     <div className="text-center text-[15px] font-semibold uppercase tracking-[0.25em] text-white">
-                      VOLT DISPLAY
+                      {t("cards.voltDisplay", { defaultValue: "VOLT DISPLAY" })}
                     </div>
                     <div className="text-3xl font-semibold" style={{ color: C.num }}>
                       {voltageDisplay}
                     </div>
                     <div className="text-xs text-white/70">
                       {realtimeTimestamp
-                        ? `อัปเดต ${formatDateTime(realtimeTimestamp)}`
-                        : "รอข้อมูลแรงดันจากมิเตอร์"}
+                        ? `${t("cards.updatedAt", {
+                            defaultValue: "Updated:",
+                          })} ${formatDateTime(realtimeTimestamp, locale)}`
+                        : t("cards.awaitVoltage", {
+                            defaultValue: "Waiting for voltage from meter",
+                          })}
                     </div>
                   </div>
                 </div>
@@ -698,7 +895,7 @@ export const ElectricMeter: React.FC = () => {
               style={{ backgroundColor: C.cardBg }}
             >
               <div className="text-[12px] font-semibold tracking-[0.2em] text-white/70">
-                ENERGY USAGE
+                {t("chart.title", { defaultValue: "ENERGY USAGE" })}
               </div>
               <div className="mt-4 rounded-[20px] border border-[#14334d] bg-gradient-to-b from-[#071f35] to-[#051627] px-2 py-3">
                 <ReactApexChart
@@ -713,7 +910,7 @@ export const ElectricMeter: React.FC = () => {
 
           <div className="mt-10">
             <h3 className="mb-3 text-[16px] font-semibold text-[#0F172A]">
-              Billing History
+              {t("history.title", { defaultValue: "Billing History" })}
             </h3>
             <BillingHistoryTable
               rows={dashboard?.billingHistory ?? []}
@@ -734,15 +931,183 @@ export const ElectricMeter: React.FC = () => {
       closeLabel={siteGuardConfig.closeLabel}
       onClose={handleSiteGuardClose}
     />
+    <Modal
+      open={pickerOpen}
+      id="electric-meter-picker"
+      hideIcon={true}
+      title={t("picker.title", { defaultValue: "Select meter view" })}
+      message={
+        <div className="mt-4 text-left">
+          <input
+            type="text"
+            value={pickerSearch}
+            onChange={(e) => setPickerSearch(e.target.value)}
+            placeholder={t("picker.searchPlaceholder", {
+              defaultValue: "Search meters or buildings...",
+            })}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-200"
+          />
+          <div className="mt-4 max-h-[360px] overflow-y-auto rounded-xl border border-slate-100">
+            <PickerSection
+              title={t("picker.sections.overview", { defaultValue: "Overview" })}
+              items={groupedPickerOptions.overview}
+              selectedId={selectedMeter?.id ?? null}
+              onSelect={handlePickMeter}
+            />
+            <PickerSection
+              title={t("picker.sections.buildings", {
+                defaultValue: "Buildings (tags)",
+              })}
+              items={groupedPickerOptions.buildings}
+              selectedId={selectedMeter?.id ?? null}
+              onSelect={handlePickMeter}
+            />
+            <PickerSection
+              title={t("picker.sections.meters", { defaultValue: "Meters" })}
+              items={groupedPickerOptions.meters}
+              selectedId={selectedMeter?.id ?? null}
+              onSelect={handlePickMeter}
+            />
+            {filteredMeterPickerOptions.length === 0 && (
+              <div className="px-4 py-3 text-sm text-slate-500">
+                {t("picker.empty", { defaultValue: "No results" })}
+              </div>
+            )}
+          </div>
+        </div>
+      }
+      closeLabel={t("picker.close", { defaultValue: "Close" })}
+      onClose={() => {
+        setPickerOpen(false);
+        setPickerSearch("");
+      }}
+    />
   </>
   );
 };
 
 export default ElectricMeter;
 
-function mapDeviceToMeterOption(device: any, siteLabel: string): MeterOption {
+function PickerSection({
+  title,
+  items,
+  selectedId,
+  onSelect,
+}: {
+  title: string;
+  items: MeterOption[];
+  selectedId: string | null;
+  onSelect: (opt: MeterOption) => void;
+}) {
+  const { t } = useTranslation(["electricMeter"]);
+  const DEFAULT_LIMIT = 60;
+  const [limit, setLimit] = React.useState(DEFAULT_LIMIT);
+
+  React.useEffect(() => {
+    setLimit(DEFAULT_LIMIT);
+  }, [items]);
+
+  if (!items.length) return null;
+  const visibleItems = items.slice(0, limit);
+  const hasMore = items.length > visibleItems.length;
+  return (
+    <div className="border-b border-slate-100 last:border-b-0">
+      <div className="sticky top-0 z-10 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {title} ({items.length.toLocaleString()})
+      </div>
+      <div className="py-1">
+        {visibleItems.map((opt) => {
+          const active = Boolean(selectedId && opt.id === selectedId);
+          const buildingTag = (opt.tags ?? []).find((tag) =>
+            String(tag).toLowerCase().startsWith("building:")
+          );
+          const buildingName = buildingTag
+            ? String(buildingTag).slice("building:".length).trim()
+            : null;
+          const subtitle =
+            opt.scope === "overview" || opt.isOverall
+              ? t("picker.meta.included", {
+                  count: opt.includedMeters ?? 0,
+                  defaultValue: `Includes ${opt.includedMeters ?? 0} meters`,
+                })
+              : opt.scope === "tag"
+              ? t("picker.meta.included", {
+                  count: opt.includedMeters ?? 0,
+                  defaultValue: `Includes ${opt.includedMeters ?? 0} meters`,
+                })
+              : buildingName
+              ? t("picker.meta.building", {
+                  name: buildingName,
+                  defaultValue: `Building: ${buildingName}`,
+                })
+              : opt.description || opt.location || "";
+          const dot =
+            opt.status === "online"
+              ? "bg-emerald-500"
+              : opt.status === "warning"
+              ? "bg-amber-500"
+              : "bg-rose-500";
+
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onSelect(opt)}
+              className={[
+                "flex w-full items-start justify-between gap-3 px-4 py-2 text-left hover:bg-slate-50 cursor-pointer",
+                active ? "bg-cyan-50" : "",
+              ].join(" ")}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm font-semibold text-slate-900">
+                    {opt.scope === "overview" || opt.isOverall
+                      ? t("view.overallLabel", {
+                          defaultValue: "All meters summary",
+                        })
+                      : opt.scope === "tag"
+                      ? t("view.buildingPrefix", {
+                          name: opt.name,
+                          defaultValue: `Building: ${opt.name}`,
+                        })
+                      : opt.name}
+                  </span>
+                  {active && (
+                    <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {t("view.selectedBadge", { defaultValue: "Selected" })}
+                    </span>
+                  )}
+                </div>
+                {subtitle ? (
+                  <div className="truncate text-xs text-slate-500">
+                    {subtitle}
+                  </div>
+                ) : null}
+              </div>
+              <span className="mt-1 inline-flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+              </span>
+            </button>
+          );
+        })}
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setLimit((prev) => prev + 80)}
+            className="w-full px-4 py-2 text-left text-sm font-semibold text-cyan-700 hover:bg-cyan-50 cursor-pointer"
+          >
+            {t("picker.showMore", { defaultValue: "Show more" })}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function mapDeviceToMeterOption(device: any, siteLabel: string, locale: string): MeterOption {
   const meta = (device?.meta ?? {}) as Record<string, any>;
   const details = (meta?.details ?? {}) as Record<string, any>;
+  const tags = Array.isArray(meta?.tags) ? meta.tags.map((t: any) => String(t)) : [];
   const statusRaw = String(device?.status ?? "offline").toLowerCase();
   const status: MeterOption["status"] =
     statusRaw === "online"
@@ -762,21 +1127,23 @@ function mapDeviceToMeterOption(device: any, siteLabel: string): MeterOption {
         : "Meter"),
     siteName: siteLabel,
     isOverall: false,
+    scope: "meter",
+    tags,
     description: details?.description ?? meta?.description ?? undefined,
     status,
     lastReading: "-",
     lastSync: device?.last_seen
-      ? formatDateTime(device.last_seen)
+      ? formatDateTime(device.last_seen, locale)
       : "-",
     todayKwh: 0,
     location: details?.location ?? "-",
-    billingMonth: new Date().toLocaleString("th-TH", {
+    billingMonth: new Date().toLocaleString(locale, {
       month: "long",
       year: "numeric",
     }),
     billingStatus: (meta?.billingStatus as any) ?? "pending",
     billingOutstandingMonth:
-      meta?.billingOutstandingMonth ?? "เดือนก่อนหน้า",
+      meta?.billingOutstandingMonth ?? undefined,
     billingDueDate: undefined,
     trendDirection: "up",
   };
@@ -793,10 +1160,10 @@ function isMeterDevice(item: any) {
   return model.startsWith("METER:");
 }
 
-function formatDateTime(value: string | Date) {
+function formatDateTime(value: string | Date, locale = "th-TH") {
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("th-TH", {
+  return date.toLocaleString(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -814,7 +1181,17 @@ type FixedRangeInfo = {
   label: string;
 };
 
-function computeFixedRange(): FixedRangeInfo {
+function computeFixedRange({
+  locale,
+  thisMonthLabel,
+  lastMonthLabel,
+  toPresentLabel,
+}: {
+  locale: string;
+  thisMonthLabel: string;
+  lastMonthLabel: string;
+  toPresentLabel: string;
+}): FixedRangeInfo {
   const now = new Date();
   const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
   const endThisMonth = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -823,18 +1200,21 @@ function computeFixedRange(): FixedRangeInfo {
   return {
     startIso: startThisMonth.toISOString(),
     endIso: endThisMonth.toISOString(),
-    label: `เดือนนี้: ${formatRangeDate(startThisMonth)} - ${formatRangeDate(
-      endThisMonth
-    )} (ปัจจุบัน) | เดือนก่อน: ${formatRangeDate(startLastMonth)} - ${formatRangeDate(
-      endLastMonth
-    )}`,
+    label: `${thisMonthLabel}: ${formatRangeDate(startThisMonth, locale)} - ${formatRangeDate(
+      endThisMonth,
+      locale
+    )} ${toPresentLabel} | ${lastMonthLabel}: ${formatRangeDate(
+      startLastMonth,
+      locale
+    )} - ${formatRangeDate(endLastMonth, locale)}`,
   };
 }
 
-function formatRangeDate(date: Date) {
-  return date.toLocaleDateString("th-TH", {
+function formatRangeDate(date: Date, locale = "th-TH") {
+  return date.toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
+

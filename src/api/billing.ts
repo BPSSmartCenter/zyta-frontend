@@ -234,3 +234,26 @@ export async function getBillingReadingsData(
   );
   return data.data;
 }
+
+export async function getSiteBillingReadingsData(
+  siteId: string,
+  params: (DailyBillingReadingsParams | MonthlyBillingReadingsParams | QuarterBillingReadingsParams) & {
+    tag?: string;
+  }
+) {
+  const query = new URLSearchParams();
+  query.set("mode", params.mode);
+  if (params.mode === "daily") {
+    query.set("date", params.date);
+  } else if (params.mode === "monthly") {
+    query.set("month", String(params.month));
+    query.set("year", String(params.year));
+  } else {
+    query.set("date", params.date);
+  }
+  if (params.tag) query.set("tag", String(params.tag));
+  const { data } = await api.get<{ ok: boolean; data: BillingReadingsPayload }>(
+    `/site/${encodeURIComponent(siteId)}/billing-readings?${query.toString()}`
+  );
+  return data.data;
+}

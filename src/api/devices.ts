@@ -64,6 +64,7 @@ export async function updateSiteDevice(
     deviceKey?: string;
     sn?: string;
     category?: "METER" | "INVERTER" | "GATEWAY" | "SENSOR";
+    buildingTag?: string | null;
   }
 ) {
   const url = `/site/${encodeURIComponent(siteIdOrCode)}/devices/${encodeURIComponent(deviceId)}`;
@@ -74,6 +75,7 @@ export async function updateSiteDevice(
     deviceKey: payload.deviceKey,
     sn: payload.sn,
     category: payload.category,
+    buildingTag: payload.buildingTag,
   });
   return data;
 }

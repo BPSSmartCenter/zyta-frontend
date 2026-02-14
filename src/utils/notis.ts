@@ -151,6 +151,8 @@ export type AlertEventKey =
   | "fire"
   | "motion"
   | "offline"
+  | "electric_offline"
+  | "electric_low_power"
   | "fall"
   | "sleep"
   | "face"
@@ -179,6 +181,13 @@ const OFFLINE_KEYWORDS = [
   "device offline",
   "offline",
   "ออฟไลน์",
+];
+const ELECTRIC_LOW_POWER_KEYWORDS = [
+  "electric low power",
+  "low power",
+  "low energy",
+  "below threshold",
+  "under threshold",
 ];
 const FALL_KEYWORDS = [
   "notis.falldetected",
@@ -237,6 +246,16 @@ const DIRECT_EVENT_MAP: Record<string, AlertEventKey> = {
   "camera offline": "offline",
   "device offline": "offline",
   "offline": "offline",
+
+  // Electric-specific (meter/inverter)
+  "notis.electricoffline": "electric_offline",
+  "notis.electricOffline": "electric_offline",
+  "zytanotis.electricoffline": "electric_offline",
+  "zytanotis.electricOffline": "electric_offline",
+  "notis.electriclowpower": "electric_low_power",
+  "notis.electricLowPower": "electric_low_power",
+  "zytanotis.electriclowpower": "electric_low_power",
+  "zytanotis.electricLowPower": "electric_low_power",
   "กล้องออฟไลน์": "offline",
   "ออฟไลน์": "offline",
   "notis.falldetected": "fall",
@@ -259,6 +278,110 @@ const DIRECT_EVENT_MAP: Record<string, AlertEventKey> = {
   "notis.platedetected": "plate",
   "face": "face",
   "plate": "plate",
+};
+
+const pickDeviceModelHint = (n: any): string => {
+  const meta = n?.meta ?? {};
+  const candidates = [
+    meta?.device?.model,
+    meta?.deviceModel,
+    meta?.deviceKey,
+    meta?.deviceHeaders?.deviceKey,
+    n?.deviceModel,
+    n?.device_model,
+  ];
+  return candidates
+    .filter((v: any) => typeof v === "string" && v.trim().length)
+    .map((v: string) => v.trim())
+    .join(" | ")
+    .toLowerCase();
+};
+
+export const isCameraOfflineNoti = (n: Partial<Noti> | Record<string, any>): boolean => {
+  const key = String((n as any)?.titleKey ?? "").toLowerCase();
+  if (key.includes("cameraoffline")) return true;
+
+  const model = pickDeviceModelHint(n);
+  if (!model) return false;
+  return (
+    model.includes("camera:") ||
+    model.includes("cctv:") ||
+    model.includes("cctv") ||
+    model.includes("camera")
+  );
+};
+
+export const isElectricDeviceNoti = (n: Partial<Noti> | Record<string, any>): boolean => {
+  const model = pickDeviceModelHint(n);
+  if (!model) return false;
+  return (
+    model.includes("inverter") ||
+    model.includes("meter:") ||
+    model.includes("electricmeter") ||
+    model.includes("electric meter")
+  );
+};
+
+export const resolveElectricDeviceId = (n: Partial<Noti> | Record<string, any>): string | null => {
+  const meta = (n as any)?.meta ?? {};
+  const candidates = [
+    (n as any)?.deviceId,
+    (n as any)?.device_id,
+    meta?.device?.id,
+    meta?.deviceId,
+    meta?.device_id,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim().length) return c.trim();
+  }
+  return null;
+};
+
+export const resolveElectricDeviceSn = (
+  n: Partial<Noti> | Record<string, any>
+): string | null => {
+  const meta = (n as any)?.meta ?? {};
+  const candidates = [
+    meta?.device?.sn,
+    meta?.deviceSn,
+    meta?.device_sn,
+    meta?.device?.serialNumber,
+    meta?.serialNumber,
+    meta?.sn,
+    (n as any)?.deviceSn,
+    (n as any)?.sn,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim().length) return c.trim();
+  }
+
+  const modelCandidates = [
+    meta?.device?.model,
+    meta?.deviceModel,
+    (n as any)?.deviceModel,
+    (n as any)?.device_model,
+    meta?.deviceKey,
+    meta?.deviceHeaders?.deviceKey,
+  ];
+  for (const m of modelCandidates) {
+    if (typeof m !== "string") continue;
+    const s = m.trim();
+    if (!s) continue;
+    const invIdx = s.toUpperCase().indexOf("INVERTER:");
+    if (invIdx >= 0) {
+      const after = s.slice(invIdx + "INVERTER:".length);
+      const sn = after.split(/[|\s]/)[0]?.trim();
+      if (sn) return sn;
+    }
+    const meterIdx = s.toUpperCase().indexOf("METER:");
+    if (meterIdx >= 0) {
+      const after = s.slice(meterIdx + "METER:".length);
+      const sn = after.split(/[|\s]/)[0]?.trim();
+      if (sn) return sn;
+    }
+  }
+
+  return null;
 };
 
 export const resolveAlertEventKey = (
@@ -285,7 +408,14 @@ export const resolveAlertEventKey = (
   for (const candidate of directCandidates) {
     if (!candidate) continue;
     const mapped = DIRECT_EVENT_MAP[candidate];
-    if (mapped) return mapped;
+    if (mapped) {
+      if (mapped === "offline") {
+        // If the source indicates an offline event but the device is an inverter/meter,
+        // keep it out of the "offline cameras" bucket.
+        if (isElectricDeviceNoti(n) && !isCameraOfflineNoti(n)) return "electric_offline";
+      }
+      return mapped;
+    }
   }
 
   const bag = buildNotiKeywordBag(n);
@@ -294,12 +424,18 @@ export const resolveAlertEventKey = (
   for (const text of texts) {
     if (!text) continue;
     if (containsKeyword(text, FIRE_KEYWORDS)) return "fire";
-    if (containsKeyword(text, OFFLINE_KEYWORDS)) return "offline";
+    if (containsKeyword(text, OFFLINE_KEYWORDS)) {
+      // Distinguish inverter/meter offline from camera offline so the dashboard header
+      // "offline cameras" card only counts camera offline.
+      if (isElectricDeviceNoti(n) && !isCameraOfflineNoti(n)) return "electric_offline";
+      return "offline";
+    }
     if (containsKeyword(text, FALL_KEYWORDS)) return "fall";
     if (containsKeyword(text, SLEEP_KEYWORDS)) return "sleep";
     if (containsKeyword(text, FACE_KEYWORDS)) return "face";
     if (containsKeyword(text, PLATE_KEYWORDS)) return "plate";
     if (containsKeyword(text, MOTION_KEYWORDS)) return "motion";
+    if (containsKeyword(text, ELECTRIC_LOW_POWER_KEYWORDS)) return "electric_low_power";
   }
 
   return null;
@@ -394,6 +530,7 @@ export const resolveDefaultNotiImage = (n: Noti): string | undefined => {
   if (eventKey === "fire") return fireNoti;
   if (eventKey === "motion") return motionNoti;
   if (eventKey === "offline") return deviceNoti;
+  if (eventKey === "electric_offline") return deviceNoti;
   if (eventKey === "fall") return fallingNoti;
   if (eventKey === "sleep") return sleepingNoti;
   if (eventKey === "face") return faceImage;

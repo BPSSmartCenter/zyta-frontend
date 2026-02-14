@@ -13,6 +13,7 @@
       "searchPlaceholder": "Search readings...",
       "buttons": {
         "refresh": "Refresh",
+        "monitoring": "Monitoring",
         "generate": "Generate Bills",
         "monitor": "Monitor"
       },
@@ -26,6 +27,7 @@
       "loading": "Loading data...",
       "empty": "No readings match the filters",
       "siteLabel": "Site",
+      "buildingLabel": "Building",
       "defaultDevice": "Meter",
       "fallbackMeterName": "Meter {{id}}"
     },
@@ -121,6 +123,11 @@
       "createBillError": "Unable to create bill, please try again",
       "selectMeterRequired": "Please select a meter before creating a bill",
       "selectSiteRequired": "Please select a site before creating a bill"
+    },
+    "meters": {
+      "overallLabel": "All Meters Summary",
+      "overallDescription": "Aggregate of all meters in this site",
+      "buildingDescription": "Aggregate of all meters in this building"
     },
     "form": {
       "billingType": "Billing type",

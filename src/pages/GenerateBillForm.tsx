@@ -16,9 +16,10 @@ import { listSiteDevices } from "../api/devices";
 import { getSiteDetails } from "../api/sites";
 import {
   getMeterDashboard,
+  getSiteMetersDashboard,
   type MeterDashboard,
 } from "../api/meter";
-import { getBillingReadingsData } from "../api/billing";
+import { getBillingReadingsData, getSiteBillingReadingsData } from "../api/billing";
 import Dropdown from "../components/Dropdown";
 import DatePicker, { type DateValue } from "../components/DateInput";
 import { buildBrandingLogoSrc } from "../utils/branding";
@@ -45,6 +46,8 @@ type SummaryTotals = {
   offPeak: number;
   total: number;
 };
+
+const OVERVIEW_METER_ID = "overview";
 
 const MONTH_CHOICES = [
   { value: "01", defaultLabel: "January" },
@@ -266,6 +269,9 @@ const GenerateBillForm: React.FC = () => {
       label: string;
       description?: string;
       serial?: string;
+      scope?: "meter" | "overview" | "tag";
+      tag?: string;
+      tags?: string[];
     }>
   >([]);
   const [siteInfo, setSiteInfo] = React.useState<{
@@ -286,7 +292,10 @@ const GenerateBillForm: React.FC = () => {
   >(null);
   const discountPercentLabel = React.useMemo(() => {
     if (typeof meterDashboard?.cost?.rates?.discountRate === "number") {
-      return `${(meterDashboard.cost.rates.discountRate * 100).toFixed(2)}%`;
+      const raw = meterDashboard.cost.rates.discountRate;
+      // Some environments store discount as 0-1 fraction, others as 0-100 percent.
+      const normalized = raw > 1 ? raw / 100 : raw;
+      return `${(normalized * 100).toFixed(2)}%`;
     }
     const raw = Number(formState.billingDiscountRate);
     if (!Number.isFinite(raw)) return null;
@@ -503,8 +512,8 @@ const GenerateBillForm: React.FC = () => {
           devicesResp?.data ??
           devicesResp ??
           [];
-        const mapped = (devicePayload as any[])
-          .filter((item) => item?.id ?? item?.model)
+          const actualMeters = (devicePayload as any[])
+            .filter((item) => item?.id ?? item?.model)
           .filter((item) => {
             const meta = (item?.meta ?? {}) as Record<string, any>;
             const details = (meta.details ?? {}) as Record<string, any>;
@@ -518,34 +527,83 @@ const GenerateBillForm: React.FC = () => {
             }
             return String(categoryRaw).toLowerCase() === "meter";
           })
-          .map((item) => {
-            const meta = (item?.meta ?? {}) as Record<string, any>;
-            const details = (meta.details ?? {}) as Record<string, any>;
-            const rawId = item?.id ?? item?.model ?? "";
-            const normalizedId =
-              typeof rawId === "string" ? rawId : String(rawId);
-            return {
-              value: normalizedId,
-              label:
-                details.name ??
-                (typeof item.model === "string"
-                  ? item.model.split(":").pop()
-                  : meterFallbackLabel),
-              description: details.location ?? item.siteName ?? "",
-              serial:
-                details.serialNumber ??
-                meta.sn ??
-                (typeof item.model === "string"
-                  ? item.model.split(":").pop()
+            .map((item) => {
+              const meta = (item?.meta ?? {}) as Record<string, any>;
+              const details = (meta.details ?? {}) as Record<string, any>;
+              const tags = Array.isArray(meta.tags) ? meta.tags.map((t) => String(t)) : [];
+              const buildingTag = tags.find((tag) =>
+                String(tag).toLowerCase().startsWith("building:")
+              );
+              const buildingLabel = buildingTag
+                ? String(buildingTag).slice("building:".length).trim()
+                : "";
+              const rawId = item?.id ?? item?.model ?? "";
+              const normalizedId =
+                typeof rawId === "string" ? rawId : String(rawId);
+              return {
+                value: normalizedId,
+                label:
+                  details.name ??
+                  (typeof item.model === "string"
+                    ? item.model.split(":").pop()
+                    : meterFallbackLabel),
+                description:
+                  buildingLabel
+                    ? `${locale.startsWith("th") ? "อาคาร" : "Building"}: ${buildingLabel}`
+                    : details.location ?? item.siteName ?? "",
+                serial:
+                  details.serialNumber ??
+                  meta.sn ??
+                  (typeof item.model === "string"
+                    ? item.model.split(":").pop()
                   : undefined),
+              scope: "meter" as const,
+              tags,
+              };
+          });
+          const buildingTags = Array.from(
+            new Set(
+              actualMeters
+                .flatMap((m) => m.tags ?? [])
+                .filter((tag) => String(tag).toLowerCase().startsWith("building:"))
+            )
+          );
+          const buildingOptions = buildingTags.map((tag) => {
+            const label = tag.replace(/^building:/i, "").trim() || tag;
+            const included = actualMeters.filter((m) => (m.tags ?? []).includes(tag));
+            return {
+              value: `tag:${tag}`,
+              label: `${locale.startsWith("th") ? "อาคาร" : "Building"}: ${label}`,
+              description: `${t("generate.meters.buildingDescription", {
+                defaultValue: "Aggregate of all meters in this building",
+              })} (${included.length} ${locale.startsWith("th") ? "มิเตอร์" : "meters"})`,
+              serial: "",
+              scope: "tag" as const,
+              tag,
             };
           });
-        setMeterOptions(mapped);
+          const overallOption = {
+            value: OVERVIEW_METER_ID,
+            label: t("generate.meters.overallLabel", {
+              defaultValue: "All Meters Summary",
+            }),
+            description: `${t("generate.meters.overallDescription", {
+              defaultValue: "Aggregate of all meters in this site",
+            })} (${actualMeters.length} ${locale.startsWith("th") ? "มิเตอร์" : "meters"})`,
+            serial: "",
+            scope: "overview" as const,
+          };
+        const allowedMeterIds = [
+          OVERVIEW_METER_ID,
+          ...buildingOptions.map((o) => o.value),
+          ...actualMeters.map((m) => m.value),
+        ];
+        setMeterOptions([overallOption, ...buildingOptions, ...actualMeters]);
         setFormState((prev) => {
           const prefillCandidate = prefillMeterIdRef.current;
           if (prefillCandidate) {
             prefillMeterIdRef.current = "";
-            if (mapped.some((m) => m.value === prefillCandidate)) {
+            if (allowedMeterIds.includes(prefillCandidate)) {
               return { ...prev, meterId: prefillCandidate };
             }
             console.warn("[GenerateBillForm] prefill id not found in options", {
@@ -553,11 +611,12 @@ const GenerateBillForm: React.FC = () => {
             });
           }
 
-          if (prev.meterId && mapped.some((m) => m.value === prev.meterId)) {
+          if (prev.meterId && allowedMeterIds.includes(prev.meterId)) {
             return prev;
           }
 
-          const fallback = mapped[0]?.value ?? "";
+          // Default to the first real meter (not overall) to preserve prior behavior.
+          const fallback = actualMeters[0]?.value ?? "";
           if (fallback) {
             return { ...prev, meterId: fallback };
           }
@@ -616,7 +675,18 @@ const GenerateBillForm: React.FC = () => {
       const range = buildDailyRange(dailyDate);
       params = { startDate: range.startDate, endDate: range.endDate };
     }
-    getMeterDashboard(meterId, params)
+    const selectedOpt = meterOptions.find((opt) => opt.value === meterId);
+    const tag =
+      selectedOpt?.scope === "tag" && selectedOpt.tag
+        ? selectedOpt.tag
+        : meterId.toLowerCase().startsWith("tag:")
+        ? meterId.slice(4)
+        : undefined;
+    const loader =
+      meterId === OVERVIEW_METER_ID || tag
+        ? getSiteMetersDashboard(normalizedSite, { ...params, tag })
+        : getMeterDashboard(meterId, params);
+    Promise.resolve(loader)
       .then((data) => {
         if (canceled) return;
         setMeterDashboard(data);
@@ -638,6 +708,8 @@ const GenerateBillForm: React.FC = () => {
     requiresSiteSelection,
     permissionBlocked,
     meterId,
+    meterOptions,
+    normalizedSite,
     billingMode,
     monthlyRequestRange?.startIso,
     monthlyRequestRange?.endIso,
@@ -701,7 +773,18 @@ const GenerateBillForm: React.FC = () => {
       }
       request = { mode: "daily", date: iso };
     }
-    getBillingReadingsData(meterId, request)
+    const selectedOpt = meterOptions.find((opt) => opt.value === meterId);
+    const tag =
+      selectedOpt?.scope === "tag" && selectedOpt.tag
+        ? selectedOpt.tag
+        : meterId.toLowerCase().startsWith("tag:")
+        ? meterId.slice(4)
+        : undefined;
+    const loader =
+      meterId === OVERVIEW_METER_ID || tag
+        ? getSiteBillingReadingsData(normalizedSite, { ...(request as any), tag })
+        : getBillingReadingsData(meterId, request);
+    Promise.resolve(loader)
       .then((data) => {
         if (canceled) return;
         const totals = data.rows.reduce(
@@ -736,6 +819,8 @@ const GenerateBillForm: React.FC = () => {
     requiresSiteSelection,
     permissionBlocked,
     meterId,
+    meterOptions,
+    normalizedSite,
     billingMode,
     formState.billingMonth,
     formState.billingYear,

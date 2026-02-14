@@ -11,6 +11,7 @@ import {
   resolveDefaultNotiImage,
   resolveAlertEventKey,
   resolveFaceRecKind,
+  resolveElectricDeviceSn,
   type AlertEventKey,
 } from "../../utils/notis";
 
@@ -286,7 +287,22 @@ const handleCameraTileClick = (
     });
     return;
   }
-    navigate(absSite(`/alert?event=${eventKey}`, sc));
+
+  if (eventKey === "electric_offline" || eventKey === "electric_low_power") {
+    const params = new URLSearchParams();
+    params.set("type", "electricmeter");
+    const sn = resolveElectricDeviceSn(noti ?? {});
+    if (sn) params.set("inverterSN", sn);
+    const notiSiteCode =
+      typeof (noti as any)?.siteCode === "string" && (noti as any).siteCode.trim().length
+        ? String((noti as any).siteCode).trim()
+        : null;
+    const targetSite = notiSiteCode && notiSiteCode !== "all" ? notiSiteCode : sc;
+    navigate(absSite(`/devices?${params.toString()}`, targetSite));
+    return;
+  }
+
+  navigate(absSite(`/alert?event=${eventKey}`, sc));
   };
 
   // ===== Mobile carousel helpers =====

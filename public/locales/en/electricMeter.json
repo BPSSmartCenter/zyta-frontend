@@ -1,0 +1,98 @@
+{
+  "title": "Electric Meter Dashboard",
+  "range": {
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "toPresent": "(to present)"
+  },
+  "errors": {
+    "loadMeter": "Unable to load meter data",
+    "loadOverview": "Unable to load aggregated meter data",
+    "loadMeters": "Unable to load meter list",
+    "downloadPdf": "Unable to download PDF"
+  },
+  "guard": {
+    "blockedTitle": "Electric Dashboard is not available",
+    "blockedMessage": "This site has no compatible electric meter devices. Please choose another site.",
+    "selectTitle": "Please select a site",
+    "selectMessage": "Choose a site from the navbar before using electric features.",
+    "closeBack": "Go back",
+    "closeOk": "OK"
+  },
+  "loading": {
+    "dashboard": "Loading meter data..."
+  },
+  "view": {
+    "active": "Active View",
+    "noSelection": "Please select a meter",
+    "overallLabel": "All meters summary",
+    "overallCount": "{{count}} meters",
+    "buildingPrefix": "Building: {{name}}",
+    "selectedBadge": "Selected",
+    "openPicker": "Select view",
+    "goBilling": "Billing overview",
+    "createBill": "Generate bill",
+    "status": "Status",
+    "lastSync": "Last update",
+    "location": "Location",
+    "todayKwh": "Today (kWh)",
+    "monthData": "Monthly data",
+    "notSpecified": "Not specified",
+    "waiting": "Waiting"
+  },
+  "picker": {
+    "title": "Select meter view",
+    "searchPlaceholder": "Search meters or buildings...",
+    "empty": "No results",
+    "close": "Close",
+    "sections": {
+      "overview": "Overview",
+      "buildings": "Buildings",
+      "meters": "Meters"
+    },
+    "meta": {
+      "included": "Includes {{count}} meters",
+      "building": "Building: {{name}}"
+    },
+    "showMore": "Show more"
+  },
+  "cards": {
+    "totalEnergyUsage": "TOTAL ENERGY USAGE",
+    "totalCost": "TOTAL COST",
+    "thisMonth": "This Month",
+    "lastMonth": "Last Month",
+    "vs": "vs",
+    "energyCost": "ENERGY COST",
+    "exceededThreshold": "EXCEEDED THRESHOLD",
+    "energyUsageRealtime": "ENERGY USAGE (Realtime)",
+    "updatedAt": "Updated:",
+    "noDataToday": "No data for today yet",
+    "onPeak": "ON PEAK (kWh)",
+    "offPeak": "OFF PEAK (kWh)",
+    "voltDisplay": "VOLT DISPLAY",
+    "awaitVoltage": "Waiting for voltage from meter"
+  },
+  "chart": {
+    "title": "ENERGY USAGE",
+    "thisMonth": "This month",
+    "lastMonth": "Last month"
+  },
+  "status": {
+    "online": "Online",
+    "warning": "Warning",
+    "offline": "Offline"
+  },
+  "history": {
+    "title": "Billing History",
+    "subtitle": "Past bills for this meter",
+    "loading": "Loading billing history...",
+    "empty": "No bills for this meter yet",
+    "month": "Month",
+    "energy": "Energy (kWh)",
+    "cost": "Cost (THB)",
+    "pdf": "PDF",
+    "download": "Download",
+    "downloading": "Downloading...",
+    "noFile": "No file"
+  }
+}
