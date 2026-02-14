@@ -292,7 +292,10 @@ const GenerateBillForm: React.FC = () => {
   >(null);
   const discountPercentLabel = React.useMemo(() => {
     if (typeof meterDashboard?.cost?.rates?.discountRate === "number") {
-      return `${(meterDashboard.cost.rates.discountRate * 100).toFixed(2)}%`;
+      const raw = meterDashboard.cost.rates.discountRate;
+      // Some environments store discount as 0-1 fraction, others as 0-100 percent.
+      const normalized = raw > 1 ? raw / 100 : raw;
+      return `${(normalized * 100).toFixed(2)}%`;
     }
     const raw = Number(formState.billingDiscountRate);
     if (!Number.isFinite(raw)) return null;
