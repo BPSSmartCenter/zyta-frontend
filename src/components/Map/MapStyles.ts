@@ -43,11 +43,12 @@ export function provinceDefaultStyleFor(
   const nameTH = feature?.properties?.pro_th ?? "";
   const fillColor = hashColor(nameTH);
   return {
+    fill: true,
+    opacity: 1,
     color: EDGE,
     weight: 1,
     fillColor,
     fillOpacity: variant === "strong" ? 1 : 0.05,
-    pane: "overlayPane",
   };
 }
 
@@ -57,6 +58,8 @@ export const styleProvinceDefault: L.StyleFunction = (feature?: any) =>
 
 /** hover จังหวัดให้เด่นขึ้น */
 export const styleProvinceHover: L.PathOptions = {
+  fill: true,
+  opacity: 1,
   color: EDGE,
   weight: 3.2,
   fillOpacity: 1,

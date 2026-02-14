@@ -6,11 +6,14 @@ import {
   LOCATION_OPTIONS,
 } from "../Dashboard/dashboard.constants";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { me } from "../../data/Dashboard/auth";
 import { useNotisFeed } from "../../context/NotisContext";
 import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
+import { useFilters } from "../../context/FiltersContext";
+import type { SitePoint, SitePinStatus } from "../Map/MapTypes";
+import { getSiteDetails } from "../../api/sites";
 
 /* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {
@@ -77,6 +80,22 @@ export default function MapPanel({
 }: Props) {
   const { t } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
+  const { setSelectedSite } = useFilters();
+
+  // When a pin is clicked on the map, update the global site selection (dropdown)
+  const handlePinClick = useCallback(
+    (site: SitePoint) => {
+      if (site.code) {
+        setSelectedSite(site.code);
+      }
+    },
+    [setSelectedSite]
+  );
+
+  // When map zooms out to country, reset site selection to "All Sites"
+  const handleZoomOutToCountry = useCallback(() => {
+    setSelectedSite("all");
+  }, [setSelectedSite]);
   // Compute i18n label for multi-select events (inside component)
   const multiEventLabel = useMemo(() => {
     if (selectedEvents.includes("all")) {
@@ -95,6 +114,8 @@ export default function MapPanel({
   }, [selectedEvents, t]);
   const labelForButton = multiEventLabel || buttonLabel;
   const userRole: "admin" | "officer" | "user" = (me()?.role as any) || "admin";
+  const [pinStatusBySite, setPinStatusBySite] = useState<Record<string, SitePinStatus>>({});
+  const pinStatusRequestIdRef = useRef(0);
 
   /* ---------- ACL sites (ใช้ object เต็มจาก accessSites) ---------- */
   type AclSite = {
@@ -242,16 +263,138 @@ export default function MapPanel({
           if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
           const name = String((s as any)?.name ?? (s as any)?.code ?? (s as any)?.id ?? "");
           if (!name) return null;
-          return { name, lat, lng, code: (s as any)?.code as any } as {
+          return {
+            name,
+            lat,
+            lng,
+            code: (s as any)?.code as any,
+            id: (s as any)?.id as any,
+          } as {
             name: string;
             lat: number;
             lng: number;
             code?: string;
+            id?: string;
           };
         })
-        .filter(Boolean) as Array<{ name: string; lat: number; lng: number; code?: string }>,
+        .filter(Boolean) as Array<{ name: string; lat: number; lng: number; code?: string; id?: string }>,
     [JSON.stringify(accessibleSites)]
   );
+
+  const refreshSitePinStatuses = useCallback(async () => {
+    const requestId = ++pinStatusRequestIdRef.current;
+    const sites = (accessibleSites ?? []).filter(Boolean) as Array<{
+      id?: string;
+      code?: string;
+      name?: string;
+    }>;
+
+    if (!sites.length) {
+      if (requestId === pinStatusRequestIdRef.current) {
+        setPinStatusBySite({});
+      }
+      return;
+    }
+
+    const resolveCountersFromResponse = (raw: any) => {
+      const payload = raw?.data ?? raw;
+      const sitePayload = payload?.site ?? payload?.data?.site ?? payload?.data ?? payload;
+      return (sitePayload?.counters ?? payload?.counters ?? {}) as Record<string, any>;
+    };
+
+    const fetchOneStatus = async (site: { id?: string; code?: string; name?: string }) => {
+      const tryKeys = [site.code, site.id]
+        .filter((v, idx, arr) => !!v && arr.indexOf(v) === idx)
+        .map(String);
+
+      let counters: Record<string, any> = {};
+      for (const key of tryKeys) {
+        try {
+          const res = await getSiteDetails(key);
+          counters = resolveCountersFromResponse(res);
+          break;
+        } catch {
+          // continue
+        }
+      }
+
+      const electricTotal = Number(counters.devices_electric ?? 0);
+      const electricOffline = Number(counters.devices_electric_offline ?? 0);
+      const electricOnlineRaw = Number(counters.devices_electric_online ?? NaN);
+      const electricOnline = Number.isFinite(electricOnlineRaw)
+        ? electricOnlineRaw
+        : Math.max(0, electricTotal - electricOffline);
+
+      const status: SitePinStatus = {
+        electricTotal,
+        electricOnline,
+        electricOffline,
+        hasElectric: electricTotal > 0,
+      };
+
+      return { site, status };
+    };
+
+    const selected =
+      selectedSiteCode && selectedSiteCode !== "all"
+        ? sites.find(
+            (site) =>
+              String(site.code ?? "") === String(selectedSiteCode) ||
+              String(site.id ?? "") === String(selectedSiteCode)
+          )
+        : null;
+
+    if (selected) {
+      try {
+        const selectedEntry = await fetchOneStatus(selected);
+        if (requestId === pinStatusRequestIdRef.current) {
+          setPinStatusBySite((prev) => {
+            const next = { ...prev };
+            if (selectedEntry.site.code) next[String(selectedEntry.site.code)] = selectedEntry.status;
+            if (selectedEntry.site.id) next[String(selectedEntry.site.id)] = selectedEntry.status;
+            if (selectedEntry.site.name) next[String(selectedEntry.site.name)] = selectedEntry.status;
+            return next;
+          });
+        }
+      } catch {
+        // best effort; continue full refresh
+      }
+    }
+
+    const entries = await Promise.all(sites.map((site) => fetchOneStatus(site)));
+    if (requestId !== pinStatusRequestIdRef.current) return;
+
+    const next: Record<string, SitePinStatus> = {};
+    entries.forEach(({ site, status }) => {
+      if (site.code) next[String(site.code)] = status;
+      if (site.id) next[String(site.id)] = status;
+      if (site.name) next[String(site.name)] = status;
+    });
+
+    setPinStatusBySite(next);
+  }, [accessibleSites, selectedSiteCode]);
+
+  useEffect(() => {
+    void refreshSitePinStatuses();
+  }, [refreshSitePinStatuses]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      void refreshSitePinStatuses();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshSitePinStatuses();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [refreshSitePinStatuses]);
 
   /* ---------- render (UI เดิม) ---------- */
   return (
@@ -463,6 +606,7 @@ export default function MapPanel({
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
           sitePoints={sitePoints}
+          pinStatusBySite={pinStatusBySite}
           // ถ้าเลือก site เฉพาะ → โฟกัสพิกัด site โดยตรง
           focusSiteCenter={
             selectedSiteCode && selectedSiteCode !== "all"
@@ -484,6 +628,8 @@ export default function MapPanel({
           onProvinceChange={(val) => {
             setProvince(val);
           }}
+          onPinClick={handlePinClick}
+          onZoomOutToCountry={handleZoomOutToCountry}
         />
       </div>
     </div>

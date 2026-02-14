@@ -9,6 +9,14 @@ export type SitePoint = {
   lat: number;
   lng: number;
   code?: string;
+  id?: string;
+};
+
+export type SitePinStatus = {
+  electricTotal: number;
+  electricOnline: number;
+  electricOffline: number;
+  hasElectric: boolean;
 };
 
 export type SeverityFilter = Severity | "all" | undefined;
@@ -29,6 +37,12 @@ export type Props = {
 
   onProvinceChange?: (value: string | "all") => void;
 
+  /** callback เมื่อผู้ใช้คลิกหมุด – ส่ง SitePoint ไปยัง parent เพื่ออัปเดต dropdown ฯลฯ */
+  onPinClick?: (site: SitePoint) => void;
+
+  /** callback เมื่อ map zoom out กลับไป country view → ให้ parent reset site selection */
+  onZoomOutToCountry?: () => void;
+
   /** สิทธิ์ผู้ใช้ — ใช้กำหนดพฤติกรรมโต้ตอบ (เช่น lock interaction สำหรับ user) */
   role?: "admin" | "officer" | "user";
 
@@ -40,10 +54,15 @@ export type Props = {
 
   /** รายชื่อ site ที่อนุญาต (ไว้ใช้กับการ aggregate marker ถ้าต้อง) */
   allowedSiteNames?: string[];
+
+  /** สถานะไฟฟ้ารายไซต์สำหรับระบายสีหมุด */
+  pinStatusBySite?: Record<string, SitePinStatus>;
 };
 
 export type ViewState = {
   bounds: L.LatLngBoundsLiteral;
+  center?: { lat: number; lng: number };
+  zoom?: number;
   padding?: [number, number];
   maxZoom?: number;
   level: "country" | "province" | "district" | "subdistrict";

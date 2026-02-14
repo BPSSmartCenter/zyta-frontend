@@ -64,6 +64,8 @@ export function loadDistrictsForProvince(
             if (!ampCode) return;
             if (beginAnimation && !beginAnimation()) return;
 
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
             const bb = (dLayer as any).getBounds() as L.LatLngBounds;
             const toLiteral: L.LatLngBoundsLiteral = [
               [bb.getSouthWest().lat, bb.getSouthWest().lng],
@@ -71,6 +73,8 @@ export function loadDistrictsForProvince(
             ];
             pushView({
               bounds: toLiteral,
+              center: { lat: currentCenter.lat, lng: currentCenter.lng },
+              zoom: currentZoom,
               padding: [12, 12],
               maxZoom: 10,
               level: "province",
@@ -147,6 +151,8 @@ export function loadSubdistrictsForDistrict(
           // คลิกตำบล → zoom เจาะเฉพาะตำบล + ถมรอบข้างทั้งหมด
           layer.on("click", () => {
             if (beginAnimation && !beginAnimation()) return;
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
             const ringsTam = extractRingsLatLng((feature as any).geometry);
             const bb = (sLayer as any).getBounds() as L.LatLngBounds;
             const toLiteral: L.LatLngBoundsLiteral = [
@@ -156,6 +162,8 @@ export function loadSubdistrictsForDistrict(
 
             pushView({
               bounds: toLiteral,
+              center: { lat: currentCenter.lat, lng: currentCenter.lng },
+              zoom: currentZoom,
               padding: [10, 10],
               maxZoom: 12,
               level: "district",

@@ -1,7 +1,7 @@
 // src/components/Map/MapMarkers.ts
 import L from "leaflet";
 import type { Noti, Severity, NotiType } from "../../data/Dashboard/notis";
-import type { SeverityFilter, SitePoint } from "./MapTypes";
+import type { SeverityFilter, SitePoint, SitePinStatus } from "./MapTypes";
 
 /** สร้าง DivIcon พินสีเรียบ */
 function makePin(color: string) {
@@ -101,7 +101,11 @@ export function renderMarkers(
   severityFilter: SeverityFilter,
   _provinceCenters: Record<string, L.LatLngLiteral>,
   sitePoints: SitePoint[] | undefined,
-  t: (key: string, opts?: any) => string
+  pinStatusBySite: Record<string, SitePinStatus> | undefined,
+  t: (key: string, opts?: any) => string,
+  onPinClick?: (site: SitePoint) => void,
+  pane?: string,
+  clipBounds?: L.LatLngBounds | null
 ) {
   void _map;
   void _provinceCenters;
@@ -133,14 +137,34 @@ export function renderMarkers(
     const siteLabel = t("map.site", { defaultValue: "Site" });
     const dateLabel = t("map.date", { defaultValue: "Date" });
     const NEUTRAL = makePin("#003a81ff");
+    const ELECTRIC_OK = makePin("#16A34A");
+    const ELECTRIC_DOWN = makePin("#EF4444");
 
     sitePoints.forEach((sp) => {
+      // If clipBounds provided, skip pins outside the bounds (hide neighbor province pins)
+      if (clipBounds && !clipBounds.contains(L.latLng(sp.lat, sp.lng))) return;
+
       const n = latestBySiteName.get(String(sp.name));
-      const icon = n ? getPinForNoti(n) : NEUTRAL;
-      const marker = L.marker([sp.lat, sp.lng], {
-        icon,
-        pane: "markersPane",
-      });
+      const statusByCode = sp.code ? pinStatusBySite?.[String(sp.code)] : undefined;
+      const statusById = sp.id ? pinStatusBySite?.[String(sp.id)] : undefined;
+      const statusByName = pinStatusBySite?.[String(sp.name)];
+      const electricStatus = statusByCode ?? statusById ?? statusByName;
+
+      let icon = n ? getPinForNoti(n) : NEUTRAL;
+      if (electricStatus?.hasElectric) {
+        icon = electricStatus.electricOffline > 0 ? ELECTRIC_DOWN : ELECTRIC_OK;
+      }
+      const markerOpts: L.MarkerOptions = { icon };
+      if (pane) markerOpts.pane = pane;
+      const marker = L.marker([sp.lat, sp.lng], markerOpts);
+
+      // Pin click → trigger Level 3 (3D) transition
+      if (onPinClick) {
+        marker.on("click", (e: L.LeafletMouseEvent) => {
+          L.DomEvent.stopPropagation(e);
+          onPinClick(sp);
+        });
+      }
 
       marker.addTo(layerGroup);
 
@@ -168,7 +192,6 @@ export function renderMarkers(
           sticky: true,
           opacity: 1,
           className: "marker-label",
-          pane: "markerLabels",
           offset: L.point(0, -14),
         });
       } else {
@@ -189,7 +212,6 @@ export function renderMarkers(
           sticky: true,
           opacity: 1,
           className: "marker-label",
-          pane: "markerLabels",
           offset: L.point(0, -14),
         });
       }
@@ -202,10 +224,9 @@ export function renderMarkers(
   if (aggregateBySite) list = groupBySiteLatest(list);
   list.forEach((n) => {
     const { lat, lng } = n.coords!;
-    const marker = L.marker([lat, lng], {
-      icon: getPinForNoti(n),
-      pane: "markersPane",
-    });
+    const mOpts: L.MarkerOptions = { icon: getPinForNoti(n) };
+    if (pane) mOpts.pane = pane;
+    const marker = L.marker([lat, lng], mOpts);
     const title = n.titleKey
       ? t(n.titleKey, { defaultValue: n.title })
       : n.title;
@@ -232,7 +253,6 @@ export function renderMarkers(
       sticky: true,
       opacity: 1,
       className: "marker-label",
-      pane: "markerLabels",
       offset: L.point(0, -14),
     });
   });
