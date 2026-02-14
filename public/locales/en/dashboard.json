@@ -116,6 +116,7 @@
     "motionDetected": "Motion detected",
     "cameraOffline": "Camera offline",
     "deviceOffline": "Device offline",
+    "electricLowPower": "Low power (Electric)",
     "sleepingLong": "Sleeping longer than usual",
     "sleepDetected": "Sleep detected",
     "fallDetected": "Fall detected",

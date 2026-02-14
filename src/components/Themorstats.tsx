@@ -1,5 +1,5 @@
 // src/components/Devices/Water/Themorstat.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 
 type ThermostatProps = {
@@ -10,6 +10,7 @@ type ThermostatProps = {
   initialValue: number; // ใช้เป็นค่าเริ่มต้น (uncontrolled)
   value?: number; // ✅ ใหม่: ถ้าส่งมาจะใช้ค่านี้เป็นตัวแสดงผล (controlled)
   valueDisplay?: React.ReactNode; // ถ้าส่งมา จะใช้เป็นข้อความแสดงค่ากลาง
+  tone?: "normal" | "danger";
 };
 
 const Thermostat: React.FC<ThermostatProps> = ({
@@ -20,8 +21,10 @@ const Thermostat: React.FC<ThermostatProps> = ({
   initialValue,
   value,
   valueDisplay,
+  tone = "normal",
 }) => {
   const [temperature, setTemperature] = useState<number>(initialValue);
+  const gradientId = useId();
 
   // sync เมื่อ initialValue เปลี่ยน (สำหรับโหมด uncontrolled)
   useEffect(() => {
@@ -50,14 +53,23 @@ const Thermostat: React.FC<ThermostatProps> = ({
             <svg style={{ position: "absolute", width: 0, height: 0 }}>
               <defs>
                 <linearGradient
-                  id="gradientId"
+                  id={gradientId}
                   x1="0%"
                   y1="0%"
                   x2="100%"
                   y2="0%"
                 >
-                  <stop offset="0%" stopColor="rgba(32,98,122,1)" />
-                  <stop offset="50%" stopColor="rgba(58,180,224,1)" />
+                  {tone === "danger" ? (
+                    <>
+                      <stop offset="0%" stopColor="#b91c1c" />
+                      <stop offset="60%" stopColor="#ef4444" />
+                    </>
+                  ) : (
+                    <>
+                      <stop offset="0%" stopColor="rgba(32,98,122,1)" />
+                      <stop offset="50%" stopColor="rgba(58,180,224,1)" />
+                    </>
+                  )}
                 </linearGradient>
               </defs>
             </svg>
@@ -68,7 +80,7 @@ const Thermostat: React.FC<ThermostatProps> = ({
               minValue={0}
               maxValue={max}
               styles={buildStyles({
-                pathColor: "url(#gradientId)",
+                pathColor: `url(#${gradientId})`,
                 trailColor: "transparent",
                 strokeLinecap: "round",
                 pathTransitionDuration: 0.5,

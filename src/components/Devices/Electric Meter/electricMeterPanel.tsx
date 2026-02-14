@@ -501,6 +501,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewTodayValue, setOverviewTodayValue] = useState<number | null>(null);
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
+  const [overviewThreshold90DayKwh, setOverviewThreshold90DayKwh] = useState<number | null>(null);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
@@ -643,7 +644,16 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           });
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
-          if (prev === OVERVIEW_DEVICE_ID) return prev;
+          // Deep-link: if URL specifies inverterSN, prefer that selection even if the current state is "Overview".
+          if (prev === OVERVIEW_DEVICE_ID) {
+            const matchSn =
+              urlDeviceSN &&
+              filtered.find(
+                (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
+              );
+            if (matchSn) return matchSn.id;
+            return prev;
+          }
           if (prev && filtered.some((opt) => opt.id === prev)) return prev;
           const matchSn =
             urlDeviceSN &&
@@ -707,12 +717,18 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           value: OVERVIEW_DEVICE_ID,
           label: overviewLabel,
         },
-        ...deviceOptions.map((opt, idx) => ({
-          value: opt.id,
-          label: isGroupSiteSelected
-            ? `${opt.siteLabel || opt.siteIdOrCode || "-"} (${opt.sn})`
-            : `Inverter ${idx + 1} (${opt.sn})`,
-        })),
+        ...deviceOptions.map((opt) => {
+          const name = (opt.label || "").trim() || opt.sn;
+          const sitePrefix =
+            isGroupSiteSelected && (opt.siteLabel || opt.siteIdOrCode)
+              ? `${opt.siteLabel || opt.siteIdOrCode} / `
+              : "";
+          return {
+            value: opt.id,
+            // Use real inverter label from backend (avoid misleading index-based names).
+            label: `${sitePrefix}${name} (${opt.sn})`,
+          };
+        }),
       ];
     },
     [deviceOptions, t, isGroupSiteSelected]
@@ -809,38 +825,77 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const startTime = formatDateTimeForApi(rangeStart);
         const endTime = formatDateTimeForApi(rangeEnd);
         let points: DailyTelemetryPoint[] = [];
+        let aggregatedEntries: DailySeries[] | null = null;
         if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           if (!targets.length) {
-            points = [];
+            aggregatedEntries = [];
           } else {
-            const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
-              fetchEquipmentTelemetry({
+            // IMPORTANT: do not merge raw cumulative totals by timestamp across sites.
+            // Sites report at different timestamps; merging can produce negative deltas and
+            // lock the 7-day chart at zeros. Instead, normalize per-site first (baseline per day)
+            // then sum the derived half-hour kWh series.
+            const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) => {
+              const res = await fetchEquipmentTelemetry({
                 siteIdOrCode,
                 sn: OVERVIEW_DEVICE_ID,
                 startTime,
                 endTime,
                 category: deviceCategory,
-              })
-            );
-            const sumByTs = new Map<number, number>();
-            for (const result of settled) {
-              if (result.status !== "fulfilled") continue;
-              const list: any[] = (result.value?.data as any)?.telemetries ?? [];
-              for (const item of list) {
-                const ts = new Date(item?.date ?? 0).getTime();
-                const total = Number(item?.totalEnergy ?? 0);
-                if (!Number.isFinite(ts) || !Number.isFinite(total)) continue;
-                sumByTs.set(ts, (sumByTs.get(ts) ?? 0) + total);
+              });
+              const list: any[] = (res?.data as any)?.telemetries ?? [];
+              return normalizeTelemetries(list);
+            });
+
+            const perSitePoints = settled
+              .filter(
+                (result): result is PromiseFulfilledResult<DailyTelemetryPoint[]> =>
+                  result.status === "fulfilled"
+              )
+              .map((result) => result.value);
+
+            aggregatedEntries = [];
+            for (let i = 0; i < daysToFetch; i++) {
+              const dayStart = new Date(todayStart);
+              dayStart.setDate(dayStart.getDate() - i);
+              const dayEnd = endOfDay(dayStart);
+              const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
+
+              const summedHalfHourSeries = HALF_HOUR_SLOTS.map(() => 0);
+              let totalWhSum = 0;
+
+              for (const sitePoints of perSitePoints) {
+                const dayPoints = sitePoints.filter(
+                  (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
+                );
+                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
+                for (let j = 0; j < summedHalfHourSeries.length; j++) {
+                  summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
+                }
+
+                const totalWh =
+                  dayPoints.length > 1
+                    ? Math.max(
+                        0,
+                        dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
+                      )
+                    : 0;
+                totalWhSum += totalWh;
               }
+
+              const totalKwh = summedHalfHourSeries.length
+                ? summedHalfHourSeries[summedHalfHourSeries.length - 1]
+                : 0;
+
+              aggregatedEntries.push({
+                key: dayKey,
+                date: dayStart,
+                isToday: i === 0,
+                totalWh: totalWhSum,
+                totalKwh,
+                halfHourSeries: summedHalfHourSeries,
+              });
             }
-            const merged = Array.from(sumByTs.entries())
-              .sort((a, b) => a[0] - b[0])
-              .map(([ts, totalEnergy]) => ({
-                date: new Date(ts).toISOString(),
-                totalEnergy,
-              }));
-            points = normalizeTelemetries(merged);
           }
         } else {
           const res = await fetchEquipmentTelemetry({
@@ -853,35 +908,40 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           const list: any[] = (res?.data as any)?.telemetries ?? [];
           points = normalizeTelemetries(list);
         }
-        const entries: DailySeries[] = [];
-        for (let i = 0; i < daysToFetch; i++) {
-          const dayStart = new Date(todayStart);
-          dayStart.setDate(dayStart.getDate() - i);
-          const dayEnd = endOfDay(dayStart);
-          const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
-          const dayPoints = points.filter(
-            (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
-          );
-          const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
-          const totalWh =
-            dayPoints.length > 1
-              ? Math.max(
-                  0,
-                  dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
-                )
-              : 0;
-          const totalKwh = halfHourSeries.length
-            ? halfHourSeries[halfHourSeries.length - 1]
-            : 0;
-          entries.push({
-            key: dayKey,
-            date: dayStart,
-            isToday: i === 0,
-            totalWh,
-            totalKwh,
-            halfHourSeries,
-          });
-        }
+        const entries: DailySeries[] = aggregatedEntries
+          ? aggregatedEntries
+          : (() => {
+              const out: DailySeries[] = [];
+              for (let i = 0; i < daysToFetch; i++) {
+                const dayStart = new Date(todayStart);
+                dayStart.setDate(dayStart.getDate() - i);
+                const dayEnd = endOfDay(dayStart);
+                const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
+                const dayPoints = points.filter(
+                  (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
+                );
+                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
+                const totalWh =
+                  dayPoints.length > 1
+                    ? Math.max(
+                        0,
+                        dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
+                      )
+                    : 0;
+                const totalKwh = halfHourSeries.length
+                  ? halfHourSeries[halfHourSeries.length - 1]
+                  : 0;
+                out.push({
+                  key: dayKey,
+                  date: dayStart,
+                  isToday: i === 0,
+                  totalWh,
+                  totalKwh,
+                  halfHourSeries,
+                });
+              }
+              return out;
+            })();
         entries.sort((a, b) => b.date.getTime() - a.date.getTime());
         if (!active) return;
         const usable = hasUsage(entries);
@@ -1359,6 +1419,40 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     });
   }, [cardItems]);
 
+  // Fetch threshold baseline (avg year/day * 90%) for the selected site.
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      if (isAllSitesSelected) {
+        if (!active) return;
+        setOverviewThreshold90DayKwh(null);
+        return;
+      }
+      try {
+        const resp = await getElectricOverview(siteForApi);
+        const data = (resp as any)?.data ?? resp ?? {};
+        const threshold = Number(data?.threshold_90_day_kwh);
+        if (!active) return;
+        setOverviewThreshold90DayKwh(Number.isFinite(threshold) ? threshold : null);
+      } catch {
+        if (!active) return;
+        setOverviewThreshold90DayKwh(null);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isAllSitesSelected, siteForApi]);
+
+  const thermoOneTone: "normal" | "danger" = React.useMemo(() => {
+    if (thermoOne.source !== "auto") return "normal";
+    if (thermoOne.valueLabel !== consumptionLabel) return "normal";
+    const threshold = overviewThreshold90DayKwh;
+    if (!Number.isFinite(threshold) || !threshold || threshold <= 0) return "normal";
+    const today = Number(metrics.consumptionKwh || 0);
+    return today < threshold ? "danger" : "normal";
+  }, [thermoOne.source, thermoOne.valueLabel, consumptionLabel, overviewThreshold90DayKwh, metrics.consumptionKwh]);
+
   // Overview side cards come from backend aggregate only.
   React.useEffect(() => {
     let active = true;
@@ -1396,6 +1490,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           setOverviewLifetimeValue(
             Number.isFinite(lifetime) ? Math.round(lifetime) : null
           );
+          // keep threshold in sync when overview is fetched here too
+          const threshold = Number(data?.threshold_90_day_kwh);
+          setOverviewThreshold90DayKwh(Number.isFinite(threshold) ? threshold : null);
           if (Number.isFinite(month)) {
             setMetrics((m) => ({ ...m, monthKwh: Math.round(month) }));
           }
@@ -1404,6 +1501,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           setOverviewTodayValue(null);
           setOverviewMonthValue(null);
           setOverviewLifetimeValue(null);
+          setOverviewThreshold90DayKwh(null);
         }
         return;
       }
@@ -1411,6 +1509,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       setOverviewTodayValue(null);
       setOverviewMonthValue(null);
       setOverviewLifetimeValue(null);
+      setOverviewThreshold90DayKwh(null);
     })();
     return () => {
       active = false;
@@ -1715,6 +1814,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                 max={thermoOneMax}
                 maxLabel={thermoOne.maxLabel}
                 valueLabel={thermoOne.valueLabel}
+                tone={thermoOneTone}
               />
             </div>
 

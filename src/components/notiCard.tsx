@@ -133,6 +133,7 @@ const fallbackImgFor = (
     if (detectedEvent === "fire") return fireNoti;
     if (detectedEvent === "motion") return motionNoti;
     if (detectedEvent === "offline") return deviceNoti;
+    if (detectedEvent === "electric_offline") return deviceNoti;
     if (detectedEvent === "fall") return fallingNoti;
     if (detectedEvent === "sleep") return sleepingNoti;
     if (detectedEvent === "face") return faceImage;

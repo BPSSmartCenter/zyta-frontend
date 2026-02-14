@@ -9,6 +9,9 @@ export type MeterOption = {
   lastSync: string;
   todayKwh: number;
   isOverall?: boolean;
+  scope?: "meter" | "overview" | "tag";
+  tag?: string;
+  tags?: string[];
   includedMeters?: number;
   phase?: string;
   chartData?: number[];

@@ -64,6 +64,7 @@ export type RegisterElectricInput = {
   ipAddress?: string;
   status?: "online" | "offline" | "maintenance";
   name?: string;
+  buildingTag?: string;
 };
 
 export async function registerElectricDevice(input: RegisterElectricInput) {

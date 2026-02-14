@@ -1,0 +1,98 @@
+{
+  "title": "แดชบอร์ดมิเตอร์ไฟฟ้า",
+  "range": {
+    "thisMonth": "เดือนนี้",
+    "lastMonth": "เดือนก่อน",
+    "toPresent": "(ถึงปัจจุบัน)"
+  },
+  "errors": {
+    "loadMeter": "ไม่สามารถโหลดข้อมูลมิเตอร์ได้",
+    "loadOverview": "ไม่สามารถโหลดข้อมูลรวมของมิเตอร์ได้",
+    "loadMeters": "ไม่สามารถโหลดรายการมิเตอร์ได้",
+    "downloadPdf": "ไม่สามารถดาวน์โหลดไฟล์ PDF ได้"
+  },
+  "guard": {
+    "blockedTitle": "ไม่สามารถใช้งานแดชบอร์ดไฟฟ้าได้",
+    "blockedMessage": "ไซต์นี้ไม่มีอุปกรณ์มิเตอร์ไฟฟ้าที่รองรับ กรุณาเลือกไซต์อื่น",
+    "selectTitle": "กรุณาเลือกไซต์ก่อนใช้งาน",
+    "selectMessage": "โปรดเลือกไซต์จากเมนูด้านบน (Navbar) ก่อนใช้งานฟีเจอร์ไฟฟ้า",
+    "closeBack": "ย้อนกลับ",
+    "closeOk": "ตกลง"
+  },
+  "loading": {
+    "dashboard": "กำลังโหลดข้อมูลจากมิเตอร์..."
+  },
+  "view": {
+    "active": "มุมมองที่เลือก",
+    "noSelection": "ยังไม่ได้เลือกมิเตอร์",
+    "overallLabel": "สรุปรวมทุกมิเตอร์",
+    "overallCount": "{{count}} มิเตอร์",
+    "buildingPrefix": "อาคาร: {{name}}",
+    "selectedBadge": "เลือกอยู่",
+    "openPicker": "เลือกมุมมอง",
+    "goBilling": "ดูภาพรวม Billing",
+    "createBill": "สร้างบิล",
+    "status": "สถานะ",
+    "lastSync": "อัปเดตล่าสุด",
+    "location": "ตำแหน่ง",
+    "todayKwh": "วันนี้ (kWh)",
+    "monthData": "ข้อมูลประจำเดือน",
+    "notSpecified": "ไม่ระบุ",
+    "waiting": "รอข้อมูล"
+  },
+  "picker": {
+    "title": "เลือกมุมมองมิเตอร์",
+    "searchPlaceholder": "ค้นหามิเตอร์หรืออาคาร...",
+    "empty": "ไม่พบรายการที่ตรงกับคำค้นหา",
+    "close": "ปิด",
+    "sections": {
+      "overview": "ภาพรวม",
+      "buildings": "อาคาร",
+      "meters": "มิเตอร์"
+    },
+    "meta": {
+      "included": "รวม {{count}} มิเตอร์",
+      "building": "อาคาร: {{name}}"
+    },
+    "showMore": "แสดงเพิ่ม"
+  },
+  "cards": {
+    "totalEnergyUsage": "การใช้พลังงานรวม",
+    "totalCost": "ค่าใช้จ่ายรวม",
+    "thisMonth": "เดือนนี้",
+    "lastMonth": "เดือนก่อน",
+    "vs": "เทียบกับ",
+    "energyCost": "ค่าไฟ",
+    "exceededThreshold": "เกินเกณฑ์ที่กำหนด",
+    "energyUsageRealtime": "การใช้พลังงาน (เรียลไทม์)",
+    "updatedAt": "อัปเดตล่าสุด:",
+    "noDataToday": "ยังไม่มีข้อมูลของวันนี้",
+    "onPeak": "ช่วงพีค (kWh)",
+    "offPeak": "ช่วงออฟพีค (kWh)",
+    "voltDisplay": "แรงดันไฟฟ้า",
+    "awaitVoltage": "รอข้อมูลแรงดันจากมิเตอร์"
+  },
+  "chart": {
+    "title": "การใช้พลังงาน",
+    "thisMonth": "เดือนนี้",
+    "lastMonth": "เดือนก่อน"
+  },
+  "status": {
+    "online": "ออนไลน์",
+    "warning": "ผิดปกติ",
+    "offline": "ออฟไลน์"
+  },
+  "history": {
+    "title": "ประวัติบิล",
+    "subtitle": "บิลย้อนหลังของมิเตอร์นี้",
+    "loading": "กำลังโหลดรายการบิล...",
+    "empty": "ยังไม่มีบิลสำหรับมิเตอร์นี้",
+    "month": "เดือน",
+    "energy": "พลังงาน (kWh)",
+    "cost": "ค่าใช้จ่าย (บาท)",
+    "pdf": "ไฟล์ PDF",
+    "download": "ดาวน์โหลด",
+    "downloading": "กำลังดาวน์โหลด...",
+    "noFile": "ยังไม่มีไฟล์"
+  }
+}

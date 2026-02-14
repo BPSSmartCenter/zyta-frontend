@@ -33,6 +33,7 @@ type DeviceEntry = {
   type: DeviceTypeKey;
   deviceKey: string;
   ipAddress?: string | null;
+  buildingTag?: string | null;
 };
 
 type DeviceMap = Record<DeviceTypeKey, DeviceEntry[]>;
@@ -64,6 +65,8 @@ function toDeviceEntries(list: any[], type: DeviceTypeKey): DeviceEntry[] {
   return list.map((item, idx) => {
     const meta = (item?.meta ?? {}) as Record<string, any>;
     const details = (meta?.details ?? {}) as Record<string, any>;
+    const tags = Array.isArray(meta?.tags) ? meta.tags.map((t: any) => String(t)) : [];
+    const buildingTag = tags.find((t: string) => t.toLowerCase().startsWith("building:")) ?? null;
     const serial =
       meta?.sn ??
       details?.serialNumber ??
@@ -88,6 +91,7 @@ function toDeviceEntries(list: any[], type: DeviceTypeKey): DeviceEntry[] {
       type,
       deviceKey: item?.model ?? "",
       ipAddress: item?.ip_address ?? null,
+      buildingTag,
     };
   });
 }
@@ -328,14 +332,15 @@ export default function ContentDetail({
       deviceForm: {
         titleAdd: t("detail.devices.form.titleAdd", { defaultValue: "Add device" }),
         titleEdit: t("detail.devices.form.titleEdit", { defaultValue: "Edit device" }),
-        labels: {
-          category: t("detail.devices.form.labels.category", { defaultValue: "Category" }),
-          sn: t("detail.devices.form.labels.sn", { defaultValue: "SN" }),
-          deviceKey: t("detail.devices.form.labels.deviceKey", {
-            defaultValue: "Device key",
-          }),
-          status: t("detail.devices.form.labels.status", { defaultValue: "Status" }),
-          ipAddress: t("detail.devices.form.labels.ipAddress", {
+      labels: {
+        category: t("detail.devices.form.labels.category", { defaultValue: "Category" }),
+        sn: t("detail.devices.form.labels.sn", { defaultValue: "SN" }),
+        buildingTag: t("detail.devices.form.labels.buildingTag", { defaultValue: "Building" }),
+        deviceKey: t("detail.devices.form.labels.deviceKey", {
+          defaultValue: "Device key",
+        }),
+        status: t("detail.devices.form.labels.status", { defaultValue: "Status" }),
+        ipAddress: t("detail.devices.form.labels.ipAddress", {
             defaultValue: "IP Address",
           }),
           name: t("detail.devices.form.labels.name", { defaultValue: "Name" }),
@@ -453,7 +458,8 @@ export default function ContentDetail({
         device.name.toLowerCase().includes(term) ||
         device.model.toLowerCase().includes(term) ||
         device.serial.toLowerCase().includes(term) ||
-        (device.ipAddress ?? "").toLowerCase().includes(term)
+        (device.ipAddress ?? "").toLowerCase().includes(term) ||
+        (device.buildingTag ?? "").toLowerCase().includes(term)
       );
     });
   }, [activeDevices, deviceSearch]);
@@ -1378,7 +1384,14 @@ export default function ContentDetail({
                 {paginatedDevices.map((item) => (
                   <tr key={item.id}>
                     <td className="px-4 py-2 font-medium text-gray-900">
-                      {item.name}
+                      <div className="flex flex-col">
+                        <span>{item.name}</span>
+                        {activeDeviceType === "electric" && item.buildingTag ? (
+                          <span className="mt-0.5 text-xs font-normal text-gray-500">
+                            {item.buildingTag.replace(/^building:/i, "อาคาร: ")}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-gray-700">{item.model}</td>
                     <td className="px-4 py-2 text-gray-700">{item.serial}</td>
@@ -1558,6 +1571,16 @@ async function submitDeviceByType(
       ? values.name.trim()
       : undefined;
   const electricCategory = normalizeElectricCategory(values.category);
+  const normalizedBuildingName =
+    typeof values.buildingTag === "string" && values.buildingTag.trim().length > 0
+      ? values.buildingTag.trim()
+      : null;
+  const buildingTag =
+    type === "electric" && electricCategory === "METER" && normalizedBuildingName
+      ? `building:${normalizedBuildingName}`
+      : type === "electric" && electricCategory === "METER"
+      ? null
+      : undefined;
 
   if (editingDeviceId) {
     await updateSiteDevice(siteId, editingDeviceId, {
@@ -1567,6 +1590,7 @@ async function submitDeviceByType(
       deviceKey: type === "electric" ? undefined : values.deviceKey?.trim(),
       sn: values.sn?.trim(),
       category: type === "electric" ? electricCategory : undefined,
+      buildingTag,
     });
     return;
   }
@@ -1579,6 +1603,7 @@ async function submitDeviceByType(
       ipAddress: normalizedIp ?? undefined,
       status,
       name: normalizedName,
+      buildingTag: buildingTag ?? undefined,
     });
     return;
   }
@@ -1630,6 +1655,7 @@ function DeviceForm({
       labels: {
         category: t("detail.devices.form.labels.category", { defaultValue: "Category" }),
         sn: t("detail.devices.form.labels.sn", { defaultValue: "SN" }),
+        buildingTag: t("detail.devices.form.labels.buildingTag", { defaultValue: "Building" }),
         deviceKey: t("detail.devices.form.labels.deviceKey", {
           defaultValue: "Device key",
         }),
@@ -1642,6 +1668,9 @@ function DeviceForm({
       placeholders: {
         sn: t("detail.devices.form.placeholders.sn", {
           defaultValue: "Serial Number",
+        }),
+        buildingTag: t("detail.devices.form.placeholders.buildingTag", {
+          defaultValue: "Building name",
         }),
         deviceKey: t("detail.devices.form.placeholders.deviceKey", {
           defaultValue: "Unique device key",
@@ -1685,6 +1714,9 @@ function DeviceForm({
   const [form, setForm] = React.useState<Record<string, string>>({
     category: isElectric ? defaultCategory : "",
     sn: device?.serial ?? "",
+    buildingTag: device?.buildingTag
+      ? String(device.buildingTag).replace(/^building:/i, "").trim()
+      : "",
     status: (device?.status as any) ?? "online",
     name: device?.name ?? "",
     deviceKey: device?.deviceKey ?? "",
@@ -1759,6 +1791,22 @@ function DeviceForm({
               placeholder={texts.placeholders.sn}
             />
           </div>
+          {form.category === "METER" && (
+            <div className="md:col-span-2">
+              <label className="text-sm font-semibold block mb-2">
+                {texts.labels.buildingTag}
+              </label>
+              <input
+                value={form.buildingTag ?? ""}
+                onChange={(e) => handleChange("buildingTag", e.target.value)}
+                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder={texts.placeholders.buildingTag}
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                ตัวอย่าง: อาคารผู้ป่วยนอก (ระบบจะบันทึกเป็น tag แบบ building:&lt;ชื่ออาคาร&gt;)
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div>

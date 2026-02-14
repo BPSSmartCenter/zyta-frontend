@@ -19,6 +19,7 @@ import {
   downloadPreviewBillExcel,
   getBillDetailApi,
   getBillingReadingsData,
+  getSiteBillingReadingsData,
   uploadBillPdf,
   generateBillExcel as generateBillExcelApi,
   type BillDetailPayload,
@@ -235,6 +236,18 @@ const BillPdfPreview: React.FC = () => {
   React.useEffect(() => {
     if (!preferredDeviceId) return;
     if (!reportMode) return;
+    const preferredId = String(preferredDeviceId);
+    const isOverall = preferredId.toLowerCase() === "overview";
+    const isTag = preferredId.toLowerCase().startsWith("tag:");
+    const tagValue = isTag ? preferredId.slice(4).trim() : null;
+    const siteKeyForReadings = preview?.siteCode ?? (selectedSite ?? "").trim();
+    if ((isOverall || isTag) && (!siteKeyForReadings || siteKeyForReadings === "all")) {
+      setBillingReadings(null);
+      setBillingReadingsError("ไม่สามารถโหลดข้อมูลพลังงานได้");
+      setBillingQuarterReadings(null);
+      setBillingQuarterReadingsError("ไม่สามารถโหลดข้อมูลพลังงานแบบ 15 นาทีได้");
+      return;
+    }
     let requestParams:
       | { mode: "daily"; date: string }
       | { mode: "monthly"; month: number; year: number }
@@ -257,7 +270,11 @@ const BillPdfPreview: React.FC = () => {
     setBillingReadings(null);
     setBillingQuarterReadings(null);
     setBillingQuarterReadingsError(null);
-    getBillingReadingsData(preferredDeviceId, requestParams)
+    const readingsLoader =
+      isOverall || isTag
+        ? getSiteBillingReadingsData(siteKeyForReadings, { ...(requestParams as any), tag: tagValue || undefined })
+        : getBillingReadingsData(preferredDeviceId, requestParams);
+    Promise.resolve(readingsLoader)
       .then((data) => {
         if (!cancelled) {
           setBillingReadings(data);
@@ -271,10 +288,18 @@ const BillPdfPreview: React.FC = () => {
         }
       });
     if (reportMode === "daily" && resolvedDailyDate) {
-      getBillingReadingsData(preferredDeviceId, {
-        mode: "quarter",
-        date: resolvedDailyDate,
-      })
+      const quarterLoader =
+        isOverall || isTag
+          ? getSiteBillingReadingsData(siteKeyForReadings, {
+              mode: "quarter",
+              date: resolvedDailyDate,
+              tag: tagValue || undefined,
+            } as any)
+          : getBillingReadingsData(preferredDeviceId, {
+              mode: "quarter",
+              date: resolvedDailyDate,
+            });
+      Promise.resolve(quarterLoader)
         .then((data) => {
           if (!cancelled) {
             setBillingQuarterReadings(data);
@@ -301,6 +326,8 @@ const BillPdfPreview: React.FC = () => {
     };
   }, [
     preferredDeviceId,
+    preview?.siteCode,
+    selectedSite,
     reportMode,
     resolvedDailyDate,
     monthlyPeriod,

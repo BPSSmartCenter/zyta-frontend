@@ -5,11 +5,13 @@ import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
 import React from "react";
 import { useUserPath } from "../../routes/useUserPath";
+import { useFilters } from "../../context/FiltersContext";
 import {
   resolveAlertEventKey,
   type AlertEventKey,
   buildNotiKeywordBag,
   isFaceRecNoti,
+  resolveElectricDeviceSn,
 } from "../../utils/notis";
 
 type Props = {
@@ -21,8 +23,9 @@ type Props = {
 export default function AlertEvents({ search, setSearch, items }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
+  const { setSelectedSite, setSelectedGroupSite } = useFilters();
 
-  const { abs } = useUserPath();
+  const { abs, absSite } = useUserPath();
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -35,8 +38,30 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
     });
   };
 
-  const navigateToEvent = (ev: AlertEventKey | null) => {
+  const navigateToEvent = (ev: AlertEventKey | null, noti?: any) => {
     if (!ev) return;
+
+    if (ev === "electric_offline" || ev === "electric_low_power") {
+      const sn = resolveElectricDeviceSn(noti ?? {});
+      const params = new URLSearchParams();
+      params.set("type", "electricmeter");
+      if (sn) params.set("inverterSN", sn);
+
+      const siteCode =
+        typeof noti?.siteCode === "string" && noti.siteCode.trim().length
+          ? noti.siteCode.trim()
+          : null;
+      if (siteCode && siteCode !== "all") {
+        // Ensure navbar/site dropdown switches to the correct site.
+        setSelectedGroupSite(null);
+        setSelectedSite(siteCode);
+        navigate(absSite(`/devices?${params.toString()}`, siteCode));
+      } else {
+        navigate(abs(`/devices?${params.toString()}`));
+      }
+      return;
+    }
+
     navigate(abs(`/alert?event=${ev}`));
   };
 
@@ -86,14 +111,27 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
             list.map((n, i) => {
               const key = String(n.titleKey || "").toLowerCase();
               const isZyta = key.startsWith("zytanotis.");
+              const eventKey = resolveAlertEventKey(n);
+              const isElectric =
+                eventKey === "electric_offline" ||
+                eventKey === "electric_low_power";
+              const meta: any = (n as any)?.meta ?? {};
+              const deviceName =
+                (typeof meta?.deviceName === "string" && meta.deviceName.trim()) ||
+                (typeof meta?.device?.name === "string" && meta.device.name.trim()) ||
+                undefined;
+
               const title = isZyta
                 ? n.title
+                : isElectric && eventKey === "electric_offline" && deviceName
+                ? `${deviceName} Offline`
+                : isElectric && eventKey === "electric_low_power" && deviceName
+                ? `${deviceName} Low power`
                 : n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
-              const eventKey = resolveAlertEventKey(n);
               const isNavigable = Boolean(eventKey);
 
               const handleClick = (n: any, eventKey: AlertEventKey | null) => {
@@ -102,7 +140,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                   navigate(abs("/facerec"), { state: { noti: n } });
                   return;
                 }
-                if (eventKey) navigateToEvent(eventKey);
+                if (eventKey) navigateToEvent(eventKey, n);
               };
 
               return (
@@ -114,7 +152,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
                   onKeyDown={(e) => {
                     if (!isNavigable) return;
                     if (e.key === "Enter" || e.key === " ") {
-                      navigateToEvent(eventKey);
+                      navigateToEvent(eventKey, n);
                     }
                   }}
                   className={`${

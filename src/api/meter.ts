@@ -92,3 +92,18 @@ export async function getMeterDashboard(
   const { data } = await api.get<{ ok: boolean; data: MeterDashboard }>(url);
   return data.data;
 }
+
+export async function getSiteMetersDashboard(
+  siteId: string,
+  params?: MeterDashboardParams & { tag?: string }
+) {
+  const query = new URLSearchParams();
+  if (params?.startDate) query.set("startDate", params.startDate);
+  if (params?.endDate) query.set("endDate", params.endDate);
+  if (params?.tag) query.set("tag", params.tag);
+  const url = `/site/${encodeURIComponent(siteId)}/meters/dashboard${
+    query.size ? `?${query.toString()}` : ""
+  }`;
+  const { data } = await api.get<{ ok: boolean; data: MeterDashboard }>(url);
+  return data.data;
+}

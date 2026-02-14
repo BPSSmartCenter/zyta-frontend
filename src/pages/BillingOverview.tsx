@@ -70,6 +70,7 @@ type RealtimeRow = {
   meterId: string;
   meter: string;
   site?: string;
+  building?: string;
   onPeak: number | null;
   offPeak: number | null;
   timestamp?: string | null;
@@ -106,6 +107,9 @@ const BillingOverview: React.FC = () => {
           refresh: t("overview.realtime.buttons.refresh", {
             defaultValue: "Refresh",
           }),
+          monitoring: t("overview.realtime.buttons.monitoring", {
+            defaultValue: "Monitoring",
+          }),
           generate: t("overview.realtime.buttons.generate", {
             defaultValue: "Generate Bills",
           }),
@@ -135,6 +139,9 @@ const BillingOverview: React.FC = () => {
           defaultValue: "No readings match the filters",
         }),
         siteLabel: t("overview.realtime.siteLabel", { defaultValue: "Site" }),
+        buildingLabel: t("overview.realtime.buildingLabel", {
+          defaultValue: "Building",
+        }),
         defaultDevice: t("overview.realtime.defaultDevice", {
           defaultValue: "Meter",
         }),
@@ -365,6 +372,8 @@ const BillingOverview: React.FC = () => {
         if (result.status === "fulfilled") {
           const mapped = dashboardToRealtimeRow(result.value, fallbackMeterName);
           if (mapped) {
+            mapped.site = device.siteName;
+            mapped.building = device.buildingName;
             rows.push(mapped);
             return;
           }
@@ -373,6 +382,7 @@ const BillingOverview: React.FC = () => {
           meterId: device.id,
           meter: device.name ?? fallbackMeterName(device.id),
           site: device.siteName,
+          building: device.buildingName,
           onPeak: 0,
           offPeak: 0,
           timestamp: null,
@@ -442,7 +452,9 @@ const BillingOverview: React.FC = () => {
     const term = tableSearch.trim().toLowerCase();
     if (!term) return realtimeRows;
     return realtimeRows.filter((row) => {
-      const haystack = [row.meter, row.site ?? ""].join(" ").toLowerCase();
+      const haystack = [row.meter, row.building ?? "", row.site ?? ""]
+        .join(" ")
+        .toLowerCase();
       return haystack.includes(term);
     });
   }, [realtimeRows, tableSearch]);
@@ -460,16 +472,28 @@ const BillingOverview: React.FC = () => {
     () => billingData?.billingRows ?? [],
     [billingData],
   );
+
+  const buildingByMeterId = React.useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    realtimeRows.forEach((row) => map.set(row.meterId, row.building));
+    return map;
+  }, [realtimeRows]);
+
   const filteredBillingRows = React.useMemo(() => {
     const term = billingSearch.trim().toLowerCase();
     if (!term) return billingRows;
     return billingRows.filter((row) => {
-      const haystack = [row.meter, row.site ?? "", row.user ?? ""]
+      const haystack = [
+        row.meter,
+        (row.meterId ? buildingByMeterId.get(row.meterId) : "") ?? "",
+        row.site ?? "",
+        row.user ?? "",
+      ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(term);
     });
-  }, [billingRows, billingSearch]);
+  }, [billingRows, billingSearch, buildingByMeterId]);
 
   const monthlyList = React.useMemo(
     () => billingData?.monthlyList ?? [],
@@ -689,6 +713,12 @@ const BillingOverview: React.FC = () => {
                     </button>
                     <button
                       className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => navigate(abs("/electric/meter"))}
+                    >
+                      {overviewText.realtime.buttons.monitoring}
+                    </button>
+                    <button
+                      className="rounded-md border border-gray-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-gray-50 cursor-pointer"
                       onClick={() => navigate(abs("/electric/generate-bill"))}
                     >
                       {overviewText.realtime.buttons.generate}
@@ -754,8 +784,8 @@ const BillingOverview: React.FC = () => {
                                   {row.meter}
                                 </span>
                                 <span className="text-xs text-slate-500">
-                                  {overviewText.realtime.siteLabel}:{" "}
-                                  {row.site ?? "-"}
+                                  {overviewText.realtime.buildingLabel}:{" "}
+                                  {row.building ?? "-"}
                                 </span>
                               </div>
                             </td>
@@ -777,7 +807,7 @@ const BillingOverview: React.FC = () => {
                             <td className="px-6 py-4">
                               <div className="flex items-center justify-center">
                                 <button
-                                  className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50"
+                                  className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 cursor-pointer"
                                   onClick={() => handleRowSelect(row)}
                                 >
                                   {overviewText.realtime.buttons.monitor}
@@ -869,8 +899,11 @@ const BillingOverview: React.FC = () => {
                               {row.meter}
                             </span>
                             <span className="text-xs text-slate-500">
-                              {overviewText.realtime.siteLabel}:{" "}
-                              {row.site ?? "-"}
+                              {overviewText.realtime.buildingLabel}:{" "}
+                              {(row.meterId
+                                ? buildingByMeterId.get(row.meterId)
+                                : undefined) ??
+                                "-"}
                             </span>
                           </div>
                         </td>
@@ -897,14 +930,14 @@ const BillingOverview: React.FC = () => {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-2 rounded-full border border-cyan-200 px-4 py-1.5 text-xs font-semibold text-cyan-700 hover:border-cyan-300 hover:bg-cyan-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               onClick={() => handleBillingPreview(row)}
                               disabled={!row.id}
                             >
                               {overviewText.billing.buttons.preview}
                             </button>
                             <button
-                              className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-2 rounded-full border border-red-200 px-4 py-1.5 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               onClick={() => handleDeleteRequest(row)}
                               disabled={!row.id}
                             >
@@ -1125,6 +1158,13 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
       const normalizedId = typeof rawId === "string" ? rawId : String(rawId);
       const meta = (item?.meta ?? {}) as Record<string, any>;
       const details = (meta.details ?? {}) as Record<string, any>;
+      const tagsSource = meta.tags ?? details.tags ?? item?.tags ?? [];
+      const tags = Array.isArray(tagsSource) ? tagsSource : [];
+      const buildingTag = tags.find(
+        (tag) => typeof tag === "string" && tag.startsWith("building:"),
+      ) as string | undefined;
+      const buildingName =
+        buildingTag?.slice("building:".length).trim() || undefined;
       const category = String(
         meta.deviceCategory ?? meta.device_type ?? item?.category ?? "",
       ).toLowerCase();
@@ -1142,9 +1182,15 @@ function normalizeDeviceList(payload: any, fallbackName: string) {
         id: normalizedId,
         name: details.name ?? item?.name ?? fallback ?? fallbackName,
         siteName: item?.siteName ?? details.site ?? undefined,
+        buildingName,
       };
     })
-    .filter(Boolean) as Array<{ id: string; name: string; siteName?: string }>;
+    .filter(Boolean) as Array<{
+    id: string;
+    name: string;
+    siteName?: string;
+    buildingName?: string;
+  }>;
 }
 
 function dashboardToRealtimeRow(
