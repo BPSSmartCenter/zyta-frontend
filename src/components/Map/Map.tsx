@@ -1191,7 +1191,8 @@ export default function Map({
     }
 
     const target = districtViewState.center;
-    map.setView([target.lat, target.lng], 14, { animate: true });
+    const entryZoom = districtViewState.lockMapToCenter ? 18 : 16;
+    map.setView([target.lat, target.lng], entryZoom, { animate: true });
     map.setMinZoom(12);
     map.setMaxZoom(18);
 
