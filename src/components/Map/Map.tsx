@@ -1,26 +1,159 @@
-﻿// src/components/Map/Map.tsx - REFACTORED
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import L from "leaflet";
-import { TH_BOUNDS } from "../Dashboard/dashboard.constants";
 import { useTranslation } from "react-i18next";
-import type { Props } from "./MapTypes";
-import { extractRingsLatLng, responsivePadding } from "./MapUtils";
-import {
-  EDGE,
-  styleProvinceDefault,
-  styleProvinceHover,
-  styleDistrictDefault,
-  provinceDefaultStyleFor,
-} from "./MapStyles";
-import { renderMarkers } from "./MapMarkers";
-import LongdoMap3D, { preloadLongdoMap3 } from "./LongdoMap3D";
+import L from "leaflet";
+import type { Noti } from "../../data/Dashboard/notis";
+import type { Props, SitePoint } from "./MapTypes";
+
+declare global {
+  interface Window {
+    longdo?: any;
+  }
+}
+
+type LonLat = { lon: number; lat: number };
+type Geometry = { type: string; coordinates: any };
+type Feature = { type: "Feature"; properties?: Record<string, any>; geometry: Geometry };
+type FeatureCollection = { type: "FeatureCollection"; features: Feature[] };
+
+type Level = "country" | "province" | "district";
+
+const DEFAULT_LONGDO_KEY = "014d3a8670f605c055dfadcbb59a35a2";
+
+let longdoScriptPromise: Promise<void> | null = null;
+
+const resolveLongdoKey = () => {
+  const envKey = (import.meta as any)?.env?.VITE_LONGDO_MAP_KEY as string | undefined;
+  return envKey || DEFAULT_LONGDO_KEY;
+};
+
+const loadLongdoMap2D = async () => {
+  if (typeof window === "undefined") return;
+  if (window.longdo) return;
+  if (longdoScriptPromise) {
+    await longdoScriptPromise;
+    return;
+  }
+
+  const key = resolveLongdoKey();
+  longdoScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-longdo="map2"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Failed to load Longdo Map script")));
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.defer = true;
+    script.dataset.longdo = "map2";
+    script.src = `https://api.longdo.com/map/?key=${encodeURIComponent(key)}`;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Longdo Map script"));
+    document.head.appendChild(script);
+  });
+
+  await longdoScriptPromise;
+};
+
+function ringToLonLat(ring: number[][]): LonLat[] {
+  return ring.map(([lon, lat]) => ({ lon, lat }));
+}
+
+function geometryToOuterRings(geometry?: Geometry | null): LonLat[][] {
+  if (!geometry) return [];
+  if (geometry.type === "Polygon") {
+    const coords = geometry.coordinates as number[][][];
+    return coords?.[0] ? [ringToLonLat(coords[0])] : [];
+  }
+  if (geometry.type === "MultiPolygon") {
+    const coords = geometry.coordinates as number[][][][];
+    return (coords || []).map((polygon) => ringToLonLat(polygon[0] || []));
+  }
+  return [];
+}
+
+function geometryCentroid(geometry?: Geometry | null): LonLat | null {
+  const rings = geometryToOuterRings(geometry);
+  const points = rings.flat();
+  if (!points.length) return null;
+  const sum = points.reduce(
+    (acc, p) => ({ lon: acc.lon + p.lon, lat: acc.lat + p.lat }),
+    { lon: 0, lat: 0 }
+  );
+  return { lon: sum.lon / points.length, lat: sum.lat / points.length };
+}
+
+function featuresBound(features: Feature[]): { minLon: number; minLat: number; maxLon: number; maxLat: number } | null {
+  let minLon = Infinity;
+  let minLat = Infinity;
+  let maxLon = -Infinity;
+  let maxLat = -Infinity;
+
+  for (const feature of features) {
+    const rings = geometryToOuterRings(feature.geometry);
+    for (const ring of rings) {
+      for (const point of ring) {
+        if (point.lon < minLon) minLon = point.lon;
+        if (point.lon > maxLon) maxLon = point.lon;
+        if (point.lat < minLat) minLat = point.lat;
+        if (point.lat > maxLat) maxLat = point.lat;
+      }
+    }
+  }
+
+  if (!Number.isFinite(minLon)) return null;
+  return { minLon, minLat, maxLon, maxLat };
+}
+
+function buildFallbackSitePoints(notis: Noti[]): SitePoint[] {
+  const byName = new globalThis.Map<string, SitePoint>();
+  for (const item of notis) {
+    const lat = item.coords?.lat ?? item.lat;
+    const lng = item.coords?.lng ?? item.lng;
+    const name = item.siteName || item.site || "Unknown";
+    if (typeof lat !== "number" || typeof lng !== "number") continue;
+    if (byName.has(name)) continue;
+    byName.set(name, {
+      name,
+      lat,
+      lng,
+      code: item.siteCode,
+      id: item.siteId,
+    });
+  }
+  return [...byName.values()];
+}
+
+function isProvinceMatch(feature: Feature, provinceKey: string) {
+  const key = String(provinceKey || "").trim();
+  if (!key) return false;
+  const proTh = String(feature.properties?.pro_th ?? "").trim();
+  const proEn = String(feature.properties?.pro_en ?? "").trim();
+  return key === proTh || key === proEn;
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const earthRadius = 6371000;
+  const dLat = toRadians(b.lat - a.lat);
+  const dLon = toRadians(b.lng - a.lng);
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return earthRadius * c;
+}
 
 export default function Map({
   notis,
-  aggregateBySite = true,
-  severityFilter,
   focusProvince,
   focusSiteCenter,
   onProvinceChange,
@@ -30,96 +163,60 @@ export default function Map({
   sitePoints,
   pinStatusBySite,
 }: Props) {
-  const { t, i18n } = useTranslation(["dashboard"]);
+  const { t } = useTranslation(["dashboard"]);
 
-  const mapRef = useRef<L.Map | null>(null);
-  const provincesLayerRef = useRef<L.GeoJSON<any> | null>(null);
-  const districtsLayerRef = useRef<L.GeoJSON<any> | null>(null);
-  const baseTileLayerRef = useRef<L.TileLayer | null>(null);
-  const thLayerRef = useRef<L.GeoJSON<any> | null>(null);
-  const overlayLayerRef = useRef<L.Polygon | null>(null);
-  const markersLayerRef = useRef<L.LayerGroup | null>(null);
-  const provinceCentersRef = useRef<Record<string, L.LatLngLiteral>>({});
-  const provinceCodeByNameRef = useRef<Record<string, string>>({});
-  const provinceRingsByNameRef = useRef<Record<string, L.LatLngExpression[][]>>({});
-  const provinceBoundsByNameRef = useRef<Record<string, L.LatLngBounds>>({});
-  const districtsGeojsonRef = useRef<any | null>(null);
-  const districtRequestIdRef = useRef(0);
-  const pendingReturnToProvinceKeyRef = useRef<string | null>(null);
-  const rebuildingMapRef = useRef(false);
-  const suppressProvinceFocusEffectRef = useRef(false);
-  const ignoreNextFocusProvinceKeyRef = useRef<string | null>(null);
-  const countryRingsRef = useRef<L.LatLngExpression[][]>([]);
-  const selectedProvinceKeyRef = useRef<string | null>(null);
-  const selectedProvinceCodeRef = useRef<string | null>(null);
-  const worldOuterRingRef = useRef<L.LatLngExpression[]>([
-    [-85, -360],
-    [85, -360],
-    [85, 360],
-    [-85, 360],
-    [-85, -360],
-  ]);
-  const currentLevelRef = useRef<"country" | "province" | "district">("country");
-  const provinceReturnViewRef = useRef<{
-    center: L.LatLngLiteral;
-    zoom: number;
-    provinceKey: string;
-    proCode?: string;
-    rings?: L.LatLngExpression[][];
-    bounds?: L.LatLngBounds;
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const leafletContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const leafletMapRef = useRef<L.Map | null>(null);
+  const leafletMarkerRef = useRef<L.Marker | null>(null);
+  const leafletLevelMarkersRef = useRef<L.Marker[]>([]);
+  const initializedRef = useRef(false);
+
+  const provincesRef = useRef<Feature[]>([]);
+  const districtsRef = useRef<Feature[]>([]);
+
+  const provinceByOverlayRef = useRef<globalThis.Map<any, Feature>>(new globalThis.Map());
+  const districtByOverlayRef = useRef<globalThis.Map<any, Feature>>(new globalThis.Map());
+  const pinByOverlayRef = useRef<globalThis.Map<any, SitePoint>>(new globalThis.Map());
+
+  const provinceOverlaysRef = useRef<any[]>([]);
+  const districtOverlaysRef = useRef<any[]>([]);
+  const markerOverlaysRef = useRef<any[]>([]);
+  const visibleMarkerSitesRef = useRef<SitePoint[]>([]);
+  const siteByKeyRef = useRef<globalThis.Map<string, SitePoint>>(new globalThis.Map());
+  const lastHoveredPinRef = useRef<{
+    site: SitePoint;
+    clientX: number;
+    clientY: number;
+    at: number;
   } | null>(null);
+  const suppressOverlayClickUntilRef = useRef(0);
+  const maskOverlayRef = useRef<any[] | null>(null);
 
+  const selectedProvinceRef = useRef<Feature | null>(null);
+  const selectedPinRef = useRef<SitePoint | null>(null);
+
+  const [level, setLevel] = useState<Level>("country");
   const [mapReady, setMapReady] = useState(false);
-  const [mapInstanceKey, setMapInstanceKey] = useState(0);
-  const [provincesReadyVersion, setProvincesReadyVersion] = useState(0);
-  const [province3DActive, setProvince3DActive] = useState(false);
-  const [province3DFromPin, setProvince3DFromPin] = useState(false);
-  const [longdoReady, setLongdoReady] = useState(false);
-  const [longdoCenterState, setLongdoCenterState] = useState<L.LatLngLiteral>({
-    lat: 13.736717,
-    lng: 100.523186,
-  });
-  // Track the current map level as state to trigger marker re-renders when level changes
-  const [mapLevelState, setMapLevelState] = useState<"country" | "province" | "district">("country");
-  // Track marker info for 3D view
-  const [longdoMarkerInfo, setLongdoMarkerInfo] = useState<{ title: string; detail: string; color?: string } | null>(null);
-
-  const resolveSiteElectricStatus = (site: { name: string; code?: string; id?: string }) => {
-    const statusByCode = site.code ? pinStatusBySite?.[String(site.code)] : undefined;
-    const statusById = site.id ? pinStatusBySite?.[String(site.id)] : undefined;
-    const statusByName = pinStatusBySite?.[String(site.name)];
-    return statusByCode ?? statusById ?? statusByName;
-  };
-
-  const resolveSitePinColor = (site: { name: string; code?: string; id?: string }) => {
-    const electricStatus = resolveSiteElectricStatus(site);
-    if (!electricStatus?.hasElectric) return "#003a81";
-    return electricStatus.electricOffline > 0 ? "#EF4444" : "#16A34A";
-  };
-
-  const buildLongdoDetail = (site: { name: string; code?: string; id?: string }) => {
-    const parts: string[] = [];
-    const electricStatus = resolveSiteElectricStatus(site);
-    if (electricStatus?.hasElectric) {
-      parts.push(`Electric: ${electricStatus.electricOnline}/${electricStatus.electricOffline}`);
-    }
-    return parts.join(" • ");
-  };
-
-  // Saved country view and bounds for consistent resets
-  const savedCountryViewRef = useRef<{ center: L.LatLngLiteral; zoom: number; bounds: L.LatLngBounds } | null>(null);
-  const countryResetAnimTokenRef = useRef(0);
-  const resizingGuardRef = useRef(false);
+  const levelRef = useRef<Level>("country");
+  const districtReturnLevelRef = useRef<"country" | "province">("province");
+  const [districtViewState, setDistrictViewState] = useState<{
+    center: { lat: number; lng: number };
+    lockMapToCenter: boolean;
+    markerSite: SitePoint | null;
+  } | null>(null);
+  const ignoreFocusSiteKeyRef = useRef<string | null>(null);
+  const [pinTooltip, setPinTooltip] = useState<{
+    visible: boolean;
+    text: string;
+    left: number;
+    top: number;
+  }>({ visible: false, text: "", left: 0, top: 0 });
 
   const focusProvinceKey =
-    focusProvince && String(focusProvince).toLowerCase() !== "all"
-      ? focusProvince
-      : null;
+    focusProvince && String(focusProvince).toLowerCase() !== "all" ? String(focusProvince) : null;
 
-  const shouldShowLongdo = province3DActive;
-  const isProvince3DView = shouldShowLongdo;
-  const DEBUG_MAP_FLOW = true;
-  const mapElementId = `th-map-${mapInstanceKey}`;
   const zoomOutButtonInlineStyle: CSSProperties = {
     padding: "6px 10px",
     background: "#ffffff",
@@ -133,1826 +230,1161 @@ export default function Map({
     fontFamily: "inherit",
   };
 
-  const createBaseTileLayer = () =>
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      minZoom: 2,
-      attribution: "&copy; OpenStreetMap contributors",
-      className: "grayscale-tiles",
-    });
+  const allSitePoints = useMemo(() => {
+    if (Array.isArray(sitePoints) && sitePoints.length > 0) return sitePoints;
+    return buildFallbackSitePoints(notis);
+  }, [notis, sitePoints]);
 
-  const ensureBaseTileLayer = (forceRecreate = false) => {
+  const resolveSiteElectricStatus = (site: { name: string; code?: string; id?: string }) => {
+    const statusByCode = site.code ? pinStatusBySite?.[String(site.code)] : undefined;
+    const statusById = site.id ? pinStatusBySite?.[String(site.id)] : undefined;
+    const statusByName = pinStatusBySite?.[String(site.name)];
+    return statusByCode ?? statusById ?? statusByName;
+  };
+
+  const resolveSitePinColor = (site: { name: string; code?: string; id?: string }) => {
+    const electricStatus = resolveSiteElectricStatus(site);
+    if (!electricStatus?.hasElectric) return "#003a81";
+    if (electricStatus.electricOffline > 0) return "#EF4444";
+    return "#16A34A";
+  };
+
+  const isSiteAlertPin = (site: { name: string; code?: string; id?: string }) => {
+    const electricStatus = resolveSiteElectricStatus(site);
+    return !!electricStatus?.hasElectric && electricStatus.electricOffline > 0;
+  };
+
+  const buildPinSvg = (pinColor: string) => {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="41" viewBox="0 0 28 41"><path d="M14 0c7.732 0 14 6.268 14 14 0 9.941-14 27-14 27S0 23.941 0 14C0 6.268 6.268 0 14 0z" fill="${pinColor}"/><circle cx="14" cy="13.5" r="6" fill="#FFFFFF"/></svg>`;
+  };
+
+  const createLeafletSiteIcon = (site: SitePoint) => {
+    const pinColor = resolveSitePinColor(site);
+    const svg = buildPinSvg(pinColor);
+
+    return L.divIcon({
+      className: "bps-leaflet-pin",
+      html: `<span class="bps-leaflet-pin-inner">${svg}</span>`,
+      iconSize: [28, 41],
+      iconAnchor: [14, 41],
+      tooltipAnchor: [0, -34],
+    });
+  };
+
+  const clearOverlayList = (listRef: React.MutableRefObject<any[]>) => {
     const map = mapRef.current;
     if (!map) return;
+    for (const overlay of listRef.current) {
+      try {
+        map.Overlays.remove(overlay);
+      } catch {}
+    }
+    listRef.current = [];
+  };
 
-    let tileLayer = baseTileLayerRef.current;
-    const container = (tileLayer as any)?._container as HTMLElement | undefined;
-    const layerInvalid =
-      !tileLayer ||
-      !map.hasLayer(tileLayer) ||
-      !container ||
-      !container.isConnected;
+  const clearMask = () => {
+    const map = mapRef.current;
+    if (!map || !maskOverlayRef.current) return;
+    maskOverlayRef.current.forEach((mask) => {
+      try {
+        map.Overlays.remove(mask);
+      } catch {}
+    });
+    maskOverlayRef.current = null;
+  };
 
-    if (forceRecreate || layerInvalid) {
-      if (tileLayer && map.hasLayer(tileLayer)) {
-        try {
-          map.removeLayer(tileLayer);
-        } catch {}
+  const setMapInteractive = (enabled: boolean) => {
+    const map = mapRef.current;
+    if (!map) return;
+    try {
+      map.Ui?.Mouse?.enableDrag(enabled);
+      map.Ui?.Mouse?.enableWheel(enabled);
+      map.Ui?.Mouse?.enableClick(true);
+      map.Ui?.Keyboard?.enable(enabled);
+    } catch {}
+  };
+
+  const setZoomRange = (min: number, max: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+    try {
+      map.zoomRange({ min, max });
+    } catch {}
+  };
+
+  const fitFeatures = (features: Feature[], allowZoomIn = true) => {
+    const map = mapRef.current;
+    if (!map || !features.length) return;
+    const bound = featuresBound(features);
+    if (!bound) return;
+    try {
+      map.bound(
+        {
+          minLon: bound.minLon,
+          minLat: bound.minLat,
+          maxLon: bound.maxLon,
+          maxLat: bound.maxLat,
+        },
+        undefined,
+        allowZoomIn
+      );
+    } catch {}
+  };
+
+  const addProvinceOverlays = () => {
+    const map = mapRef.current;
+    const longdo = window.longdo;
+    if (!map || !longdo) return;
+
+    clearOverlayList(provinceOverlaysRef);
+    provinceByOverlayRef.current.clear();
+
+    const provinceStyle = {
+      lineColor: "rgba(2,132,199,0.95)",
+      fillColor: "rgba(2,132,199,0.16)",
+    };
+
+    for (const feature of provincesRef.current) {
+      const rings = geometryToOuterRings(feature.geometry);
+      for (const ring of rings) {
+        if (!ring.length) continue;
+        const polygon = new longdo.Polygon(ring, {
+          lineWidth: 1.25,
+          lineColor: provinceStyle.lineColor,
+          fillColor: provinceStyle.fillColor,
+          clickable: true,
+          pointer: true,
+        });
+
+        provinceOverlaysRef.current.push(polygon);
+        provinceByOverlayRef.current.set(polygon, feature);
+        map.Overlays.add(polygon);
       }
+    }
+  };
 
-      tileLayer = createBaseTileLayer().addTo(map);
-      baseTileLayerRef.current = tileLayer;
-      logMapFlow("tiles:recreated", {
-        forceRecreate,
-        hadPreviousLayer: Boolean(baseTileLayerRef.current),
+  const addDistrictOverlaysForProvince = (province: Feature) => {
+    const map = mapRef.current;
+    const longdo = window.longdo;
+    if (!map || !longdo) return;
+
+    clearOverlayList(districtOverlaysRef);
+    districtByOverlayRef.current.clear();
+
+    const selectedProCode = String(province.properties?.pro_code ?? "");
+    const inProvince = districtsRef.current.filter(
+      (d) => String(d.properties?.pro_code ?? "") === selectedProCode
+    );
+
+    for (const district of inProvince) {
+      const rings = geometryToOuterRings(district.geometry);
+      for (const ring of rings) {
+        if (!ring.length) continue;
+        const polygon = new longdo.Polygon(ring, {
+          lineWidth: 1,
+          lineColor: "rgba(2,132,199,0.95)",
+          fillColor: "rgba(173,216,230,0.30)",
+          clickable: true,
+          pointer: true,
+        });
+        districtOverlaysRef.current.push(polygon);
+        districtByOverlayRef.current.set(polygon, district);
+        map.Overlays.add(polygon);
+      }
+    }
+  };
+
+  const addMarkers = (clipToProvince: Feature | null) => {
+    const map = mapRef.current;
+    const longdo = window.longdo;
+    if (!map || !longdo) return;
+
+    clearOverlayList(markerOverlaysRef);
+    pinByOverlayRef.current.clear();
+    siteByKeyRef.current.clear();
+
+    const points = allSitePoints;
+    let filtered = points;
+
+    if (clipToProvince) {
+      const proCode = String(clipToProvince.properties?.pro_code ?? "");
+      const districtFeatures = districtsRef.current.filter(
+        (feature) => String(feature.properties?.pro_code ?? "") === proCode
+      );
+
+      filtered = points.filter((site) => {
+        const probe = { lon: site.lng, lat: site.lat };
+        return districtFeatures.some((feature) => {
+          const rings = geometryToOuterRings(feature.geometry);
+          return rings.some((ring) => {
+            try {
+              return !!longdo.Util?.contains?.(probe, ring);
+            } catch {
+              return false;
+            }
+          });
+        });
       });
     }
 
-    try {
-      tileLayer?.bringToBack();
-    } catch {}
-  };
-
-  const normalizeTilePaneState = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const pane = map.getPane("tilePane") as HTMLElement | undefined;
-    if (!pane) return;
-
-    try {
-      pane.style.opacity = "1";
-      pane.style.visibility = "visible";
-      pane.style.display = "block";
-      pane.style.pointerEvents = "none";
-    } catch {}
-
-    const tileLayer = baseTileLayerRef.current as any;
-    const container = tileLayer?._container as HTMLElement | undefined;
-    if (container) {
-      try {
-        container.style.opacity = "1";
-        container.style.visibility = "visible";
-        container.style.display = "block";
-      } catch {}
-    }
-  };
-
-  const forceRestoreTileVisibility = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const tilePane = map.getPane("tilePane") as HTMLElement | undefined;
-    if (tilePane) {
-      try {
-        tilePane.style.opacity = "1";
-        tilePane.style.visibility = "visible";
-        tilePane.style.display = "block";
-        tilePane.style.transition = "";
-        tilePane.style.pointerEvents = "none";
-      } catch {}
-
-      try {
-        const containers = tilePane.querySelectorAll(".leaflet-layer, .leaflet-tile-container");
-        containers.forEach((node) => {
-          const el = node as HTMLElement;
-          el.style.opacity = "1";
-          el.style.visibility = "visible";
-          el.style.display = "block";
-        });
-      } catch {}
-    }
-
-    const tileLayer = baseTileLayerRef.current as any;
-    const layerContainer = tileLayer?._container as HTMLElement | undefined;
-    if (layerContainer) {
-      try {
-        layerContainer.style.opacity = "1";
-        layerContainer.style.visibility = "visible";
-        layerContainer.style.display = "block";
-      } catch {}
-
-      try {
-        const tileImgs = layerContainer.querySelectorAll("img.leaflet-tile");
-        tileImgs.forEach((node) => {
-          const img = node as HTMLImageElement;
-          img.style.opacity = "1";
-          img.style.visibility = "visible";
-          img.style.display = "block";
-          if (!img.classList.contains("leaflet-tile-loaded")) {
-            img.classList.add("leaflet-tile-loaded");
-          }
-        });
-      } catch {}
-    }
-  };
-
-  const logTileDiagnostics = (tag: string) => {
-    if (!DEBUG_MAP_FLOW) return;
-
-    const map = mapRef.current;
-    if (!map) return;
-
-    const tilePane = map.getPane("tilePane") as HTMLElement | undefined;
-    const mapContainer = map.getContainer?.() as HTMLElement | undefined;
-    const tileLayer = baseTileLayerRef.current as any;
-    const layerContainer = tileLayer?._container as HTMLElement | undefined;
-    const tileObjects = Object.values(tileLayer?._tiles ?? {}) as Array<{ el?: HTMLElement }>;
-
-    let loadedTiles = 0;
-    let visibleTiles = 0;
-
-    tileObjects.forEach((obj) => {
-      const el = obj?.el as HTMLImageElement | undefined;
-      if (!el) return;
-
-      if (el.complete && el.naturalWidth > 0) loadedTiles += 1;
-
-      try {
-        const cs = window.getComputedStyle(el);
-        const visible = cs.display !== "none" && cs.visibility !== "hidden" && Number(cs.opacity || "1") > 0;
-        if (visible) visibleTiles += 1;
-      } catch {}
+    filtered = [...filtered].sort((a, b) => {
+      const aAlert = isSiteAlertPin(a);
+      const bAlert = isSiteAlertPin(b);
+      if (aAlert === bAlert) return 0;
+      return aAlert ? 1 : -1;
     });
 
-    const safeStyle = (el?: HTMLElement) => {
-      if (!el) return null;
+    visibleMarkerSitesRef.current = filtered;
+
+    const pinColorDetectCache = new globalThis.Map<string, boolean>();
+
+    const isRedMarkerNode = (node: HTMLImageElement) => {
+      const src = node.getAttribute("src") || "";
+      if (!src.startsWith("data:image/svg+xml;base64,")) return false;
+      if (pinColorDetectCache.has(src)) return !!pinColorDetectCache.get(src);
+
+      let isRed = false;
       try {
-        const cs = window.getComputedStyle(el);
-        return {
-          opacity: cs.opacity,
-          visibility: cs.visibility,
-          display: cs.display,
-        };
+        const base64 = src.slice(src.indexOf(",") + 1);
+        const svg = atob(base64);
+        isRed = svg.includes("#EF4444");
       } catch {
+        isRed = false;
+      }
+
+      pinColorDetectCache.set(src, isRed);
+      return isRed;
+    };
+
+    const applyMarkerPriority = (node: HTMLImageElement) => {
+      const isRed = isRedMarkerNode(node);
+      const priority = isRed ? "2147483647" : "2000";
+      let current: HTMLElement | null = node;
+
+      for (let depth = 0; depth < 10 && current; depth += 1) {
+        current.style.setProperty("z-index", priority, "important");
+        if (!current.style.position || current.style.position === "static") {
+          current.style.setProperty("position", "relative", "important");
+        }
+        current = current.parentElement;
+      }
+    };
+
+    for (const site of filtered) {
+      const pinColor = resolveSitePinColor(site);
+      const iconSvg = buildPinSvg(pinColor);
+      const iconUrl = `data:image/svg+xml;base64,${btoa(iconSvg)}`;
+      const siteKey = `${site.code ?? site.id ?? site.name}__${site.lat},${site.lng}`;
+      siteByKeyRef.current.set(siteKey, site);
+
+      const marker = new longdo.Marker(
+        { lon: site.lng, lat: site.lat },
+        {
+          title: site.name,
+          icon: {
+            url: iconUrl,
+            offset: { x: 14, y: 41 },
+          },
+          weight: longdo.OverlayWeight?.Top,
+        }
+      );
+
+      markerOverlaysRef.current.push(marker);
+      pinByOverlayRef.current.set(marker, site);
+      map.Overlays.add(marker);
+    }
+
+    const bindAndPrioritizeMarkerDom = () => {
+      const root = mapContainerRef.current;
+      if (!root) return;
+      try {
+        const markerElements = Array.from(
+          root.querySelectorAll('img[src^="data:image/svg+xml;base64"], img[src^="data:image/svg"]')
+        ) as HTMLImageElement[];
+
+        const markerTail = markerElements.slice(-filtered.length);
+
+        markerTail.forEach((node, index) => {
+          const site = filtered[index];
+          if (!site || !node) return;
+          const siteKey = `${site.code ?? site.id ?? site.name}__${site.lat},${site.lng}`;
+          node.title = site.name;
+          node.setAttribute("aria-label", site.name);
+          node.dataset.siteName = site.name;
+          node.dataset.siteKey = siteKey;
+          node.style.pointerEvents = "auto";
+          applyMarkerPriority(node);
+
+          if (node.dataset.pinHoverBound === "1") return;
+
+          const onEnter = (ev: MouseEvent) => {
+            if (levelRef.current === "district") return;
+            const rect = root.getBoundingClientRect();
+            setPinTooltip({
+              visible: true,
+              text: site.name,
+              left: ev.clientX - rect.left,
+              top: ev.clientY - rect.top - 14,
+            });
+          };
+
+          const onMove = (ev: MouseEvent) => {
+            if (levelRef.current === "district") return;
+            const rect = root.getBoundingClientRect();
+            setPinTooltip((prev) =>
+              prev.visible
+                ? {
+                    ...prev,
+                    left: ev.clientX - rect.left,
+                    top: ev.clientY - rect.top - 14,
+                  }
+                : prev
+            );
+          };
+
+          const onLeave = () => {
+            setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+          };
+
+          node.addEventListener("mouseenter", onEnter);
+          node.addEventListener("mousemove", onMove);
+          node.addEventListener("mouseleave", onLeave);
+          node.dataset.pinHoverBound = "1";
+        });
+
+        markerElements.forEach((node) => {
+          const siteKey = node.dataset.siteKey || "";
+          const site = siteByKeyRef.current.get(siteKey);
+          if (!site) return;
+
+          node.dataset.siteName = site.name;
+          node.dataset.siteKey = siteKey;
+          applyMarkerPriority(node);
+        });
+      } catch {}
+    };
+
+    [80, 180, 360].forEach((delay) => {
+      window.setTimeout(() => {
+        bindAndPrioritizeMarkerDom();
+      }, delay);
+    });
+  };
+
+  const resolveMarkerSiteFromPointer = (clientX: number, clientY: number): SitePoint | null => {
+    if (typeof document === "undefined") return null;
+
+    const stack = document.elementsFromPoint(clientX, clientY);
+    for (const el of stack) {
+      if (!(el instanceof HTMLImageElement)) continue;
+      const src = el.getAttribute("src") || "";
+      if (!src.startsWith("data:image/svg")) continue;
+
+      const siteKey = el.dataset.siteKey || "";
+      if (siteKey) {
+        const byKey = siteByKeyRef.current.get(siteKey);
+        if (byKey) return byKey;
+      }
+
+      const name = el.dataset.siteName || el.getAttribute("aria-label") || el.title || "";
+      if (!name.trim()) continue;
+      const byName = visibleMarkerSitesRef.current.find((site) => site.name === name.trim());
+      if (byName) return byName;
+    }
+
+    return null;
+  };
+
+  const resolveHoveredPinFromPointer = (clientX: number, clientY: number) => {
+    const markerSite = resolveMarkerSiteFromPointer(clientX, clientY);
+    if (markerSite) {
+      return {
+        site: markerSite,
+        name: markerSite.name,
+        left: clientX,
+        top: clientY,
+      };
+    }
+
+    const root = mapContainerRef.current;
+    if (!root) return null;
+
+    const markerElements = Array.from(
+      root.querySelectorAll('img[data-site-name], img[aria-label][src^="data:image/svg+xml;base64"], img[aria-label][src^="data:image/svg"]')
+    ) as HTMLImageElement[];
+
+    for (const markerEl of markerElements) {
+      const rect = markerEl.getBoundingClientRect();
+      const hitPad = 6;
+      const hit =
+        clientX >= rect.left - hitPad &&
+        clientX <= rect.right + hitPad &&
+        clientY >= rect.top - hitPad &&
+        clientY <= rect.bottom + hitPad;
+      if (!hit) continue;
+
+      const name =
+        markerEl.dataset.siteName || markerEl.getAttribute("aria-label") || markerEl.title || "";
+      if (name.trim()) {
+        const markerSiteByName = visibleMarkerSitesRef.current.find((site) => site.name === name.trim()) || null;
+        return {
+          site: markerSiteByName,
+          name: name.trim(),
+          left: clientX,
+          top: clientY,
+        };
+      }
+    }
+
+    return null;
+  };
+
+  const handleLongdoPointerMove: React.MouseEventHandler<HTMLDivElement> = (event) => {
+    if (levelRef.current === "district") return;
+    const root = mapContainerRef.current;
+    if (!root) return;
+
+    const hovered = (() => {
+      const byDom = resolveHoveredPinFromPointer(event.clientX, event.clientY);
+      if (byDom) return byDom;
+
+      const map = mapRef.current;
+      const longdo = window.longdo;
+      if (!map || !longdo) return null;
+
+      let pointerLoc: any = null;
+      try {
+        pointerLoc = map.location(longdo.LocationMode.Pointer);
+      } catch {
+        pointerLoc = null;
+      }
+
+      if (!pointerLoc || !Number.isFinite(pointerLoc.lat) || !Number.isFinite(pointerLoc.lon)) {
         return null;
       }
-    };
 
-    console.log("[MapFlow][TileDiag]", tag, {
-      level: currentLevelRef.current,
-      province3DActive,
-      hasTileLayer: Boolean(tileLayer && map.hasLayer(tileLayer)),
-      tileObjects: tileObjects.length,
-      loadedTiles,
-      visibleTiles,
-      mapContainerStyle: safeStyle(mapContainer),
-      tilePaneStyle: safeStyle(tilePane),
-      tileLayerContainerStyle: safeStyle(layerContainer),
-    });
-  };
+      let currentZoom = 6;
+      try {
+        const z = map.zoom?.();
+        if (Number.isFinite(z)) currentZoom = Number(z);
+      } catch {}
 
-  const recoverTilesIfBlank = (tag: string) => {
-    const map = mapRef.current;
-    if (!map) return;
+      const metersPerPixel =
+        (156543.03392 * Math.cos((Number(pointerLoc.lat) * Math.PI) / 180)) /
+        Math.pow(2, currentZoom);
+      const hoverRadiusMeters = Math.max(80, metersPerPixel * 24);
 
-    const tileLayer = baseTileLayerRef.current as any;
-    const tileObjects = Object.values(tileLayer?._tiles ?? {}) as Array<{ el?: HTMLElement }>;
-    const loadedTiles = tileObjects.filter((obj) => {
-      const el = obj?.el as HTMLImageElement | undefined;
-      return Boolean(el && el.complete && el.naturalWidth > 0);
-    }).length;
+      let nearest: SitePoint | null = null;
+      let nearestDistance = Number.POSITIVE_INFINITY;
 
-    if (loadedTiles > 0) return;
-
-    logMapFlow("tiles:recover-blank", {
-      tag,
-      tileObjects: tileObjects.length,
-      loadedTiles,
-    });
-
-    ensureBaseTileLayer(true);
-    forceRestoreTileVisibility();
-    normalizeTilePaneState();
-    map.invalidateSize({ animate: false });
-    try {
-      baseTileLayerRef.current?.redraw();
-    } catch {}
-  };
-
-  const logMapFlow = (event: string, extra?: Record<string, unknown>) => {
-    if (!DEBUG_MAP_FLOW) return;
-    const map = mapRef.current;
-    const mapState = map
-      ? {
-          zoom: Number(map.getZoom().toFixed(3)),
-          center: map.getCenter(),
-          hasProvincesLayer: Boolean(provincesLayerRef.current && map.hasLayer(provincesLayerRef.current)),
-          hasDistrictsLayer: Boolean(districtsLayerRef.current && map.hasLayer(districtsLayerRef.current)),
-          hasOverlayLayer: Boolean(overlayLayerRef.current && map.hasLayer(overlayLayerRef.current)),
+      for (const site of visibleMarkerSitesRef.current) {
+        const distance = haversineMeters(
+          { lat: Number(pointerLoc.lat), lng: Number(pointerLoc.lon) },
+          { lat: site.lat, lng: site.lng }
+        );
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearest = site;
         }
-      : { map: "not-ready" };
+      }
 
-    console.log("[MapFlow]", event, {
-      level: currentLevelRef.current,
-      focusProvinceKey,
-      selectedProvinceKey: selectedProvinceKeyRef.current,
-      province3DActive,
-      longdoReady,
-      suppressProvinceFocusEffect: suppressProvinceFocusEffectRef.current,
-      ...mapState,
-      ...(extra ?? {}),
-    });
-  };
+      if (!nearest || nearestDistance > hoverRadiusMeters) return null;
 
-  // Preload Longdo Map script early
-  useEffect(() => {
-    preloadLongdoMap3().catch(() => undefined);
-  }, []);
+      return {
+        site: nearest,
+        name: nearest.name,
+        left: event.clientX,
+        top: event.clientY,
+      };
+    })();
 
-  // Fit map to Thailand bounds and save the view
-  const fitThailand = () => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const sz = map.getSize();
-    if (sz.x === 0 || sz.y === 0) return;
-
-    const vw = typeof window !== "undefined" ? window.innerWidth : sz.x;
-    const pad = responsivePadding(sz.x, sz.y, vw);
-
-    map.fitBounds(TH_BOUNDS as any, {
-      animate: false,
-      paddingTopLeft: [pad.x, pad.y],
-      paddingBottomRight: [pad.x, pad.y],
-    });
-
-    const baseZoom = map.getZoom();
-    const zoom = baseZoom + 0.5;
-    map.setZoom(zoom, { animate: false });
-
-    // Save this exact view and bounds
-    const center = map.getCenter();
-    const bounds = map.getBounds();
-    savedCountryViewRef.current = {
-      center: { lat: center.lat, lng: center.lng },
-      zoom,
-      bounds,
-    };
-    map.setMinZoom(Math.max(5, zoom - 0.1));
-    map.setMaxZoom(19);
-  };
-
-  const setMapInteractivity = (enabled: boolean) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (enabled) {
-      map.dragging.enable();
-      map.scrollWheelZoom.enable();
-      map.doubleClickZoom.enable();
-      map.boxZoom.enable();
-      map.touchZoom.enable();
-      map.keyboard.enable();
+    if (!hovered) {
+      lastHoveredPinRef.current = null;
+      setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
       return;
     }
 
-    map.dragging.disable();
-    map.scrollWheelZoom.disable();
-    map.doubleClickZoom.disable();
-    map.boxZoom.disable();
-    map.touchZoom.disable();
-    map.keyboard.disable();
-  };
-
-  const updateZoomOutControlVisibility = () => {
-    const btn = document.getElementById("zoom-out-control");
-    if (!btn) return;
-    // Show when not at country level (3D uses its own JSX button)
-    const show = currentLevelRef.current !== "country";
-    btn.style.display = show ? "block" : "none";
-  };
-
-  const clearDistrictLayer = () => {
-    const map = mapRef.current;
-    const layer = districtsLayerRef.current;
-    if (!map || !layer) return;
-    if (map.hasLayer(layer)) map.removeLayer(layer);
-    districtsLayerRef.current = null;
-  };
-
-  const setOverlayRings = (rings: L.LatLngExpression[][]) => {
-    const overlay = overlayLayerRef.current;
-    const map = mapRef.current;
-    if (!overlay || !map) return;
-    overlay.setLatLngs([worldOuterRingRef.current, ...rings] as any);
-    // Ensure overlay is on map and visible
-    if (!map.hasLayer(overlay)) {
-      overlay.addTo(map);
+    if (hovered.site) {
+      lastHoveredPinRef.current = {
+        site: hovered.site,
+        clientX: event.clientX,
+        clientY: event.clientY,
+        at: Date.now(),
+      };
     }
-    try {
-      overlay.bringToFront();
-      overlay.redraw();
-    } catch {}
-    // Force Leaflet to update the overlay bounds immediately with multiple passes
-    for (let i = 0; i < 3; i++) {
-      requestAnimationFrame(() => {
-        try {
-          overlay.bringToFront();
-          overlay.redraw();
-        } catch {}
-      });
-    }
+
+    const rect = root.getBoundingClientRect();
+    setPinTooltip({
+      visible: true,
+      text: hovered.name,
+      left: hovered.left - rect.left,
+      top: hovered.top - rect.top - 14,
+    });
   };
 
-  const setProvinceStyleMode = (
-    mode: "country" | "province",
-    selectedKey?: string,
-    selectedCode?: string
-  ) => {
-    const layer = provincesLayerRef.current;
-    if (!layer) return;
+  const handleLongdoPointerLeave: React.MouseEventHandler<HTMLDivElement> = () => {
+    lastHoveredPinRef.current = null;
+    setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+  };
 
-    let selectedCount = 0;
+  const handleLongdoRootClickCapture: React.MouseEventHandler<HTMLDivElement> = (event) => {
+    if (levelRef.current === "district") return;
 
-    layer.eachLayer((ly: any) => {
-      const feature = ly?.feature;
-      const th = String(feature?.properties?.pro_th ?? "");
-      const en = String(feature?.properties?.pro_en ?? "");
-      const code = String(feature?.properties?.pro_code ?? "");
-      const isSelected = Boolean(
-        (selectedCode && selectedCode === code) ||
-          (selectedKey && (selectedKey === th || selectedKey === en))
-      );
-      if (isSelected) selectedCount += 1;
+    const now = Date.now();
+    const hovered = lastHoveredPinRef.current;
+    let markerSite: SitePoint | null = null;
 
-      if (mode === "country") {
-        try {
-          (ly as any).options = {
-            ...((ly as any).options ?? {}),
-            interactive: true,
-          };
-        } catch {}
-        (ly as L.Path).setStyle(provinceDefaultStyleFor(feature));
-        return;
+    if (hovered && now - hovered.at <= 1400) {
+      const dx = event.clientX - hovered.clientX;
+      const dy = event.clientY - hovered.clientY;
+      if (dx * dx + dy * dy <= 30 * 30) {
+        markerSite = hovered.site;
       }
-
-      try {
-        (ly as any).options = {
-          ...((ly as any).options ?? {}),
-          interactive: false,
-        };
-      } catch {}
-
-      (ly as L.Path).setStyle({
-        color: EDGE,
-        weight: isSelected ? 1.8 : 0,
-        fill: false,
-        fillOpacity: 0,
-        opacity: isSelected ? 1 : 0,
-      });
-    });
-
-    if (mode === "province") {
-      logMapFlow("setProvinceStyleMode:province", {
-        selectedKey,
-        selectedCode,
-        selectedCount,
-      });
     }
+
+    if (!markerSite) {
+      markerSite = resolveMarkerSiteFromPointer(event.clientX, event.clientY);
+    }
+
+    if (!markerSite) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    suppressOverlayClickUntilRef.current = Date.now() + 300;
+    handlePinSelection(markerSite, true);
+    setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
   };
 
-  const restoreProvinceLayerForCountry = () => {
-    const layer = provincesLayerRef.current;
-    if (!layer) return;
+  const resolveLeafletMarkers = () => {
+    const inProvince = selectedProvinceRef.current;
+    if (!inProvince) return allSitePoints;
 
-    layer.eachLayer((ly: any) => {
-      const feature = ly?.feature;
-      (ly as L.Path).setStyle(provinceDefaultStyleFor(feature));
-      try {
-        (ly as any).options = {
-          ...((ly as any).options ?? {}),
-          interactive: true,
-        };
-      } catch {}
-      try {
-        (ly as any).bringToFront?.();
-      } catch {}
-    });
-  };
+    const proCode = String(inProvince.properties?.pro_code ?? "");
+    const districtFeatures = districtsRef.current.filter(
+      (feature) => String(feature.properties?.pro_code ?? "") === proCode
+    );
 
-  const refreshLeafletView = () => {
-    const map = mapRef.current;
-    if (!map) return;
-    ensureBaseTileLayer(false);
-    normalizeTilePaneState();
-    const tileLayer = baseTileLayerRef.current;
-
-    requestAnimationFrame(() => {
-      try {
-        map.invalidateSize(false);
-        try {
-          tileLayer?.redraw();
-        } catch {}
-        map.eachLayer((ly: any) => {
-          if (typeof ly?.redraw === "function") {
-            ly.redraw();
+    return allSitePoints.filter((site) => {
+      const probe = { lon: site.lng, lat: site.lat };
+      return districtFeatures.some((feature) => {
+        const rings = geometryToOuterRings(feature.geometry);
+        return rings.some((ring) => {
+          try {
+            return !!window.longdo?.Util?.contains?.(probe, ring);
+          } catch {
+            return false;
           }
         });
-        normalizeTilePaneState();
-
-        window.setTimeout(() => {
-          const activeTileLayer = baseTileLayerRef.current;
-          const tiles = activeTileLayer ? Object.keys((activeTileLayer as any)?._tiles ?? {}).length : 0;
-          if (tiles === 0) {
-            logMapFlow("tiles:empty-after-refresh", { tiles });
-            ensureBaseTileLayer(true);
-            try {
-              baseTileLayerRef.current?.redraw();
-            } catch {}
-          }
-        }, 180);
-      } catch {}
-    });
-  };
-
-  const extractRingsFromLayer = (layerObj: L.Layer): L.LatLngExpression[][] => {
-    const rings: L.LatLngExpression[][] = [];
-    const raw = (layerObj as any)?.getLatLngs?.();
-    if (!raw) return rings;
-
-    const walk = (node: any) => {
-      if (!Array.isArray(node) || node.length === 0) return;
-      const first = node[0];
-      if (
-        first &&
-        (first instanceof L.LatLng ||
-          (typeof first.lat === "number" && typeof first.lng === "number"))
-      ) {
-        rings.push(node.map((p: any) => [p.lat, p.lng]));
-        return;
-      }
-      node.forEach(walk);
-    };
-
-    walk(raw);
-    return rings;
-  };
-
-  const extractOuterRingsLatLng = (geo: any): L.LatLngExpression[][] => {
-    const rings: L.LatLngExpression[][] = [];
-    const toLatLngRing = (ring: number[][]) => ring.map(([lng, lat]) => [lat, lng] as L.LatLngExpression);
-    if (!geo) return rings;
-    if (geo.type === "Polygon" && Array.isArray(geo.coordinates?.[0])) {
-      rings.push(toLatLngRing(geo.coordinates[0]));
-    } else if (geo.type === "MultiPolygon" && Array.isArray(geo.coordinates)) {
-      geo.coordinates.forEach((poly: number[][][]) => {
-        if (Array.isArray(poly?.[0])) rings.push(toLatLngRing(poly[0]));
       });
-    }
-    return rings;
+    });
   };
 
-  const selectProvince = (
-    selected: string,
-    feature: any,
-    layerObj: L.Layer,
-    source: "layer-click" | "map-fallback"
-  ) => {
-    logMapFlow("province:select", {
-      selected,
-      source,
-      proCode: String(feature?.properties?.pro_code ?? ""),
-    });
+  const enterCountryLevel = () => {
+    selectedProvinceRef.current = null;
+    selectedPinRef.current = null;
+    setLevel("country");
+    levelRef.current = "country";
+    districtReturnLevelRef.current = "country";
+    setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
 
-    if (!selected || selected === "all") {
-      onProvinceChange?.("all");
-      return;
-    }
+    clearOverlayList(districtOverlaysRef);
+    addProvinceOverlays();
+    clearMask();
+    addMarkers(null);
+    setDistrictViewState(null);
 
-    suppressProvinceFocusEffectRef.current = false;
-    selectedProvinceKeyRef.current = selected;
-    ignoreNextFocusProvinceKeyRef.current = selected;
-    const clickedProCode = String(feature?.properties?.pro_code ?? "");
-    const clickedRingsFromFeature = extractOuterRingsLatLng(feature?.geometry);
-    const clickedRingsFromLayer = extractRingsFromLayer(layerObj);
-    const clickedRings =
-      clickedRingsFromFeature.length > 0
-        ? clickedRingsFromFeature
-        : clickedRingsFromLayer;
-    const clickedBounds = (layerObj as any).getBounds() as L.LatLngBounds;
-    void loadDistrictsForProvince(selected, {
-      proCode: clickedProCode,
-      rings: clickedRings,
-      bounds: clickedBounds,
-    });
-    onProvinceChange?.(selected);
+    setMapInteractive(false);
+    setZoomRange(5.2, 16);
+    fitFeatures(provincesRef.current, true);
+
+    onProvinceChange?.("all");
+    onZoomOutToCountry?.();
   };
 
-  const loadDistrictsForProvince = async (
-    provinceKey: string,
-    overrides?: {
-      proCode?: string;
-      rings?: L.LatLngExpression[][];
-      bounds?: L.LatLngBounds;
-      returnView?: { center: L.LatLngLiteral; zoom: number };
+  const enterProvinceLevel = (province: Feature, preserveSelectedPin = false) => {
+    selectedProvinceRef.current = province;
+    if (!preserveSelectedPin) {
+      selectedPinRef.current = null;
     }
-  ) => {
+    setLevel("province");
+    levelRef.current = "province";
+    districtReturnLevelRef.current = "province";
+    setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+
+    clearOverlayList(provinceOverlaysRef);
+    clearMask();
+    addDistrictOverlaysForProvince(province);
+    addMarkers(province);
+    setDistrictViewState(null);
+
+    setMapInteractive(false);
+    setZoomRange(7, 17);
+    fitFeatures([province], true);
+
+    const selectedName =
+      String(province.properties?.pro_th ?? "") || String(province.properties?.pro_en ?? "") || "all";
+    onProvinceChange?.(selectedName as string | "all");
+  };
+
+  const pointerToLocation = (): LonLat | null => {
     const map = mapRef.current;
-    if (!map) return;
-
-    const proCode = overrides?.proCode ?? provinceCodeByNameRef.current[provinceKey];
-    const provinceRings = overrides?.rings ?? provinceRingsByNameRef.current[provinceKey];
-    const provinceBounds = overrides?.bounds ?? provinceBoundsByNameRef.current[provinceKey];
-    if (!proCode) {
-      logMapFlow("loadDistrictsForProvince:missing-proCode", { provinceKey });
-      clearDistrictLayer();
-      return;
-    }
-
-    const reqId = ++districtRequestIdRef.current;
-    logMapFlow("loadDistrictsForProvince:start", { provinceKey, proCode, reqId });
-
+    const longdo = window.longdo;
+    if (!map || !longdo) return null;
     try {
-      if (!districtsGeojsonRef.current) {
-        const res = await fetch("/data/districts.geojson");
-        if (!res.ok) throw new Error("failed to load districts.geojson");
-        districtsGeojsonRef.current = await res.json();
-      }
-      if (reqId !== districtRequestIdRef.current) return;
-
-      const allFeatures = Array.isArray(districtsGeojsonRef.current?.features)
-        ? districtsGeojsonRef.current.features
-        : [];
-      const filtered = allFeatures.filter(
-        (f: any) =>
-          String(f?.properties?.pro_code) === String(proCode) &&
-          Boolean(f?.properties?.amp_code)
-      );
-      const provinceArea =
-        provinceBounds && provinceBounds.isValid()
-          ? Math.abs(
-              (provinceBounds.getNorthEast().lat - provinceBounds.getSouthWest().lat) *
-                (provinceBounds.getNorthEast().lng - provinceBounds.getSouthWest().lng)
-            )
-          : 0;
-      const sanitized = filtered.filter((f: any) => {
-        if (!provinceArea) return true;
-        try {
-          const b = L.geoJSON(f as any).getBounds();
-          if (!b.isValid()) return false;
-          const area = Math.abs(
-            (b.getNorthEast().lat - b.getSouthWest().lat) *
-              (b.getNorthEast().lng - b.getSouthWest().lng)
-          );
-          const isTooLarge = area > provinceArea * 0.92;
-          if (isTooLarge) {
-            logMapFlow("loadDistrictsForProvince:drop-large-feature", {
-              provinceKey,
-              proCode,
-              ampCode: String(f?.properties?.amp_code ?? ""),
-              area,
-              provinceArea,
-            });
-          }
-          return !isTooLarge;
-        } catch {
-          return false;
-        }
-      });
-      logMapFlow("loadDistrictsForProvince:filtered", {
-        provinceKey,
-        proCode,
-        count: filtered.length,
-        countAfterSanitize: sanitized.length,
-        reqId,
-      });
-
-      clearDistrictLayer();
-
-      // Reset province layer first to avoid stale dim/gray visual artifacts
-      // when returning from 3D back to province view.
-      restoreProvinceLayerForCountry();
-
-      if (provinceRings && provinceRings.length) {
-        setOverlayRings(provinceRings);
-        // Ensure overlay fully covers viewport before any animations
-        const overlay = overlayLayerRef.current;
-        if (overlay) {
-          try {
-            overlay.bringToFront();
-            overlay.redraw();
-          } catch {}
-        }
-      }
-      selectedProvinceCodeRef.current = String(proCode);
-      setProvinceStyleMode("province", provinceKey, String(proCode));
-
-      const layer = L.geoJSON(
-        {
-          type: "FeatureCollection",
-          features: sanitized,
-        } as any,
-        {
-          pane: "districtsPane",
-          style: {
-            ...styleDistrictDefault,
-            className: "district-hitarea",
-            fillOpacity: 0,
-            fill: true,
-            color: EDGE,
-            weight: 2,
-          },
-          onEachFeature: (feature, districtLayer) => {
-            const nameTH = feature?.properties?.amp_th as string | undefined;
-            const nameEN = feature?.properties?.amp_en as string | undefined;
-
-            (districtLayer as L.Path).bindTooltip(nameTH ?? nameEN ?? "", {
-              direction: "top",
-              sticky: true,
-              offset: L.point(0, -10),
-              className: "district-label",
-            });
-
-            districtLayer.on("mouseover", () => {
-              (districtLayer as L.Path).setStyle({
-                ...styleDistrictDefault,
-                className: "district-hitarea",
-                fillOpacity: 0,
-                fill: true,
-                color: EDGE,
-                weight: 2.6,
-              });
-              (districtLayer as any).openTooltip?.();
-            });
-
-            districtLayer.on("mouseout", () => {
-              (districtLayer as L.Path).setStyle({
-                ...styleDistrictDefault,
-                className: "district-hitarea",
-                fillOpacity: 0,
-                fill: true,
-                color: EDGE,
-                weight: 2,
-              });
-              (districtLayer as any).closeTooltip?.();
-            });
-
-            districtLayer.on("click", (ev: L.LeafletMouseEvent) => {
-              const clicked = ev.latlng ?? (districtLayer as any).getBounds().getCenter();
-              logMapFlow("district:click", { clicked });
-              try {
-                (layer as L.GeoJSON).setStyle({
-                  ...styleDistrictDefault,
-                  className: "district-hitarea",
-                  fillOpacity: 0,
-                  fill: true,
-                  color: EDGE,
-                  weight: 2,
-                });
-              } catch {}
-              const provinceKeyForReturn = selectedProvinceKeyRef.current ?? provinceKey;
-              provinceReturnViewRef.current = {
-                center: {
-                  lat: map.getCenter().lat,
-                  lng: map.getCenter().lng,
-                },
-                zoom: map.getZoom(),
-                provinceKey: provinceKeyForReturn,
-                proCode,
-                rings: provinceRings,
-                bounds: provinceBounds,
-              };
-              currentLevelRef.current = "district";
-              setMapLevelState("district");
-              updateZoomOutControlVisibility();
-              setLongdoCenterState({ lat: clicked.lat, lng: clicked.lng });
-              // Clear marker info - marker should only show for specific sites, not district centers
-              setLongdoMarkerInfo(null);
-              setProvince3DActive(true);
-              setProvince3DFromPin(false);
-              setLongdoReady(false);
-              setMapInteractivity(false);
-            });
-          },
-        }
-      ).addTo(map);
-
-      districtsLayerRef.current = layer;
-      currentLevelRef.current = "province";
-      setMapLevelState("province");
-      setMapInteractivity(false);
-      updateZoomOutControlVisibility();
-      logMapFlow("loadDistrictsForProvince:layer-added", { provinceKey, reqId });
-      
-      // Ensure districts layer and overlay are fully rendered before animating
-      refreshLeafletView();
-      
-      const overlay = overlayLayerRef.current;
-      if (overlay) {
-        try {
-          overlay.redraw();
-        } catch {}
-      }
-
-      // Wait for multiple frames to guarantee districts and overlay are painted before animation
-      let frameCount = 0;
-      const waitForDistrictRender = () => {
-        frameCount++;
-        if (districtRequestIdRef.current !== reqId) return;
-        
-        // Ensure district layer is visible
-        if (layer) {
-          try {
-            layer.bringToFront();
-          } catch {}
-        }
-        if (overlay) {
-          try {
-            overlay.redraw();
-          } catch {}
-        }
-        
-        // Wait for 4 frames to ensure browser has fully painted the districts and overlay
-        if (frameCount < 4) {
-          requestAnimationFrame(waitForDistrictRender);
-        } else {
-          // Fade tiles back in now that the overlay is fully painted
-          const tilePane = map.getPane("tilePane") as HTMLElement | undefined;
-          if (tilePane && tilePane.style.opacity === "0") {
-            try {
-              tilePane.style.transition = "opacity 0.3s ease";
-              tilePane.style.opacity = "1";
-              setTimeout(() => {
-                try { tilePane.style.transition = ""; } catch {}
-              }, 350);
-            } catch {}
-          }
-
-          // Only now, after full render, start the animation
-          if (overrides?.returnView) {
-            const zBase = Number(overrides.returnView.zoom);
-            const zFrom = Math.min(18, Math.max(zBase + 0.9, zBase));
-            map.setView([overrides.returnView.center.lat, overrides.returnView.center.lng], zFrom, {
-              animate: false,
-            });
-            map.flyTo([overrides.returnView.center.lat, overrides.returnView.center.lng], zBase, {
-              animate: true,
-              duration: 0.45,
-              easeLinearity: 0.25,
-            });
-          } else {
-            const bounds = provinceBounds ?? layer.getBounds();
-            if (bounds.isValid()) {
-              map.flyToBounds(bounds, {
-                animate: true,
-                padding: [0, 0],
-                maxZoom: 10.8,
-                duration: 0.7,
-              });
-            }
-          }
-        }
-      };
-      
-      requestAnimationFrame(waitForDistrictRender);
-    } catch (err) {
-      logMapFlow("loadDistrictsForProvince:error", {
-        provinceKey,
-        message: err instanceof Error ? err.message : String(err),
-      });
-      console.error("[Map] cannot load districts for province", err);
-    }
-  };
-
-  // Reset to country view
-  const resetToCountry = (opts?: { preRenderThenZoomOut?: boolean; smoothFade?: boolean }) => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    logMapFlow("resetToCountry:start");
-
-    setProvince3DActive(false);
-    setProvince3DFromPin(false);
-    setLongdoReady(false);
-    setLongdoCenterState({ lat: 13.736717, lng: 100.523186 });
-    setLongdoMarkerInfo(null);
-    districtRequestIdRef.current += 1;
-    clearDistrictLayer();
-    const overlay = overlayLayerRef.current;
-    if (overlay && !map.hasLayer(overlay)) {
-      overlay.addTo(map);
-    }
-    setOverlayRings(countryRingsRef.current);
-    // Ensure overlay fully covers viewport before country zoom animation - TRIPLE PASS
-    if (overlay) {
-      for (let i = 0; i < 3; i++) {
-        try {
-          overlay.bringToFront();
-          overlay.redraw();
-        } catch {}
-      }
-    }
-    
-    // Ensure province colors are visible before any country zoom animation starts.
-    setProvinceStyleMode("country");
-    restoreProvinceLayerForCountry();
-    
-    selectedProvinceKeyRef.current = null;
-    selectedProvinceCodeRef.current = null;
-    currentLevelRef.current = "country";
-    setMapLevelState("country");
-    setMapInteractivity(false);
-    updateZoomOutControlVisibility();
-
-    try {
-      map.closeTooltip?.();
-      map.closePopup?.();
+      const loc = map.location(longdo.LocationMode.Pointer);
+      if (loc && Number.isFinite(loc.lon) && Number.isFinite(loc.lat)) return { lon: loc.lon, lat: loc.lat };
     } catch {}
+    return null;
+  };
 
+  const resolveOverlayFromEventArg = (eventArg: any) => {
+    if (!eventArg) return null;
+    if (pinByOverlayRef.current.has(eventArg)) return eventArg;
+    if (eventArg.overlay && pinByOverlayRef.current.has(eventArg.overlay)) return eventArg.overlay;
+    if (eventArg.target && pinByOverlayRef.current.has(eventArg.target)) return eventArg.target;
+    if (eventArg.object && pinByOverlayRef.current.has(eventArg.object)) return eventArg.object;
+    return null;
+  };
 
-    map.stop?.();
-    const animToken = ++countryResetAnimTokenRef.current;
+  const extractClientPointFromEventArg = (eventArg: any) => {
+    const raw = eventArg?.event || eventArg?.originalEvent || eventArg;
+    const clientX = raw?.clientX;
+    const clientY = raw?.clientY;
+    if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+      return { clientX: Number(clientX), clientY: Number(clientY) };
+    }
+    return null;
+  };
 
-    if (opts?.preRenderThenZoomOut) {
-      // For animated zoom-out, use saved values to preserve the animation
-      let saved = savedCountryViewRef.current;
-      if (!saved) {
-        fitThailand();
-        saved = savedCountryViewRef.current;
-      }
-      if (!saved) return;
+  const enterDistrictLevel = (
+    center: LonLat,
+    lockMapToCenter: boolean,
+    markerSite: SitePoint | null = null,
+    returnLevel: "country" | "province" = "province"
+  ) => {
+    setLevel("district");
+    levelRef.current = "district";
+    districtReturnLevelRef.current = returnLevel;
+    setDistrictViewState({
+      center: { lat: center.lat, lng: center.lon },
+      lockMapToCenter,
+      markerSite,
+    });
 
-      const nextZoom = Number(saved.zoom);
-      const nextCenter = { lat: saved.center.lat, lng: saved.center.lng };
+    visibleMarkerSitesRef.current = [];
 
-      map.setMinZoom(Math.max(5, nextZoom - 0.1));
-      map.setMaxZoom(19);
-      
-      // STRATEGY: Instantly jump to final country position FIRST, then hide everything
-      // This pre-loads the correct zoom level tiles before we hide them
-      map.setView([nextCenter.lat, nextCenter.lng], nextZoom, { animate: false });
-      
-      // Now hide base tiles completely during zoom-out animation
-      // Only the overlay will be visible during the animated transition
-      const tilePane = map.getPane("tilePane") as HTMLElement | undefined;
-      if (tilePane) {
-        try {
-          tilePane.style.opacity = "0";
-          tilePane.style.visibility = "hidden";
-          tilePane.style.transition = "none";
-        } catch {}
-      }
-      
-      const provincesPane = map.getPane("provincesPane") as HTMLElement | undefined;
-      if (provincesPane) {
-        try {
-          provincesPane.style.opacity = "1";
-          provincesPane.style.visibility = "visible";
-        } catch {}
-      }
+    clearMask();
+    setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+    setMapInteractive(false);
+  };
 
-      map.invalidateSize({ animate: false });
-      const overlay = overlayLayerRef.current;
-      
-      // Ensure all layers are properly refreshed and visible
-      refreshLeafletView();
-      
-      if (overlay) {
-        try {
-          overlay.bringToFront();
-          overlay.redraw();
-        } catch {}
-      }
+  const handlePinSelection = (site: SitePoint, lockMapToCenter: boolean) => {
+    selectedPinRef.current = site;
+    const sourceLevel = levelRef.current;
+    const returnLevel: "country" | "province" = sourceLevel === "country" ? "country" : "province";
 
-      // AGGRESSIVE pre-rendering: Force overlay to render at maximum viewport size
-      // Multiple invalidateSize calls with increasing timeouts to ensure full coverage
-      for (let i = 0; i < 3; i++) {
-        map.invalidateSize({ animate: false });
-        if (overlay) {
-          try {
-            overlay.bringToFront();
-            overlay.redraw();
-          } catch {}
-        }
-      }
-
-      // Wait for many more frames to guarantee full render before animating
-      let frameCount = 0;
-      const waitForRender = () => {
-        frameCount++;
-        if (animToken !== countryResetAnimTokenRef.current) return;
-        
-        // Aggressively redraw overlay on every frame
-        if (overlay) {
-          try {
-            overlay.bringToFront();
-            overlay.redraw();
-          } catch {}
-        }
-        
-        // Force map to recalculate bounds every few frames
-        if (frameCount % 2 === 0) {
-          map.invalidateSize({ animate: false });
-        }
-        
-        // Wait for 8 frames (doubled from 4) to ensure browser has fully painted the overlay
-        if (frameCount < 8) {
-          requestAnimationFrame(waitForRender);
-        } else {
-          // Final pre-flight check: one more aggressive redraw
-          if (overlay) {
-            try {
-              overlay.bringToFront();
-              overlay.redraw();
-            } catch {}
-          }
-          map.invalidateSize({ animate: false });
-          
-          // Create visual zoom-out effect: start from previous position and pan to center
-          // Map is already at correct zoom level, we just animate the pan
-          const currentCenter = map.getCenter();
-          const startLat = currentCenter.lat;
-          const startLng = currentCenter.lng;
-          
-          // Calculate a point that's slightly offset to create zoom-out illusion
-          const offsetLat = startLat + (startLat - nextCenter.lat) * 0.3;
-          const offsetLng = startLng + (startLng - nextCenter.lng) * 0.3;
-          
-          map.setView([offsetLat, offsetLng], nextZoom, { animate: false });
-          
-          // Now animate back to center - this creates smooth transition while keeping tiles hidden
-          map.flyTo([nextCenter.lat, nextCenter.lng], nextZoom, {
-            animate: true,
-            duration: 0.55,
-            easeLinearity: 0.25,
+    if (!selectedProvinceRef.current) {
+      const province = provincesRef.current.find((feature) => {
+        const proCode = String(feature.properties?.pro_code ?? "");
+        return districtsRef.current
+          .filter((d) => String(d.properties?.pro_code ?? "") === proCode)
+          .some((d) => {
+            const rings = geometryToOuterRings(d.geometry);
+            return rings.some((ring) => {
+              try {
+                return !!window.longdo?.Util?.contains?.({ lon: site.lng, lat: site.lat }, ring);
+              } catch {
+                return false;
+              }
+            });
           });
-
-          map.once("moveend", () => {
-            if (animToken !== countryResetAnimTokenRef.current) return;
-            map.setView([nextCenter.lat, nextCenter.lng], nextZoom, { animate: false });
-
-            // Restore tile pane visibility
-            if (tilePane) {
-              try {
-                tilePane.style.opacity = "1";
-                tilePane.style.visibility = "visible";
-                tilePane.style.transition = "";
-              } catch {}
-            }
-            
-            // Keep provinces pane visible after animation.
-            const provincesPane = map.getPane("provincesPane") as HTMLElement | undefined;
-            if (provincesPane) {
-              try {
-                provincesPane.style.opacity = "1";
-                provincesPane.style.visibility = "visible";
-              } catch {}
-            }
-            
-            normalizeTilePaneState();
-            if (overlay) {
-              try {
-                overlay.bringToFront();
-                overlay.redraw();
-              } catch {}
-            }
-            
-            // CRITICAL: Restore province colors after zoom animation completes
-            // This creates the "overlay → colored provinces over base map" effect
-            setProvinceStyleMode("country");
-            restoreProvinceLayerForCountry();
-            
-            refreshLeafletView();
-          });
-        }
-      };
-      
-      requestAnimationFrame(waitForRender);
-    } else {
-      // Direct transition (e.g., from dropdown "All Sites")
-      const mapContainer = map.getContainer?.() as HTMLElement | undefined;
-      const shouldSmoothFade = Boolean(opts?.smoothFade && mapContainer);
-
-      if (shouldSmoothFade && mapContainer) {
-        try {
-          mapContainer.style.transition = "opacity 180ms ease";
-          mapContainer.style.opacity = "0.9";
-        } catch {}
-      }
-
-      // Always recalculate for accurate zoom level
-      fitThailand();
-      // For non-animated transitions, restore colors immediately
-      setProvinceStyleMode("country");
-      restoreProvinceLayerForCountry();
-      refreshLeafletView();
-
-      if (shouldSmoothFade && mapContainer) {
-        requestAnimationFrame(() => {
-          try {
-            mapContainer.style.opacity = "1";
-          } catch {}
-
-          window.setTimeout(() => {
-            try {
-              mapContainer.style.transition = "";
-            } catch {}
-          }, 220);
-        });
+      });
+      if (province) {
+        enterProvinceLevel(province);
       }
     }
-    refreshLeafletView();
 
-    logMapFlow("resetToCountry:end");
+    enterDistrictLevel({ lon: site.lng, lat: site.lat }, lockMapToCenter, site, returnLevel);
+    onPinClick?.(site);
   };
 
   const handleZoomOut = () => {
-    const level = currentLevelRef.current;
-    logMapFlow("handleZoomOut:click", { level });
-
     if (level === "district") {
-      const returnInfo = provinceReturnViewRef.current;
-      const enteredViaDistrict = !!returnInfo && !province3DFromPin;
-
-      setProvince3DActive(false);
-      setProvince3DFromPin(false);
-      setLongdoReady(false);
-      setLongdoMarkerInfo(null);
-
-      if (enteredViaDistrict) {
-        // Entered 3D via district click (Level 2 → 3): return to Level 2
-        logMapFlow("handleZoomOut:district-to-province");
-        pendingReturnToProvinceKeyRef.current = returnInfo.provinceKey;
-        rebuildingMapRef.current = true;
-        setMapReady(false);
-        setMapInstanceKey((prev) => prev + 1);
+      if (focusSiteCenter) {
+        ignoreFocusSiteKeyRef.current = `${focusSiteCenter.lat},${focusSiteCenter.lng}`;
+      }
+      if (districtReturnLevelRef.current === "country") {
+        enterCountryLevel();
         return;
       }
-
-      // Pin or dropdown entry → go straight to Level 1 (country)
-      onZoomOutToCountry?.();
-      logMapFlow("handleZoomOut:district-to-country");
-      currentLevelRef.current = "country";
-      setMapLevelState("country");
-      suppressProvinceFocusEffectRef.current = true;
-      selectedProvinceKeyRef.current = null;
-      pendingReturnToProvinceKeyRef.current = null;
-      provinceReturnViewRef.current = null;
-
-      rebuildingMapRef.current = true;
-      setMapReady(false);
-      setMapInstanceKey((prev) => prev + 1);
+      const selectedProvince = selectedProvinceRef.current;
+      if (selectedProvince) {
+        enterProvinceLevel(selectedProvince, true);
+      } else {
+        enterCountryLevel();
+      }
       return;
     }
 
     if (level === "province") {
-      logMapFlow("handleZoomOut:province-to-country");
-      suppressProvinceFocusEffectRef.current = true;
-      selectedProvinceKeyRef.current = null;
-      pendingReturnToProvinceKeyRef.current = null;
-      provinceReturnViewRef.current = null;
-      resetToCountry({ smoothFade: true });
-      onProvinceChange?.("all");
-      return;
+      enterCountryLevel();
     }
-
-    logMapFlow("handleZoomOut:country-reset");
-    suppressProvinceFocusEffectRef.current = true;
-    selectedProvinceKeyRef.current = null;
-    pendingReturnToProvinceKeyRef.current = null;
-    provinceReturnViewRef.current = null;
-    resetToCountry();
-    onProvinceChange?.("all");
   };
 
-  // Keep map view stable on container resize
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const el = map.getContainer();
-    if (!el || typeof ResizeObserver === "undefined") return;
-    
-    const ro = new ResizeObserver(() => {
+    let cancelled = false;
+    let overlayClickHandler: ((overlay: any) => void) | null = null;
+    const hoverBindings: Array<{ eventName: string; handler: (eventArg: any) => void }> = [];
+
+    (async () => {
+      if (!mapContainerRef.current) return;
+      await loadLongdoMap2D();
+      if (cancelled || !mapContainerRef.current || !window.longdo) return;
+
+      const longdo = window.longdo;
+
+      const [provincesGeo, districtsGeo] = await Promise.all([
+        fetch("/data/provinces.geojson").then((r) => r.json()) as Promise<FeatureCollection>,
+        fetch("/data/districts.geojson").then((r) => r.json()) as Promise<FeatureCollection>,
+      ]);
+
+      if (cancelled) return;
+
+      provincesRef.current = provincesGeo.features || [];
+      districtsRef.current = districtsGeo.features || [];
+
+      mapContainerRef.current.innerHTML = "";
+      const map = new longdo.Map({
+        placeholder: mapContainerRef.current,
+        location: { lon: 100.523186, lat: 13.736717 },
+        zoom: 6,
+        ui: longdo.UiComponent?.None,
+        layer: longdo.Layers?.NORMAL_EN || longdo.Layers?.NORMAL,
+        zoomRange: { min: 4.5, max: 18 },
+        input: true,
+        smoothZoom: true,
+      });
+
       try {
-        const center = map.getCenter();
-        const zoom = map.getZoom();
-        resizingGuardRef.current = true;
-        map.invalidateSize(false);
-        map.setView(center, zoom, { animate: false });
-      } catch {} finally {
-        setTimeout(() => (resizingGuardRef.current = false), 0);
-      }
+        map.Ui?.Crosshair?.visible?.(false);
+      } catch {}
+
+      mapRef.current = map;
+      initializedRef.current = true;
+
+      overlayClickHandler = (overlay: any) => {
+        if (Date.now() <= suppressOverlayClickUntilRef.current) {
+          return;
+        }
+        const pin = pinByOverlayRef.current.get(overlay);
+        if (pin) {
+          handlePinSelection(pin, true);
+          return;
+        }
+
+        if (levelRef.current === "country") {
+          const province = provinceByOverlayRef.current.get(overlay);
+          if (province) {
+            enterProvinceLevel(province);
+          }
+          return;
+        }
+
+        if (levelRef.current === "province") {
+          const district = districtByOverlayRef.current.get(overlay);
+          if (district) {
+            const pointer = pointerToLocation();
+            const centroid = geometryCentroid(district.geometry);
+            const center = pointer || centroid;
+            if (!center) return;
+            enterDistrictLevel(center, false, null);
+          }
+        }
+      };
+
+      map.Event.bind("overlayClick", overlayClickHandler);
+
+      const bindOverlayHover = (eventName: string, handler: (eventArg: any) => void) => {
+        try {
+          map.Event.bind(eventName, handler);
+          hoverBindings.push({ eventName, handler });
+        } catch {}
+      };
+
+      bindOverlayHover("overlayMouseOver", (eventArg: any) => {
+        if (levelRef.current === "district") return;
+        const overlay = resolveOverlayFromEventArg(eventArg);
+        if (!overlay) return;
+
+        const pin = pinByOverlayRef.current.get(overlay);
+        if (!pin) return;
+
+        const root = mapContainerRef.current;
+        if (!root) return;
+
+        const rootRect = root.getBoundingClientRect();
+        const point = extractClientPointFromEventArg(eventArg);
+        const left = point ? point.clientX - rootRect.left : rootRect.width / 2;
+        const top = point ? point.clientY - rootRect.top - 14 : rootRect.height / 2;
+
+        setPinTooltip({
+          visible: true,
+          text: pin.name,
+          left,
+          top,
+        });
+      });
+
+      bindOverlayHover("overlayMouseMove", (eventArg: any) => {
+        if (levelRef.current === "district") return;
+        const overlay = resolveOverlayFromEventArg(eventArg);
+        if (!overlay) return;
+
+        const pin = pinByOverlayRef.current.get(overlay);
+        if (!pin) return;
+
+        const root = mapContainerRef.current;
+        if (!root) return;
+
+        const point = extractClientPointFromEventArg(eventArg);
+        if (!point) return;
+
+        const rootRect = root.getBoundingClientRect();
+        setPinTooltip({
+          visible: true,
+          text: pin.name,
+          left: point.clientX - rootRect.left,
+          top: point.clientY - rootRect.top - 14,
+        });
+      });
+
+      bindOverlayHover("overlayMouseOut", (eventArg: any) => {
+        const overlay = resolveOverlayFromEventArg(eventArg);
+        if (!overlay) return;
+        const pin = pinByOverlayRef.current.get(overlay);
+        if (!pin) return;
+        setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+      });
+
+      enterCountryLevel();
+      setMapReady(true);
+    })().catch((err) => {
+      console.error("[Map] Longdo init failed", err);
     });
-    ro.observe(el);
+
     return () => {
-      try { ro.disconnect(); } catch {}
+      cancelled = true;
+      const map = mapRef.current;
+      if (map && overlayClickHandler) {
+        try {
+          map.Event.unbind("overlayClick", overlayClickHandler);
+        } catch {}
+      }
+      if (map && hoverBindings.length) {
+        hoverBindings.forEach(({ eventName, handler }) => {
+          try {
+            map.Event.unbind(eventName, handler);
+          } catch {}
+        });
+      }
+      try {
+        clearMask();
+        clearOverlayList(markerOverlaysRef);
+        clearOverlayList(districtOverlaysRef);
+        clearOverlayList(provinceOverlaysRef);
+      } catch {}
+      try {
+        leafletMarkerRef.current?.remove();
+        leafletMarkerRef.current = null;
+        leafletMapRef.current?.remove();
+        leafletMapRef.current = null;
+      } catch {}
+      initializedRef.current = false;
+      mapRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
-  // Initialize map
   useEffect(() => {
-    if (mapRef.current) {
-      try {
-        mapRef.current.remove();
-      } catch {}
-      mapRef.current = null;
-    }
-
-    provincesLayerRef.current = null;
-    districtsLayerRef.current = null;
-    baseTileLayerRef.current = null;
-    thLayerRef.current = null;
-    overlayLayerRef.current = null;
-    markersLayerRef.current = null;
-
-    const map = L.map(mapElementId, {
-      center: [13.736717, 100.523186],
-      zoom: 6,
-      fadeAnimation: false,
-      zoomControl: false,
-      dragging: false,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      boxZoom: false,
-      touchZoom: false,
-      keyboard: false,
-      // Use TH_BOUNDS as maxBounds to prevent showing neighboring countries
-      maxBounds: TH_BOUNDS,
-      maxBoundsViscosity: 1.0,
-    });
-
-    mapRef.current = map;
-    setMapReady(true);
-    logMapFlow("map:init");
-
-    // If we're rebuilding the map for a return-to-province transition,
-    // hide the tile pane immediately so base map tiles don't flash.
-    if (rebuildingMapRef.current) {
-      const tilePane = map.getPane("tilePane") as HTMLElement | undefined;
-      if (tilePane) {
-        try {
-          tilePane.style.opacity = "0";
-          tilePane.style.transition = "none";
-        } catch {}
-      }
-    }
-
-    // Create panes with proper z-index layering
-    // tilePane (200) → overlayPane (550) → provincesPane (660) → districtsPane (670) → markersPane (700) → tooltipPane (800)
-    map.createPane("overlayPane");
-    map.getPane("overlayPane")!.style.zIndex = "550";
-    map.getPane("overlayPane")!.style.pointerEvents = "none";
-    map.createPane("provincesPane");
-    map.getPane("provincesPane")!.style.zIndex = "660";
-    map.createPane("districtsPane");
-    map.getPane("districtsPane")!.style.zIndex = "670";
-    map.createPane("markersPane");
-    map.getPane("markersPane")!.style.zIndex = "700";
-    if (map.getPane("tooltipPane")) {
-      map.getPane("tooltipPane")!.style.zIndex = "800";
-    }
-
-    // Add grayscale tiles
-    const baseTileLayer = createBaseTileLayer().addTo(map);
-    baseTileLayerRef.current = baseTileLayer;
-
-    // Add CSS for grayscale effect
-    if (!document.getElementById("grayscale-tiles-style")) {
-      const style = document.createElement("style");
-      style.id = "grayscale-tiles-style";
-      style.textContent = `
-        .leaflet-tile.grayscale-tiles,
-        .leaflet-layer img.leaflet-tile.grayscale-tiles,
-        .leaflet-pane .leaflet-tile.grayscale-tiles {
-          filter: grayscale(1) contrast(1.05) brightness(1);
-        }
-        .leaflet-tooltip.province-label {
-          background: #ffffff;
-          border: 1px solid rgba(15,23,42,0.08);
-          box-shadow: 0 2px 8px rgba(15,23,42,0.12);
-          color: #0f172a;
-          font-weight: 600;
-          font-size: 12px;
-          line-height: 1.2;
-          padding: 6px 8px;
-          border-radius: 8px;
-          pointer-events: none;
-          white-space: nowrap;
-        }
-        .leaflet-tooltip.district-label {
-          background: #ffffff;
-          border: 1px solid rgba(15,23,42,0.08);
-          box-shadow: 0 2px 8px rgba(15,23,42,0.12);
-          color: #0f172a;
-          font-weight: 600;
-          font-size: 12px;
-          line-height: 1.2;
-          padding: 6px 8px;
-          border-radius: 8px;
-          pointer-events: none;
-          white-space: nowrap;
-        }
-        .leaflet-tooltip.marker-label {
-          background: transparent;
-          border: none;
-          box-shadow: none;
-          padding: 0;
-          pointer-events: none;
-        }
-        .leaflet-tooltip.marker-label::before {
-          display: none;
-        }
-        .leaflet-interactive.district-hitarea {
-          pointer-events: all;
-        }
-        .leaflet-interactive:focus {
-          outline: none;
-        }
-      `;
-      document.head.appendChild(style);
-    }
-
-    // Load Thailand border
-    (async () => {
-      try {
-        const res = await fetch("/data/thailand.geojson");
-        if (!res.ok) throw new Error("failed to load thailand.geojson");
-        const geojson = await res.json();
-
-        thLayerRef.current = L.geoJSON(geojson, {
-          style: { color: EDGE, weight: 2, fillOpacity: 0 },
-          interactive: false,
-        }).addTo(map);
-
-        // Create overlay to hide non-Thailand areas
-        // Extract Thailand polygon rings from geojson
-        const thRings: L.LatLngExpression[][] = [];
-        const features = Array.isArray(geojson.features) ? geojson.features : [geojson];
-        features.forEach((f: any) => {
-          const geom = f.geometry;
-          if (geom.type === "Polygon") {
-            geom.coordinates.forEach((ring: number[][]) => {
-              thRings.push(ring.map(([lng, lat]) => [lat, lng]));
-            });
-          } else if (geom.type === "MultiPolygon") {
-            geom.coordinates.forEach((poly: number[][][]) => {
-              poly.forEach((ring) => {
-                thRings.push(ring.map(([lng, lat]) => [lat, lng]));
-              });
-            });
-          }
-        });
-
-        countryRingsRef.current = thRings;
-
-        overlayLayerRef.current = L.polygon([worldOuterRingRef.current, ...thRings], {
-          pane: "overlayPane",
-          stroke: false,
-          fillColor: "#d3f7ff",
-          fillOpacity: 1,
-          interactive: false,
-          renderer: L.svg({ padding: 1.0 }),
-        }).addTo(map);
-
-        fitThailand();
-      } catch (err) {
-        console.error("[Map] cannot load thailand.geojson", err);
-      }
-    })();
-
-    // Load provinces
-    (async () => {
-      try {
-        const res = await fetch("/data/provinces.geojson");
-        if (!res.ok) throw new Error("failed to load provinces");
-        const provinces = await res.json();
-
-        const layer = L.geoJSON(provinces, {
-          pane: "provincesPane",
-          style: styleProvinceDefault,
-          onEachFeature: (feature, layer) => {
-            const nameTH = feature?.properties?.pro_th as string | undefined;
-            const nameEN = feature?.properties?.pro_en as string | undefined;
-
-            if (nameTH) {
-              const c = (layer as any).getBounds().getCenter();
-              const b = (layer as any).getBounds() as L.LatLngBounds;
-              const code = String(feature?.properties?.pro_code ?? "");
-              const rings = extractRingsLatLng(feature?.geometry);
-
-              provinceCentersRef.current[nameTH] = { lat: c.lat, lng: c.lng };
-              provinceBoundsByNameRef.current[nameTH] = b;
-              provinceRingsByNameRef.current[nameTH] = rings;
-              if (code) provinceCodeByNameRef.current[nameTH] = code;
-              if (nameEN) {
-                provinceCentersRef.current[nameEN] = { lat: c.lat, lng: c.lng };
-                provinceBoundsByNameRef.current[nameEN] = b;
-                provinceRingsByNameRef.current[nameEN] = rings;
-              }
-              if (nameEN && code) provinceCodeByNameRef.current[nameEN] = code;
-            }
-
-            (layer as L.Path).bindTooltip(nameTH ?? nameEN ?? "", {
-              direction: "top",
-              sticky: true,
-              offset: L.point(0, -12),
-              className: "province-label",
-            });
-
-            layer.on("mouseover", () => {
-              if (currentLevelRef.current !== "country") return;
-              (layer as L.Path).setStyle(styleProvinceHover);
-              (layer as any).openTooltip?.();
-            });
-
-            layer.on("mouseout", () => {
-              if (currentLevelRef.current !== "country") return;
-              (layer as L.Path).setStyle(provinceDefaultStyleFor(feature));
-              (layer as any).closeTooltip?.();
-            });
-
-            layer.on("click", (ev: any) => {
-              L.DomEvent.stopPropagation(ev);
-              const selected = nameTH || nameEN || "all";
-              logMapFlow("province:click", {
-                selected,
-                proCode: String(feature?.properties?.pro_code ?? ""),
-              });
-              selectProvince(selected, feature, layer as L.Layer, "layer-click");
-            });
-          },
-        }).addTo(map);
-
-        provincesLayerRef.current = layer;
-        setProvincesReadyVersion((prev) => prev + 1);
-
-        // Fallback selection path if vector-layer click becomes non-interactive
-        // after level transitions: resolve clicked province from bounds and drill down.
-        map.on("click", (ev: L.LeafletMouseEvent) => {
-          if (currentLevelRef.current !== "country") return;
-          const provincesLayer = provincesLayerRef.current;
-          if (!provincesLayer) return;
-
-          let matchedFeature: any | null = null;
-          let matchedLayer: L.Layer | null = null;
-          let matchedArea = Number.POSITIVE_INFINITY;
-
-          provincesLayer.eachLayer((ly: any) => {
-            const bounds = ly?.getBounds?.() as L.LatLngBounds | undefined;
-            if (!bounds || !bounds.isValid() || !bounds.contains(ev.latlng)) return;
-            const sw = bounds.getSouthWest();
-            const ne = bounds.getNorthEast();
-            const area = Math.abs((ne.lat - sw.lat) * (ne.lng - sw.lng));
-            if (area < matchedArea) {
-              matchedArea = area;
-              matchedFeature = ly?.feature;
-              matchedLayer = ly as L.Layer;
-            }
-          });
-
-          if (!matchedFeature || !matchedLayer) return;
-
-          const nameTH = matchedFeature?.properties?.pro_th as string | undefined;
-          const nameEN = matchedFeature?.properties?.pro_en as string | undefined;
-          const selected = nameTH || nameEN || "all";
-
-          logMapFlow("province:map-fallback-click", {
-            selected,
-            proCode: String(matchedFeature?.properties?.pro_code ?? ""),
-          });
-          selectProvince(selected, matchedFeature, matchedLayer, "map-fallback");
-        });
-      } catch (err) {
-        console.error("[Map] cannot load provinces.geojson", err);
-      }
-    })();
-
-    // Markers layer — rendered into markersPane so pins appear above province overlay
-    markersLayerRef.current = L.layerGroup([], { pane: "markersPane" } as any).addTo(map);
-
-    // Zoom out button (top-left)
-    const ZoomOutControl = L.Control.extend({
-      options: { position: "topleft" as L.ControlPosition },
-      onAdd: () => {
-        const wrap = L.DomUtil.create("div", "leaflet-bar");
-        wrap.style.display = "none";
-        wrap.id = "zoom-out-control";
-
-        const btn = L.DomUtil.create("button", "", wrap);
-        btn.setAttribute("type", "button");
-        Object.assign(btn.style, zoomOutButtonInlineStyle);
-        btn.title = "Zoom out";
-        btn.innerText = "Zoom out";
-
-        L.DomEvent.on(btn, "click", (ev) => {
-          L.DomEvent.stop(ev);
-          handleZoomOut();
-        });
-
-        return wrap;
-      },
-    });
-
-    map.addControl(new ZoomOutControl());
-
-    // Force instant overlay redraw on browser zoom/resize
-    const handleResize = () => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize({ animate: false });
-      }
-    };
-    
-    window.addEventListener("resize", handleResize);
-    // Also listen to visual viewport for browser zoom
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener("resize", handleResize);
-    }
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener("resize", handleResize);
-      }
-      clearDistrictLayer();
-      map.remove();
-      mapRef.current = null;
-      provincesLayerRef.current = null;
-      districtsLayerRef.current = null;
-      baseTileLayerRef.current = null;
-      thLayerRef.current = null;
-      overlayLayerRef.current = null;
-      markersLayerRef.current = null;
-      setMapReady(false);
-    };
-  }, [mapElementId]);
-
-  // Handle pin (marker) click → transition to Level 3 (3D view)
-  const handlePinClick = (site: { name: string; lat: number; lng: number; code?: string; id?: string }) => {
-    const map = mapRef.current;
-    logMapFlow("pin:click", { site: site.name, lat: site.lat, lng: site.lng });
-
-    // Save current province view for return
-    const provinceKey = selectedProvinceKeyRef.current ?? focusProvinceKey;
-    if (map && provinceKey) {
-      provinceReturnViewRef.current = {
-        center: { lat: map.getCenter().lat, lng: map.getCenter().lng },
-        zoom: map.getZoom(),
-        provinceKey,
-        proCode: selectedProvinceCodeRef.current ?? undefined,
-        rings: provinceRingsByNameRef.current[provinceKey],
-        bounds: provinceBoundsByNameRef.current[provinceKey],
-      };
-    }
-
-    currentLevelRef.current = "district";
-    setMapLevelState("district");
-    updateZoomOutControlVisibility();
-
-    // Set 3D view center to the pin location and lock interaction
-    setLongdoCenterState({ lat: site.lat, lng: site.lng });
-    setLongdoMarkerInfo({
-      title: site.name,
-      detail: buildLongdoDetail(site),
-      color: resolveSitePinColor(site),
-    });
-    setProvince3DActive(true);
-    setProvince3DFromPin(true);
-    setLongdoReady(false);
-    setMapInteractivity(false);
-
-    // Notify parent (to update dropdown label etc.)
-    onPinClick?.(site);
-  };
-
-  // Update markers when data changes
-  useEffect(() => {
-    const map = mapRef.current;
-    const grp = markersLayerRef.current;
-    if (!map || !grp || !mapReady) return;
-
-    try {
-      grp.clearLayers();
-    } catch {}
-
-    // At province level (L2), clip pins to current province bounds
-    const clipBounds = mapLevelState === "province" && selectedProvinceKeyRef.current
-      ? provinceBoundsByNameRef.current[selectedProvinceKeyRef.current] ?? null
-      : null;
-
-    renderMarkers(
-      map,
-      grp,
-      notis,
-      aggregateBySite,
-      severityFilter,
-      provinceCentersRef.current,
-      sitePoints,
-      pinStatusBySite,
-      t,
-      handlePinClick,
-      "markersPane",
-      clipBounds
-    );
-  }, [notis, aggregateBySite, severityFilter, sitePoints, pinStatusBySite, t, i18n.language, mapReady, provincesReadyVersion, mapLevelState]);
-
-  // Handle province focus
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-
-    logMapFlow("focusProvinceEffect:run");
-
-    // When a specific site is focused (dropdown or pin), let the site effect handle it
-    if (focusSiteCenter) {
-      logMapFlow("focusProvinceEffect:skip-site-focus");
-      return;
-    }
-
-    // Don't interfere while 3D mode is active (district click, pin click, etc.)
-    if (province3DActive) {
-      logMapFlow("focusProvinceEffect:skip-3d-active");
-      return;
-    }
-
-    // Skip if there's a pending return-to-province operation (avoid double loadDistrictsForProvince)
-    if (pendingReturnToProvinceKeyRef.current) {
-      logMapFlow("focusProvinceEffect:skip-pending-return");
-      return;
-    }
-
-    if (
-      ignoreNextFocusProvinceKeyRef.current &&
-      focusProvinceKey &&
-      ignoreNextFocusProvinceKeyRef.current === focusProvinceKey
-    ) {
-      logMapFlow("focusProvinceEffect:ignore-next", {
-        focusProvinceKey,
-      });
-      ignoreNextFocusProvinceKeyRef.current = null;
-      return;
-    }
-
-    if (suppressProvinceFocusEffectRef.current) {
-      logMapFlow("focusProvinceEffect:suppressed");
-      if (!focusProvinceKey) {
-        suppressProvinceFocusEffectRef.current = false;
-        logMapFlow("focusProvinceEffect:unsuppress");
-      }
-      return;
-    }
+    if (!mapReady || !initializedRef.current) return;
 
     if (!focusProvinceKey) {
-      ignoreNextFocusProvinceKeyRef.current = null;
-      provinceReturnViewRef.current = null;
-    }
-
-    if (focusProvinceKey && !provinceCodeByNameRef.current[focusProvinceKey]) {
-      logMapFlow("focusProvinceEffect:waiting-province-metadata", {
-        focusProvinceKey,
-      });
-      return;
-    }
-
-    selectedProvinceKeyRef.current = focusProvinceKey;
-
-    if (!focusProvinceKey) {
-      if (currentLevelRef.current === "country") {
-        setMapInteractivity(false);
-        updateZoomOutControlVisibility();
-        logMapFlow("focusProvinceEffect:no-focus-keep-country");
-        return;
+      if (level !== "country") {
+        enterCountryLevel();
       }
-      logMapFlow("focusProvinceEffect:no-focus-reset-country");
-      resetToCountry();
       return;
     }
 
-    // Enter level 2 directly (province -> districts) without double-zoom
-    logMapFlow("focusProvinceEffect:load-districts", { focusProvinceKey });
-    void loadDistrictsForProvince(focusProvinceKey);
-  }, [focusProvinceKey, focusSiteCenter, mapReady, provincesReadyVersion, province3DActive]);
+    const province = provincesRef.current.find((feature) => isProvinceMatch(feature, focusProvinceKey));
+    if (!province) return;
 
-  // Handle site focus - trigger 3D view when site selected from dropdown
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const currentPro = selectedProvinceRef.current;
+    if (!currentPro || currentPro !== province || level === "country") {
+      enterProvinceLevel(province);
+    }
+  }, [focusProvinceKey, mapReady]);
+
   useEffect(() => {
     if (!mapReady) return;
+    if (!focusSiteCenter) {
+      ignoreFocusSiteKeyRef.current = null;
+      if (levelRef.current === "district") {
+        if (districtReturnLevelRef.current === "country") {
+          enterCountryLevel();
+        } else {
+          const selectedProvince = selectedProvinceRef.current;
+          if (selectedProvince) enterProvinceLevel(selectedProvince);
+          else enterCountryLevel();
+        }
+      }
+      return;
+    }
+
+    const focusKey = `${focusSiteCenter.lat},${focusSiteCenter.lng}`;
+    if (ignoreFocusSiteKeyRef.current && ignoreFocusSiteKeyRef.current === focusKey) {
+      return;
+    }
+    ignoreFocusSiteKeyRef.current = null;
+
+    const matched = allSitePoints.find(
+      (site) => site.lat === focusSiteCenter.lat && site.lng === focusSiteCenter.lng
+    );
+
+    if (matched) {
+      handlePinSelection(matched, true);
+      return;
+    }
+
+    enterDistrictLevel({ lon: focusSiteCenter.lng, lat: focusSiteCenter.lat }, true, null);
+  }, [focusSiteCenter, mapReady, allSitePoints]);
+
+  useEffect(() => {
+    if (!mapReady || !initializedRef.current) return;
+    if (level === "country") {
+      addMarkers(null);
+    } else if (level === "province") {
+      addMarkers(selectedProvinceRef.current);
+    }
+  }, [allSitePoints, pinStatusBySite, mapReady, level]);
+
+  useEffect(() => {
+    if (level !== "district" || !districtViewState) return;
+    const container = leafletContainerRef.current;
+    if (!container) return;
+
+    let map = leafletMapRef.current;
+    if (!map) {
+      map = L.map(container, {
+        zoomControl: false,
+        attributionControl: true,
+        minZoom: 12,
+        maxZoom: 18,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        minZoom: 2,
+        attribution: "&copy; OpenStreetMap contributors",
+      }).addTo(map);
+
+      leafletMapRef.current = map;
+    }
+
+    const target = districtViewState.center;
+    map.setView([target.lat, target.lng], 14, { animate: true });
+    map.setMinZoom(12);
+    map.setMaxZoom(18);
+
+    if (districtViewState.lockMapToCenter) {
+      map.dragging.disable();
+      map.scrollWheelZoom.disable();
+      map.doubleClickZoom.disable();
+      map.boxZoom.disable();
+      map.keyboard.disable();
+      map.touchZoom.disable();
+      map.setView([target.lat, target.lng], map.getZoom(), { animate: false });
+    } else {
+      map.dragging.enable();
+      map.scrollWheelZoom.enable();
+      map.doubleClickZoom.enable();
+      map.boxZoom.enable();
+      map.keyboard.enable();
+      map.touchZoom.enable();
+    }
+
+    if (leafletMarkerRef.current) {
+      leafletMarkerRef.current.remove();
+      leafletMarkerRef.current = null;
+    }
+    if (leafletLevelMarkersRef.current.length) {
+      leafletLevelMarkersRef.current.forEach((marker) => marker.remove());
+      leafletLevelMarkersRef.current = [];
+    }
+
+    if (districtViewState.lockMapToCenter && districtViewState.markerSite) {
+      const markerLat = districtViewState.markerSite.lat;
+      const markerLng = districtViewState.markerSite.lng;
+      const markerTitle = districtViewState.markerSite.name;
+
+      leafletMarkerRef.current = L.marker([markerLat, markerLng], {
+        title: markerTitle,
+        icon: createLeafletSiteIcon(districtViewState.markerSite),
+      }).addTo(map);
+
+      leafletMarkerRef.current.bindTooltip(markerTitle, {
+        direction: "top",
+        offset: [0, -12],
+      });
+    } else {
+      const pins = resolveLeafletMarkers();
+      pins.forEach((site) => {
+        const marker = L.marker([site.lat, site.lng], {
+          title: site.name,
+          icon: createLeafletSiteIcon(site),
+        }).addTo(map);
+        marker.bindTooltip(site.name, {
+          direction: "top",
+          offset: [0, -12],
+        });
+        leafletLevelMarkersRef.current.push(marker);
+      });
+    }
+
+    window.setTimeout(() => {
+      leafletMapRef.current?.invalidateSize();
+    }, 40);
+  }, [level, districtViewState]);
+
+  useEffect(() => {
+    if (level === "district") return;
+
+    try {
+      leafletMarkerRef.current?.remove();
+      leafletMarkerRef.current = null;
+    } catch {}
+
+    try {
+      if (leafletLevelMarkersRef.current.length) {
+        leafletLevelMarkersRef.current.forEach((marker) => marker.remove());
+        leafletLevelMarkersRef.current = [];
+      }
+    } catch {}
+
+    try {
+      leafletMapRef.current?.remove();
+      leafletMapRef.current = null;
+    } catch {}
+
+    try {
+      if (leafletContainerRef.current) {
+        leafletContainerRef.current.innerHTML = "";
+      }
+    } catch {}
+  }, [level]);
+
+  useEffect(() => {
+    if (level === "district") return;
     const map = mapRef.current;
     if (!map) return;
 
-    if (!focusSiteCenter) {
-      // "All Sites" selected - exit 3D if active, let focusProvinceEffect handle country reset
-      if (province3DActive) {
-        logMapFlow("focusSiteCenter:exit-3d");
-        setProvince3DActive(false);
-        setProvince3DFromPin(false);
-        setLongdoReady(false);
-        setLongdoMarkerInfo(null);
-      }
-      return;
-    }
+    const t1 = window.setTimeout(() => {
+      try {
+        map.resize?.();
+      } catch {}
+      try {
+        map.repaint?.();
+      } catch {}
+    }, 40);
 
-    // Already in 3D - just update center for site switching
-    if (province3DActive) {
-      logMapFlow("focusSiteCenter:update-3d-center", { focusSiteCenter });
-      setLongdoCenterState({ lat: focusSiteCenter.lat, lng: focusSiteCenter.lng });
-      // Update marker info for the new site
-      const site = sitePoints?.find(s => s.lat === focusSiteCenter.lat && s.lng === focusSiteCenter.lng);
-      setLongdoMarkerInfo(
-        site
-          ? {
-              title: site.name,
-              detail: buildLongdoDetail(site),
-              color: resolveSitePinColor(site),
-            }
-          : null
-      );
-      return;
-    }
-
-    // Entering from pin click - handlePinClick already activated 3D
-    if (province3DFromPin) return;
-
-    // Dropdown site selection -> enter 3D mode
-    logMapFlow("focusSiteCenter:trigger-3d", { focusSiteCenter });
-    currentLevelRef.current = "district";
-    setMapLevelState("district");
-    setLongdoCenterState({ lat: focusSiteCenter.lat, lng: focusSiteCenter.lng });
-    // Find site info for marker
-    const site = sitePoints?.find(s => s.lat === focusSiteCenter.lat && s.lng === focusSiteCenter.lng);
-    setLongdoMarkerInfo(
-      site
-        ? {
-            title: site.name,
-            detail: buildLongdoDetail(site),
-            color: resolveSitePinColor(site),
-          }
-        : null
-    );
-    setProvince3DActive(true);
-    setProvince3DFromPin(false);
-    setLongdoReady(false);
-    setMapInteractivity(false);
-  }, [focusSiteCenter, mapReady, sitePoints, pinStatusBySite]);
-
-  // Complete lv3 -> lv2 transition only after 3D is fully hidden.
-  useEffect(() => {
-    if (!mapReady) return;
-    if (province3DActive) return;
-
-    if (rebuildingMapRef.current && !provincesLayerRef.current) {
-      return;
-    }
-
-    if (rebuildingMapRef.current && provincesLayerRef.current) {
-      rebuildingMapRef.current = false;
-    }
-
-    const pendingKey = pendingReturnToProvinceKeyRef.current;
-    if (!pendingKey) return;
-
-    const returnView =
-      provinceReturnViewRef.current && provinceReturnViewRef.current.provinceKey === pendingKey
-        ? {
-            center: provinceReturnViewRef.current.center,
-            zoom: provinceReturnViewRef.current.zoom,
-          }
-        : undefined;
-
-    const returnOverrides =
-      provinceReturnViewRef.current && provinceReturnViewRef.current.provinceKey === pendingKey
-        ? {
-            proCode: provinceReturnViewRef.current.proCode,
-            rings: provinceReturnViewRef.current.rings,
-            bounds: provinceReturnViewRef.current.bounds,
-            returnView,
-          }
-        : {
-            returnView,
-          };
-
-    pendingReturnToProvinceKeyRef.current = null;
-    logMapFlow("returnToProvince:after-3d-dismiss", { pendingKey });
-    // Don't force-recreate the tile layer — it was never invalidated during 3D mode
-    // (the Leaflet div was only hidden via CSS opacity, DOM stayed intact).
-    // Force-recreating destroys already-loaded tiles, causing grey background to show.
-    ensureBaseTileLayer(false);
-    normalizeTilePaneState();
-    
-    // Ensure overlay is properly positioned after returning from 3D
-    const overlay = overlayLayerRef.current;
-    const map = mapRef.current;
-    if (overlay && map && !map.hasLayer(overlay)) {
-      overlay.addTo(map);
-    }
-
-    // Invalidate map size and redraw tiles immediately since the container
-    // was hidden (opacity: 0) during 3D mode and may need a fresh layout pass
-    if (map) {
-      forceRestoreTileVisibility();
-      map.invalidateSize({ animate: false });
-      try { baseTileLayerRef.current?.redraw(); } catch {}
-      logTileDiagnostics("returnToProvince:immediate");
-    }
-    
-    void loadDistrictsForProvince(pendingKey, returnOverrides);
-
-    const diagTimerA = window.setTimeout(() => {
-      logTileDiagnostics("returnToProvince:+350ms");
-      recoverTilesIfBlank("returnToProvince:+350ms");
-    }, 350);
-
-    const diagTimerB = window.setTimeout(() => {
-      logTileDiagnostics("returnToProvince:+1200ms");
-      recoverTilesIfBlank("returnToProvince:+1200ms");
-    }, 1200);
+    const t2 = window.setTimeout(() => {
+      try {
+        map.resize?.();
+      } catch {}
+      try {
+        map.repaint?.();
+      } catch {}
+    }, 180);
 
     return () => {
-      window.clearTimeout(diagTimerA);
-      window.clearTimeout(diagTimerB);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
     };
-  }, [province3DActive, mapReady, provincesReadyVersion]);
+  }, [level]);
 
-  // When returning from 3D to Leaflet, force a redraw to avoid gray/blank base tiles.
-  useEffect(() => {
-    if (!mapReady || province3DActive) return;
-
-    const level = currentLevelRef.current;
-    if (level === "district") return;
-
-    // Ensure tile pane is visible
-    forceRestoreTileVisibility();
-    normalizeTilePaneState();
-
-    // After the CSS opacity transition (500ms) completes, do a full redraw
-    // to ensure tiles are properly rendered after the container becomes visible
-    const timer = window.setTimeout(() => {
-      const map = mapRef.current;
-      if (map) {
-        forceRestoreTileVisibility();
-        map.invalidateSize({ animate: false });
-        logTileDiagnostics("3DHideEffect:+550ms");
-        recoverTilesIfBlank("3DHideEffect:+550ms");
-      }
-      normalizeTilePaneState();
-    }, 550);
-    return () => window.clearTimeout(timer);
-  }, [province3DActive, mapReady]);
-
-  // Show/hide zoom out button
-  useEffect(() => {
-    updateZoomOutControlVisibility();
-  }, [focusProvinceKey, focusSiteCenter, lockZoomOut, mapReady, mapInstanceKey, province3DActive]);
-
-  // Context menu to zoom out
-  const onContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Allow zoom out in 3D mode even if lockZoomOut is true
-    if (isProvince3DView) {
-      handleZoomOut();
-    }
-  };
+  const showZoomOut = level !== "country";
+  const allowZoomOutButton = level === "district" ? true : !lockZoomOut || !!selectedPinRef.current;
 
   return (
-    <div className="relative">
-      <div
-        id={mapElementId}
-        className={
-          "relative z-0 h-[900px] w-full rounded-lg bg-gray-200 md:h-[750px] sm:h-[600px] transition-opacity duration-500 overflow-hidden" +
-          (isProvince3DView ? " opacity-0 pointer-events-none" : "")
+    <div
+      className="longdo-map-root relative"
+      onClickCapture={handleLongdoRootClickCapture}
+      onMouseMove={handleLongdoPointerMove}
+      onMouseLeave={handleLongdoPointerLeave}
+    >
+      <style>{`
+        .longdo-map-root .bps-leaflet-pin {
+          background: transparent !important;
+          border: 0 !important;
         }
-        onContextMenu={onContextMenu}
-        style={{
-          clipPath: "inset(0 0 0 0 round 0.5rem)",
-        }}
+
+        .longdo-map-root .bps-leaflet-pin-inner {
+          display: inline-flex;
+          width: 28px;
+          height: 41px;
+        }
+
+        .longdo-map-root .bps-leaflet-pin-inner svg {
+          display: block;
+          width: 28px;
+          height: 41px;
+        }
+
+        .longdo-map-root .ldmap_center_mark,
+        .longdo-map-root .ldmap-center-mark,
+        .longdo-map-root [class*="center"][class*="mark"],
+        .longdo-map-root [class*="crosshair"],
+        .longdo-map-root div[style*="position: absolute"][style*="left: 50%"][style*="top: 50%"][style*="transform"] {
+          display: none !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+        }
+      `}</style>
+      <div
+        ref={mapContainerRef}
+        className={
+          "relative z-0 h-[900px] w-full overflow-hidden rounded-lg bg-[#dff1ff] md:h-[750px] sm:h-[600px] transition-opacity duration-300" +
+          (level === "district" ? " opacity-0 pointer-events-none" : " opacity-100")
+        }
       />
 
-      {shouldShowLongdo && (
-        <div
-          className={
-            "absolute inset-0 z-10 h-[900px] w-full rounded-lg md:h-[750px] sm:h-[600px] transition-opacity duration-500" +
-            (longdoReady ? " opacity-100" : " opacity-0 pointer-events-none")
-          }
-          onContextMenu={onContextMenu}
-        >
-          <LongdoMap3D
-            center={longdoCenterState}
-            zoom={18.3}
-            minZoom={15}
-            maxZoom={19}
-            pitch={45}
-            interactive={!province3DFromPin && !!provinceReturnViewRef.current}
-            markerLocation={longdoMarkerInfo ? longdoCenterState : null}
-            markerTitle={longdoMarkerInfo?.title}
-            markerDetail={longdoMarkerInfo?.detail}
-            markerColor={longdoMarkerInfo?.color}
-            onReady={() => setLongdoReady(true)}
-          />
+      <div
+        ref={leafletContainerRef}
+        className={
+          "absolute inset-0 z-10 h-[900px] w-full overflow-hidden rounded-lg md:h-[750px] sm:h-[600px] transition-opacity duration-300" +
+          (level === "district" ? " opacity-100" : " opacity-0 pointer-events-none")
+        }
+      />
 
-          {longdoReady && (
-            <div className="absolute left-3 top-3 z-20">
-              <div className="leaflet-bar">
-                <button
-                  type="button"
-                  title="Zoom out"
-                  onClick={handleZoomOut}
-                  style={zoomOutButtonInlineStyle}
-                >
-                  Zoom out
-                </button>
-              </div>
-            </div>
-          )}
+      <div
+        className={
+          "absolute z-30 pointer-events-none" + (pinTooltip.visible ? " block" : " hidden")
+        }
+        style={{
+          left: pinTooltip.left,
+          top: pinTooltip.top,
+          transform: "translate(-50%, -100%)",
+        }}
+      >
+        <div className="rounded-md bg-black px-3 py-1.5 text-xs font-semibold text-white shadow-lg whitespace-nowrap">
+          {pinTooltip.text}
+        </div>
+      </div>
+
+      {showZoomOut && allowZoomOutButton && (
+        <div className="absolute left-3 top-3 z-20">
+          <button type="button" title={t("map.zoomOut") || "Zoom out"} onClick={handleZoomOut} style={zoomOutButtonInlineStyle}>
+            Zoom out
+          </button>
         </div>
       )}
     </div>
