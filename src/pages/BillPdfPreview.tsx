@@ -782,6 +782,33 @@ const BillPdfPreview: React.FC = () => {
           reportMode === "monthly"
             ? monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues)
             : null;
+        const toDataUrl = async (src: string): Promise<string | null> => {
+          try {
+            const resp = await fetch(src);
+            if (!resp.ok) return null;
+            const blob = await resp.blob();
+            const reader = new FileReader();
+            return await new Promise<string | null>((resolve) => {
+              reader.onload = () =>
+                resolve(typeof reader.result === "string" ? reader.result : null);
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(blob);
+            });
+          } catch {
+            return null;
+          }
+        };
+
+        let logoForExcel =
+          preview?.customLogoDataUrl ?? preferredData?.site?.brandingLogoUrl ?? null;
+        if (logoForExcel && !/^data:/i.test(logoForExcel)) {
+          const normalized = buildBrandingLogoSrc(logoForExcel) ?? logoForExcel;
+          logoForExcel = await toDataUrl(normalized);
+        }
+        if (!logoForExcel) {
+          logoForExcel = await toDataUrl(brandImage);
+        }
+
         const previewPayload = {
           meterId: preferredDeviceId,
           billingMode: reportMode,
@@ -794,8 +821,7 @@ const BillPdfPreview: React.FC = () => {
           billingFtRate: formValues.billingFtRate,
           billingCo2Factor: formValues.billingCo2Factor,
           billingTreeFactor: formValues.billingTreeFactor,
-          brandingLogoDataUrl:
-            preview?.customLogoDataUrl ?? preferredData?.site?.brandingLogoUrl ?? null,
+          brandingLogoDataUrl: logoForExcel,
           customLogoDataUrl: preview?.customLogoDataUrl ?? null,
         };
         const blob = await downloadPreviewBillExcel(
@@ -1304,9 +1330,11 @@ function formatThaiDate(value: string | Date) {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between text-[15px]">
-      <span className="font-medium text-black">{label}</span>
-      <span className="text-black">{value}</span>
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-6 text-[15px]">
+      <span className="whitespace-nowrap font-medium text-black">{label}</span>
+      <span className="whitespace-nowrap text-right tabular-nums text-black">
+        {value}
+      </span>
     </div>
   );
 }
