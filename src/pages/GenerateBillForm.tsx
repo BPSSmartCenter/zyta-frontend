@@ -756,6 +756,7 @@ const GenerateBillForm: React.FC = () => {
     let request:
       | { mode: "monthly"; month: number; year: number }
       | { mode: "daily"; date: string }
+      | { mode: "quarter"; date: string }
       | null = null;
     if (billingMode === "monthly") {
       const monthNum = Number(formState.billingMonth);
@@ -771,7 +772,9 @@ const GenerateBillForm: React.FC = () => {
         setSummaryLoading(false);
         return;
       }
-      request = { mode: "daily", date: iso };
+      // Use quarter-level source for daily autofill so Generate Form matches
+      // preview/export values and includes current-day intraday data.
+      request = { mode: "quarter", date: iso };
     }
     const selectedOpt = meterOptions.find((opt) => opt.value === meterId);
     const tag =

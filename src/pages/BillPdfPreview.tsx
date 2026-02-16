@@ -368,15 +368,6 @@ const BillPdfPreview: React.FC = () => {
     return [];
   }, [billingReadingRows, billDetail, dashboard, reportMode]);
 
-  const tableData = React.useMemo<TableDataRow[]>(() => {
-    const rows = previewRows;
-    if (reportMode === "daily") {
-      return buildDailyTableRows(rows);
-    }
-    const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
-    return buildMonthlyTableRows(rows, period.year, period.month);
-  }, [billDetail, formValues, previewRows, reportMode, monthlyPeriod]);
-
   const quarterTableRows = React.useMemo<TableDataRow[]>(() => {
     if (!billingQuarterReadings?.rows?.length) return [];
     return billingQuarterReadings.rows.map((row) => ({
@@ -390,6 +381,20 @@ const BillPdfPreview: React.FC = () => {
       moduleTemp: 0,
     }));
   }, [billingQuarterReadings]);
+
+  const tableData = React.useMemo<TableDataRow[]>(() => {
+    if (reportMode === "daily") {
+      // Prefer quarter (15-min) readings as source of truth for daily preview.
+      // This keeps "ภาพรวม" consistent even when legacy hourly aggregates are stale.
+      if (quarterTableRows.length > 0) {
+        return buildDailyTableRowsFromQuarter(quarterTableRows);
+      }
+      return buildDailyTableRows(previewRows);
+    }
+    const rows = previewRows;
+    const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+    return buildMonthlyTableRows(rows, period.year, period.month);
+  }, [billDetail, formValues, previewRows, reportMode, monthlyPeriod, quarterTableRows]);
 
   const quarterPages = React.useMemo(() => {
     if (quarterTableRows.length === 0) return [];
@@ -1306,8 +1311,8 @@ export default BillPdfPreview;
 
 function formatValue(value: number) {
   return Number(value ?? 0).toLocaleString("th-TH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
@@ -1330,9 +1335,9 @@ function formatThaiDate(value: string | Date) {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-6 text-[15px]">
-      <span className="whitespace-nowrap font-medium text-black">{label}</span>
-      <span className="whitespace-nowrap text-right tabular-nums text-black">
+    <div className="flex items-baseline justify-between gap-8 text-[15px]">
+      <span className="whitespace-nowrap pr-4 font-medium text-black">{label}</span>
+      <span className="min-w-[220px] whitespace-nowrap pl-2 text-right tabular-nums text-black">
         {value}
       </span>
     </div>
@@ -1449,6 +1454,34 @@ function buildDailyTableRows(rows: ExtendedBillRow[]): TableDataRow[] {
   for (let hour = 0; hour < 24; hour++) {
     const label = `${hour.toString().padStart(2, "0")}:00`;
     result.push(map.get(label) ?? createEmptyRow(label));
+  }
+  return result;
+}
+
+function buildDailyTableRowsFromQuarter(rows: TableDataRow[]): TableDataRow[] {
+  const byHour = new Map<string, TableDataRow>();
+  rows.forEach((row) => {
+    const hour = String(row.time || "").slice(0, 2).padStart(2, "0");
+    const label = `${hour}:00`;
+    const target = byHour.get(label) ?? createEmptyRow(label);
+    byHour.set(
+      label,
+      mergeRowValues(target, {
+        energyProduction: row.energyProduction,
+        energyOnPeak: row.energyOnPeak,
+        energyOffPeak: row.energyOffPeak,
+        energyPurchased: row.energyPurchased,
+        irradiance: row.irradiance,
+        ambientTemp: row.ambientTemp,
+        moduleTemp: row.moduleTemp,
+      })
+    );
+  });
+
+  const result: TableDataRow[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    const label = `${hour.toString().padStart(2, "0")}:00`;
+    result.push(byHour.get(label) ?? createEmptyRow(label));
   }
   return result;
 }
