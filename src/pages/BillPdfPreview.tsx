@@ -1335,9 +1335,9 @@ function formatThaiDate(value: string | Date) {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-8 text-[15px]">
-      <span className="whitespace-nowrap pr-4 font-medium text-black">{label}</span>
-      <span className="min-w-[220px] whitespace-nowrap pl-2 text-right tabular-nums text-black">
+    <div className="grid grid-cols-[minmax(0,1fr)_max-content] items-baseline gap-4 text-[15px]">
+      <span className="whitespace-nowrap font-medium text-black">{label}</span>
+      <span className="whitespace-nowrap text-right tabular-nums text-black">
         {value}
       </span>
     </div>
