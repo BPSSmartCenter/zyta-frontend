@@ -55,6 +55,8 @@ export default function Content({
         empty: t("content.empty", { defaultValue: "No sites found" }),
       },
       detail: t("content.detail", { defaultValue: "Detail" }),
+      copyUuid: t("content.copyUuid", { defaultValue: "Copy UUID" }),
+      copied: t("content.copied", { defaultValue: "Copied" }),
       pagination: {
         prev: t("content.pagination.prev", { defaultValue: "Prev" }),
         next: t("content.pagination.next", { defaultValue: "Next" }),
@@ -71,6 +73,38 @@ export default function Content({
   const [search, setSearch] = React.useState("");
   const [provinceFilter, setProvinceFilter] = React.useState("all");
   const [page, setPage] = React.useState(1);
+  const [copiedSiteId, setCopiedSiteId] = React.useState<string | null>(null);
+
+  const copyToClipboard = React.useCallback(async (value: string) => {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+  }, []);
+
+  const onCopyUuid = React.useCallback(
+    async (siteId: string) => {
+      try {
+        await copyToClipboard(siteId);
+        setCopiedSiteId(siteId);
+        window.setTimeout(() => {
+          setCopiedSiteId((prev) => (prev === siteId ? null : prev));
+        }, 1500);
+      } catch (err) {
+        console.error("Failed to copy site UUID", err);
+      }
+    },
+    [copyToClipboard]
+  );
 
   const provinces = React.useMemo(() => {
     const list = new Set<string>();
@@ -263,16 +297,29 @@ export default function Content({
                     {row.usersCount}
                   </td>
                   <td className="py-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onDetail(row)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <i className="material-icons-outlined text-sm">
-                        visibility
-                      </i>
-                      {texts.detail}
-                    </button>
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onDetail(row)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <i className="material-icons-outlined text-sm">
+                          visibility
+                        </i>
+                        {texts.detail}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onCopyUuid(row.id)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                        title={row.id}
+                      >
+                        <i className="material-icons-outlined text-sm">
+                          content_copy
+                        </i>
+                        {copiedSiteId === row.id ? texts.copied : texts.copyUuid}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

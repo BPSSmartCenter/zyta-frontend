@@ -82,6 +82,32 @@ type ExtendedBillRow = BillDetailPayload["rows"][number] & {
   label?: string;
 };
 
+function normalizeDailyDateInput(value: unknown): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${mm}-${dd}`;
+}
+
+function formatThaiDateFromDateOnly(raw: string) {
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("th-TH", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 const BillPdfPreview: React.FC = () => {
   const location = useLocation();
   const preview = (
@@ -226,9 +252,8 @@ const BillPdfPreview: React.FC = () => {
       previewForm?.dailyDate,
     ];
     for (const candidate of candidates) {
-      if (!candidate) continue;
-      const parsed = new Date(candidate);
-      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      const normalized = normalizeDailyDateInput(candidate);
+      if (normalized) return normalized;
     }
     return null;
   }, [billDetail?.form, formValues, dailyDateParam, previewForm]);
@@ -640,18 +665,15 @@ const BillPdfPreview: React.FC = () => {
   const reportFileBase = React.useMemo(() => {
     if (reportMode === "daily") {
       const raw = resolvedDailyDate ?? (formValues.dailyDate as string | undefined);
-      const date = raw ? new Date(raw) : new Date();
-      const formatted = Number.isNaN(date.getTime())
-        ? new Date().toLocaleDateString("th-TH", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          })
-        : date.toLocaleDateString("th-TH", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-          });
+      const dateOnly = normalizeDailyDateInput(raw);
+      const fallback = new Date().toLocaleDateString("th-TH", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const formatted = dateOnly
+        ? formatThaiDateFromDateOnly(dateOnly).replace(/\s/g, "/")
+        : fallback;
       return `report เก็บค่าไฟ วันที่ ${formatted}`.replace(/[\\/]/g, "-");
     }
     const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
@@ -886,24 +908,16 @@ const BillPdfPreview: React.FC = () => {
       const raw =
         (billDetail?.form as any)?.dailyDate ??
         (formValues.dailyDate as string | undefined);
-      if (raw) {
-        const date = new Date(raw);
-        if (!Number.isNaN(date.getTime())) {
-          return date.toLocaleDateString("th-TH", {
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          });
-        }
+      const normalized = normalizeDailyDateInput(raw);
+      if (normalized) {
+        const formatted = formatThaiDateFromDateOnly(normalized);
+        if (formatted) return formatted;
       }
       if (preferredData?.form?.dailyDate) {
-        const date = new Date(preferredData.form.dailyDate);
-        if (!Number.isNaN(date.getTime())) {
-          return date.toLocaleDateString("th-TH", {
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          });
+        const normalizedPreferred = normalizeDailyDateInput(preferredData.form.dailyDate);
+        if (normalizedPreferred) {
+          const formattedPreferred = formatThaiDateFromDateOnly(normalizedPreferred);
+          if (formattedPreferred) return formattedPreferred;
         }
       }
     } else if (reportMode === "monthly") {
@@ -1461,7 +1475,10 @@ function buildDailyTableRows(rows: ExtendedBillRow[]): TableDataRow[] {
 function buildDailyTableRowsFromQuarter(rows: TableDataRow[]): TableDataRow[] {
   const byHour = new Map<string, TableDataRow>();
   rows.forEach((row) => {
-    const hour = String(row.time || "").slice(0, 2).padStart(2, "0");
+    const hourRaw = String(row.time || "").split(":")[0];
+    const hourNum = Number.parseInt(hourRaw, 10);
+    if (!Number.isFinite(hourNum) || hourNum < 0 || hourNum > 23) return;
+    const hour = String(hourNum).padStart(2, "0");
     const label = `${hour}:00`;
     const target = byHour.get(label) ?? createEmptyRow(label);
     byHour.set(

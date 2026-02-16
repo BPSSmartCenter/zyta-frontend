@@ -4,6 +4,7 @@ import type { Noti } from "../data/Dashboard/notis";
 import { listNotis } from "../api/notis";
 import { notis as mockNotis } from "../data/Dashboard/notis";
 import { decorateNotiForDisplay, sortByNewest } from "../utils/notis";
+import { useFilters } from "./FiltersContext";
 
 type NotisContextValue = {
   items: Noti[];
@@ -31,7 +32,15 @@ const pickFallback = (current: Noti[]): Noti[] => {
   return [];
 };
 
+const toIsoRangeForDate = (date: { y: number; m: number; d: number }) => {
+  // DatePicker is local-calendar based, so build local day boundaries.
+  const from = new Date(date.y, date.m - 1, date.d, 0, 0, 0, 0);
+  const to = new Date(date.y, date.m - 1, date.d, 23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
+};
+
 export function NotisProvider({ children }: { children: React.ReactNode }) {
+  const { date, selectedSite } = useFilters();
   const [items, setItems] = React.useState<Noti[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>();
@@ -39,7 +48,13 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const fetched = await listNotis();
+      const range = toIsoRangeForDate(date);
+      const fetched = await listNotis({
+        from: range.from,
+        to: range.to,
+        siteCode: selectedSite && selectedSite !== "all" ? selectedSite : undefined,
+        limit: 500,
+      });
       setItems(prepareNotis(fetched));
       setError(undefined);
     } catch (err) {
@@ -49,7 +64,7 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [date, selectedSite]);
 
   React.useEffect(() => {
     let cancelled = false;

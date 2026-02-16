@@ -37,11 +37,14 @@
       "address": "Address",
       "devices": "Devices",
       "users": "Users",
-      "actions": "Actions"
+      "actions": "Actions",
+      "group": "Group"
     },
     "loading": "Loading sites...",
     "empty": "No sites found",
     "detail": "Detail",
+    "copyUuid": "Copy UUID",
+    "copied": "Copied",
     "pagination": {
       "prev": "Prev",
       "next": "Next",

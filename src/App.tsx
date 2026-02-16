@@ -51,9 +51,9 @@ function App() {
   return (
     <BrowserRouter>
       <DeviceInventoryProvider>
-        <NotisProvider>
-          <FaceRecProvider>
-            <FiltersProvider>
+        <FaceRecProvider>
+          <FiltersProvider>
+            <NotisProvider>
               <ScrollToTop smooth={true} />
               <ScrollUnlocker />
               <LanguageSwitcher />
@@ -101,9 +101,9 @@ function App() {
                 {/* catch-all */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-            </FiltersProvider>
-          </FaceRecProvider>
-        </NotisProvider>
+            </NotisProvider>
+          </FiltersProvider>
+        </FaceRecProvider>
       </DeviceInventoryProvider>
     </BrowserRouter>
   );

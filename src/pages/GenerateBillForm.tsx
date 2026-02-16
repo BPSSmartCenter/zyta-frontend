@@ -49,6 +49,13 @@ type SummaryTotals = {
 
 const OVERVIEW_METER_ID = "overview";
 
+function toDateOnly(value: Date) {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 const MONTH_CHOICES = [
   { value: "01", defaultLabel: "January" },
   { value: "02", defaultLabel: "February" },
@@ -767,14 +774,14 @@ const GenerateBillForm: React.FC = () => {
       }
       request = { mode: "monthly", month: monthNum, year: yearNum };
     } else {
-      const iso = dailyDate?.toISOString?.();
-      if (!iso) {
+      const dateOnly = dailyDate ? toDateOnly(dailyDate) : "";
+      if (!dateOnly) {
         setSummaryLoading(false);
         return;
       }
       // Use quarter-level source for daily autofill so Generate Form matches
       // preview/export values and includes current-day intraday data.
-      request = { mode: "quarter", date: iso };
+      request = { mode: "quarter", date: dateOnly };
     }
     const selectedOpt = meterOptions.find((opt) => opt.value === meterId);
     const tag =
@@ -924,13 +931,13 @@ const GenerateBillForm: React.FC = () => {
         const formPayload = {
           ...formState,
           billingMode: mode,
-          dailyDate: mode === "daily" ? dailyDate.toISOString() : undefined,
+          dailyDate: mode === "daily" ? toDateOnly(dailyDate) : undefined,
           customLogoDataUrl: customLogoDataUrl ?? undefined,
         };
         const params = new URLSearchParams();
         params.set("mode", mode);
         if (mode === "daily") {
-          params.set("dailyDate", dailyDate.toISOString());
+          params.set("dailyDate", toDateOnly(dailyDate));
         } else {
           if (formState.billingMonth) {
             params.set("billingMonth", formState.billingMonth);
