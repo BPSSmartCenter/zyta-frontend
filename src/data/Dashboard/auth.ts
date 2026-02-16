@@ -9,7 +9,7 @@ export type LoginResponse =
       user: {
         id: string;
         email: string;
-        role: "admin" | "officer" | "user";
+        role: "admin" | "manager" | "officer" | "user";
         sites: string[];
       };
     }

@@ -28,7 +28,8 @@
         "all": "All role",
         "admin": "Admin",
         "officer": "Officer",
-        "user": "User"
+        "user": "User",
+        "manager": "Manager"
       }
     },
     "table": {
@@ -57,7 +58,7 @@
       "lastName": "Last name",
       "email": "Email",
       "role": "Role",
-      "sites": "Sites access",
+      "sites": "Group Sites access",
       "password": "Password",
       "confirmPassword": "Confirm password",
       "fullName": "Full name"
@@ -70,8 +71,8 @@
       "password": "Please enter new password",
       "confirmPassword": "Please confirm password"
     },
-    "sitesHelper": "Choose one or more sites this user can access.",
-    "selectSites": "Select sites",
+    "sitesHelper": "Choose one or more site groups this user can access.",
+    "selectSites": "Select group sites",
     "sitesSelected": {
       "one": "{{count}} site selected",
       "other": "{{count}} sites selected"
@@ -83,7 +84,9 @@
     },
     "emailError": "Invalid email format.",
     "confirmError": "Passwords do not match.",
-    "resetNote": "After confirmation, this user's password will change and they must log in again."
+    "resetNote": "After confirmation, this user's password will change and they must log in again.",
+    "groupsSelectedLabel": "{{count}} group sites selected",
+    "noGroupSites": "No grouped sites available"
   },
   "create": {
     "title": "Create admin",
@@ -119,7 +122,8 @@
   "roles": {
     "admin": "Admin",
     "officer": "Officer",
-    "user": "User"
+    "user": "User",
+    "manager": "Manager"
   },
   "status": {
     "active": "Active",

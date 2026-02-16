@@ -1,7 +1,7 @@
 // src/mocks/data.ts
 // ---- Mock ERD Data (USERS, SITES, USER_SITES) ----
 
-export type Role = "admin" | "officer" | "user";
+export type Role = "admin" | "manager" | "officer" | "user";
 
 export type User = {
   id: string;

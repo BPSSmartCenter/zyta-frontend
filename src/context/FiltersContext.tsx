@@ -5,6 +5,7 @@ import type { DateValue } from "../components/DateInput";
 import { today as defaultToday } from "../components/Dashboard/dashboard.constants";
 import { me as apiMe } from "../api/user";
 import { listSites, getSiteDetails } from "../api/sites";
+import { listSiteGroups } from "../api/siteGroups";
 
 export type SiteOption = {
   label: string;
@@ -203,13 +204,38 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     return {
       label: label || value,
       value,
-      groupLabel: groupFromApi?.name ?? null,
-      groupId: groupFromApi?.id ?? null,
+      groupLabel:
+        groupFromApi?.name ??
+        site?.site_group_name ??
+        site?.siteGroupName ??
+        site?.group_name ??
+        null,
+      groupId:
+        groupFromApi?.id ??
+        site?.site_group_id ??
+        site?.siteGroupId ??
+        null,
     };
   }, []);
 
   const fetchSitesFromApi = React.useCallback(async (): Promise<SiteOption[]> => {
     try {
+      let groupsById = new Map<string, string>();
+      try {
+        const groups = await listSiteGroups();
+        groupsById = new Map(
+          (Array.isArray(groups) ? groups : [])
+            .map(
+              (g: any): [string, string] => [
+                String(g?.id || "").trim(),
+                String(g?.name || "").trim(),
+              ]
+            )
+            .filter(([id, name]) => id.length > 0 && name.length > 0)
+        );
+      } catch {
+        groupsById = new Map();
+      }
       const sitesResp = await listSites();
       const items = Array.isArray(sitesResp?.items)
         ? sitesResp.items
@@ -218,6 +244,12 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
         : [];
       return items
         .map((s: any) => normalizeSiteToOption(s))
+        .map((opt: SiteOption | null) => {
+          if (!opt) return null;
+          if (opt.groupLabel || !opt.groupId) return opt;
+          const name = groupsById.get(String(opt.groupId).trim());
+          return name ? { ...opt, groupLabel: name } : opt;
+        })
         .filter((opt: SiteOption | null): opt is SiteOption => Boolean(opt));
     } catch {
       return [];
@@ -255,12 +287,25 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
           : [];
 
         let baseOptions: SiteOption[] = [];
+        const catalogOptions = await fetchSitesFromApi();
+        const catalogByValue = new Map(
+          catalogOptions.map((opt) => [String(opt.value).toLowerCase(), opt] as const)
+        );
         if (isAdmin) {
-          baseOptions = await fetchSitesFromApi();
+          baseOptions = catalogOptions;
         } else if (assignedOptions.length > 0) {
-          baseOptions = assignedOptions;
+          baseOptions = assignedOptions.map((opt) => {
+            const key = String(opt.value).toLowerCase();
+            const catalog = catalogByValue.get(key);
+            if (!catalog) return opt;
+            return {
+              ...opt,
+              groupLabel: opt.groupLabel ?? catalog.groupLabel ?? null,
+              groupId: opt.groupId ?? catalog.groupId ?? null,
+            };
+          });
         } else {
-          baseOptions = await fetchSitesFromApi();
+          baseOptions = catalogOptions;
         }
 
         const uniqueOptions = (() => {
@@ -275,7 +320,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
           return list;
         })();
 
-        const opts: SiteOption[] = isAdmin
+        const includeAllOption = uniqueOptions.length > 0;
+        const opts: SiteOption[] = includeAllOption
           ? [
               {
                 label: t("navbar.allSites"),
@@ -292,7 +338,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
         const storedIsValid =
           !!stored &&
           (stored === "all"
-            ? isAdmin
+            ? includeAllOption
             : uniqueOptions.some((o) => o.value === stored));
 
         if (stored && storedIsValid) {
@@ -300,9 +346,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Default selected site: admin → all, others → first available
+        // Default selected site: prefer "all" so every role can aggregate their accessible sites.
         const prev = selectedSiteRef.current;
-        if (isAdmin) {
+        if (includeAllOption) {
           setSelectedSite("all");
           return;
         }

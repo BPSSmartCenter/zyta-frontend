@@ -113,7 +113,7 @@ export default function MapPanel({
     return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
   }, [selectedEvents, t]);
   const labelForButton = multiEventLabel || buttonLabel;
-  const userRole: "admin" | "officer" | "user" = (me()?.role as any) || "admin";
+  const userRole: "admin" | "manager" | "officer" | "user" = (me()?.role as any) || "admin";
   const [pinStatusBySite, setPinStatusBySite] = useState<Record<string, SitePinStatus>>({});
   const pinStatusRequestIdRef = useRef(0);
 

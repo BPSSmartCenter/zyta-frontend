@@ -98,7 +98,7 @@ export default function Dashboard() {
     setSearchSite,
   } = useFilters();
   // Role + sites for ContentLayout behavior similar to original
-  const [role, setRole] = React.useState<"admin" | "officer" | "user" | null>(
+  const [role, setRole] = React.useState<"admin" | "manager" | "officer" | "user" | null>(
     null
   );
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
@@ -109,14 +109,18 @@ export default function Dashboard() {
         const myRole =
           (String(me?.role || "user").toLowerCase() as any) ?? "user";
         setRole(myRole);
+        const meSites = Array.isArray((me as any)?.sites) ? (me as any).sites : [];
+        if (meSites.length > 0) {
+          setAccessibleSites(meSites as any);
+          return;
+        }
         const resp = await listSites();
-        const items = Array.isArray(resp?.items)
-          ? resp.items
+        const items = Array.isArray((resp as any)?.items)
+          ? (resp as any).items
           : Array.isArray(resp)
-          ? resp
+          ? (resp as any)
           : [];
-        const sites = items as any[];
-        setAccessibleSites(sites as any);
+        setAccessibleSites(items as any);
       } catch {
         setRole((r) => r ?? "user");
         setAccessibleSites([]);

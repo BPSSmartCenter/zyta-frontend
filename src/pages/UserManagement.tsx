@@ -38,7 +38,8 @@ function UserManagementGuarded() {
     (async () => {
       try {
         const me = await (await import("../api/user")).me();
-        setAllowed(String(me.role).toLowerCase() === "admin");
+        const role = String(me.role).toLowerCase();
+        setAllowed(role === "admin" || role === "manager");
       } catch {
         setAllowed(false);
       }
@@ -65,6 +66,10 @@ function UserManagementGuarded() {
 function UserManagementInner() {
   const { t } = useTranslation("userManagement");
   const { show } = useToast();
+  const [actorRole, setActorRole] = React.useState<
+    "admin" | "manager" | "officer" | "user"
+  >("admin");
+  const [actorSiteIds, setActorSiteIds] = React.useState<string[]>([]);
   const texts = React.useMemo(
     () => ({
       title: t("page.title", { defaultValue: "User management" }),
@@ -97,7 +102,14 @@ function UserManagementInner() {
     id: u.id,
     fullName: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
     email: u.email,
-    role: (u.role === "admin" ? "Admin" : u.role === "officer" ? "Officer" : "User") as any,
+    role:
+      (u.role === "admin"
+        ? "Admin"
+        : u.role === "manager"
+        ? "Manager"
+        : u.role === "officer"
+        ? "Officer"
+        : "User") as any,
     addedAt: u.createdAt,
     lastAccessAt: u.updatedAt,
     active: !!u.active,
@@ -118,6 +130,22 @@ function UserManagementInner() {
     refresh();
   }, [refresh]);
 
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await import("../api/user")).me();
+        setActorRole((String(me?.role || "user").toLowerCase() as any) || "user");
+        const siteIds = Array.isArray(me?.sites)
+          ? me.sites.map((s: any) => s?.id).filter(Boolean)
+          : [];
+        setActorSiteIds(siteIds);
+      } catch {
+        setActorRole("user");
+        setActorSiteIds([]);
+      }
+    })();
+  }, []);
+
   return (
     <div className="p-4 bg-[#F8FBFE]">
       <Navbar title={texts.title} />
@@ -125,6 +153,8 @@ function UserManagementInner() {
       {/* ลำดับ: Create > Reset > Edit > List */}
       {creating ? (
         <Content_Create
+          actorRole={actorRole}
+          actorSiteIds={actorSiteIds}
           onCancel={() => setCreating(false)}
           onCreate={async ({ password, avatarFile, siteIds, ...created }) => {
             try {
@@ -135,7 +165,14 @@ function UserManagementInner() {
                 lastName,
                 email: created.email,
                 password,
-                role: created.role === "Admin" ? "admin" : created.role === "Officer" ? "officer" : "user",
+                role:
+                  created.role === "Admin"
+                    ? "admin"
+                    : created.role === "Manager"
+                    ? "manager"
+                    : created.role === "Officer"
+                    ? "officer"
+                    : "user",
                 ...(Array.isArray(siteIds) ? { siteIds } : {}),
               });
               await refresh();
@@ -164,6 +201,8 @@ function UserManagementInner() {
         />
       ) : editing ? (
         <Content_Edit
+          actorRole={actorRole}
+          actorSiteIds={actorSiteIds}
           user={editing}
           allUsers={rows}
           onCancel={() => setEditing(null)}
@@ -175,7 +214,14 @@ function UserManagementInner() {
                 firstName,
                 lastName,
                 email: next.email,
-                role: next.role === "Admin" ? "admin" : next.role === "Officer" ? "officer" : "user",
+                role:
+                  next.role === "Admin"
+                    ? "admin"
+                    : next.role === "Manager"
+                    ? "manager"
+                    : next.role === "Officer"
+                    ? "officer"
+                    : "user",
                 // include siteIds for non-admins
                 ...(Array.isArray((next as any).siteIds)
                   ? { siteIds: (next as any).siteIds as string[] }
@@ -192,6 +238,7 @@ function UserManagementInner() {
         />
       ) : (
         <Content
+          actorRole={actorRole}
           rows={rows}
           setRows={setRows}
           onEdit={setEditing}

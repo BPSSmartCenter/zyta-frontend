@@ -1,7 +1,7 @@
 // src/api/adminUsers.ts
 import { api } from "./axios";
 
-export type Role = "admin" | "officer" | "user";
+export type Role = "admin" | "manager" | "officer" | "user";
 
 export type AdminUserDto = {
   id: string;

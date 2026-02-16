@@ -51,7 +51,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const [account, setAccount] = useState<{
     name: string;
     email: string;
-    role?: "admin" | "officer" | "user";
+    role?: "admin" | "manager" | "officer" | "user";
   } | null>(null);
   useEffect(() => {
     let mounted = true;
@@ -587,7 +587,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
                   })()}
 
                   {/* ===== การจัดการผู้ใช้ / User Management (super admin only) ===== */}
-                  {String(account?.email || "").toLowerCase() === MASTER_EMAIL &&
+                  {(String(account?.role || "").toLowerCase() === "admin" ||
+                    String(account?.role || "").toLowerCase() === "manager") &&
                     (() => {
                       const label = t("menu.user_management", {
                         defaultValue: "การจัดการผู้ใช้",

@@ -3,7 +3,7 @@
 
 export type JwtPayload = {
   sub: string; // user id
-  role: "admin" | "officer" | "user";
+  role: "admin" | "manager" | "officer" | "user";
   site_ids: string[];
   exp: number; // epoch seconds
 };

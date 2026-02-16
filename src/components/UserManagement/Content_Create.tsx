@@ -5,6 +5,8 @@ import type { AdminRow } from "./user.constant";
 import { listSites } from "../../api/sites";
 
 type Props = {
+  actorRole?: "admin" | "manager" | "officer" | "user";
+  actorSiteIds?: string[];
   onCancel: () => void;
   onCreate: (
     next: AdminRow & {
@@ -22,7 +24,19 @@ const hasComplex = (pwd: string) =>
   /[0-9]/.test(pwd) && /[A-Z]/.test(pwd) && /[a-z]/.test(pwd);
 const minLen = (pwd: string) => pwd.length >= 10;
 
-export default function Content_Create({ onCancel, onCreate }: Props) {
+type SiteGroupOption = {
+  id: string;
+  label: string;
+  siteIds: string[];
+  isSingleSite?: boolean;
+};
+
+export default function Content_Create({
+  actorRole = "admin",
+  actorSiteIds = [],
+  onCancel,
+  onCreate,
+}: Props) {
   const { t } = useTranslation("userManagement");
   const texts = React.useMemo(
     () => ({
@@ -36,7 +50,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
         lastName: t("form.labels.lastName", { defaultValue: "Last name" }),
         email: t("form.labels.email", { defaultValue: "Email" }),
         role: t("form.labels.role", { defaultValue: "Role" }),
-        sites: t("form.labels.sites", { defaultValue: "Sites access" }),
+        sites: t("form.labels.sites", { defaultValue: "Group Sites access" }),
         password: t("form.labels.password", { defaultValue: "Password" }),
         confirmPassword: t("form.labels.confirmPassword", {
           defaultValue: "Confirm password",
@@ -63,9 +77,15 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
         }),
       },
       helper: t("form.sitesHelper", {
-        defaultValue: "Choose one or more sites this user can access.",
+        defaultValue: "Choose one or more site groups this user can access.",
       }),
-      selectSites: t("form.selectSites", { defaultValue: "Select sites" }),
+      selectSites: t("form.selectSites", { defaultValue: "Select group sites" }),
+      noGroupSites: t("form.noGroupSites", {
+        defaultValue: "No grouped sites available",
+      }),
+      groupsSelectedLabel: t("form.groupsSelectedLabel", {
+        defaultValue: "{{count}} group sites selected",
+      }),
       emailError: t("form.emailError", { defaultValue: "Invalid email format." }),
       confirmError: t("form.confirmError", {
         defaultValue: "Passwords do not match.",
@@ -82,23 +102,21 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
     }),
     [t]
   );
-  const formatSitesSelected = React.useCallback(
-    (count: number) =>
-      t("form.sitesSelected", {
-        count,
-        defaultValue:
-          count === 1 ? `${count} site selected` : `${count} sites selected`,
-      }),
-    [t]
+  const formatGroupsSelected = React.useCallback(
+    (count: number) => texts.groupsSelectedLabel.replace("{{count}}", String(count)),
+    [texts.groupsSelectedLabel]
   );
-  const roleOptions = React.useMemo(
-    () => [
+  const roleOptions = React.useMemo(() => {
+    if (actorRole === "manager") {
+      return [{ label: t("roles.user", { defaultValue: "User" }), value: "User" }];
+    }
+    return [
       { label: t("roles.admin", { defaultValue: "Admin" }), value: "Admin" },
+      { label: t("roles.manager", { defaultValue: "Manager" }), value: "Manager" },
       { label: t("roles.officer", { defaultValue: "Officer" }), value: "Officer" },
       { label: t("roles.user", { defaultValue: "User" }), value: "User" },
-    ],
-    [t]
-  );
+    ];
+  }, [actorRole, t]);
   // avatar
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
@@ -109,13 +127,13 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
   const [last, setLast] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [emailTouched, setEmailTouched] = React.useState(false);
-  const [role, setRole] = React.useState<"Admin" | "Officer" | "User" | "">("");
+  const [role, setRole] = React.useState<"Admin" | "Manager" | "Officer" | "User" | "">(
+    actorRole === "manager" ? "User" : ""
+  );
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [siteOptions, setSiteOptions] = React.useState<
-    Array<{ label: string; value: string }>
-  >([]);
-  const [selectedSiteIds, setSelectedSiteIds] = React.useState<string[]>([]);
+  const [groupOptions, setGroupOptions] = React.useState<SiteGroupOption[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
 
   // validations (เหมือน RegisterPage)
   const emailInvalid = emailTouched && !isEmailValid(email);
@@ -139,7 +157,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
     return () => URL.revokeObjectURL(url);
   }, [avatarFile]);
 
-  // fetch available sites for admin to assign
+  // fetch available site groups for admin/manager to assign
   React.useEffect(() => {
     (async () => {
       try {
@@ -149,17 +167,92 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
           : Array.isArray((data as any)?.items)
           ? (data as any).items
           : [];
-        setSiteOptions(
-          arr.map((s: any) => ({
-            label: s.name || s.code || s.id,
-            value: s.id,
+        const mapped = arr
+          .map((s: any) => {
+            const siteId = String(s?.id || "").trim();
+            if (!siteId) return null;
+            const siteName =
+              String(s?.name || s?.code || s?.id || "").trim() || siteId;
+            const groupFromApi =
+              s?.site_group ?? s?.site_groups ?? s?.siteGroup ?? s?.group ?? null;
+            const groupId =
+              String(
+                s?.site_group_id ??
+                  s?.siteGroupId ??
+                  groupFromApi?.id ??
+                  groupFromApi?.name ??
+                  ""
+              ).trim() || null;
+            const groupLabel =
+              String(groupFromApi?.name ?? groupFromApi?.label ?? "").trim() || null;
+            return {
+              siteId,
+              siteName,
+              groupId,
+              groupLabel,
+            };
+          })
+          .filter(Boolean) as Array<{
+          siteId: string;
+          siteName: string;
+          groupId: string | null;
+          groupLabel: string | null;
+        }>;
+        const allowedSet = new Set(actorSiteIds);
+        const scoped =
+          actorRole === "manager"
+            ? mapped.filter((s) => allowedSet.has(s.siteId))
+            : mapped;
+        const groupedMap = new Map<string, SiteGroupOption>();
+        for (const site of scoped) {
+          const label = site.groupLabel;
+          const id = site.groupId;
+          if (!label || !id) {
+            groupedMap.set(`site:${site.siteId}`, {
+              id: `site:${site.siteId}`,
+              label: site.siteName,
+              siteIds: [site.siteId],
+              isSingleSite: true,
+            });
+            continue;
+          }
+          const current = groupedMap.get(id);
+          if (current) {
+            current.siteIds.push(site.siteId);
+          } else {
+            groupedMap.set(id, { id, label, siteIds: [site.siteId] });
+          }
+        }
+        const nextOptions = Array.from(groupedMap.values())
+          .map((group) => ({
+            ...group,
+            siteIds: Array.from(new Set(group.siteIds)),
           }))
+          .sort((a, b) => {
+            if (!!a.isSingleSite !== !!b.isSingleSite) return a.isSingleSite ? 1 : -1;
+            return a.label.localeCompare(b.label, "th");
+          });
+        setGroupOptions(nextOptions);
+        setSelectedGroupIds((prev) =>
+          prev.filter((groupId) => nextOptions.some((group) => group.id === groupId))
         );
-      } catch (e) {
-        setSiteOptions([]);
+      } catch {
+        setGroupOptions([]);
       }
     })();
-  }, []);
+  }, [actorRole, actorSiteIds]);
+
+  const selectedSiteIds = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          groupOptions
+            .filter((group) => selectedGroupIds.includes(group.id))
+            .flatMap((group) => group.siteIds)
+        )
+      ),
+    [groupOptions, selectedGroupIds]
+  );
 
   const submit = () => {
     if (!formValid) return;
@@ -167,7 +260,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
       id: String(Date.now()),
       fullName: `${first.trim()} ${last.trim()}`.trim(),
       email: email.trim(),
-      role: role as "Admin" | "Officer" | "User",
+      role: role as "Admin" | "Manager" | "Officer" | "User",
       addedAt: new Date().toISOString(),
       lastAccessAt: new Date().toISOString(),
       active: true,
@@ -317,7 +410,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
             <Dropdown
               options={roleOptions as any}
               value={role}
-              onChange={(v) => setRole(v as "Admin" | "Officer" | "User")}
+              onChange={(v) => setRole(v as "Admin" | "Manager" | "Officer" | "User")}
             >
               {({
                 open,
@@ -376,7 +469,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
             </label>
             <div className="col-span-12 md:col-span-9">
               <Dropdown
-                options={siteOptions as any}
+                options={groupOptions as any}
                 value="__multi__"
                 onChange={() => {}}
               >
@@ -390,8 +483,8 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                       onMouseDown={(e) => e.preventDefault()}
                     >
                       <span className="truncate">
-                        {selectedSiteIds.length > 0
-                          ? formatSitesSelected(selectedSiteIds.length)
+                        {selectedGroupIds.length > 0
+                          ? formatGroupsSelected(selectedGroupIds.length)
                           : texts.selectSites}
                       </span>
                       <i className="material-icons leading-none">
@@ -403,16 +496,20 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                       <div
                         {...getMenuProps({
                           className:
-                            "absolute z-50 mt-1 min-w-[220px] whitespace-nowrap rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto",
+                            "absolute z-50 mt-1 min-w-[420px] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto overflow-x-auto",
                         })}
                         onMouseDown={(e) => e.preventDefault()}
                       >
                         <div className="mt-1">
-                          {siteOptions.map((opt: any) => {
-                            const checked = selectedSiteIds.includes(opt.value);
+                          {groupOptions.length === 0 ? (
+                            <div className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-500">
+                              {texts.noGroupSites}
+                            </div>
+                          ) : groupOptions.map((opt) => {
+                            const checked = selectedGroupIds.includes(opt.id);
                             return (
                               <label
-                                key={opt.value}
+                                key={opt.id}
                                 className={[
                                   "flex items-center gap-2 rounded-md px-3 py-2 text-[14px] hover:bg-gray-50 hover:cursor-pointer",
                                   checked ? "bg-gray-50" : "",
@@ -423,15 +520,20 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                                   className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
                                   checked={checked}
                                   onChange={() =>
-                                    setSelectedSiteIds((prev) =>
-                                      prev.includes(opt.value)
-                                        ? prev.filter((v) => v !== opt.value)
-                                        : [...prev, opt.value]
+                                    setSelectedGroupIds((prev) =>
+                                      prev.includes(opt.id)
+                                        ? prev.filter((v) => v !== opt.id)
+                                        : [...prev, opt.id]
                                     )
                                   }
                                   onMouseDown={(e) => e.preventDefault()}
                                 />
-                                <span>{opt.label}</span>
+                                <span
+                                  className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap"
+                                  title={opt.label}
+                                >
+                                  {opt.label}
+                                </span>
                               </label>
                             );
                           })}
@@ -442,11 +544,11 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                 )}
               </Dropdown>
               {/* selected chips */}
-              {selectedSiteIds.length > 0 && (
+              {selectedGroupIds.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedSiteIds.map((id) => {
+                  {selectedGroupIds.map((id) => {
                     const label =
-                      siteOptions.find((s) => s.value === id)?.label || id;
+                      groupOptions.find((s) => s.id === id)?.label || id;
                     return (
                       <span
                         key={id}
@@ -458,7 +560,7 @@ export default function Content_Create({ onCancel, onCreate }: Props) {
                           aria-label={texts.remove}
                           className="ml-1 text-gray-500 hover:text-gray-800"
                           onClick={() =>
-                            setSelectedSiteIds((prev) =>
+                            setSelectedGroupIds((prev) =>
                               prev.filter((v) => v !== id)
                             )
                           }

@@ -35,6 +35,7 @@ const getPageNumbers = (current: number, total: number) => {
 
 /* ---------- props ---------- */
 type Props = {
+  actorRole?: "admin" | "manager" | "officer" | "user";
   rows: AdminRow[];
   setRows: React.Dispatch<React.SetStateAction<AdminRow[]>>;
   onEdit: (row: AdminRow) => void;
@@ -45,6 +46,7 @@ type Props = {
 };
 
 export default function Content({
+  actorRole = "admin",
   rows,
   setRows,
   onEdit,
@@ -75,25 +77,26 @@ export default function Content({
   );
 
   const roleOptions = React.useMemo(
-    () => [
-      {
-        label: t("content.filters.role.all", { defaultValue: "All role" }),
-        value: "all",
-      },
-      {
-        label: t("content.filters.role.admin", { defaultValue: "Admin" }),
-        value: "Admin",
-      },
-      {
-        label: t("content.filters.role.officer", { defaultValue: "Officer" }),
-        value: "Officer",
-      },
-      {
-        label: t("content.filters.role.user", { defaultValue: "User" }),
-        value: "User",
-      },
-    ],
-    [t]
+    () => {
+      const base = [
+        {
+          label: t("content.filters.role.all", { defaultValue: "All role" }),
+          value: "all",
+        },
+      ] as Array<{ label: string; value: string }>;
+      if (actorRole === "admin") {
+        base.push(
+          { label: t("content.filters.role.admin", { defaultValue: "Admin" }), value: "Admin" },
+          { label: t("roles.manager", { defaultValue: "Manager" }), value: "Manager" },
+          { label: t("content.filters.role.officer", { defaultValue: "Officer" }), value: "Officer" },
+          { label: t("content.filters.role.user", { defaultValue: "User" }), value: "User" }
+        );
+      } else {
+        base.push({ label: t("content.filters.role.user", { defaultValue: "User" }), value: "User" });
+      }
+      return base;
+    },
+    [actorRole, t]
   );
 
   const texts = React.useMemo(
@@ -132,7 +135,7 @@ export default function Content({
   const resolveRoleLabel = React.useCallback(
     (roleValue: string) => {
       const key = roleValue?.toLowerCase();
-      if (key === "admin" || key === "officer" || key === "user") {
+      if (key === "admin" || key === "manager" || key === "officer" || key === "user") {
         return t(`roles.${key}`, { defaultValue: roleValue });
       }
       return roleValue;

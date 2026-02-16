@@ -194,6 +194,14 @@ function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
   return options;
 }
 
+function extractInverterNumber(label: string, sn: string): number | null {
+  const fromLabel = /inverter\s*([0-9]+)/i.exec(label || "");
+  if (fromLabel) return Number(fromLabel[1]);
+  const fromSn = /([0-9]+)[^0-9]*$/i.exec(sn || "");
+  if (fromSn) return Number(fromSn[1]);
+  return null;
+}
+
 function formatWithComma(v: number | string) {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n)
@@ -640,6 +648,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               "th"
             );
             if (bySite !== 0) return bySite;
+            const aNo = extractInverterNumber(a.label, a.sn);
+            const bNo = extractInverterNumber(b.label, b.sn);
+            if (aNo !== null && bNo !== null && aNo !== bNo) return aNo - bNo;
+            const byLabel = String(a.label || "").localeCompare(String(b.label || ""), "th", {
+              numeric: true,
+            });
+            if (byLabel !== 0) return byLabel;
             return a.sn.localeCompare(b.sn, undefined, { numeric: true });
           });
         setDeviceOptions(filtered);

@@ -61,10 +61,21 @@ export default function Content({ }: Props) {
   const { abs, absSite } = useUserPath();
   const { siteCode } = useParams();
   const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
-  const { selectedSite } = useFilters();
+  const { selectedSite, siteOptions } = useFilters();
+  const accessibleSitesFromFilters = useMemo(
+    () =>
+      (siteOptions || [])
+        .map((opt) => ({
+          code: String(opt?.value || "").trim(),
+          name: String(opt?.label || "").trim(),
+        }))
+        .filter((site) => site.code.length > 0 && site.code.toLowerCase() !== "all"),
+    [siteOptions]
+  );
 
   useDeviceInventoryLoader({
     selectedSiteCode: siteCode ?? selectedSite,
+    accessibleSites: accessibleSitesFromFilters,
   });
   // ===== URL → type (derive only; no local state) =====
   const urlType = useMemo(() => {

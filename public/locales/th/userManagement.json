@@ -28,7 +28,8 @@
         "all": "ทุกสิทธิ์",
         "admin": "ผู้ดูแล",
         "officer": "เจ้าหน้าที่",
-        "user": "ผู้ใช้"
+        "user": "ผู้ใช้",
+        "manager": "\u0e1c\u0e39\u0e49\u0e08\u0e31\u0e14\u0e01\u0e32\u0e23"
       }
     },
     "table": {
@@ -57,7 +58,7 @@
       "lastName": "นามสกุล",
       "email": "อีเมล",
       "role": "สิทธิ์",
-      "sites": "สิทธิ์การเข้าถึงไซต์",
+      "sites": "\u0e2a\u0e34\u0e17\u0e18\u0e34\u0e4c\u0e01\u0e32\u0e23\u0e40\u0e02\u0e49\u0e32\u0e16\u0e36\u0e07\u0e01\u0e25\u0e38\u0e48\u0e21\u0e44\u0e0b\u0e15\u0e4c",
       "password": "รหัสผ่าน",
       "confirmPassword": "ยืนยันรหัสผ่าน",
       "fullName": "ชื่อ-นามสกุล"
@@ -70,8 +71,8 @@
       "password": "กรุณากรอกรหัสผ่านใหม่",
       "confirmPassword": "กรุณายืนยันรหัสผ่าน"
     },
-    "sitesHelper": "เลือกไซต์ที่ผู้ใช้นี้มีสิทธิ์เข้าได้",
-    "selectSites": "เลือกไซต์",
+    "sitesHelper": "\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e01\u0e25\u0e38\u0e48\u0e21\u0e44\u0e0b\u0e15\u0e4c\u0e17\u0e35\u0e48\u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e19\u0e35\u0e49\u0e21\u0e35\u0e2a\u0e34\u0e17\u0e18\u0e34\u0e4c\u0e40\u0e02\u0e49\u0e32\u0e16\u0e36\u0e07",
+    "selectSites": "\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e01\u0e25\u0e38\u0e48\u0e21\u0e44\u0e0b\u0e15\u0e4c",
     "sitesSelected": {
       "one": "เลือก {{count}} ไซต์",
       "other": "เลือก {{count}} ไซต์"
@@ -83,7 +84,9 @@
     },
     "emailError": "รูปแบบอีเมลไม่ถูกต้อง",
     "confirmError": "รหัสผ่านไม่ตรงกัน",
-    "resetNote": "เมื่อยืนยัน รหัสผ่านของผู้ใช้นี้จะถูกเปลี่ยนและต้องเข้าสู่ระบบใหม่"
+    "resetNote": "เมื่อยืนยัน รหัสผ่านของผู้ใช้นี้จะถูกเปลี่ยนและต้องเข้าสู่ระบบใหม่",
+    "groupsSelectedLabel": "\u0e40\u0e25\u0e37\u0e2d\u0e01 {{count}} \u0e01\u0e25\u0e38\u0e48\u0e21\u0e44\u0e0b\u0e15\u0e4c",
+    "noGroupSites": "\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e01\u0e25\u0e38\u0e48\u0e21\u0e44\u0e0b\u0e15\u0e4c\u0e17\u0e35\u0e48\u0e1e\u0e23\u0e49\u0e2d\u0e21\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19"
   },
   "create": {
     "title": "เพิ่มผู้ดูแล",
@@ -119,7 +122,8 @@
   "roles": {
     "admin": "ผู้ดูแล",
     "officer": "เจ้าหน้าที่",
-    "user": "ผู้ใช้"
+    "user": "ผู้ใช้",
+    "manager": "\u0e1c\u0e39\u0e49\u0e08\u0e31\u0e14\u0e01\u0e32\u0e23"
   },
   "status": {
     "active": "ใช้งาน",

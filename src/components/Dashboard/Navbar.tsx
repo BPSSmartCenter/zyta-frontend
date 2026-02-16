@@ -25,6 +25,8 @@ type SiteOption = {
   label: string;
   value: string;
   i18nKey?: string; // โ เธ–เนเธฒเธกเธต key เธเนเธเธฐเนเธเนเนเธเธฅเนเธ”เธขเธ•เธฃเธ
+  groupLabel?: string | null;
+  groupId?: string | null;
 };
 
 export default function Navbar({
@@ -143,6 +145,7 @@ export default function Navbar({
                 }
                 getLabel={getSiteLabelStrict}
                 showUngrouped={true}
+                showUngroupedHeader={false}
                 buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
                 menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto rounded-md border border-gray-300 bg-white p-1 shadow-md whitespace-nowrap"
               />
@@ -214,6 +217,7 @@ export default function Navbar({
                         }
                         getLabel={getSiteLabelStrict}
                         showUngrouped={true}
+                        showUngroupedHeader={false}
                         rootClassName="relative inline-block w-full"
                         buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
                         menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md"

@@ -1,25 +1,34 @@
-import React from "react";
+﻿import React from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../Dropdown";
 import Modal from "../Modal";
-import { useToast } from "../../hook/toastProvider"; // ใช้ตาม path เดิมของโปรเจกต์คุณ
+import { useToast } from "../../hook/toastProvider";
 import type { AdminRow } from "./user.constant";
 import { listSites } from "../../api/sites";
 import { getUser } from "../../api/adminUsers";
 
 type Props = {
+  actorRole?: "admin" | "manager" | "officer" | "user";
+  actorSiteIds?: string[];
   user: AdminRow;
   onCancel: () => void;
   onSave: (next: AdminRow & { siteIds?: string[] }) => void;
-  /** ส่งรายชื่อผู้ใช้ทั้งหมดเข้ามาเพื่อเช็คซ้ำ (ยกเว้นตัวที่กำลังแก้) */
   allUsers?: AdminRow[];
 };
 
+type SiteGroupOption = {
+  id: string;
+  label: string;
+  siteIds: string[];
+  isSingleSite?: boolean;
+};
+
 const normalizeEmail = (s: string) => s.trim().toLowerCase();
-const normalizeName = (s: string) =>
-  s.replace(/\s+/g, " ").trim().toLowerCase();
+const normalizeName = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 
 export default function Content_Edit({
+  actorRole = "admin",
+  actorSiteIds = [],
   user,
   onCancel,
   onSave,
@@ -27,6 +36,7 @@ export default function Content_Edit({
 }: Props) {
   const { t } = useTranslation("userManagement");
   const { show } = useToast();
+
   const texts = React.useMemo(
     () => ({
       title: t("edit.title", { defaultValue: "Edit admin information" }),
@@ -39,7 +49,7 @@ export default function Content_Edit({
         lastName: t("form.labels.lastName", { defaultValue: "Last name" }),
         email: t("form.labels.email", { defaultValue: "Email" }),
         role: t("form.labels.role", { defaultValue: "Role" }),
-        sites: t("form.labels.sites", { defaultValue: "Sites access" }),
+        sites: t("form.labels.sites", { defaultValue: "Group Sites access" }),
       },
       placeholders: {
         firstName: t("form.placeholders.firstName", {
@@ -56,9 +66,15 @@ export default function Content_Edit({
         }),
       },
       helper: t("form.sitesHelper", {
-        defaultValue: "Choose one or more sites this user can access.",
+        defaultValue: "Choose one or more site groups this user can access.",
       }),
-      selectSites: t("form.selectSites", { defaultValue: "Select sites" }),
+      selectSites: t("form.selectSites", { defaultValue: "Select group sites" }),
+      noGroupSites: t("form.noGroupSites", {
+        defaultValue: "No grouped sites available",
+      }),
+      groupsSelectedLabel: t("form.groupsSelectedLabel", {
+        defaultValue: "{{count}} group sites selected",
+      }),
       remove: t("form.remove", { defaultValue: "Remove" }),
       errors: {
         required: t("edit.errors.required", {
@@ -81,36 +97,34 @@ export default function Content_Edit({
     }),
     [t]
   );
-  const formatSitesSelected = React.useCallback(
-    (count: number) =>
-      t("form.sitesSelected", {
-        count,
-        defaultValue:
-          count === 1 ? `${count} site selected` : `${count} sites selected`,
-      }),
-    [t]
+
+  const formatGroupsSelected = React.useCallback(
+    (count: number) => texts.groupsSelectedLabel.replace("{{count}}", String(count)),
+    [texts.groupsSelectedLabel]
   );
-  const roleOptions = React.useMemo(
-    () => [
+
+  const roleOptions = React.useMemo(() => {
+    if (actorRole === "manager") {
+      return [{ label: t("roles.user", { defaultValue: "User" }), value: "User" }];
+    }
+    return [
       { label: t("roles.admin", { defaultValue: "Admin" }), value: "Admin" },
+      { label: t("roles.manager", { defaultValue: "Manager" }), value: "Manager" },
       { label: t("roles.officer", { defaultValue: "Officer" }), value: "Officer" },
       { label: t("roles.user", { defaultValue: "User" }), value: "User" },
-    ],
-    [t]
-  );
+    ];
+  }, [actorRole, t]);
 
   const [first, setFirst] = React.useState("");
   const [last, setLast] = React.useState("");
   const [email, setEmail] = React.useState(user.email);
-  const [role, setRole] = React.useState<"Admin" | "Officer" | "User">(
+  const [role, setRole] = React.useState<"Admin" | "Manager" | "Officer" | "User">(
     user.role as any
   );
-  const [siteOptions, setSiteOptions] = React.useState<
-    Array<{ label: string; value: string }>
-  >([]);
-  const [selectedSiteIds, setSelectedSiteIds] = React.useState<string[]>([]);
+  const [groupOptions, setGroupOptions] = React.useState<SiteGroupOption[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
+  const [initialSiteIds, setInitialSiteIds] = React.useState<string[]>([]);
 
-  // modal state
   const [dupModal, setDupModal] = React.useState<{
     open: boolean;
     title: string;
@@ -122,22 +136,20 @@ export default function Content_Edit({
     setFirst(f ?? "");
     setLast(rest.join(" "));
     setEmail(user.email);
-    setRole(user.role);
-    // fetch user sites for pre-select
+    setRole((actorRole === "manager" ? "User" : user.role) as any);
     (async () => {
       try {
         const u = await getUser(user.id);
         const ids = Array.isArray(u?.sites)
           ? (u.sites as any[]).map((s) => s.id).filter(Boolean)
           : [];
-        setSelectedSiteIds(ids);
+        setInitialSiteIds(ids);
       } catch {
-        setSelectedSiteIds([]);
+        setInitialSiteIds([]);
       }
     })();
-  }, [user]);
+  }, [user, actorRole]);
 
-  // fetch available sites (admin will get all)
   React.useEffect(() => {
     (async () => {
       try {
@@ -147,24 +159,103 @@ export default function Content_Edit({
           : Array.isArray((data as any)?.items)
           ? (data as any).items
           : [];
-        setSiteOptions(
-          arr.map((s: any) => ({
-            label: s.name || s.code || s.id,
-            value: s.id,
-          }))
-        );
-      } catch (e) {
-        setSiteOptions([]);
+        const mapped = arr
+          .map((s: any) => {
+            const siteId = String(s?.id || "").trim();
+            if (!siteId) return null;
+            const siteName =
+              String(s?.name || s?.code || s?.id || "").trim() || siteId;
+            const groupFromApi =
+              s?.site_group ?? s?.site_groups ?? s?.siteGroup ?? s?.group ?? null;
+            const groupId =
+              String(
+                s?.site_group_id ??
+                  s?.siteGroupId ??
+                  groupFromApi?.id ??
+                  groupFromApi?.name ??
+                  ""
+              ).trim() || null;
+            const groupLabel =
+              String(groupFromApi?.name ?? groupFromApi?.label ?? "").trim() || null;
+            return { siteId, siteName, groupId, groupLabel };
+          })
+          .filter(Boolean) as Array<{
+          siteId: string;
+          siteName: string;
+          groupId: string | null;
+          groupLabel: string | null;
+        }>;
+
+        const allowedSet = new Set(actorSiteIds);
+        const scoped =
+          actorRole === "manager"
+            ? mapped.filter((s) => allowedSet.has(s.siteId))
+            : mapped;
+
+        const groupMap = new Map<string, SiteGroupOption>();
+        for (const site of scoped) {
+          if (!site.groupId || !site.groupLabel) {
+            groupMap.set(`site:${site.siteId}`, {
+              id: `site:${site.siteId}`,
+              label: site.siteName,
+              siteIds: [site.siteId],
+              isSingleSite: true,
+            });
+            continue;
+          }
+          const current = groupMap.get(site.groupId);
+          if (current) {
+            current.siteIds.push(site.siteId);
+          } else {
+            groupMap.set(site.groupId, {
+              id: site.groupId,
+              label: site.groupLabel,
+              siteIds: [site.siteId],
+            });
+          }
+        }
+
+        const nextGroups = Array.from(groupMap.values())
+          .map((group) => ({ ...group, siteIds: Array.from(new Set(group.siteIds)) }))
+          .sort((a, b) => {
+            if (!!a.isSingleSite !== !!b.isSingleSite) return a.isSingleSite ? 1 : -1;
+            return a.label.localeCompare(b.label, "th");
+          });
+
+        setGroupOptions(nextGroups);
+      } catch {
+        setGroupOptions([]);
       }
     })();
-  }, []);
+  }, [actorRole, actorSiteIds]);
+
+  React.useEffect(() => {
+    if (!groupOptions.length) {
+      setSelectedGroupIds([]);
+      return;
+    }
+    const siteIdSet = new Set(initialSiteIds);
+    const nextSelected = groupOptions
+      .filter((group) => group.siteIds.some((siteId) => siteIdSet.has(siteId)))
+      .map((group) => group.id);
+    setSelectedGroupIds(nextSelected);
+  }, [groupOptions, initialSiteIds]);
+
+  const selectedSiteIds = React.useMemo(
+    () =>
+      Array.from(
+        new Set(
+          groupOptions
+            .filter((group) => selectedGroupIds.includes(group.id))
+            .flatMap((group) => group.siteIds)
+        )
+      ),
+    [groupOptions, selectedGroupIds]
+  );
 
   const submit = () => {
     if (!first.trim() || !last.trim() || !email.trim()) {
-      show({
-        message: texts.errors.required,
-        variant: "error",
-      });
+      show({ message: texts.errors.required, variant: "error" });
       return;
     }
 
@@ -172,20 +263,18 @@ export default function Content_Edit({
       ...user,
       fullName: `${first.trim()} ${last.trim()}`.trim(),
       email: email.trim(),
-      role,
+      role: actorRole === "manager" ? "User" : role,
       siteIds: role === "Admin" ? undefined : selectedSiteIds,
     };
 
-    // ===== Duplicate validation (ตามมาตรฐานทั่วไป) =====
     const conflicts: string[] = [];
     const nEmail = normalizeEmail(next.email);
     const nName = normalizeName(next.fullName);
 
     allUsers.forEach((u) => {
-      if (u.id === user.id) return; // ข้ามตัวที่กำลังแก้
+      if (u.id === user.id) return;
       if (normalizeEmail(u.email) === nEmail) conflicts.push(texts.duplicate.email);
-      if (normalizeName(u.fullName) === nName)
-        conflicts.push(texts.duplicate.fullName);
+      if (normalizeName(u.fullName) === nName) conflicts.push(texts.duplicate.fullName);
     });
 
     if (conflicts.length) {
@@ -205,9 +294,7 @@ export default function Content_Edit({
       });
       return;
     }
-    // ================================================
 
-    // Delegate to parent; parent will show success toast after API completes
     onSave(next);
   };
 
@@ -217,7 +304,6 @@ export default function Content_Edit({
       <hr className="mt-3" />
 
       <div className="mt-6 space-y-5 max-w-3xl">
-        {/* First name */}
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
             {texts.labels.firstName} <span className="text-red-500">*</span>
@@ -230,7 +316,6 @@ export default function Content_Edit({
           />
         </div>
 
-        {/* Last name */}
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
             {texts.labels.lastName} <span className="text-red-500">*</span>
@@ -243,7 +328,6 @@ export default function Content_Edit({
           />
         </div>
 
-        {/* Email */}
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
             {texts.labels.email} <span className="text-red-500">*</span>
@@ -257,7 +341,6 @@ export default function Content_Edit({
           />
         </div>
 
-        {/* Role */}
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
             {texts.labels.role} <span className="text-red-500">*</span>
@@ -266,16 +349,9 @@ export default function Content_Edit({
             <Dropdown
               options={roleOptions as any}
               value={role}
-              onChange={(v) => setRole(v as "Admin" | "Officer" | "User")}
+              onChange={(v) => setRole(v as "Admin" | "Manager" | "Officer" | "User")}
             >
-              {({
-                open,
-                selected,
-                getButtonProps,
-                getMenuProps,
-                getItemProps,
-                options,
-              }) => (
+              {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
                 <div className="relative">
                   <button
                     {...getButtonProps({
@@ -283,9 +359,7 @@ export default function Content_Edit({
                         "h-[40px] w-full rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 font-semibold flex items-center justify-between gap-2 hover:cursor-pointer",
                     })}
                   >
-                    <span className="truncate">
-                      {selected?.label ?? texts.placeholders.role}
-                    </span>
+                    <span className="truncate">{selected?.label ?? texts.placeholders.role}</span>
                     <i className="material-icons leading-none">
                       {open ? "arrow_drop_up" : "arrow_drop_down"}
                     </i>
@@ -317,18 +391,13 @@ export default function Content_Edit({
           </div>
         </div>
 
-        {/* Sites (hidden for Admin) */}
         {role !== "Admin" && (
           <div className="grid grid-cols-12 items-start gap-4">
             <label className="col-span-12 md:col-span-3 font-medium pt-2">
               {texts.labels.sites}
             </label>
             <div className="col-span-12 md:col-span-9">
-              <Dropdown
-                options={siteOptions as any}
-                value="__multi__"
-                onChange={() => {}}
-              >
+              <Dropdown options={groupOptions as any} value="__multi__" onChange={() => {}}>
                 {({ open, getButtonProps, getMenuProps }) => (
                   <div className="relative">
                     <button
@@ -339,8 +408,8 @@ export default function Content_Edit({
                       onMouseDown={(e) => e.preventDefault()}
                     >
                       <span className="truncate">
-                        {selectedSiteIds.length > 0
-                          ? formatSitesSelected(selectedSiteIds.length)
+                        {selectedGroupIds.length > 0
+                          ? formatGroupsSelected(selectedGroupIds.length)
                           : texts.selectSites}
                       </span>
                       <i className="material-icons leading-none">
@@ -352,50 +421,60 @@ export default function Content_Edit({
                       <div
                         {...getMenuProps({
                           className:
-                            "absolute z-50 mt-1 min-w-[220px] whitespace-nowrap rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto",
+                            "absolute z-50 mt-1 min-w-[420px] max-w-[90vw] rounded-lg border border-gray-200 bg-white p-2 shadow-lg max-h-96 overflow-y-auto overflow-x-auto",
                         })}
                         onMouseDown={(e) => e.preventDefault()}
                       >
                         <div className="mt-1">
-                          {siteOptions.map((opt: any) => {
-                            const checked = selectedSiteIds.includes(opt.value);
-                            return (
-                              <label
-                                key={opt.value}
-                                className={[
-                                  "flex items-center gap-2 rounded-md px-3 py-2 text-[14px] hover:bg-gray-50 hover:cursor-pointer",
-                                  checked ? "bg-gray-50" : "",
-                                ].join(" ")}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
-                                  checked={checked}
-                                  onChange={() =>
-                                    setSelectedSiteIds((prev) =>
-                                      prev.includes(opt.value)
-                                        ? prev.filter((v) => v !== opt.value)
-                                        : [...prev, opt.value]
-                                    )
-                                  }
-                                  onMouseDown={(e) => e.preventDefault()}
-                                />
-                                <span>{opt.label}</span>
-                              </label>
-                            );
-                          })}
+                          {groupOptions.length === 0 ? (
+                            <div className="rounded-md bg-gray-50 px-3 py-2 text-[13px] text-gray-500">
+                              {texts.noGroupSites}
+                            </div>
+                          ) : (
+                            groupOptions.map((opt) => {
+                              const checked = selectedGroupIds.includes(opt.id);
+                              return (
+                                <label
+                                  key={opt.id}
+                                  className={[
+                                    "flex items-center gap-2 rounded-md px-3 py-2 text-[14px] hover:bg-gray-50 hover:cursor-pointer",
+                                    checked ? "bg-gray-50" : "",
+                                  ].join(" ")}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
+                                    checked={checked}
+                                    onChange={() =>
+                                      setSelectedGroupIds((prev) =>
+                                        prev.includes(opt.id)
+                                          ? prev.filter((v) => v !== opt.id)
+                                          : [...prev, opt.id]
+                                      )
+                                    }
+                                    onMouseDown={(e) => e.preventDefault()}
+                                  />
+                                  <span
+                                    className="block max-w-full overflow-hidden text-ellipsis whitespace-nowrap"
+                                    title={opt.label}
+                                  >
+                                    {opt.label}
+                                  </span>
+                                </label>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 )}
               </Dropdown>
-              {/* selected chips */}
-              {selectedSiteIds.length > 0 && (
+
+              {selectedGroupIds.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {selectedSiteIds.map((id) => {
-                    const label =
-                      siteOptions.find((s) => s.value === id)?.label || id;
+                  {selectedGroupIds.map((id) => {
+                    const label = groupOptions.find((g) => g.id === id)?.label || id;
                     return (
                       <span
                         key={id}
@@ -406,11 +485,7 @@ export default function Content_Edit({
                           type="button"
                           aria-label={texts.remove}
                           className="ml-1 text-gray-500 hover:text-gray-800"
-                          onClick={() =>
-                            setSelectedSiteIds((prev) =>
-                              prev.filter((v) => v !== id)
-                            )
-                          }
+                          onClick={() => setSelectedGroupIds((prev) => prev.filter((v) => v !== id))}
                         >
                           ×
                         </button>
@@ -419,16 +494,13 @@ export default function Content_Edit({
                   })}
                 </div>
               )}
-              {/* helper text */}
-              <div className="text-[12px] text-gray-500 mt-1">
-                {texts.helper}
-              </div>
+
+              <div className="text-[12px] text-gray-500 mt-1">{texts.helper}</div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer */}
       <div className="mt-8 flex items-center justify-end gap-3">
         <button
           onClick={onCancel}
@@ -436,15 +508,11 @@ export default function Content_Edit({
         >
           {texts.buttons.cancel}
         </button>
-        <button
-          onClick={submit}
-          className="h-9 px-4 rounded-md bg-cyan text-white cursor-pointer"
-        >
+        <button onClick={submit} className="h-9 px-4 rounded-md bg-cyan text-white cursor-pointer">
           {texts.buttons.submit}
         </button>
       </div>
 
-      {/* Duplicate modal */}
       <Modal
         open={dupModal.open}
         icon="cancel"
@@ -456,3 +524,4 @@ export default function Content_Edit({
     </div>
   );
 }
+

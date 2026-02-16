@@ -1,6 +1,6 @@
 // ข้อมูลตัวอย่างสำหรับหน้า Admin Management
 
-export type UserRole = "Admin" | "Officer" | "User";
+export type UserRole = "Admin" | "Manager" | "Officer" | "User";
 export type AdminRow = {
   id: string;
   fullName: string;

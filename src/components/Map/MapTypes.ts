@@ -44,7 +44,7 @@ export type Props = {
   onZoomOutToCountry?: () => void;
 
   /** สิทธิ์ผู้ใช้ — ใช้กำหนดพฤติกรรมโต้ตอบ (เช่น lock interaction สำหรับ user) */
-  role?: "admin" | "officer" | "user";
+  role?: "admin" | "manager" | "officer" | "user";
 
   /** อนุญาตให้มุมมอง country หรือไม่ (บาง role อาจไม่ให้ออกนอกจังหวัด) */
   allowCountryView?: boolean;
