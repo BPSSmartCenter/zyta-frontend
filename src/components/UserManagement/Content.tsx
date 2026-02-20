@@ -43,7 +43,6 @@ type Props = {
   onReset?: (row: AdminRow) => void;
   onDelete?: (row: AdminRow) => void;
   onToggleActive?: (row: AdminRow, nextActive: boolean) => Promise<void> | void;
-  managerSearchWidget?: React.ReactNode;
 };
 
 export default function Content({
@@ -55,7 +54,6 @@ export default function Content({
   onReset,
   onDelete,
   onToggleActive,
-  managerSearchWidget,
 }: Props) {
   const { t, i18n } = useTranslation("userManagement");
   const locale = i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US";
@@ -108,6 +106,10 @@ export default function Content({
       filters: {
         statusLabel: t("content.filters.statusLabel", { defaultValue: "Status" }),
         roleLabel: t("content.filters.roleLabel", { defaultValue: "Role" }),
+        searchLabel: t("content.filters.searchLabel", { defaultValue: "Search" }),
+        searchPlaceholder: t("content.filters.searchPlaceholder", {
+          defaultValue: "Search users under your management",
+        }),
       },
       table: {
         no: t("content.table.no", { defaultValue: "NO" }),
@@ -148,16 +150,23 @@ export default function Content({
   /* ---------- filters ---------- */
   const [status, setStatus] = React.useState("all");
   const [role, setRole] = React.useState("all");
+  const [keyword, setKeyword] = React.useState("");
 
   const rowsFiltered = React.useMemo(() => {
+    const q = keyword.trim().toLowerCase();
     return rows
+      .filter((r) =>
+        q
+          ? `${r.fullName} ${r.email}`.toLowerCase().includes(q)
+          : true
+      )
       .filter((r) =>
         role === "all" ? true : r.role.toLowerCase() === role.toLowerCase()
       )
       .filter((r) =>
         status === "all" ? true : status === "active" ? r.active : !r.active
       );
-  }, [rows, status, role]);
+  }, [rows, status, role, keyword]);
 
   /* ---------- pagination ---------- */
   const PAGE_SIZE = 10;
@@ -195,6 +204,21 @@ export default function Content({
         {/* filters */}
         <div className="mt-6">
           <div className="flex gap-6 flex-col lg:flex-row lg:items-end">
+            <div className="w-full lg:max-w-[360px]">
+              <label className="font-bold text-sm block mb-2">
+                {texts.filters.searchLabel}
+              </label>
+              <input
+                value={keyword}
+                onChange={(e) => {
+                  setPage(1);
+                  setKeyword(e.target.value);
+                }}
+                placeholder={texts.filters.searchPlaceholder}
+                className="w-full h-[40px] rounded-md border border-gray-300 bg-white px-3 text-[14px] text-gray-800 outline-none focus:ring-2 focus:ring-cyan/40"
+              />
+            </div>
+
             {/* Status */}
             <div>
               <label className="font-bold text-sm block mb-2">
@@ -316,8 +340,6 @@ export default function Content({
                 )}
               </Dropdown>
             </div>
-
-            {managerSearchWidget ? <div className="w-full lg:w-[440px]">{managerSearchWidget}</div> : null}
           </div>
         </div>
 

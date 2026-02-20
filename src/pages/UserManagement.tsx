@@ -261,6 +261,90 @@ function UserManagementInner() {
     [show, texts.managerSearch.addSuccess, texts.managerSearch.addFailed, refresh, emailQuery, runSearch]
   );
 
+  const managerAssignWidget =
+    actorRole === "manager" ? (
+      <div className="relative" ref={searchWrapRef}>
+        <label className="font-bold text-sm block mb-2">{texts.managerSearch.title}</label>
+        <div className="flex gap-2">
+          <input
+            value={emailQuery}
+            onChange={(e) => setEmailQuery(e.target.value)}
+            onFocus={() => {
+              if (emailQuery.trim()) setSearchOpen(true);
+            }}
+            placeholder={texts.managerSearch.placeholder}
+            className="h-[40px] flex-1 rounded-md border border-gray-300 px-3 text-[14px] outline-none focus:ring-2 focus:ring-cyan/40"
+          />
+          <button
+            type="button"
+            onClick={handleManagerSearch}
+            className="h-[40px] px-4 rounded-md bg-cyan text-white font-semibold hover:bg-cyan-400 cursor-pointer"
+          >
+            {searching
+              ? t("page.loading", { defaultValue: "Loading..." })
+              : texts.managerSearch.search}
+          </button>
+        </div>
+        {searchOpen && emailQuery.trim().length > 0 && (
+          <div className="absolute left-0 right-0 top-[78px] z-50 rounded-md border border-gray-200 bg-white shadow-lg">
+            <div className="px-3 py-2 border-b border-gray-100">
+              <p className="text-sm font-medium text-gray-700">{texts.managerSearch.resultHeader}</p>
+            </div>
+            {searchResults.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-gray-500">{texts.managerSearch.noResult}</p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto p-2 space-y-2">
+                {searchResults.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-md border border-gray-200 px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-cyan/15 text-cyan font-bold flex items-center justify-center shrink-0">
+                        {(([item.firstName, item.lastName]
+                          .filter(Boolean)
+                          .join(" ")
+                          .trim()
+                          .charAt(0) || item.email.charAt(0)) as string).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{texts.managerSearch.profilePreview}</p>
+                        <p className="font-medium text-gray-900">
+                          {[item.firstName, item.lastName].filter(Boolean).join(" ").trim() || "-"}
+                        </p>
+                        <p className="text-sm text-gray-600">{item.email}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {texts.managerSearch.roleLabel}: {roleLabel(item.role)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {texts.managerSearch.sitesLabel}: {item.siteIds.length}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.inManagedScope ? (
+                        <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                          {texts.managerSearch.alreadyInScope}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleAssign(item.id)}
+                          className="h-9 px-3 rounded-md border border-cyan text-cyan font-semibold hover:bg-cyan-50 cursor-pointer"
+                        >
+                          {texts.managerSearch.addAccess}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    ) : null;
+
   return (
     <div className="p-4 bg-[#F8FBFE]">
       <Navbar title={texts.title} />
@@ -269,6 +353,7 @@ function UserManagementInner() {
         <Content_Create
           actorRole={actorRole}
           actorSiteIds={actorSiteIds}
+          managerAssignWidget={managerAssignWidget}
           onCancel={() => setCreating(false)}
           onCreate={async ({ password, siteIds, ...created }) => {
             try {
@@ -374,90 +459,6 @@ function UserManagementInner() {
               console.error(e);
             }
           }}
-          managerSearchWidget={
-            actorRole === "manager" ? (
-              <div className="relative" ref={searchWrapRef}>
-                <label className="font-bold text-sm block mb-2">{texts.managerSearch.title}</label>
-                <div className="flex gap-2">
-                  <input
-                    value={emailQuery}
-                    onChange={(e) => setEmailQuery(e.target.value)}
-                    onFocus={() => {
-                      if (emailQuery.trim()) setSearchOpen(true);
-                    }}
-                    placeholder={texts.managerSearch.placeholder}
-                    className="h-[40px] flex-1 rounded-md border border-gray-300 px-3 text-[14px] outline-none focus:ring-2 focus:ring-cyan/40"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleManagerSearch}
-                    className="h-[40px] px-4 rounded-md bg-cyan text-white font-semibold hover:bg-cyan-400 cursor-pointer"
-                  >
-                    {searching
-                      ? t("page.loading", { defaultValue: "Loading..." })
-                      : texts.managerSearch.search}
-                  </button>
-                </div>
-                {searchOpen && emailQuery.trim().length > 0 && (
-                  <div className="absolute left-0 right-0 top-[78px] z-50 rounded-md border border-gray-200 bg-white shadow-lg">
-                    <div className="px-3 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-700">{texts.managerSearch.resultHeader}</p>
-                    </div>
-                    {searchResults.length === 0 ? (
-                      <p className="px-3 py-3 text-sm text-gray-500">{texts.managerSearch.noResult}</p>
-                    ) : (
-                      <div className="max-h-80 overflow-y-auto p-2 space-y-2">
-                        {searchResults.map((item) => (
-                          <div
-                            key={item.id}
-                            className="rounded-md border border-gray-200 px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="w-10 h-10 rounded-full bg-cyan/15 text-cyan font-bold flex items-center justify-center shrink-0">
-                                {(([item.firstName, item.lastName]
-                                  .filter(Boolean)
-                                  .join(" ")
-                                  .trim()
-                                  .charAt(0) || item.email.charAt(0)) as string).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="text-xs text-gray-500">{texts.managerSearch.profilePreview}</p>
-                                <p className="font-medium text-gray-900">
-                                  {[item.firstName, item.lastName].filter(Boolean).join(" ").trim() || "-"}
-                                </p>
-                                <p className="text-sm text-gray-600">{item.email}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {texts.managerSearch.roleLabel}: {roleLabel(item.role)}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {texts.managerSearch.sitesLabel}: {item.siteIds.length}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.inManagedScope ? (
-                                <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
-                                  {texts.managerSearch.alreadyInScope}
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAssign(item.id)}
-                                  className="h-9 px-3 rounded-md border border-cyan text-cyan font-semibold hover:bg-cyan-50 cursor-pointer"
-                                >
-                                  {texts.managerSearch.addAccess}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : null
-          }
         />
       )}
     </div>

@@ -31,6 +31,8 @@
     "header": "จัดการผู้ดูแล",
     "createButton": "เพิ่มผู้ดูแล",
     "filters": {
+      "searchLabel": "ค้นหา",
+      "searchPlaceholder": "ค้นหาผู้ใช้ภายใต้การดูแลของคุณ",
       "statusLabel": "สถานะ",
       "status": {
         "all": "ทุกสถานะ",

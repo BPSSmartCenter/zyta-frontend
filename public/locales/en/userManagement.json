@@ -31,6 +31,8 @@
     "header": "Admin management",
     "createButton": "Create admin",
     "filters": {
+      "searchLabel": "Search",
+      "searchPlaceholder": "Search users under your management",
       "statusLabel": "Status",
       "status": {
         "all": "All status",

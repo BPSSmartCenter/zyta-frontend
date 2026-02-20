@@ -7,6 +7,7 @@ import { listSites } from "../../api/sites";
 type Props = {
   actorRole?: "admin" | "manager" | "officer" | "user";
   actorSiteIds?: string[];
+  managerAssignWidget?: React.ReactNode;
   onCancel: () => void;
   onCreate: (
     next: AdminRow & {
@@ -34,6 +35,7 @@ type SiteGroupOption = {
 export default function Content_Create({
   actorRole = "admin",
   actorSiteIds = [],
+  managerAssignWidget,
   onCancel,
   onCreate,
 }: Props) {
@@ -278,6 +280,10 @@ export default function Content_Create({
     <div className="mt-6 p-6 bg-white rounded-lg">
       <h2 className="text-[24px] font-bold">{texts.title}</h2>
       <hr className="mt-3" />
+
+      {actorRole === "manager" && managerAssignWidget ? (
+        <div className="mt-5">{managerAssignWidget}</div>
+      ) : null}
 
       <div className="mt-6 space-y-5 max-w-3xl">
         <div className="grid grid-cols-12 items-center gap-4">
