@@ -1,4 +1,3 @@
-// src/pages/UserManagement.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "../components/Sidebar";
@@ -14,12 +13,12 @@ import {
   updateUser as apiUpdateUser,
   deleteUser as apiDeleteUser,
   resetUserPassword as apiResetPassword,
+  searchUsersByEmail as apiSearchUsersByEmail,
+  assignUserSites as apiAssignUserSites,
   type AdminUserDto,
+  type UserSearchDto,
 } from "../api/adminUsers";
-import {
-  ADMIN_ROWS,
-  type AdminRow,
-} from "../components/UserManagement/user.constant";
+import { ADMIN_ROWS, type AdminRow } from "../components/UserManagement/user.constant";
 
 export default function UserManagement() {
   return (
@@ -34,6 +33,7 @@ export default function UserManagement() {
 function UserManagementGuarded() {
   const { t } = useTranslation("userManagement");
   const [allowed, setAllowed] = React.useState<boolean | null>(null);
+
   React.useEffect(() => {
     (async () => {
       try {
@@ -47,17 +47,10 @@ function UserManagementGuarded() {
   }, []);
 
   if (allowed === null) {
-    return (
-      <div className="p-6">
-        {t("page.loading", { defaultValue: "Loading..." })}
-      </div>
-    );
+    return <div className="p-6">{t("page.loading", { defaultValue: "Loading..." })}</div>;
   }
   if (!allowed) {
-    // redirect away silently
-    if (typeof window !== "undefined") {
-      window.location.replace("/dashboard");
-    }
+    if (typeof window !== "undefined") window.location.replace("/dashboard");
     return null;
   }
   return <UserManagementInner />;
@@ -66,13 +59,50 @@ function UserManagementGuarded() {
 function UserManagementInner() {
   const { t } = useTranslation("userManagement");
   const { show } = useToast();
-  const [actorRole, setActorRole] = React.useState<
-    "admin" | "manager" | "officer" | "user"
-  >("admin");
+  const [actorRole, setActorRole] = React.useState<"admin" | "manager" | "officer" | "user">(
+    "admin"
+  );
   const [actorSiteIds, setActorSiteIds] = React.useState<string[]>([]);
+  const [rows, setRows] = React.useState<AdminRow[]>(ADMIN_ROWS);
+  const [editing, setEditing] = React.useState<AdminRow | null>(null);
+  const [creating, setCreating] = React.useState(false);
+  const [resetting, setResetting] = React.useState<AdminRow | null>(null);
+  const [emailQuery, setEmailQuery] = React.useState("");
+  const [searching, setSearching] = React.useState(false);
+  const [searchResults, setSearchResults] = React.useState<UserSearchDto[]>([]);
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const searchWrapRef = React.useRef<HTMLDivElement | null>(null);
+  const searchReqRef = React.useRef(0);
+
   const texts = React.useMemo(
     () => ({
       title: t("page.title", { defaultValue: "User management" }),
+      managerSearch: {
+        title: t("managerSearch.title", {
+          defaultValue: "Find User by Email to Give Permission",
+        }),
+        placeholder: t("managerSearch.placeholder", {
+          defaultValue: "Enter user email",
+        }),
+        search: t("managerSearch.search", { defaultValue: "Search" }),
+        noResult: t("managerSearch.noResult", { defaultValue: "No users found" }),
+        resultHeader: t("managerSearch.resultHeader", { defaultValue: "Search results" }),
+        addAccess: t("managerSearch.addAccess", { defaultValue: "Add to my sites" }),
+        alreadyInScope: t("managerSearch.alreadyInScope", {
+          defaultValue: "Already in at least one of your sites",
+        }),
+        addSuccess: t("managerSearch.addSuccess", {
+          defaultValue: "Site access has been granted",
+        }),
+        addFailed: t("managerSearch.addFailed", {
+          defaultValue: "Unable to grant site access",
+        }),
+        profilePreview: t("managerSearch.profilePreview", {
+          defaultValue: "Profile preview",
+        }),
+        roleLabel: t("managerSearch.roleLabel", { defaultValue: "Role" }),
+        sitesLabel: t("managerSearch.sitesLabel", { defaultValue: "Current sites" }),
+      },
       toasts: {
         createSuccess: t("toasts.createSuccess", { defaultValue: "Create success" }),
         createFailed: t("toasts.createFailed", { defaultValue: "Create failed" }),
@@ -86,17 +116,13 @@ function UserManagementInner() {
     }),
     [t]
   );
+
   const toastContent = React.useCallback(
     (key: keyof typeof texts.toasts) => (
       <span className="text-white font-semibold">{texts.toasts[key]}</span>
     ),
     [texts.toasts]
   );
-
-  const [rows, setRows] = React.useState<AdminRow[]>(ADMIN_ROWS);
-  const [editing, setEditing] = React.useState<AdminRow | null>(null);
-  const [creating, setCreating] = React.useState<boolean>(false);
-  const [resetting, setResetting] = React.useState<AdminRow | null>(null); // ← เพิ่ม
 
   const mapDto = (u: AdminUserDto): AdminRow => ({
     id: u.id,
@@ -115,6 +141,14 @@ function UserManagementInner() {
     active: !!u.active,
     avatar: "",
   });
+
+  const roleLabel = React.useCallback(
+    (role: string) => {
+      const key = String(role || "user").toLowerCase();
+      return t(`roles.${key}`, { defaultValue: role });
+    },
+    [t]
+  );
 
   const refresh = React.useCallback(async () => {
     try {
@@ -146,17 +180,97 @@ function UserManagementInner() {
     })();
   }, []);
 
+  const runSearch = React.useCallback(async (queryInput: string) => {
+    const query = queryInput.trim();
+    if (!query || actorRole !== "manager") {
+      setSearchResults([]);
+      setSearchOpen(false);
+      return;
+    }
+    const reqId = ++searchReqRef.current;
+    setSearching(true);
+    try {
+      const items = await apiSearchUsersByEmail(query);
+      if (reqId !== searchReqRef.current) return;
+      setSearchResults(items);
+      setSearchOpen(true);
+    } catch (e) {
+      console.error(e);
+      if (reqId !== searchReqRef.current) return;
+      setSearchResults([]);
+    } finally {
+      if (reqId === searchReqRef.current) setSearching(false);
+    }
+  }, [actorRole]);
+
+  const handleManagerSearch = React.useCallback(async () => {
+    await runSearch(emailQuery);
+  }, [emailQuery, runSearch]);
+
+  React.useEffect(() => {
+    if (actorRole !== "manager") return;
+    const q = emailQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchOpen(false);
+      setSearching(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      runSearch(q);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [emailQuery, actorRole, runSearch]);
+
+  React.useEffect(() => {
+    const onDocClick = (ev: MouseEvent) => {
+      if (!searchWrapRef.current) return;
+      if (!searchWrapRef.current.contains(ev.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    const onEsc = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") setSearchOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, []);
+
+  const handleAssign = React.useCallback(
+    async (userId: string) => {
+      try {
+        await apiAssignUserSites(userId);
+        show({
+          variant: "success",
+          message: <span className="text-white font-semibold">{texts.managerSearch.addSuccess}</span>,
+        });
+        await refresh();
+        if (emailQuery.trim()) await runSearch(emailQuery);
+      } catch (e) {
+        console.error(e);
+        show({
+          variant: "error",
+          message: <span className="text-white font-semibold">{texts.managerSearch.addFailed}</span>,
+        });
+      }
+    },
+    [show, texts.managerSearch.addSuccess, texts.managerSearch.addFailed, refresh, emailQuery, runSearch]
+  );
+
   return (
     <div className="p-4 bg-[#F8FBFE]">
       <Navbar title={texts.title} />
 
-      {/* ลำดับ: Create > Reset > Edit > List */}
       {creating ? (
         <Content_Create
           actorRole={actorRole}
           actorSiteIds={actorSiteIds}
           onCancel={() => setCreating(false)}
-          onCreate={async ({ password, avatarFile, siteIds, ...created }) => {
+          onCreate={async ({ password, siteIds, ...created }) => {
             try {
               const [firstName, ...rest] = (created.fullName || "").split(" ");
               const lastName = rest.join(" ");
@@ -222,7 +336,6 @@ function UserManagementInner() {
                     : next.role === "Officer"
                     ? "officer"
                     : "user",
-                // include siteIds for non-admins
                 ...(Array.isArray((next as any).siteIds)
                   ? { siteIds: (next as any).siteIds as string[] }
                   : {}),
@@ -243,7 +356,7 @@ function UserManagementInner() {
           setRows={setRows}
           onEdit={setEditing}
           onCreateClick={() => setCreating(true)}
-          onReset={(row) => setResetting(row)} // ← hook เข้าปุ่มกุญแจ
+          onReset={(row) => setResetting(row)}
           onDelete={async (row) => {
             try {
               await apiDeleteUser(row.id);
@@ -261,6 +374,90 @@ function UserManagementInner() {
               console.error(e);
             }
           }}
+          managerSearchWidget={
+            actorRole === "manager" ? (
+              <div className="relative" ref={searchWrapRef}>
+                <label className="font-bold text-sm block mb-2">{texts.managerSearch.title}</label>
+                <div className="flex gap-2">
+                  <input
+                    value={emailQuery}
+                    onChange={(e) => setEmailQuery(e.target.value)}
+                    onFocus={() => {
+                      if (emailQuery.trim()) setSearchOpen(true);
+                    }}
+                    placeholder={texts.managerSearch.placeholder}
+                    className="h-[40px] flex-1 rounded-md border border-gray-300 px-3 text-[14px] outline-none focus:ring-2 focus:ring-cyan/40"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleManagerSearch}
+                    className="h-[40px] px-4 rounded-md bg-cyan text-white font-semibold hover:bg-cyan-400 cursor-pointer"
+                  >
+                    {searching
+                      ? t("page.loading", { defaultValue: "Loading..." })
+                      : texts.managerSearch.search}
+                  </button>
+                </div>
+                {searchOpen && emailQuery.trim().length > 0 && (
+                  <div className="absolute left-0 right-0 top-[78px] z-50 rounded-md border border-gray-200 bg-white shadow-lg">
+                    <div className="px-3 py-2 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-700">{texts.managerSearch.resultHeader}</p>
+                    </div>
+                    {searchResults.length === 0 ? (
+                      <p className="px-3 py-3 text-sm text-gray-500">{texts.managerSearch.noResult}</p>
+                    ) : (
+                      <div className="max-h-80 overflow-y-auto p-2 space-y-2">
+                        {searchResults.map((item) => (
+                          <div
+                            key={item.id}
+                            className="rounded-md border border-gray-200 px-3 py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-full bg-cyan/15 text-cyan font-bold flex items-center justify-center shrink-0">
+                                {(([item.firstName, item.lastName]
+                                  .filter(Boolean)
+                                  .join(" ")
+                                  .trim()
+                                  .charAt(0) || item.email.charAt(0)) as string).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500">{texts.managerSearch.profilePreview}</p>
+                                <p className="font-medium text-gray-900">
+                                  {[item.firstName, item.lastName].filter(Boolean).join(" ").trim() || "-"}
+                                </p>
+                                <p className="text-sm text-gray-600">{item.email}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {texts.managerSearch.roleLabel}: {roleLabel(item.role)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {texts.managerSearch.sitesLabel}: {item.siteIds.length}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {item.inManagedScope ? (
+                                <span className="text-xs text-green-700 bg-green-100 px-2 py-1 rounded">
+                                  {texts.managerSearch.alreadyInScope}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAssign(item.id)}
+                                  className="h-9 px-3 rounded-md border border-cyan text-cyan font-semibold hover:bg-cyan-50 cursor-pointer"
+                                >
+                                  {texts.managerSearch.addAccess}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null
+          }
         />
       )}
     </div>

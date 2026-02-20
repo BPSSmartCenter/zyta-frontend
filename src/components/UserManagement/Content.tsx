@@ -43,6 +43,7 @@ type Props = {
   onReset?: (row: AdminRow) => void;
   onDelete?: (row: AdminRow) => void;
   onToggleActive?: (row: AdminRow, nextActive: boolean) => Promise<void> | void;
+  managerSearchWidget?: React.ReactNode;
 };
 
 export default function Content({
@@ -54,6 +55,7 @@ export default function Content({
   onReset,
   onDelete,
   onToggleActive,
+  managerSearchWidget,
 }: Props) {
   const { t, i18n } = useTranslation("userManagement");
   const locale = i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US";
@@ -192,7 +194,7 @@ export default function Content({
 
         {/* filters */}
         <div className="mt-6">
-          <div className="flex gap-10 flex-col sm:flex-row">
+          <div className="flex gap-6 flex-col lg:flex-row lg:items-end">
             {/* Status */}
             <div>
               <label className="font-bold text-sm block mb-2">
@@ -314,6 +316,8 @@ export default function Content({
                 )}
               </Dropdown>
             </div>
+
+            {managerSearchWidget ? <div className="w-full lg:w-[440px]">{managerSearchWidget}</div> : null}
           </div>
         </div>
 

@@ -13,6 +13,20 @@
     "deleteSuccess": "Deleted",
     "deleteFailed": "Delete failed"
   },
+  "managerSearch": {
+    "title": "Find User by Email to Give Permission",
+    "placeholder": "Enter user email",
+    "search": "Search",
+    "noResult": "No users found",
+    "resultHeader": "Search results",
+    "addAccess": "Add to my sites",
+    "alreadyInScope": "Already in at least one of your sites",
+    "addSuccess": "Site access has been granted",
+    "addFailed": "Unable to grant site access",
+    "profilePreview": "Profile preview",
+    "roleLabel": "Role",
+    "sitesLabel": "Current sites"
+  },
   "content": {
     "header": "Admin management",
     "createButton": "Create admin",

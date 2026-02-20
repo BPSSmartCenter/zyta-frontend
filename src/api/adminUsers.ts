@@ -15,6 +15,19 @@ export type AdminUserDto = {
   sites?: Array<{ id: string; code?: string; name?: string }>; // when fetched via getUser
 };
 
+export type UserSearchDto = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: Role;
+  active: boolean;
+  siteIds: string[];
+  inManagedScope: boolean;
+  manageableSiteIds: string[];
+  manageableSites: Array<{ id: string; name?: string; code?: string }>;
+};
+
 export async function listUsers(): Promise<AdminUserDto[]> {
   const { data } = await api.get("/users");
   return Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
@@ -49,5 +62,18 @@ export async function resetUserPassword(id: string, newPassword: string): Promis
 
 export async function getUser(id: string): Promise<AdminUserDto> {
   const { data } = await api.get(`/users/${encodeURIComponent(id)}`);
+  return data;
+}
+
+export async function searchUsersByEmail(email: string): Promise<UserSearchDto[]> {
+  const { data } = await api.get("/users/search", { params: { email } });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+export async function assignUserSites(
+  id: string,
+  payload?: { siteIds?: string[] }
+): Promise<{ id: string; siteIds: string[] }> {
+  const { data } = await api.post(`/users/${encodeURIComponent(id)}/assign-sites`, payload ?? {});
   return data;
 }
