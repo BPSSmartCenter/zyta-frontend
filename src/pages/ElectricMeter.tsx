@@ -36,10 +36,6 @@ const C = {
 const ENERGY_USAGE_CATEGORIES = Array.from({ length: 24 }, (_, idx) =>
   String(idx + 1)
 );
-const DEFAULT_ENERGY_DATA = [
-  420, 460, 510, 430, 480, 520, 610, 720, 640, 590, 980, 1180, 760, 600, 540,
-  580, 620, 560, 610, 640, 670, 690, 620, 580,
-];
 export const ElectricMeter: React.FC = () => {
   const { t, i18n } = useTranslation(["electricMeter"]);
   const locale = React.useMemo(
@@ -475,19 +471,24 @@ export const ElectricMeter: React.FC = () => {
 
   const energyCategories =
     dashboard?.chart.categories ?? ENERGY_USAGE_CATEGORIES;
+  const emptyChartData = React.useMemo<number[]>(
+    () => energyCategories.map(() => 0),
+    [energyCategories]
+  );
   const currentEnergyData = React.useMemo<number[]>(
-    () => [...(dashboard?.chart.current ?? DEFAULT_ENERGY_DATA)],
-    [dashboard]
+    () => [...(dashboard?.chart.current ?? emptyChartData)],
+    [dashboard, emptyChartData]
   );
   const lastMonthEnergyData = React.useMemo<number[]>(
     () =>
       dashboard?.chart.previous
         ? [...dashboard.chart.previous]
-        : currentEnergyData.map((value, idx) => {
-            const variance = (idx % 4) * 8;
-            return Math.max(200, Math.round(value * 0.88 + variance));
-          }),
-    [dashboard, currentEnergyData]
+        : [...emptyChartData],
+    [dashboard, emptyChartData]
+  );
+  const chartMaxValue = React.useMemo(
+    () => Math.max(0, ...currentEnergyData, ...lastMonthEnergyData),
+    [currentEnergyData, lastMonthEnergyData]
   );
 
   const energySeries = React.useMemo<AxisSeries>(
@@ -537,9 +538,9 @@ export const ElectricMeter: React.FC = () => {
         tooltip: { enabled: false },
       },
       yaxis: {
-        min: 400,
-        max: 1200,
-        tickAmount: 4,
+        min: 0,
+        max: chartMaxValue > 0 ? Math.ceil(chartMaxValue * 1.15) : 10,
+        tickAmount: 5,
         labels: {
           style: { colors: "#7EAEDA", fontSize: "11px" },
           formatter: (value) =>
@@ -558,7 +559,7 @@ export const ElectricMeter: React.FC = () => {
         markers: { size: 10 },
       },
     }),
-    [energyCategories]
+    [energyCategories, chartMaxValue]
   );
 
   return (
