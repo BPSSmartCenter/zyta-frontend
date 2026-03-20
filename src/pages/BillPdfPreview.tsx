@@ -1325,8 +1325,8 @@ export default BillPdfPreview;
 
 function formatValue(value: number) {
   return Number(value ?? 0).toLocaleString("th-TH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 
