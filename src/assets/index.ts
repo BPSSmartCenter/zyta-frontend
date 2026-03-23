@@ -62,10 +62,12 @@ import whiteBaht from "./Whitebaht.png";
 import cyanTrend from "./Cyantrend.png";
 import whiteTrend from "./Whitetrend.png";
 import meaLogo from "./MEALOGO.png";
+import peaLogo from "./PEALOGO.svg";
 import nurseImage from "./nurse.svg";
 
 export {
   meaLogo,
+  peaLogo,
   nurseImage,
   cyanTrend,
   whiteTrend,

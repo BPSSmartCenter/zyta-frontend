@@ -63,6 +63,8 @@ type Props = {
     province_code?: string;
     lat?: number;
     lng?: number;
+    utility?: string;
+    groupSite?: string;
   }>;
 };
 
@@ -78,9 +80,15 @@ export default function MapPanel({
   selectedSiteCode,
   accessibleSites,
 }: Props) {
+  console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
   const { t } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
-  const { setSelectedSite } = useFilters();
+  const {
+    setSelectedSite,
+    siteOptions,
+    selectedGroupSite,
+    selectedUtility,
+  } = useFilters();
 
   // When a pin is clicked on the map, update the global site selection (dropdown)
   const handlePinClick = useCallback(
@@ -125,6 +133,8 @@ export default function MapPanel({
     province_code?: string;
     lat?: number;
     lng?: number;
+    utility?: string;
+    groupSite?: string;
   };
   const aclSites: AclSite[] = (accessibleSites ?? []) as AclSite[];
 
@@ -253,33 +263,109 @@ export default function MapPanel({
 
   const onSelectProvince = (val: string) => setProvince(val);
 
+
   /* ---------- sitePoints (พิกัดไซต์ถาวรสำหรับปักหมุด) ---------- */
-  const sitePoints = useMemo(
-    () =>
-      (accessibleSites ?? [])
-        .map((s) => {
-          const lat = Number((s as any)?.lat);
-          const lng = Number((s as any)?.lng);
-          if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-          const name = String((s as any)?.name ?? (s as any)?.code ?? (s as any)?.id ?? "");
-          if (!name) return null;
-          return {
-            name,
-            lat,
-            lng,
-            code: (s as any)?.code as any,
-            id: (s as any)?.id as any,
-          } as {
-            name: string;
-            lat: number;
-            lng: number;
-            code?: string;
-            id?: string;
-          };
-        })
-        .filter(Boolean) as Array<{ name: string; lat: number; lng: number; code?: string; id?: string }>,
-    [JSON.stringify(accessibleSites)]
-  );
+  const sitePoints = useMemo(() => {
+    // สร้าง map: site code/id → groupLabel จาก siteOptions (FiltersContext มี group info)
+    const codeToGroup = new Map<string, string>();
+    for (const opt of siteOptions) {
+      if (opt.value && opt.groupLabel) {
+        codeToGroup.set(opt.value, opt.groupLabel);
+      }
+    }
+
+    return (accessibleSites ?? [])
+      .map((s) => {
+        const lat = Number((s as any)?.lat);
+        const lng = Number((s as any)?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const name = String((s as any)?.name ?? (s as any)?.code ?? (s as any)?.id ?? "");
+        if (!name) return null;
+        const code: string | undefined = (s as any)?.code;
+        const id: string | undefined = (s as any)?.id;
+
+        // ลอง groupSite จาก API fields ก่อน, ถ้าไม่มีให้ fallback จาก siteOptions
+        const groupFromApi =
+          (s as any)?.site_group ??
+          (s as any)?.site_groups ??
+          (s as any)?.siteGroup ??
+          (s as any)?.group ??
+          null;
+        const groupSite: string | undefined =
+          groupFromApi?.name ??
+          (s as any)?.site_group_name ??
+          (s as any)?.siteGroupName ??
+          (s as any)?.group_name ??
+          (s as any)?.groupSite ??
+          // fallback: ดึงจาก siteOptions (FiltersContext เคย fetch group info แล้ว)
+          (code ? codeToGroup.get(code) : undefined) ??
+          (id ? codeToGroup.get(id) : undefined) ??
+          undefined;
+
+        const utility: string | undefined =
+          (s as any)?.utility?.name ??
+          (s as any)?.utilityName ??
+          (s as any)?.utility ??
+          undefined;
+
+        return {
+          name,
+          lat,
+          lng,
+          code,
+          id,
+          utility: utility ? String(utility) : undefined,
+          groupSite: groupSite ? String(groupSite) : undefined,
+        };
+      })
+      .filter(Boolean) as Array<{
+        name: string; lat: number; lng: number;
+        code?: string; id?: string;
+        utility?: string; groupSite?: string;
+      }>;
+  }, [JSON.stringify(accessibleSites), siteOptions]);
+
+  /* ---------- กรอง sitePoints ตามการเลือกใน Navbar ---------- */
+  const visibleSitePoints = useMemo(() => {
+    // เลือก Site เฉพาะ → แสดงเฉพาะ site นั้น
+    if (selectedSiteCode && selectedSiteCode !== "all") {
+      return sitePoints.filter(
+        (s) => s.code === selectedSiteCode || s.id === selectedSiteCode
+      );
+    }
+
+    // เลือก Utility → แสดง sites ภายใต้ Utility นั้น
+    if (selectedUtility) {
+      const siteCodes = new Set(
+        siteOptions
+          .filter((o) => o.utilityId === selectedUtility.id)
+          .map((o) => o.value)
+      );
+      return sitePoints.filter((s) => s.code && siteCodes.has(s.code));
+    }
+
+    // เลือก GroupSite → แสดง sites ภายใต้ GroupSite นั้น
+    if (selectedGroupSite) {
+      const siteCodes = new Set(
+        siteOptions
+          .filter(
+            (o) =>
+              o.groupId === selectedGroupSite.id ||
+              o.groupLabel === selectedGroupSite.label
+          )
+          .map((o) => o.value)
+      );
+      return sitePoints.filter((s) => s.code && siteCodes.has(s.code));
+    }
+
+    // ไม่ได้เลือกอะไร → แสดงทั้งหมด
+    return sitePoints;
+  }, [sitePoints, selectedSiteCode, selectedUtility, selectedGroupSite, siteOptions]);
+
+  // Debug: ดูจำนวน site points ที่ส่งให้ map
+  useEffect(() => {
+    console.debug("[MapPanel] sitePoints:", sitePoints.length, "visible:", visibleSitePoints.length, "accessibleSites:", accessibleSites?.length);
+  }, [sitePoints, visibleSitePoints, accessibleSites]);
 
   const refreshSitePinStatuses = useCallback(async () => {
     const requestId = ++pinStatusRequestIdRef.current;
@@ -596,6 +682,7 @@ export default function MapPanel({
             )}
           </Dropdown>
         )}
+
       </div>
 
       {/* แผนที่ */}
@@ -605,7 +692,7 @@ export default function MapPanel({
           showPins={true}
           aggregateBySite={true}
           severityFilter={toSeverity(site)}
-          sitePoints={sitePoints}
+          sitePoints={visibleSitePoints}
           pinStatusBySite={pinStatusBySite}
           // ถ้าเลือก site เฉพาะ → โฟกัสพิกัด site โดยตรง
           focusSiteCenter={

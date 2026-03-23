@@ -18,6 +18,8 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
     setSelectedSite,
     selectedGroupSite,
     setSelectedGroupSite,
+    selectedUtility,
+    setSelectedUtility,
     siteOptions,
   } =
     useFilters();
@@ -36,35 +38,38 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.siteCode]);
 
+  const navigateToPage = React.useCallback(
+    (siteCode?: string) => {
+      if (!page) return;
+      if (page === "devices" || page === "alert" || page === "dashboard" || page === "facerec") {
+        const path = `/${page}`;
+        const pathname = siteCode ? absSite(path, siteCode) : abs(path);
+        if (page === "devices") {
+          navigate({ pathname, search: location.search || "" });
+        } else {
+          navigate(pathname);
+        }
+      }
+    },
+    [page, abs, absSite, navigate, location.search]
+  );
+
   const onChangeSite = (val: string) => {
     setSelectedSite(val);
-    // Navigate for pages that support :siteCode in URL
-    if (!page) return;
-    if (page === "devices" || page === "alert" || page === "dashboard" || page === "facerec") {
-      const siteCode = val && val !== "all" ? val : undefined;
-      const path = `/${page}`;
-      const pathname = siteCode ? absSite(path, siteCode) : abs(path);
-      // Preserve existing query string on Devices page (e.g. ?type=electricmeter)
-      if (page === "devices") {
-        navigate({ pathname, search: location.search || "" });
-      } else {
-        navigate(pathname);
-      }
-    }
+    const siteCode = val && val !== "all" ? val : undefined;
+    navigateToPage(siteCode);
   };
+
   const onSelectGroup = (group: { id: string; label: string }) => {
     setSelectedSite("all");
     setSelectedGroupSite(group);
-    if (!page) return;
-    if (page === "devices" || page === "alert" || page === "dashboard" || page === "facerec") {
-      const path = `/${page}`;
-      const pathname = abs(path);
-      if (page === "devices") {
-        navigate({ pathname, search: location.search || "" });
-      } else {
-        navigate(pathname);
-      }
-    }
+    navigateToPage();
+  };
+
+  const onSelectUtility = (utility: { id: string; label: string }) => {
+    setSelectedSite("all");
+    setSelectedUtility(utility);
+    navigateToPage();
   };
 
   return (
@@ -75,6 +80,8 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
         onChange={onChangeSite}
         selectedGroup={selectedGroupSite}
         onSelectGroup={onSelectGroup}
+        selectedUtility={selectedUtility}
+        onSelectUtility={onSelectUtility}
         showUngrouped={true}
         showUngroupedHeader={false}
         buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"

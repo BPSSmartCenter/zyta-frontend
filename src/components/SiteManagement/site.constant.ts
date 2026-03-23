@@ -4,6 +4,8 @@ export type SiteRow = {
   code: string;
   groupId?: string | null;
   groupLabel?: string | null;
+  utilityId?: string | null;
+  utilityLabel?: string | null;
   provinceLabel: string;
   lat: number | null;
   lng: number | null;
@@ -24,8 +26,12 @@ export type SiteRow = {
   billingFtRate?: number | null;
   billingCo2Factor?: number | null;
   billingTreeFactor?: number | null;
+  inverterApiType?: string;
   solaredgeSiteId?: string | null;
   solaredgeApiKey?: string | null;
+  solisKeyId?: string | null;
+  solisKeySecret?: string | null;
+  solisStationId?: string | null;
 };
 
 export const SITE_ROWS: SiteRow[] = [];

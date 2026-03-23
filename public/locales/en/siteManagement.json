@@ -38,7 +38,8 @@
       "devices": "Devices",
       "users": "Users",
       "actions": "Actions",
-      "group": "Group"
+      "group": "Group",
+      "utility": "Utility"
     },
     "loading": "Loading sites...",
     "empty": "No sites found",
@@ -49,6 +50,9 @@
       "prev": "Prev",
       "next": "Next",
       "label": "Page {{page}} / {{total}}"
+    },
+    "utility": {
+      "all": "All utilities"
     }
   },
   "form": {
@@ -56,6 +60,10 @@
       "siteName": "Site name",
       "brandingLogo": "Branding logo",
       "siteCode": "Site code",
+      "utility": "Utility",
+      "utilityCreate": "Create new utility",
+      "siteGroup": "Site group",
+      "siteGroupCreate": "Create new group",
       "solarEdgeTitle": "SolarEdge Credentials",
       "solarEdgeSiteId": "SolarEdge Site ID",
       "solarEdgeApiKey": "SolarEdge API Key",
@@ -77,7 +85,11 @@
       "longitude": "100.5018",
       "addressDetail": "House number / building / road",
       "zipcode": "e.g. 10100",
-      "province": "Province"
+      "province": "Province",
+      "utility": "Select utility",
+      "utilityCreate": "e.g. MEA",
+      "siteGroup": "Select group",
+      "siteGroupCreate": "e.g. Chula Hospital"
     },
     "hints": {
       "solarEdgeCreate": "Provide Site ID and API Key for this site (or leave blank to use system default).",
@@ -110,7 +122,18 @@
       "selectSubDistrict": "Select sub-district"
     },
     "buttons": {
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "createUtility": "Create utility",
+      "createGroup": "Create group",
+      "delete": "Delete"
+    },
+    "utility": {
+      "none": "No utility",
+      "loading": "Loading utilities..."
+    },
+    "group": {
+      "none": "No group",
+      "loading": "Loading groups..."
     }
   },
   "create": {

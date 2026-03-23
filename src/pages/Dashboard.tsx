@@ -30,6 +30,10 @@ type Site = {
   code?: string;
   name?: string;
   province_code?: string;
+  lat?: number;
+  lng?: number;
+  utility?: string;
+  groupSite?: string;
 };
 
 const isDefaultEventCategory = (n: Noti): boolean => {
@@ -93,6 +97,10 @@ export default function Dashboard() {
     setDate: setGlobalDate,
     selectedSite,
     setSelectedSite,
+    selectedGroupSite,
+    setSelectedGroupSite,
+    selectedUtility,
+    setSelectedUtility,
     siteOptions,
     searchSite,
     setSearchSite,
@@ -331,6 +339,11 @@ export default function Dashboard() {
           siteOptions={siteOptions}
           selectedSite={selectedSite}
           setSelectedSite={setSelectedSite}
+          selectedGroupSite={selectedGroupSite}
+          setSelectedGroupSite={setSelectedGroupSite}
+          selectedUtility={selectedUtility}
+          setSelectedUtility={setSelectedUtility}
+          enableGroupSiteSelection={true}
           date={globalDate as any}
           setDate={setGlobalDate as any}
         />

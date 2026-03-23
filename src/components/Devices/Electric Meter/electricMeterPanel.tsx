@@ -387,7 +387,7 @@ const sanitizeSeries = (arr: number[]) =>
   arr.map((value) => (Number.isFinite(value) ? Math.round(value) : 0));
 
 export default function ElectricMeterPanel({ siteCode }: Props) {
-  const { selectedSite, selectedGroupSite, siteOptions, date: filtersDate } = useFilters();
+  const { selectedSite, selectedGroupSite, selectedUtility, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
   const locale = React.useMemo(
     () => (i18n.language?.toLowerCase().startsWith("th") ? "th-TH" : "en-US"),
@@ -520,8 +520,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const isAllSitesSelected = String(selectedSite || "")
     .trim()
     .toLowerCase() === "all";
+  const isUtilitySelected = Boolean(selectedUtility?.id);
   const isGroupSiteSelected = Boolean(selectedGroupSite?.id);
-  const isGlobalAllOverview = isAllSitesSelected && !isGroupSiteSelected;
+  const isGlobalAllOverview = isAllSitesSelected && !isGroupSiteSelected && !isUtilitySelected;
   const siteLabelByCode = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const option of siteOptions || []) {
@@ -584,18 +585,31 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       : siteCode && String(siteCode).trim().length > 0
       ? String(siteCode)
       : allSiteTargets[0] || "3078000";
+  // Filter by utility first, then by group
+  const utilityScopedTargets = React.useMemo(() => {
+    if (!isUtilitySelected) return allSiteTargets;
+    const utilId = selectedUtility?.id;
+    return (siteOptions || [])
+      .filter((opt) => {
+        const code = String(opt?.value || "").trim();
+        if (!code || code.toLowerCase() === "all") return false;
+        return (opt as any)?.utilityId === utilId;
+      })
+      .map((opt) => String(opt.value).trim());
+  }, [isUtilitySelected, selectedUtility, siteOptions, allSiteTargets]);
+
   const siteTargets = React.useMemo(() => {
     if (!isAllSitesSelected) return [siteForApi];
-    if (!selectedGroupSite?.id) return allSiteTargets;
+    if (!selectedGroupSite?.id) return utilityScopedTargets;
     const selectedGroup = groupSiteEntries.find(
       (entry) => entry.id === selectedGroupSite.id || entry.label === selectedGroupSite.label
     );
-    return selectedGroup?.siteCodes ?? allSiteTargets;
+    return selectedGroup?.siteCodes ?? utilityScopedTargets;
   }, [
     isAllSitesSelected,
     siteForApi,
     selectedGroupSite,
-    allSiteTargets,
+    utilityScopedTargets,
     groupSiteEntries,
   ]);
   const siteTargetsKey = siteTargets.join("|");
@@ -1561,11 +1575,15 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       ? overviewMonthValue
       : metrics.monthKwh;
   const selectedGroupLabel = React.useMemo(() => {
-    if (!isAllSitesSelected || !selectedGroupSite?.label) {
+    if (!isAllSitesSelected) {
       return t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" });
     }
-    return selectedGroupSite.label;
-  }, [isAllSitesSelected, selectedGroupSite, t]);
+    const parts: string[] = [];
+    if (selectedUtility?.label) parts.push(selectedUtility.label);
+    if (selectedGroupSite?.label) parts.push(selectedGroupSite.label);
+    if (parts.length > 0) return parts.join(" › ");
+    return t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" });
+  }, [isAllSitesSelected, selectedUtility, selectedGroupSite, t]);
   const hasTemperature = typeof temperatureC === "number" && Number.isFinite(temperatureC);
   const temperatureValue = hasTemperature ? Math.round(Number(temperatureC)) : 0;
   const temperatureDisplay = hasTemperature

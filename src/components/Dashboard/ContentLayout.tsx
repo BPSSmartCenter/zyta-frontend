@@ -55,6 +55,8 @@ type Props = {
     province_code?: string;
     lat?: number;
     lng?: number;
+    utility?: string;
+    groupSite?: string;
   }>;
 };
 

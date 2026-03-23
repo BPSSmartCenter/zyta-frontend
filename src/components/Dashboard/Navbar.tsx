@@ -6,7 +6,7 @@ import DatePicker from "../../components/DateInput";
 import type { DateValue } from "../../components/DateInput";
 import searchIcon from "../../assets/search.png";
 import { useTranslation } from "react-i18next";
-import type { SelectedGroupSite } from "../../context/FiltersContext";
+import type { SelectedGroupSite, SelectedUtility } from "../../context/FiltersContext";
 
 type Props = {
   searchSite: string;
@@ -16,6 +16,8 @@ type Props = {
   setSelectedSite: (v: string) => void;
   selectedGroupSite?: SelectedGroupSite;
   setSelectedGroupSite?: (group: SelectedGroupSite) => void;
+  selectedUtility?: SelectedUtility;
+  setSelectedUtility?: (utility: SelectedUtility) => void;
   enableGroupSiteSelection?: boolean;
   date: DateValue;
   setDate: (v: DateValue) => void;
@@ -27,6 +29,8 @@ type SiteOption = {
   i18nKey?: string; // โ เธ–เนเธฒเธกเธต key เธเนเธเธฐเนเธเนเนเธเธฅเนเธ”เธขเธ•เธฃเธ
   groupLabel?: string | null;
   groupId?: string | null;
+  utilityId?: string | null;
+  utilityLabel?: string | null;
 };
 
 export default function Navbar({
@@ -37,6 +41,8 @@ export default function Navbar({
   setSelectedSite,
   selectedGroupSite = null,
   setSelectedGroupSite,
+  selectedUtility = null,
+  setSelectedUtility,
   enableGroupSiteSelection = false,
   date,
   setDate,
@@ -88,7 +94,10 @@ export default function Navbar({
     return siteOptions
       .filter(
         (s) =>
-          s.label.toLowerCase().includes(q) || s.value.toLowerCase().includes(q)
+          s.label.toLowerCase().includes(q) ||
+          s.value.toLowerCase().includes(q) ||
+          (s.groupLabel && s.groupLabel.toLowerCase().includes(q)) ||
+          (s.utilityLabel && s.utilityLabel.toLowerCase().includes(q))
       )
       .slice(0, 50) // กันยาวเกิน
       .map((s) => ({ label: s.label, value: s.value }));
@@ -140,6 +149,15 @@ export default function Navbar({
                     ? (group) => {
                         setSelectedSite("all");
                         setSelectedGroupSite?.(group);
+                      }
+                    : undefined
+                }
+                selectedUtility={selectedUtility}
+                onSelectUtility={
+                  enableGroupSiteSelection
+                    ? (utility) => {
+                        setSelectedSite("all");
+                        setSelectedUtility?.(utility);
                       }
                     : undefined
                 }
@@ -212,6 +230,15 @@ export default function Navbar({
                             ? (group) => {
                                 setSelectedSite("all");
                                 setSelectedGroupSite?.(group);
+                              }
+                            : undefined
+                        }
+                        selectedUtility={selectedUtility}
+                        onSelectUtility={
+                          enableGroupSiteSelection
+                            ? (utility) => {
+                                setSelectedSite("all");
+                                setSelectedUtility?.(utility);
                               }
                             : undefined
                         }

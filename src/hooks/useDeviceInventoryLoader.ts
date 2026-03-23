@@ -2,6 +2,7 @@ import React from "react";
 import { getSiteDetails, listSites } from "../api/sites";
 import { getIoTDevices } from "../api/iot";
 import { useDeviceInventory } from "../context/DeviceInventoryContext";
+import { useFilters } from "../context/FiltersContext";
 
 type DeviceCounts = Partial<{
   cameras: number;
@@ -103,6 +104,7 @@ export function useDeviceInventoryLoader({
   const [totals, setTotalsState] = React.useState<DeviceTotals>(EMPTY_TOTALS);
   const [loading, setLocalLoading] = React.useState<boolean>(false);
   const { setCounts, setLoading } = useDeviceInventory();
+  const { selectedUtility, selectedGroupSite, siteOptions } = useFilters();
 
   const sitesCacheRef = React.useRef<SiteSummary[] | null>(null);
 
@@ -161,10 +163,29 @@ export function useDeviceInventoryLoader({
         const allSites = await resolveSites();
         const validSites = allSites.filter((s) => s.code || s.id);
 
-        const targetSites =
+        let targetSites =
           !selectedKey || selectedKey === "all"
             ? validSites
             : validSites.filter((s) => s.code === selectedKey || s.id === selectedKey);
+
+        // When viewing all sites, filter by utility/group scope if active
+        if ((!selectedKey || selectedKey === "all") && (selectedUtility?.id || selectedGroupSite?.id)) {
+          const scopedCodes = new Set<string>();
+          for (const opt of siteOptions) {
+            const code = String(opt.value || "").trim();
+            if (!code || code.toLowerCase() === "all") continue;
+            if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
+            if (selectedGroupSite?.id) {
+              const gId = (opt as any).groupId;
+              const gLabel = (opt as any).groupLabel;
+              if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
+            }
+            scopedCodes.add(code);
+          }
+          targetSites = targetSites.filter(
+            (s) => scopedCodes.has(String(s.code ?? "")) || scopedCodes.has(String(s.id ?? ""))
+          );
+        }
 
         // Initialize aggregation with zeros
         let aggregated = {
@@ -365,7 +386,8 @@ export function useDeviceInventoryLoader({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [accessDigest, selectedKey, enabled, setCounts, setLoading, accessibleSites]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessDigest, selectedKey, enabled, setCounts, setLoading, accessibleSites, selectedUtility?.id, selectedGroupSite?.id]);
 
   return { counts, totals, loading };
 }

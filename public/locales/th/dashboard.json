@@ -12,7 +12,9 @@
       "excel": "ส่งออก Excel",
       "word": "ส่งออก Word"
     },
-    "searchPlaceholder": "ช่องค้นหาไซต์"
+    "searchPlaceholder": "ช่องค้นหาไซต์",
+    "scopeFilter": "กรองตาม",
+    "clearScope": "ล้างตัวกรอง"
   },
   "date": {
     "today": "วันนี้",
@@ -63,7 +65,8 @@
     "waterMeter": "มิเตอร์น้ำ",
     "electricMeter": "มิเตอร์ไฟ",
     "air": "อากาศ",
-    "zyta": "Red Box"
+    "zyta": "Red Box",
+    "iot": "IoT"
   },
   "userMgmt": {
     "title": "การจัดการผู้ใช้",

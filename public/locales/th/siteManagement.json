@@ -38,7 +38,8 @@
       "devices": "อุปกรณ์",
       "users": "ผู้ใช้",
       "actions": "การจัดการ",
-      "group": "กลุ่ม"
+      "group": "กลุ่ม",
+      "utility": "การไฟฟ้า"
     },
     "loading": "กำลังโหลดข้อมูล...",
     "empty": "ไม่พบข้อมูลไซต์",
@@ -48,6 +49,9 @@
       "next": "ถัดไป",
       "label": "หน้า {{page}} / {{total}}"
     },
+    "utility": {
+      "all": "ทุกการไฟฟ้า"
+    },
     "copyUuid": "คัดลอก UUID",
     "copied": "คัดลอกแล้ว"
   },
@@ -56,6 +60,10 @@
       "siteName": "ชื่อไซต์",
       "brandingLogo": "โลโก้ประจำไซต์",
       "siteCode": "รหัสไซต์",
+      "utility": "การไฟฟ้า (Utility)",
+      "utilityCreate": "สร้าง Utility ใหม่",
+      "siteGroup": "กลุ่มไซต์",
+      "siteGroupCreate": "สร้างกลุ่มใหม่",
       "solarEdgeTitle": "ข้อมูล SolarEdge",
       "solarEdgeSiteId": "SolarEdge Site ID",
       "solarEdgeApiKey": "SolarEdge API Key",
@@ -77,7 +85,11 @@
       "longitude": "100.5018",
       "addressDetail": "บ้านเลขที่ / อาคาร / ถนน ฯลฯ",
       "zipcode": "เช่น 10100",
-      "province": "จังหวัด"
+      "province": "จังหวัด",
+      "utility": "เลือกการไฟฟ้า",
+      "utilityCreate": "เช่น MEA",
+      "siteGroup": "เลือกกลุ่ม",
+      "siteGroupCreate": "เช่น โรงพยาบาลจุฬา"
     },
     "hints": {
       "solarEdgeCreate": "ระบุ Site ID และ API Key สำหรับไซต์นี้ (เว้นว่างเพื่อตกลงใช้ค่า default ของระบบ)",
@@ -110,7 +122,18 @@
       "selectSubDistrict": "เลือกตำบล"
     },
     "buttons": {
-      "cancel": "ยกเลิก"
+      "cancel": "ยกเลิก",
+      "createUtility": "สร้าง Utility",
+      "createGroup": "สร้างกลุ่ม",
+      "delete": "ลบ"
+    },
+    "utility": {
+      "none": "ไม่ระบุการไฟฟ้า",
+      "loading": "กำลังโหลดรายการ..."
+    },
+    "group": {
+      "none": "ไม่มีกลุ่ม",
+      "loading": "กำลังโหลดรายการ..."
     }
   },
   "create": {

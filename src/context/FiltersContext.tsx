@@ -13,6 +13,8 @@ export type SiteOption = {
   i18nKey?: string;
   groupLabel?: string | null;
   groupId?: string | null;
+  utilityId?: string | null;
+  utilityLabel?: string | null;
 };
 
 const SELECTED_SITE_STORAGE_PREFIX = "filters:selectedSite";
@@ -29,6 +31,11 @@ export type SelectedGroupSite = {
   label: string;
 } | null;
 
+export type SelectedUtility = {
+  id: string;
+  label: string;
+} | null;
+
 type FiltersState = {
   date: DateValue;
   setDate: (v: DateValue) => void;
@@ -39,6 +46,8 @@ type FiltersState = {
   setSelectedSite: (v: string) => void;
   selectedGroupSite: SelectedGroupSite;
   setSelectedGroupSite: (group: SelectedGroupSite) => void;
+  selectedUtility: SelectedUtility;
+  setSelectedUtility: (utility: SelectedUtility) => void;
 
   siteOptions: SiteOption[];
   setSiteOptions: (opts: SiteOption[]) => void;
@@ -64,6 +73,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const [dateTouched, setDateTouched] = React.useState<boolean>(false);
   const [selectedSite, setSelectedSiteState] = React.useState<string>("all");
   const [selectedGroupSite, setSelectedGroupSiteState] = React.useState<SelectedGroupSite>(null);
+  const [selectedUtility, setSelectedUtilityState] = React.useState<SelectedUtility>(null);
   const [siteOptions, setSiteOptions] = React.useState<SiteOption[]>([
     { label: t("navbar.allSites"), value: "all", i18nKey: "navbar.allSites" },
   ]);
@@ -179,6 +189,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     (value: string) => {
       setSelectedSiteState(value);
       setSelectedGroupSiteState(null);
+      setSelectedUtilityState(null);
       storedSiteRef.current = value;
       persistSelectedSite(value);
     },
@@ -186,6 +197,10 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   );
   const setSelectedGroupSite = React.useCallback((group: SelectedGroupSite) => {
     setSelectedGroupSiteState(group);
+  }, []);
+  const setSelectedUtility = React.useCallback((utility: SelectedUtility) => {
+    setSelectedUtilityState(utility);
+    setSelectedGroupSiteState(null);
   }, []);
 
   const normalizeSiteToOption = React.useCallback((site: any): SiteOption | null => {
@@ -198,6 +213,15 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       site?.siteGroup ??
       site?.group ??
       null;
+    // Direct utility on the site takes priority; fallback to group's utility
+    const utilityFromApi =
+      site?.utility ??
+      groupFromApi?.utility ??
+      groupFromApi?.utilities ??
+      null;
+    const utilityId =
+      utilityFromApi?.id ?? site?.utility_id ?? site?.utilityId ?? null;
+    const utilityLabel = utilityFromApi?.name ?? null;
     const label = rawLabel ? String(rawLabel).trim() : "";
     const value = rawValue ? String(rawValue).trim() : "";
     if (!value) return null;
@@ -215,6 +239,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
         site?.site_group_id ??
         site?.siteGroupId ??
         null,
+      utilityId,
+      utilityLabel,
     };
   }, []);
 
@@ -302,6 +328,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
               ...opt,
               groupLabel: opt.groupLabel ?? catalog.groupLabel ?? null,
               groupId: opt.groupId ?? catalog.groupId ?? null,
+              utilityId: opt.utilityId ?? catalog.utilityId ?? null,
+              utilityLabel: opt.utilityLabel ?? catalog.utilityLabel ?? null,
             };
           });
         } else {
@@ -387,6 +415,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       setSelectedSite,
       selectedGroupSite,
       setSelectedGroupSite,
+      selectedUtility,
+      setSelectedUtility,
       siteOptions,
       setSiteOptions,
       searchSite,
@@ -400,10 +430,12 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       resetDateTouched,
       selectedSite,
       selectedGroupSite,
+      selectedUtility,
       siteOptions,
       searchSite,
       setSelectedSite,
       setSelectedGroupSite,
+      setSelectedUtility,
       billingGuard,
     ]
   );

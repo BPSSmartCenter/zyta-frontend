@@ -121,12 +121,28 @@ function SiteManagementInner() {
       site?.site_group_id ??
       site?.siteGroupId ??
       null;
+    /* Utility: check direct site.utility first, then fall back to group.utility */
+    const directUtility =
+      site?.utility ?? null;
+    const groupUtility =
+      groupFromApi?.utility ??
+      groupFromApi?.utilities ??
+      null;
+    const utilityFromApi = directUtility ?? groupUtility;
+    const utilityId =
+      utilityFromApi?.id ??
+      site?.utility_id ??
+      site?.utilityId ??
+      null;
+    const utilityLabel = utilityFromApi?.name ?? null;
     return {
       id: site.id ?? site.code ?? site.name,
       name: site.name ?? site.code ?? "-",
       code: site.code ?? "-",
       groupId: groupId ?? null,
       groupLabel: groupLabel ?? null,
+      utilityId: utilityId ?? null,
+      utilityLabel: utilityLabel ?? null,
       provinceLabel: normalizedProvince,
       lat,
       lng,
@@ -149,6 +165,10 @@ function SiteManagementInner() {
       allowWaterBilling: Boolean(
         site.allowWaterBilling ?? site.allow_water_billing
       ),
+      inverterApiType:
+        site.inverterApiType ??
+        site.inverter_api_type ??
+        "solaredge",
       solaredgeSiteId:
         site.solaredgeSiteId ??
         site.se_site_id ??
@@ -158,6 +178,18 @@ function SiteManagementInner() {
         site.solaredgeApiKey ??
         site.se_api_key ??
         site.seApiKey ??
+        null,
+      solisKeyId:
+        site.solisKeyId ??
+        site.solis_key_id ??
+        null,
+      solisKeySecret:
+        site.solisKeySecret ??
+        site.solis_key_secret ??
+        null,
+      solisStationId:
+        site.solisStationId ??
+        site.solis_station_id ??
         null,
     };
   }, []);
@@ -192,6 +224,7 @@ function SiteManagementInner() {
     async (payload: {
       name: string;
       code?: string;
+      utilityId?: string;
       siteGroupId?: string;
       lat?: number;
       lng?: number;
@@ -201,8 +234,12 @@ function SiteManagementInner() {
       addressSubDistrict?: string;
       addressLine?: string;
       brandingLogoDataUrl?: string;
+      inverterApiType?: string;
       solaredgeSiteId?: string;
       solaredgeApiKey?: string;
+      solisKeyId?: string;
+      solisKeySecret?: string;
+      solisStationId?: string;
     }) => {
       try {
         setLoading(true);
@@ -232,6 +269,8 @@ function SiteManagementInner() {
     async (payload: {
       name?: string;
       code?: string;
+      utilityId?: string;
+      removeUtility?: boolean;
       siteGroupId?: string;
       removeSiteGroup?: boolean;
       lat?: number;
@@ -243,8 +282,12 @@ function SiteManagementInner() {
       addressLine?: string;
       brandingLogoDataUrl?: string;
       removeBrandingLogo?: boolean;
+      inverterApiType?: string;
       solaredgeSiteId?: string;
       solaredgeApiKey?: string;
+      solisKeyId?: string;
+      solisKeySecret?: string;
+      solisStationId?: string;
     }) => {
       if (!editing) return;
       try {

@@ -10,7 +10,7 @@ import {
 import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import { useUserPath } from "../routes/useUserPath";
 import { useLocation, useNavigate } from "react-router-dom";
-import { brandImage, meaLogo } from "../assets";
+import { brandImage, meaLogo, peaLogo } from "../assets";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
 import type { MeterDashboard } from "../api/meter";
@@ -218,6 +218,22 @@ const BillPdfPreview: React.FC = () => {
     return result;
   }, [billDetail?.form, previewForm, queryForm]);
   const siteName = preferredData?.site?.name ?? "Building System";
+
+  // ดึง utility label จาก siteOptions เพื่อเลือก logo การไฟฟ้าที่ถูกต้อง
+  const currentSiteCode = (preview?.siteCode ?? selectedSite ?? "").trim();
+  const currentSiteOption = React.useMemo(
+    () => siteOptions.find((o) => o.value === currentSiteCode) ?? null,
+    [siteOptions, currentSiteCode]
+  );
+  const utilityLabel = currentSiteOption?.utilityLabel ?? "";
+  const utilityCode = React.useMemo(() => {
+    const upper = utilityLabel.toUpperCase();
+    if (upper.includes("PEA")) return "PEA";
+    if (upper.includes("MEA")) return "MEA";
+    return null;
+  }, [utilityLabel]);
+  const utilityLogo = utilityCode === "PEA" ? peaLogo : meaLogo;
+
   const previewCustomLogo =
     preferredData && "customLogoDataUrl" in preferredData
       ? (preferredData.customLogoDataUrl as string | null | undefined)
@@ -850,6 +866,7 @@ const BillPdfPreview: React.FC = () => {
           billingTreeFactor: formValues.billingTreeFactor,
           brandingLogoDataUrl: logoForExcel,
           customLogoDataUrl: preview?.customLogoDataUrl ?? null,
+          utilityCode: utilityCode ?? null,
         };
         const blob = await downloadPreviewBillExcel(
           siteCodeForCreate,
@@ -860,7 +877,7 @@ const BillPdfPreview: React.FC = () => {
       }
       let excelPayload: Parameters<typeof generateBillExcelApi>[1] | undefined;
       if (reportMode === "daily" && resolvedDailyDate) {
-        excelPayload = { mode: "daily", dailyDate: resolvedDailyDate };
+        excelPayload = { mode: "daily", dailyDate: resolvedDailyDate, utilityCode: utilityCode ?? null };
       } else if (reportMode === "monthly") {
         const period =
           monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
@@ -869,6 +886,7 @@ const BillPdfPreview: React.FC = () => {
             mode: "monthly",
             billingMonth: period.month,
             billingYear: period.year,
+            utilityCode: utilityCode ?? null,
           };
         }
       }
@@ -901,6 +919,7 @@ const BillPdfPreview: React.FC = () => {
     billDetail,
     formValues,
     reportFileBase,
+    utilityCode,
   ]);
 
   const reportDate = React.useMemo(() => {
@@ -1084,8 +1103,8 @@ const BillPdfPreview: React.FC = () => {
                       <p className="text-sm">{meterName}</p>
                     </div>
                     <img
-                      src={meaLogo}
-                      alt="MEA"
+                      src={utilityLogo}
+                      alt={utilityCode ?? "MEA"}
                       className="h-34 w-40 object-contain"
                     />
                   </div>

@@ -23,6 +23,7 @@
     "i18next-http-backend": "^3.0.2",
     "jspdf": "^4.1.0",
     "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
     "longdomap-react": "^1.0.0",
     "preline": "^3.2.3",
     "react": "^19.0.0-rc.1",

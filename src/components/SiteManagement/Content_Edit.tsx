@@ -3,12 +3,15 @@ import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import { lookupThaiAddress } from "../../api/thaiAddress";
 import { useSiteGroups } from "../../hooks/useSiteGroups";
+import { useUtilities } from "../../hooks/useUtilities";
 import Dropdown from "../Dropdown";
 import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type UpdatePayload = {
   name?: string;
   code?: string;
+  utilityId?: string;
+  removeUtility?: boolean;
   siteGroupId?: string;
   removeSiteGroup?: boolean;
   lat?: number;
@@ -20,8 +23,12 @@ type UpdatePayload = {
   addressLine?: string;
   brandingLogoDataUrl?: string;
   removeBrandingLogo?: boolean;
+  inverterApiType?: string;
   solaredgeSiteId?: string;
   solaredgeApiKey?: string;
+  solisKeyId?: string;
+  solisKeySecret?: string;
+  solisStationId?: string;
 };
 
 type Props = {
@@ -50,8 +57,15 @@ export default function ContentEdit({
       labels: {
         siteName: t("form.labels.siteName", { defaultValue: "Site name" }),
         siteCode: t("form.labels.siteCode", { defaultValue: "Site code" }),
+        utility: t("form.labels.utility", { defaultValue: "Utility" }),
         siteGroup: t("form.labels.siteGroup", { defaultValue: "Site group" }),
         siteGroupCreate: t("form.labels.siteGroupCreate", { defaultValue: "Create new group" }),
+        inverterApiTitle: t("form.labels.inverterApiTitle", {
+          defaultValue: "Inverter API Configuration",
+        }),
+        inverterApiType: t("form.labels.inverterApiType", {
+          defaultValue: "API Provider",
+        }),
         solarEdgeTitle: t("form.labels.solarEdgeTitle", {
           defaultValue: "SolarEdge Credentials",
         }),
@@ -60,6 +74,18 @@ export default function ContentEdit({
         }),
         solarEdgeApiKey: t("form.labels.solarEdgeApiKey", {
           defaultValue: "SolarEdge API Key",
+        }),
+        solisCloudTitle: t("form.labels.solisCloudTitle", {
+          defaultValue: "SolisCloud Credentials",
+        }),
+        solisKeyId: t("form.labels.solisKeyId", {
+          defaultValue: "SolisCloud Key ID",
+        }),
+        solisKeySecret: t("form.labels.solisKeySecret", {
+          defaultValue: "SolisCloud Key Secret",
+        }),
+        solisStationId: t("form.labels.solisStationId", {
+          defaultValue: "SolisCloud Station ID",
         }),
         brandingLogo: t("form.labels.brandingLogo", { defaultValue: "Branding logo" }),
         latitude: t("form.labels.latitude", { defaultValue: "Latitude" }),
@@ -75,6 +101,7 @@ export default function ContentEdit({
         siteCode: t("form.placeholders.siteCodeEdit", {
           defaultValue: "Internal code",
         }),
+        utility: t("form.placeholders.utility", { defaultValue: "Select utility" }),
         siteGroup: t("form.placeholders.siteGroup", { defaultValue: "Select group" }),
         siteGroupCreate: t("form.placeholders.siteGroupCreate", { defaultValue: "e.g. Chula Hospital" }),
         solarEdgeSiteId: t("form.placeholders.solarEdgeSiteId", {
@@ -82,6 +109,15 @@ export default function ContentEdit({
         }),
         solarEdgeApiKey: t("form.placeholders.solarEdgeApiKey", {
           defaultValue: "SE_xxxxxxxx",
+        }),
+        solisKeyId: t("form.placeholders.solisKeyId", {
+          defaultValue: "e.g. 1300000000000000000",
+        }),
+        solisKeySecret: t("form.placeholders.solisKeySecret", {
+          defaultValue: "e.g. abcdef1234567890",
+        }),
+        solisStationId: t("form.placeholders.solisStationId", {
+          defaultValue: "e.g. 1300000000000000001",
         }),
         latitude: t("form.placeholders.latitude", { defaultValue: "13.7563" }),
         longitude: t("form.placeholders.longitude", { defaultValue: "100.5018" }),
@@ -95,6 +131,10 @@ export default function ContentEdit({
         solarEdge: t("form.hints.solarEdgeEdit", {
           defaultValue:
             "Adjust Site ID / API Key for SolarEdge (clear to revert to default).",
+        }),
+        solisCloud: t("form.hints.solisCloudEdit", {
+          defaultValue:
+            "Adjust Key ID, Key Secret, and Station ID for SolisCloud.",
         }),
         zipInfo: t("form.hints.zipManual", {
           defaultValue: "You can edit from postal code or type manually.",
@@ -155,6 +195,13 @@ export default function ContentEdit({
         submitting: t("edit.buttons.submitting", { defaultValue: "Saving..." }),
         createGroup: t("form.buttons.createGroup", { defaultValue: "Create group" }),
       },
+      utility: {
+        none: t("form.utility.none", { defaultValue: "No utility" }),
+        loading: t("form.utility.loading", { defaultValue: "Loading utilities..." }),
+        create: t("form.labels.utilityCreate", { defaultValue: "Create new utility" }),
+        createPlaceholder: t("form.placeholders.utilityCreate", { defaultValue: "e.g. MEA" }),
+        createButton: t("form.buttons.createUtility", { defaultValue: "Create utility" }),
+      },
       group: {
         none: t("form.group.none", { defaultValue: "No group" }),
         loading: t("form.group.loading", { defaultValue: "Loading groups..." }),
@@ -173,10 +220,19 @@ export default function ContentEdit({
     addressDistrict: site.addressDistrict ?? "",
     addressSubDistrict: site.addressSubDistrict ?? "",
     addressLine: site.addressLine ?? "",
+    inverterApiType: site.inverterApiType ?? "solaredge",
     solaredgeSiteId: site.solaredgeSiteId ?? "",
     solaredgeApiKey: site.solaredgeApiKey ?? "",
+    solisKeyId: site.solisKeyId ?? "",
+    solisKeySecret: site.solisKeySecret ?? "",
+    solisStationId: site.solisStationId ?? "",
   });
+  const [selectedUtilityId, setSelectedUtilityId] = React.useState(
+    site.utilityId ?? ""
+  );
+  const [newUtilityName, setNewUtilityName] = React.useState("");
   const [newGroupName, setNewGroupName] = React.useState("");
+  const { utilities, loading: utilitiesLoading, create: createUtility } = useUtilities();
   const { groups, loading: groupsLoading, create: createGroup } = useSiteGroups();
   const [logoPreview, setLogoPreview] = React.useState<string | null>(
     site.brandingLogoUrl ?? null
@@ -217,6 +273,14 @@ export default function ContentEdit({
     return list;
   }, [subDistrictOptions, form.addressSubDistrict]);
 
+  const utilityOptions = React.useMemo(
+    () => [
+      { value: "", label: texts.utility.none },
+      ...utilities.map((u) => ({ value: u.id, label: u.name })),
+    ],
+    [utilities, texts.utility.none]
+  );
+
   const groupOptions = React.useMemo(
     () => [
       { value: "", label: texts.group.none },
@@ -239,8 +303,12 @@ export default function ContentEdit({
       | "addressDistrict"
       | "addressSubDistrict"
       | "addressLine"
+      | "inverterApiType"
       | "solaredgeSiteId"
-      | "solaredgeApiKey",
+      | "solaredgeApiKey"
+      | "solisKeyId"
+      | "solisKeySecret"
+      | "solisStationId",
     value: string
   ) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -286,6 +354,34 @@ export default function ContentEdit({
     const prevApiKey = site.solaredgeApiKey?.trim() ?? "";
     if (nextApiKey !== prevApiKey) {
       payload.solaredgeApiKey = nextApiKey;
+    }
+    // Inverter API type
+    const nextApiType = form.inverterApiType ?? "solaredge";
+    const prevApiType = site.inverterApiType ?? "solaredge";
+    if (nextApiType !== prevApiType) {
+      payload.inverterApiType = nextApiType;
+    }
+    // SolisCloud fields
+    const nextSolisKeyId = form.solisKeyId?.trim() ?? "";
+    const prevSolisKeyId = site.solisKeyId?.trim() ?? "";
+    if (nextSolisKeyId !== prevSolisKeyId) {
+      payload.solisKeyId = nextSolisKeyId;
+    }
+    const nextSolisKeySecret = form.solisKeySecret?.trim() ?? "";
+    const prevSolisKeySecret = site.solisKeySecret?.trim() ?? "";
+    if (nextSolisKeySecret !== prevSolisKeySecret) {
+      payload.solisKeySecret = nextSolisKeySecret;
+    }
+    const nextSolisStationId = form.solisStationId?.trim() ?? "";
+    const prevSolisStationId = site.solisStationId?.trim() ?? "";
+    if (nextSolisStationId !== prevSolisStationId) {
+      payload.solisStationId = nextSolisStationId;
+    }
+    const nextUtilityId = selectedUtilityId?.trim() ?? "";
+    const prevUtilityId = site.utilityId?.trim() ?? "";
+    if (nextUtilityId !== prevUtilityId) {
+      if (nextUtilityId) payload.utilityId = nextUtilityId;
+      else payload.removeUtility = true;
     }
     const nextGroupId = form.siteGroupId?.trim() ?? "";
     const prevGroupId = site.groupId?.trim() ?? "";
@@ -431,6 +527,95 @@ export default function ContentEdit({
 
         <div>
           <label className="font-semibold text-sm block mb-2">
+            {texts.labels.utility}
+          </label>
+          <Dropdown
+            options={utilityOptions}
+            value={selectedUtilityId}
+            onChange={(val) => {
+              setSelectedUtilityId(val);
+            }}
+          >
+            {({ open, selected, getButtonProps, getMenuProps, getItemProps, options }) => (
+              <div className="relative">
+                <button
+                  {...getButtonProps({
+                    className:
+                      "h-[44px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                  })}
+                >
+                  <span className="whitespace-nowrap">
+                    {selected?.label ?? texts.utility.none}
+                  </span>
+                  <i className="material-icons leading-none">
+                    {open ? "arrow_drop_up" : "arrow_drop_down"}
+                  </i>
+                </button>
+                <div
+                  {...getMenuProps({
+                    className: [
+                      "absolute left-0 z-50 mt-1 min-w-full w-max max-w-[92vw] rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto overflow-x-visible",
+                      open ? "block" : "hidden",
+                    ].join(" "),
+                  })}
+                >
+                  {utilitiesLoading && (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      {texts.utility.loading}
+                    </div>
+                  )}
+                  {options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      {...getItemProps(opt, {
+                        className:
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer whitespace-nowrap",
+                      })}
+                      title={opt.label}
+                    >
+                      <span className="block whitespace-nowrap">
+                        {opt.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Dropdown>
+
+          <div className="mt-3">
+            <label className="text-xs font-semibold block mb-2 text-gray-600">
+              {texts.utility.create}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newUtilityName}
+                onChange={(e) => setNewUtilityName(e.target.value)}
+                className="flex-1 h-10 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                placeholder={texts.utility.createPlaceholder}
+              />
+              <button
+                type="button"
+                className="h-10 px-3 rounded-md border border-gray-300 text-sm font-semibold hover:bg-gray-50 cursor-pointer"
+                onClick={async () => {
+                  const trimmed = newUtilityName.trim();
+                  if (!trimmed) return;
+                  const created = await createUtility(trimmed);
+                  if (created?.id) {
+                    setSelectedUtilityId(created.id);
+                  }
+                  setNewUtilityName("");
+                }}
+              >
+                {texts.utility.createButton}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="font-semibold text-sm block mb-2">
             {texts.labels.siteGroup}
           </label>
           <Dropdown
@@ -503,7 +688,7 @@ export default function ContentEdit({
                 onClick={async () => {
                   const trimmed = newGroupName.trim();
                   if (!trimmed) return;
-                  const created = await createGroup(trimmed);
+                  const created = await createGroup(trimmed, undefined, selectedUtilityId || undefined);
                   if (created?.id) {
                     setForm((prev) => ({ ...prev, siteGroupId: created.id }));
                   }
@@ -519,36 +704,114 @@ export default function ContentEdit({
         <div className="space-y-3 rounded-xl border border-slate-200 p-4">
           <div className="flex flex-col gap-1">
             <p className="font-semibold text-sm">
-              {texts.labels.solarEdgeTitle}
+              {texts.labels.inverterApiTitle}
             </p>
-            <p className="text-xs text-gray-500">{texts.hints.solarEdge}</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="font-semibold text-sm block mb-2">
-                {texts.labels.solarEdgeSiteId}
+          <div>
+            <label className="font-semibold text-sm block mb-2">
+              {texts.labels.inverterApiType}
+            </label>
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="inverterApiType"
+                  value="solaredge"
+                  checked={form.inverterApiType === "solaredge"}
+                  onChange={() => handleChange("inverterApiType", "solaredge")}
+                  className="accent-cyan"
+                />
+                <span className="text-sm font-medium">SolarEdge</span>
               </label>
-              <input
-                type="text"
-                value={form.solaredgeSiteId ?? ""}
-                onChange={(e) => handleChange("solaredgeSiteId", e.target.value)}
-                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-                placeholder={texts.placeholders.solarEdgeSiteId}
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-sm block mb-2">
-                {texts.labels.solarEdgeApiKey}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="inverterApiType"
+                  value="soliscloud"
+                  checked={form.inverterApiType === "soliscloud"}
+                  onChange={() => handleChange("inverterApiType", "soliscloud")}
+                  className="accent-cyan"
+                />
+                <span className="text-sm font-medium">SolisCloud</span>
               </label>
-              <input
-                type="password"
-                value={form.solaredgeApiKey ?? ""}
-                onChange={(e) => handleChange("solaredgeApiKey", e.target.value)}
-                className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
-                placeholder={texts.placeholders.solarEdgeApiKey}
-              />
             </div>
           </div>
+
+          {form.inverterApiType === "solaredge" && (
+            <>
+              <p className="text-xs text-gray-500">{texts.hints.solarEdge}</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="font-semibold text-sm block mb-2">
+                    {texts.labels.solarEdgeSiteId}
+                  </label>
+                  <input
+                    type="text"
+                    value={form.solaredgeSiteId ?? ""}
+                    onChange={(e) => handleChange("solaredgeSiteId", e.target.value)}
+                    className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                    placeholder={texts.placeholders.solarEdgeSiteId}
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-sm block mb-2">
+                    {texts.labels.solarEdgeApiKey}
+                  </label>
+                  <input
+                    type="password"
+                    value={form.solaredgeApiKey ?? ""}
+                    onChange={(e) => handleChange("solaredgeApiKey", e.target.value)}
+                    className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                    placeholder={texts.placeholders.solarEdgeApiKey}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {form.inverterApiType === "soliscloud" && (
+            <>
+              <p className="text-xs text-gray-500">{texts.hints.solisCloud}</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="font-semibold text-sm block mb-2">
+                    {texts.labels.solisKeyId}
+                  </label>
+                  <input
+                    type="text"
+                    value={form.solisKeyId ?? ""}
+                    onChange={(e) => handleChange("solisKeyId", e.target.value)}
+                    className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                    placeholder={texts.placeholders.solisKeyId}
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-sm block mb-2">
+                    {texts.labels.solisKeySecret}
+                  </label>
+                  <input
+                    type="password"
+                    value={form.solisKeySecret ?? ""}
+                    onChange={(e) => handleChange("solisKeySecret", e.target.value)}
+                    className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                    placeholder={texts.placeholders.solisKeySecret}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="font-semibold text-sm block mb-2">
+                  {texts.labels.solisStationId}
+                </label>
+                <input
+                  type="text"
+                  value={form.solisStationId ?? ""}
+                  onChange={(e) => handleChange("solisStationId", e.target.value)}
+                  className="w-full h-11 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
+                  placeholder={texts.placeholders.solisStationId}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div>

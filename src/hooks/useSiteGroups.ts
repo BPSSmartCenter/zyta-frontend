@@ -24,10 +24,10 @@ export function useSiteGroups() {
     refresh();
   }, [refresh]);
 
-  const create = React.useCallback(async (name: string, code?: string) => {
+  const create = React.useCallback(async (name: string, code?: string, utilityId?: string) => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error("name is required");
-    const resp = await createSiteGroup({ name: trimmed, code });
+    const resp = await createSiteGroup({ name: trimmed, code, utilityId });
     const item = (resp as any)?.item ?? resp;
     if (item?.id) {
       setGroups((prev) => {

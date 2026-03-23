@@ -305,7 +305,7 @@ const minutesFromTimeLabel = (label?: string) => {
 
 export default function WaterMeterPanel({ siteCode }: Props) {
   const { t } = useTranslation("devices"); // ใช้คีย์แบบ devices.waterMeter.*
-  const { selectedSite, siteOptions } = useFilters();
+  const { selectedSite, selectedUtility, selectedGroupSite, siteOptions } = useFilters();
 
   // options ทุก 30 นาที
   const timeOptions = useMemo(
@@ -322,16 +322,29 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   const normalizedSiteCode = siteCode?.trim();
   const normalizedSelectedSite = selectedSite?.trim();
 
-  const normalizedSiteOptions = useMemo(
-    () =>
-      siteOptions
-        .map((opt) => (opt.value ? String(opt.value).trim() : ""))
-        .filter(
-          (val, idx, arr) =>
-            val && val.toLowerCase() !== "all" && arr.indexOf(val) === idx
-        ),
-    [siteOptions]
-  );
+  const normalizedSiteOptions = useMemo(() => {
+    let filtered = siteOptions;
+    // Filter by utility scope if selected
+    if (selectedUtility?.id) {
+      filtered = filtered.filter(
+        (opt) => (opt as any)?.utilityId === selectedUtility.id
+      );
+    }
+    // Filter by group scope if selected
+    if (selectedGroupSite?.id) {
+      filtered = filtered.filter(
+        (opt) =>
+          (opt as any)?.groupId === selectedGroupSite.id ||
+          (opt as any)?.groupLabel === selectedGroupSite.label
+      );
+    }
+    return filtered
+      .map((opt) => (opt.value ? String(opt.value).trim() : ""))
+      .filter(
+        (val, idx, arr) =>
+          val && val.toLowerCase() !== "all" && arr.indexOf(val) === idx
+      );
+  }, [siteOptions, selectedUtility, selectedGroupSite]);
 
   const siteTargets = useMemo(() => {
     const targets = new Set<string>();

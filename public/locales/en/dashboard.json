@@ -12,7 +12,9 @@
       "excel": "Export to Excel",
       "word": "Export to Word"
     },
-    "searchPlaceholder": "Find sites"
+    "searchPlaceholder": "Find sites",
+    "scopeFilter": "Filtered by",
+    "clearScope": "Clear filter"
   },
   "date": {
     "today": "Today",

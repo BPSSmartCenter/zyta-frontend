@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import Dropdown from "../Dropdown";
 
 export type SiteOption = {
@@ -7,6 +7,8 @@ export type SiteOption = {
   i18nKey?: string;
   groupLabel?: string | null;
   groupId?: string | null;
+  utilityId?: string | null;
+  utilityLabel?: string | null;
 };
 
 type GroupedSiteDropdownProps = {
@@ -22,42 +24,110 @@ type GroupedSiteDropdownProps = {
   showUngroupedHeader?: boolean;
   selectedGroup?: { id: string; label: string } | null;
   onSelectGroup?: (group: { id: string; label: string }) => void;
+  selectedUtility?: { id: string; label: string } | null;
+  onSelectUtility?: (utility: { id: string; label: string }) => void;
 };
 
-type GroupedSite = {
+/* ── Tree data types ── */
+
+type SiteNode = SiteOption;
+
+type GroupNode = {
   id: string;
   label: string;
-  sites: SiteOption[];
+  sites: SiteNode[];
 };
+
+type UtilityNode = {
+  id: string;
+  label: string;
+  groups: GroupNode[];
+  ungroupedSites: SiteNode[];
+};
+
+type HierarchyTree = {
+  utilities: UtilityNode[];
+  /** Groups without utility */
+  orphanGroups: GroupNode[];
+  /** Sites without group and utility */
+  ungrouped: SiteNode[];
+};
+
+/* ── Build hierarchy from flat options ── */
+
+function buildHierarchyTree(options: SiteOption[]): HierarchyTree {
+  const utilityMap = new Map<string, UtilityNode>();
+  const orphanGroupMap = new Map<string, GroupNode>();
+  const ungrouped: SiteNode[] = [];
+
+  for (const opt of options) {
+    const uId = opt.utilityId ?? null;
+    const uLabel = opt.utilityLabel ?? null;
+    const gId = opt.groupId ?? opt.groupLabel ?? null;
+    const gLabel = opt.groupLabel ?? null;
+
+    // Site has utility
+    if (uId && uLabel) {
+      let uNode = utilityMap.get(uId);
+      if (!uNode) {
+        uNode = { id: uId, label: uLabel, groups: [], ungroupedSites: [] };
+        utilityMap.set(uId, uNode);
+      }
+      if (gId && gLabel) {
+        let gNode = uNode.groups.find((g) => g.id === String(gId));
+        if (!gNode) {
+          gNode = { id: String(gId), label: gLabel, sites: [] };
+          uNode.groups.push(gNode);
+        }
+        gNode.sites.push(opt);
+      } else {
+        uNode.ungroupedSites.push(opt);
+      }
+      continue;
+    }
+
+    // Site has group but no utility
+    if (gId && gLabel) {
+      const key = String(gId);
+      let gNode = orphanGroupMap.get(key);
+      if (!gNode) {
+        gNode = { id: key, label: gLabel, sites: [] };
+        orphanGroupMap.set(key, gNode);
+      }
+      gNode.sites.push(opt);
+      continue;
+    }
+
+    // No group, no utility
+    ungrouped.push(opt);
+  }
+
+  const sortTh = (a: { label: string }, b: { label: string }) =>
+    a.label.localeCompare(b.label, "th");
+
+  const utilities = Array.from(utilityMap.values()).sort(sortTh);
+  for (const u of utilities) u.groups.sort(sortTh);
+
+  const orphanGroups = Array.from(orphanGroupMap.values()).sort(sortTh);
+
+  return { utilities, orphanGroups, ungrouped };
+}
+
+/* ── Helpers ── */
 
 const normalizeKey = (value: string) => value.trim().toLowerCase();
-const SUBMENU_MIN_WIDTH = 220;
-const SUBMENU_PREFERRED_WIDTH = 320;
-const SUBMENU_GAP = 8;
 
-const buildGroupSites = (options: SiteOption[]): {
-  groups: GroupedSite[];
-  remaining: SiteOption[];
-} => {
-  const grouped = new Map<string, SiteOption[]>();
-  const remaining = options.filter((opt) => !opt.groupLabel);
+function countSites(node: UtilityNode | GroupNode): number {
+  if ("groups" in node) {
+    return (
+      node.groups.reduce((sum, g) => sum + g.sites.length, 0) +
+      node.ungroupedSites.length
+    );
+  }
+  return node.sites.length;
+}
 
-  options.forEach((opt) => {
-    const label = String(opt.groupLabel || "").trim();
-    if (!label) return;
-    const list = grouped.get(label) ?? [];
-    list.push(opt);
-    grouped.set(label, list);
-  });
-
-  const groups: GroupedSite[] = Array.from(grouped.entries()).map(([label, sites]) => ({
-    id: label,
-    label,
-    sites,
-  }));
-  groups.sort((a, b) => a.label.localeCompare(b.label, "th"));
-  return { groups, remaining };
-};
+/* ── Component ── */
 
 export default function SiteDropdownGrouped({
   options,
@@ -74,50 +144,12 @@ export default function SiteDropdownGrouped({
   showUngroupedHeader = true,
   selectedGroup = null,
   onSelectGroup,
+  selectedUtility = null,
+  onSelectUtility,
 }: GroupedSiteDropdownProps) {
-  const [activeGroupId, setActiveGroupId] = React.useState<string | null>(null);
+  const [expandedUtilities, setExpandedUtilities] = React.useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const [submenuSide, setSubmenuSide] = React.useState<"right" | "left">("right");
-  const [submenuMaxWidth, setSubmenuMaxWidth] = React.useState<number>(SUBMENU_PREFERRED_WIDTH);
-
-  const pickSubmenuSide = (el: HTMLElement | null) => {
-    if (!el || typeof window === "undefined") return;
-    const rect = el.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const pad = 12;
-    const rightSpace = viewportWidth - rect.right - SUBMENU_GAP - pad;
-    const leftSpace = rect.left - SUBMENU_GAP - pad;
-    const clampWidth = (space: number) =>
-      Math.max(SUBMENU_MIN_WIDTH, Math.min(SUBMENU_PREFERRED_WIDTH, space));
-
-    const willOverflowRight = rightSpace < SUBMENU_PREFERRED_WIDTH;
-    const canRight = rightSpace >= SUBMENU_MIN_WIDTH;
-    const canLeft = leftSpace >= SUBMENU_MIN_WIDTH;
-
-    if (willOverflowRight && canLeft) {
-      setSubmenuSide("left");
-      setSubmenuMaxWidth(clampWidth(leftSpace));
-      return;
-    }
-    if (canRight) {
-      setSubmenuSide("right");
-      setSubmenuMaxWidth(clampWidth(rightSpace));
-      return;
-    }
-    if (canLeft) {
-      setSubmenuSide("left");
-      setSubmenuMaxWidth(clampWidth(leftSpace));
-      return;
-    }
-
-    if (rightSpace >= leftSpace) {
-      setSubmenuSide("right");
-      setSubmenuMaxWidth(Math.max(160, rightSpace));
-    } else {
-      setSubmenuSide("left");
-      setSubmenuMaxWidth(Math.max(160, leftSpace));
-    }
-  };
 
   const displayLabel = React.useCallback(
     (opt: SiteOption) => (getLabel ? getLabel(opt) : opt.label),
@@ -125,15 +157,174 @@ export default function SiteDropdownGrouped({
   );
 
   const allOption = options.find((opt) => normalizeKey(opt.value) === "all") ?? null;
-  const normalOptions = allOption ? options.filter((opt) => opt.value !== allOption.value) : options;
-  const { groups, remaining } = React.useMemo(
-    () => buildGroupSites(normalOptions),
+  const normalOptions = allOption
+    ? options.filter((opt) => opt.value !== allOption.value)
+    : options;
+
+  const tree = React.useMemo(
+    () => buildHierarchyTree(normalOptions),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [JSON.stringify(normalOptions)]
   );
 
+  // Determine if we have any utility data at all (for backward compat: render old style if no utilities)
+  const hasUtilities = tree.utilities.length > 0;
+
+  const toggleUtility = (id: string) => {
+    setExpandedUtilities((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Reset expand state when menu closes
   React.useEffect(() => {
-    if (!menuOpen) setActiveGroupId(null);
+    if (!menuOpen) {
+      setExpandedUtilities(new Set());
+      setExpandedGroups(new Set());
+    }
   }, [menuOpen]);
+
+  /* ── Button label ── */
+  const getButtonLabel = React.useCallback(() => {
+    if (selectedUtility && normalizeKey(value) === "all") {
+      if (selectedGroup) return `${selectedUtility.label} › ${selectedGroup.label}`;
+      return selectedUtility.label;
+    }
+    if (selectedGroup && normalizeKey(value) === "all") return selectedGroup.label;
+    const opt = options.find((o) => o.value === value) ?? options[0];
+    return opt ? displayLabel(opt) : "";
+  }, [value, selectedUtility, selectedGroup, options, displayLabel]);
+
+  /* ── Render helpers ── */
+
+  const renderSiteItem = (
+    opt: SiteOption,
+    indent: number,
+    getItemProps: any
+  ) => (
+    <button
+      key={opt.value}
+      {...getItemProps(opt, {
+        className:
+          "flex w-full items-center rounded-lg py-1.5 text-left text-sm hover:bg-gray-100 hover:cursor-pointer whitespace-nowrap",
+      })}
+      style={{ paddingLeft: `${indent * 16 + 12}px`, paddingRight: "12px" }}
+      title={displayLabel(opt)}
+    >
+      <i className="material-icons text-[14px] text-gray-400 mr-1.5">location_on</i>
+      <span className="truncate">{displayLabel(opt)}</span>
+    </button>
+  );
+
+  const renderGroupNode = (
+    group: GroupNode,
+    indent: number,
+    getItemProps: any
+  ) => {
+    const isExpanded = expandedGroups.has(group.id);
+    const count = group.sites.length;
+    return (
+      <div key={group.id}>
+        <div className="flex items-center">
+          {/* expand/collapse toggle */}
+          <button
+            type="button"
+            className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 rounded"
+            style={{ marginLeft: `${indent * 16 + 4}px` }}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleGroup(group.id);
+            }}
+          >
+            <i className="material-icons text-[16px] text-gray-400">
+              {isExpanded ? "expand_more" : "chevron_right"}
+            </i>
+          </button>
+          {/* group label (clickable = select group scope) */}
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-1 rounded-lg py-1.5 pr-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-100 hover:cursor-pointer"
+            onClick={() => {
+              if (onSelectGroup) {
+                onSelectGroup({ id: group.id, label: group.label });
+              } else {
+                toggleGroup(group.id);
+              }
+            }}
+          >
+            <i className="material-icons text-[16px] text-gray-500 mr-1">folder</i>
+            <span className="truncate">{group.label}</span>
+            <span className="ml-auto text-[11px] text-gray-400 tabular-nums">{count}</span>
+          </button>
+        </div>
+        {isExpanded &&
+          group.sites.map((site) => renderSiteItem(site, indent + 1, getItemProps))}
+      </div>
+    );
+  };
+
+  const renderUtilityNode = (
+    utility: UtilityNode,
+    getItemProps: any
+  ) => {
+    const isExpanded = expandedUtilities.has(utility.id);
+    const count = countSites(utility);
+    return (
+      <div key={utility.id}>
+        {/* Utility header row */}
+        <div className="flex items-center">
+          <button
+            type="button"
+            className="flex items-center justify-center w-6 h-6 hover:bg-gray-100 rounded ml-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleUtility(utility.id);
+            }}
+          >
+            <i className="material-icons text-[16px] text-gray-500">
+              {isExpanded ? "expand_more" : "chevron_right"}
+            </i>
+          </button>
+          <button
+            type="button"
+            className="flex flex-1 items-center gap-1 rounded-lg py-2 pr-3 text-left text-sm font-semibold text-gray-800 hover:bg-blue-50 hover:cursor-pointer"
+            onClick={() => {
+              if (onSelectUtility) {
+                onSelectUtility({ id: utility.id, label: utility.label });
+              } else {
+                toggleUtility(utility.id);
+              }
+            }}
+          >
+            <i className="material-icons text-[16px] text-blue-500 mr-1">business</i>
+            <span className="truncate">{utility.label}</span>
+            <span className="ml-auto text-[11px] text-gray-400 tabular-nums">{count}</span>
+          </button>
+        </div>
+
+        {isExpanded && (
+          <div>
+            {utility.groups.map((g) => renderGroupNode(g, 1, getItemProps))}
+            {utility.ungroupedSites.map((s) =>
+              renderSiteItem(s, 2, getItemProps)
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Dropdown
@@ -143,23 +334,14 @@ export default function SiteDropdownGrouped({
       onOpenChange={setMenuOpen}
       className={rootClassName}
     >
-      {({ open, selected, options: rawOptions, getButtonProps, getMenuProps, getItemProps }) => {
-        const siteOptionList = rawOptions as SiteOption[];
-        const fallbackOption = selected ?? siteOptionList.find((opt) => opt.value === value) ?? siteOptionList[0];
-        const selectedLabel = fallbackOption
-          ? displayLabel(fallbackOption)
-          : siteOptionList[0]
-          ? displayLabel(siteOptionList[0])
-          : "";
-
-        const buttonLabel =
-          selectedGroup && normalizeKey(value) === "all" ? selectedGroup.label : selectedLabel;
-
+      {({ open, getButtonProps, getMenuProps, getItemProps }) => {
         return (
           <>
             <button {...getButtonProps({ className: buttonClassName })}>
-              <span className="whitespace-nowrap">{buttonLabel}</span>
-              <i className="material-icons leading-none">{open ? "arrow_drop_up" : "arrow_drop_down"}</i>
+              <span className="whitespace-nowrap truncate max-w-[200px]">{getButtonLabel()}</span>
+              <i className="material-icons leading-none">
+                {open ? "arrow_drop_up" : "arrow_drop_down"}
+              </i>
             </button>
 
             <div
@@ -167,103 +349,78 @@ export default function SiteDropdownGrouped({
                 className: [
                   menuClassName,
                   "transition-all duration-150",
-                  open ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none",
-                  "overflow-visible",
+                  open
+                    ? "opacity-100 translate-y-0 pointer-events-auto"
+                    : "opacity-0 -translate-y-1 pointer-events-none",
                   menuOffsetClassName,
                 ].join(" "),
               })}
-              onMouseLeave={() => setActiveGroupId(null)}
             >
+              {/* All Sites option */}
               {allOption && (
                 <button
                   {...getItemProps(allOption, {
                     className:
-                      "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
+                      "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-gray-100 hover:cursor-pointer",
                   })}
                 >
+                  <i className="material-icons text-[16px] text-gray-500 mr-2">public</i>
                   {displayLabel(allOption)}
                 </button>
               )}
 
-              {groups.map((group) => (
-                <div
-                  key={group.id}
-                  className="relative"
-                  onMouseLeave={() => setActiveGroupId((prev) => (prev === group.id ? null : prev))}
-                >
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer"
-                    onMouseEnter={(e) => {
-                      pickSubmenuSide(e.currentTarget as HTMLElement);
-                      setActiveGroupId(group.id);
-                    }}
-                    onFocus={(e) => {
-                      pickSubmenuSide(e.currentTarget as HTMLElement);
-                      setActiveGroupId(group.id);
-                    }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (onSelectGroup) {
-                        onSelectGroup({ id: group.id, label: group.label });
-                        return;
-                      }
-                      setActiveGroupId(group.id);
-                    }}
-                  >
-                    <span className="whitespace-nowrap">{group.label}</span>
-                    <i className="material-icons text-[18px] leading-none text-gray-500">chevron_right</i>
-                  </button>
-
-                  <div
-                    className={[
-                      "absolute top-0 min-w-[220px] rounded-md border border-gray-300 bg-white p-1 shadow-md",
-                      activeGroupId === group.id ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-                      "transition-opacity duration-150",
-                    ].join(" ")}
-                    style={
-                      submenuSide === "right"
-                        ? { left: "100%", marginLeft: 0, maxWidth: `${submenuMaxWidth}px` }
-                        : { right: "100%", marginRight: 0, maxWidth: `${submenuMaxWidth}px` }
-                    }
-                  >
-                    <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">{group.label}</div>
-                    {group.sites.length === 0 ? (
-                      <div className="px-3 py-2 text-sm text-gray-500">No sites in this group</div>
-                    ) : (
-                      group.sites.map((opt) => (
-                        <button
-                          key={opt.value}
-                          {...getItemProps(opt, {
-                            className:
-                              "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer whitespace-nowrap",
-                          })}
-                          title={displayLabel(opt)}
-                        >
-                          <span className="whitespace-nowrap">{displayLabel(opt)}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {showUngrouped && remaining.length > 0 && (
+              {/* ── Utility nodes (new 3-tier) ── */}
+              {hasUtilities && (
                 <>
-                  {showUngroupedHeader && (
-                    <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">Other sites</div>
+                  {tree.utilities.map((u) => renderUtilityNode(u, getItemProps))}
+
+                  {/* Orphan groups (groups without utility) */}
+                  {tree.orphanGroups.length > 0 && (
+                    <div className="mt-1 border-t border-gray-100 pt-1">
+                      <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">
+                        ไม่ระบุการไฟฟ้า
+                      </div>
+                      {tree.orphanGroups.map((g) =>
+                        renderGroupNode(g, 0, getItemProps)
+                      )}
+                    </div>
                   )}
-                  {remaining.map((opt) => (
-                    <button
-                      key={opt.value}
-                      {...getItemProps(opt, {
-                        className:
-                          "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm hover:bg-gray-100 hover:cursor-pointer",
-                      })}
-                    >
-                      {displayLabel(opt)}
-                    </button>
-                  ))}
+
+                  {/* Ungrouped sites */}
+                  {showUngrouped && tree.ungrouped.length > 0 && (
+                    <div className="mt-1 border-t border-gray-100 pt-1">
+                      {showUngroupedHeader && (
+                        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">
+                          ไม่มีกลุ่ม
+                        </div>
+                      )}
+                      {tree.ungrouped.map((s) =>
+                        renderSiteItem(s, 0, getItemProps)
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Fallback: old 2-tier layout (no utilities exist) ── */}
+              {!hasUtilities && (
+                <>
+                  {tree.orphanGroups.map((g) =>
+                    renderGroupNode(g, 0, getItemProps)
+                  )}
+
+                  {showUngrouped && tree.ungrouped.length > 0 && (
+                    <>
+                      {showUngroupedHeader && (
+                        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-gray-400">
+                          Other sites
+                        </div>
+                      )}
+                      {tree.ungrouped.map((s) =>
+                        renderSiteItem(s, 0, getItemProps)
+                      )}
+                    </>
+                  )}
                 </>
               )}
             </div>

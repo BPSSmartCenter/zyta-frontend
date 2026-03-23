@@ -40,10 +40,31 @@ const toIsoRangeForDate = (date: { y: number; m: number; d: number }) => {
 };
 
 export function NotisProvider({ children }: { children: React.ReactNode }) {
-  const { date, selectedSite } = useFilters();
+  const { date, selectedSite, selectedUtility, selectedGroupSite, siteOptions } = useFilters();
   const [items, setItems] = React.useState<Noti[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>();
+
+  // Build set of site codes that match the current utility/group scope
+  const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {
+    const isAll = !selectedSite || selectedSite === "all";
+    if (!isAll) return null; // single site — no client filter needed
+    if (!selectedUtility?.id && !selectedGroupSite?.id) return null; // truly all
+
+    const codes = new Set<string>();
+    for (const opt of siteOptions) {
+      const code = String(opt.value || "").trim();
+      if (!code || code.toLowerCase() === "all") continue;
+      if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
+      if (selectedGroupSite?.id) {
+        const gId = (opt as any).groupId;
+        const gLabel = (opt as any).groupLabel;
+        if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
+      }
+      codes.add(code);
+    }
+    return codes;
+  }, [selectedSite, selectedUtility, selectedGroupSite, siteOptions]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -55,7 +76,14 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
         siteCode: selectedSite && selectedSite !== "all" ? selectedSite : undefined,
         limit: 500,
       });
-      setItems(prepareNotis(fetched));
+      // Client-side filter when utility/group scope is active
+      const filtered = scopedSiteCodes
+        ? fetched.filter((n) => {
+            const code = (n as any).siteCode ?? (n as any).site_code ?? "";
+            return scopedSiteCodes.has(String(code).trim());
+          })
+        : fetched;
+      setItems(prepareNotis(filtered));
       setError(undefined);
     } catch (err) {
       console.error("Failed to load notis", err);
@@ -64,7 +92,7 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [date, selectedSite]);
+  }, [date, selectedSite, scopedSiteCodes]);
 
   React.useEffect(() => {
     let cancelled = false;

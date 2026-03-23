@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
 import Dropdown from "../Dropdown";
+import { useUtilities } from "../../hooks/useUtilities";
 
 type Props = {
   rows: SiteRow[];
@@ -43,12 +44,17 @@ export default function Content({
       },
       table: {
         site: t("content.table.site", { defaultValue: "Site" }),
+        utility: t("content.table.utility", { defaultValue: "Utility" }),
         group: t("content.table.group", { defaultValue: "Group" }),
         code: t("content.table.code", { defaultValue: "Code" }),
         address: t("content.table.address", { defaultValue: "Address" }),
         devices: t("content.table.devices", { defaultValue: "Devices" }),
         users: t("content.table.users", { defaultValue: "Users" }),
         actions: t("content.table.actions", { defaultValue: "Actions" }),
+      },
+      utility: {
+        label: t("form.labels.utility", { defaultValue: "Utility" }),
+        all: t("content.utility.all", { defaultValue: "All utilities" }),
       },
       status: {
         loading: t("content.loading", { defaultValue: "Loading sites..." }),
@@ -70,10 +76,29 @@ export default function Content({
     }),
     [t]
   );
+  const { utilities } = useUtilities();
   const [search, setSearch] = React.useState("");
   const [provinceFilter, setProvinceFilter] = React.useState("all");
+  const [utilityFilter, setUtilityFilter] = React.useState("all");
   const [page, setPage] = React.useState(1);
   const [copiedSiteId, setCopiedSiteId] = React.useState<string | null>(null);
+
+  /* Utility filter options from loaded utilities + rows */
+  const utilityOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
+    utilities.forEach((u) => map.set(u.id, u.name));
+    rows.forEach((r) => {
+      if (r.utilityId && r.utilityLabel && !map.has(r.utilityId))
+        map.set(r.utilityId, r.utilityLabel);
+    });
+    const sorted = Array.from(map.entries()).sort((a, b) =>
+      a[1].localeCompare(b[1], "th")
+    );
+    return [
+      { value: "all", label: texts.utility.all },
+      ...sorted.map(([id, name]) => ({ value: id, label: name })),
+    ];
+  }, [utilities, rows, texts.utility.all]);
 
   const copyToClipboard = React.useCallback(async (value: string) => {
     if (navigator?.clipboard?.writeText) {
@@ -118,18 +143,40 @@ export default function Content({
 
   const filtered = React.useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((row) => {
+    const result = rows.filter((row) => {
       const matchProvince =
         provinceFilter === "all" || row.provinceLabel === provinceFilter;
+      const matchUtility =
+        utilityFilter === "all" || row.utilityId === utilityFilter;
       const matchSearch =
         !q ||
         row.name.toLowerCase().includes(q) ||
         row.code.toLowerCase().includes(q) ||
         row.provinceLabel.toLowerCase().includes(q) ||
-        (row.groupLabel ?? "").toLowerCase().includes(q);
-      return matchProvince && matchSearch;
+        (row.groupLabel ?? "").toLowerCase().includes(q) ||
+        (row.utilityLabel ?? "").toLowerCase().includes(q);
+      return matchProvince && matchUtility && matchSearch;
     });
-  }, [rows, search, provinceFilter]);
+    /* Sort by Utility → Group → Site name */
+    result.sort((a, b) => {
+      const uA = (a.utilityLabel ?? "").toLowerCase();
+      const uB = (b.utilityLabel ?? "").toLowerCase();
+      if (uA !== uB) {
+        if (!uA) return 1;
+        if (!uB) return -1;
+        return uA.localeCompare(uB, "th");
+      }
+      const gA = (a.groupLabel ?? "").toLowerCase();
+      const gB = (b.groupLabel ?? "").toLowerCase();
+      if (gA !== gB) {
+        if (!gA) return 1;
+        if (!gB) return -1;
+        return gA.localeCompare(gB, "th");
+      }
+      return a.name.localeCompare(b.name, "th");
+    });
+    return result;
+  }, [rows, search, provinceFilter, utilityFilter]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   React.useEffect(() => {
@@ -167,7 +214,7 @@ export default function Content({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto]">
+      <div className="mt-6 grid gap-4 md:grid-cols-[1fr_auto_auto]">
         <div>
           <label className="text-sm font-semibold block mb-2">
             {texts.search.label}
@@ -182,6 +229,64 @@ export default function Content({
             placeholder={texts.search.placeholder}
             className="w-full h-10 rounded-md border border-gray-300 px-3 text-sm focus:ring-2 focus:ring-cyan focus:outline-hidden"
           />
+        </div>
+        <div>
+          <label className="text-sm font-semibold block mb-2">
+            {texts.utility.label}
+          </label>
+          <Dropdown
+            options={utilityOptions}
+            value={utilityFilter}
+            onChange={(val) => {
+              setPage(1);
+              setUtilityFilter(val);
+            }}
+          >
+            {({
+              open,
+              selected,
+              getButtonProps,
+              getMenuProps,
+              getItemProps,
+              options: opts,
+            }) => (
+              <div className="relative">
+                <button
+                  {...getButtonProps({
+                    className:
+                      "h-[40px] w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-800 font-semibold flex items-center justify-between gap-2 cursor-pointer",
+                  })}
+                >
+                  <span className="truncate">
+                    {selected?.label ?? texts.utility.all}
+                  </span>
+                  <i className="material-icons leading-none">
+                    {open ? "arrow_drop_up" : "arrow_drop_down"}
+                  </i>
+                </button>
+                <div
+                  {...getMenuProps({
+                    className: [
+                      "absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white p-1 shadow-lg max-h-64 overflow-y-auto",
+                      open ? "block" : "hidden",
+                    ].join(" "),
+                  })}
+                >
+                  {opts.map((opt) => (
+                    <button
+                      key={opt.value}
+                      {...getItemProps(opt, {
+                        className:
+                          "w-full text-left rounded-md px-3 py-2 text-[14px] hover:bg-gray-100 cursor-pointer",
+                      })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Dropdown>
         </div>
         <div>
           <label className="text-sm font-semibold block mb-2">
@@ -252,6 +357,7 @@ export default function Content({
           <thead>
             <tr className="text-left text-gray-500 text-xs uppercase tracking-wide">
               <th className="pb-3">{texts.table.site}</th>
+              <th className="pb-3">{texts.table.utility}</th>
               <th className="pb-3">{texts.table.group}</th>
               <th className="pb-3">{texts.table.code}</th>
               <th className="pb-3">{texts.table.address}</th>
@@ -263,66 +369,85 @@ export default function Content({
           <tbody className="divide-y divide-gray-100 text-sm">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-gray-500">
+                <td colSpan={8} className="py-10 text-center text-gray-500">
                   {texts.status.loading}
                 </td>
               </tr>
             ) : rowsPage.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-10 text-center text-gray-500">
+                <td colSpan={8} className="py-10 text-center text-gray-500">
                   {texts.status.empty}
                 </td>
               </tr>
             ) : (
-              rowsPage.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  <td className="py-4">
-                    <div className="font-semibold text-gray-900">
-                      {row.name || "-"}
-                    </div>
-                  </td>
-                  <td className="py-4 text-gray-700">
-                    {row.groupLabel || "-"}
-                  </td>
-                  <td className="py-4 text-gray-700">{row.code || "-"}</td>
-                  <td className="py-4 text-gray-700 max-w-[220px]">
-                    <div className="text-sm text-gray-800">
-                      {row.addressLine || "-"}
-                    </div>
-                  </td>
-                  <td className="py-4 text-center font-semibold">
-                    {row.devicesTotal}
-                  </td>
-                  <td className="py-4 text-center font-semibold">
-                    {row.usersCount}
-                  </td>
-                  <td className="py-4 text-center">
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onDetail(row)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <i className="material-icons-outlined text-sm">
-                          visibility
-                        </i>
-                        {texts.detail}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onCopyUuid(row.id)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
-                        title={row.id}
-                      >
-                        <i className="material-icons-outlined text-sm">
-                          content_copy
-                        </i>
-                        {copiedSiteId === row.id ? texts.copied : texts.copyUuid}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              rowsPage.map((row) => {
+                return (
+                  <tr key={row.id} className="hover:bg-gray-50">
+                    <td className="py-4">
+                      <div className="font-semibold text-gray-900">
+                        {row.name || "-"}
+                      </div>
+                    </td>
+                    <td className="py-4">
+                      {row.utilityLabel ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
+                          <i className="material-icons-outlined text-sm">bolt</i>
+                          {row.utilityLabel}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="py-4">
+                      {row.groupLabel ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">
+                          <i className="material-icons-outlined text-sm">folder</i>
+                          {row.groupLabel}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </td>
+                    <td className="py-4 text-gray-700">{row.code || "-"}</td>
+                    <td className="py-4 text-gray-700 max-w-[220px]">
+                      <div className="text-sm text-gray-800">
+                        {row.addressLine || "-"}
+                      </div>
+                    </td>
+                    <td className="py-4 text-center font-semibold">
+                      {row.devicesTotal}
+                    </td>
+                    <td className="py-4 text-center font-semibold">
+                      {row.usersCount}
+                    </td>
+                    <td className="py-4 text-center">
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onDetail(row)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <i className="material-icons-outlined text-sm">
+                            visibility
+                          </i>
+                          {texts.detail}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onCopyUuid(row.id)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border border-gray-200 hover:bg-gray-50 cursor-pointer"
+                          title={row.id}
+                        >
+                          <i className="material-icons-outlined text-sm">
+                            content_copy
+                          </i>
+                          {copiedSiteId === row.id ? texts.copied : texts.copyUuid}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

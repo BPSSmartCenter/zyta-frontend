@@ -28,6 +28,7 @@ export async function getSiteDetails(siteIdOrCode: string) {
 export type RegisterSiteInput = {
   name: string;
   code?: string;
+  utilityId?: string;
   siteGroupId?: string;
   siteGroupName?: string;
   lat?: number;
@@ -38,8 +39,12 @@ export type RegisterSiteInput = {
   addressSubDistrict?: string;
   addressLine?: string;
   brandingLogoDataUrl?: string;
+  inverterApiType?: string;
   solaredgeSiteId?: string;
   solaredgeApiKey?: string;
+  solisKeyId?: string;
+  solisKeySecret?: string;
+  solisStationId?: string;
 };
 
 export async function registerSite(input: RegisterSiteInput) {
@@ -47,6 +52,7 @@ export async function registerSite(input: RegisterSiteInput) {
     name: input.name,
   };
   if (input.code) payload.code = input.code;
+  if (input.utilityId) payload.utilityId = input.utilityId;
   if (input.siteGroupId) payload.siteGroupId = input.siteGroupId;
   if (input.siteGroupName) payload.siteGroupName = input.siteGroupName;
   if (typeof input.lat === "number") payload.lat = input.lat;
@@ -58,11 +64,23 @@ export async function registerSite(input: RegisterSiteInput) {
     payload.addressSubDistrict = input.addressSubDistrict;
   if (input.addressLine) payload.addressLine = input.addressLine;
   if (input.brandingLogoDataUrl) payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
+  if (typeof input.inverterApiType === "string") {
+    payload.inverterApiType = input.inverterApiType;
+  }
   if (typeof input.solaredgeSiteId === "string") {
     payload.solaredgeSiteId = input.solaredgeSiteId.trim();
   }
   if (typeof input.solaredgeApiKey === "string") {
     payload.solaredgeApiKey = input.solaredgeApiKey.trim();
+  }
+  if (typeof input.solisKeyId === "string") {
+    payload.solisKeyId = input.solisKeyId.trim();
+  }
+  if (typeof input.solisKeySecret === "string") {
+    payload.solisKeySecret = input.solisKeySecret.trim();
+  }
+  if (typeof input.solisStationId === "string") {
+    payload.solisStationId = input.solisStationId.trim();
   }
 
   const { data } = await api.post("/site/register", payload);
@@ -72,6 +90,8 @@ export async function registerSite(input: RegisterSiteInput) {
 export type UpdateSiteInput = {
   name?: string;
   code?: string;
+  utilityId?: string;
+  removeUtility?: boolean;
   siteGroupId?: string;
   siteGroupName?: string;
   removeSiteGroup?: boolean;
@@ -84,8 +104,12 @@ export type UpdateSiteInput = {
   addressLine?: string;
   brandingLogoDataUrl?: string;
   removeBrandingLogo?: boolean;
+  inverterApiType?: string;
   solaredgeSiteId?: string;
   solaredgeApiKey?: string;
+  solisKeyId?: string;
+  solisKeySecret?: string;
+  solisStationId?: string;
 };
 
 function normalizeSitePayload(input: UpdateSiteInput) {
@@ -95,6 +119,12 @@ function normalizeSitePayload(input: UpdateSiteInput) {
   }
   if (typeof input.code === "string" && input.code.trim()) {
     payload.code = input.code.trim();
+  }
+  if (typeof input.utilityId === "string" && input.utilityId.trim()) {
+    payload.utilityId = input.utilityId.trim();
+  }
+  if (typeof input.removeUtility === "boolean") {
+    payload.removeUtility = input.removeUtility;
   }
   if (typeof input.siteGroupId === "string" && input.siteGroupId.trim()) {
     payload.siteGroupId = input.siteGroupId.trim();
@@ -121,11 +151,23 @@ function normalizeSitePayload(input: UpdateSiteInput) {
     payload.brandingLogoDataUrl = input.brandingLogoDataUrl;
   if (typeof input.removeBrandingLogo === "boolean")
     payload.removeBrandingLogo = input.removeBrandingLogo;
+  if (typeof input.inverterApiType === "string") {
+    payload.inverterApiType = input.inverterApiType;
+  }
   if (typeof input.solaredgeSiteId === "string") {
     payload.solaredgeSiteId = input.solaredgeSiteId;
   }
   if (typeof input.solaredgeApiKey === "string") {
     payload.solaredgeApiKey = input.solaredgeApiKey;
+  }
+  if (typeof input.solisKeyId === "string") {
+    payload.solisKeyId = input.solisKeyId;
+  }
+  if (typeof input.solisKeySecret === "string") {
+    payload.solisKeySecret = input.solisKeySecret;
+  }
+  if (typeof input.solisStationId === "string") {
+    payload.solisStationId = input.solisStationId;
   }
   return payload;
 }

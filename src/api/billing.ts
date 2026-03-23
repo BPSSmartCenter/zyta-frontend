@@ -158,6 +158,7 @@ export type PreviewBillExcelPayload = {
   billingTreeFactor?: string | number;
   brandingLogoDataUrl?: string | null;
   customLogoDataUrl?: string | null;
+  utilityCode?: string | null;
 };
 
 export async function downloadPreviewBillExcel(
@@ -177,6 +178,7 @@ type BillExcelPayload = {
   dailyDate?: string;
   billingMonth?: number | string;
   billingYear?: number | string;
+  utilityCode?: string | null;
 };
 
 export async function generateBillExcel(billId: string, payload?: BillExcelPayload) {
