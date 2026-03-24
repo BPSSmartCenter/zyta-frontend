@@ -510,6 +510,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const [overviewThreshold90DayKwh, setOverviewThreshold90DayKwh] = useState<number | null>(null);
+  const [inverterApiType, setInverterApiType] = useState<string>("solaredge");
+  const [overviewLastUpdateTime, setOverviewLastUpdateTime] = useState<string | null>(null);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
@@ -1522,6 +1524,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           // keep threshold in sync when overview is fetched here too
           const threshold = Number(data?.threshold_90_day_kwh);
           setOverviewThreshold90DayKwh(Number.isFinite(threshold) ? threshold : null);
+          if (typeof data?.inverterApiType === "string") setInverterApiType(data.inverterApiType);
+          if (typeof data?.lastUpdateTime === "string") setOverviewLastUpdateTime(data.lastUpdateTime);
           if (Number.isFinite(month)) {
             setMetrics((m) => ({ ...m, monthKwh: Math.round(month) }));
           }
@@ -1730,7 +1734,21 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               </p>
             )}
           </div>
-          {/* Time Range (Dropdown x2) */}
+          {/* Time Range (Dropdown x2) — hidden for SolisCloud; show last update badge instead */}
+          {inverterApiType === "soliscloud" ? (
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm select-none">
+                {overviewLastUpdateTime
+                  ? (() => {
+                      const d = new Date(overviewLastUpdateTime);
+                      return isNaN(d.getTime())
+                        ? overviewLastUpdateTime
+                        : d.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" });
+                    })()
+                  : "--:--"}
+              </span>
+            </div>
+          ) : (
           <div className="flex items-center gap-3">
             {/* From */}
             <Dropdown
@@ -1836,6 +1854,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               )}
             </Dropdown>
           </div>
+          )}
           {/* ──────────────────────────────────── */}
 
           <div className="flex flex-col md:flex-row w-full justify-around gap-10 lg:gap-0">
