@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
+import { useUserLogo } from "../hooks/useUserLogo";
 import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
 import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import RingRunner from "../components/RingRunner";
@@ -52,6 +53,7 @@ export const ElectricMeter: React.FC = () => {
     date,
     setDate,
   } = useFilters();
+  const userLogoSrc = useUserLogo();
   const location = useLocation();
   const searchParams = React.useMemo(
     () => new URLSearchParams(location.search),
@@ -574,6 +576,7 @@ export const ElectricMeter: React.FC = () => {
           setSelectedSite={setSelectedSite}
           date={date as any}
           setDate={setDate as any}
+          logoSrc={userLogoSrc}
         />
 
         <div className="mx-auto w-full max-w-[1300px] px-6 pb-16">

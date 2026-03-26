@@ -6,6 +6,7 @@ import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import Modal from "../components/Modal";
 import { useFilters } from "../context/FiltersContext";
+import { useUserLogo } from "../hooks/useUserLogo";
 import {
   useDeviceInventory,
   getCountForType,
@@ -308,6 +309,7 @@ const GenerateBillForm: React.FC = () => {
     setDate,
     billingGuard,
   } = useFilters();
+  const userLogoSrc = useUserLogo();
   const defaultBillingPeriod = React.useMemo(
     () => getDefaultBillingPeriod(),
     []
@@ -1136,6 +1138,7 @@ const GenerateBillForm: React.FC = () => {
           setSelectedSite={setSelectedSite}
           date={date as any}
           setDate={setDate as any}
+          logoSrc={userLogoSrc}
         />
 
         <div className="mx-auto w-full max-w-xl px-6 py-10">

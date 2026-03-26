@@ -3,6 +3,8 @@ import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import Modal from "../components/Modal";
 import { useFilters } from "../context/FiltersContext";
+import { useUserLogo } from "../hooks/useUserLogo";
+
 import {
   useDeviceInventory,
   getCountForType,
@@ -135,6 +137,7 @@ const BillPdfPreview: React.FC = () => {
     date,
     setDate,
   } = useFilters();
+  const userLogoSrc = useUserLogo();
   const { abs } = useUserPath();
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
@@ -1050,6 +1053,7 @@ const BillPdfPreview: React.FC = () => {
           setSelectedSite={setSelectedSite}
           date={date as any}
           setDate={setDate as any}
+          logoSrc={userLogoSrc}
         />
 
         <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">

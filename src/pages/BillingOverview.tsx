@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Dashboard/Navbar";
 import { useFilters } from "../context/FiltersContext";
+import { useUserLogo } from "../hooks/useUserLogo";
 import { StatCardGroup } from "../components/StatCard";
 import StatCard from "../components/StatCard";
 import {
@@ -313,6 +314,7 @@ const BillingOverview: React.FC = () => {
     setDate,
     billingGuard,
   } = useFilters();
+  const userLogoSrc = useUserLogo();
   const navigate = useNavigate();
   const { abs } = useUserPath();
   const { counts: inventoryCounts, loading: inventoryLoading } =
@@ -637,6 +639,7 @@ const BillingOverview: React.FC = () => {
           setSelectedSite={setSelectedSite}
           date={date as any}
           setDate={setDate as any}
+          logoSrc={userLogoSrc}
         />
 
         <div className="mx-auto w-full  px-6 pb-16">
