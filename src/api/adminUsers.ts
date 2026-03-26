@@ -13,6 +13,7 @@ export type AdminUserDto = {
   updatedAt: string;
   active: boolean; // temporary mapped from emailVerified until DB field added
   sites?: Array<{ id: string; code?: string; name?: string }>; // when fetched via getUser
+  brandingLogoUrl?: string | null;
 };
 
 export type UserSearchDto = {
@@ -40,12 +41,13 @@ export async function createUser(payload: {
   password: string;
   role: Role;
   siteIds?: string[];
+  brandingLogoDataUrl?: string;
 }): Promise<AdminUserDto> {
   const { data } = await api.post("/users", payload);
   return data;
 }
 
-export async function updateUser(id: string, payload: Partial<{ firstName: string; lastName: string; email: string; role: Role; active: boolean; siteIds: string[] }>): Promise<AdminUserDto> {
+export async function updateUser(id: string, payload: Partial<{ firstName: string; lastName: string; email: string; role: Role; active: boolean; siteIds: string[]; brandingLogoDataUrl: string; removeBrandingLogo: boolean }>): Promise<AdminUserDto> {
   const { data } = await api.patch(`/users/${encodeURIComponent(id)}`, payload);
   return data;
 }

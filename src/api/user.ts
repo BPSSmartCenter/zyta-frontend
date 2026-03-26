@@ -9,6 +9,7 @@ export type MeResponse = {
   firstName: string;
   lastName: string;
   sites: Array<{ id: string; code: string; name: string; province_code: string; lat: number; lng: number }>;
+  brandingLogoUrl?: string | null;
 };
 
 export async function me(): Promise<MeResponse> {

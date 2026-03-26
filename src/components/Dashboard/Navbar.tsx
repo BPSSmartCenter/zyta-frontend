@@ -21,6 +21,7 @@ type Props = {
   enableGroupSiteSelection?: boolean;
   date: DateValue;
   setDate: (v: DateValue) => void;
+  logoSrc?: string;
 };
 
 type SiteOption = {
@@ -46,6 +47,7 @@ export default function Navbar({
   enableGroupSiteSelection = false,
   date,
   setDate,
+  logoSrc,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const [mobilePanelOpen, setMobilePanelOpen] = React.useState(false);
@@ -111,8 +113,9 @@ export default function Navbar({
         <div className="flex items-center gap-4 sm:gap-6 md:gap-3">
           <img
             className="w-[110px] sm:w-[125px] md:w-[146px]"
-            src={brandImage}
+            src={logoSrc ?? brandImage}
             alt=""
+            onError={(e) => { (e.currentTarget as HTMLImageElement).src = brandImage; }}
           />
           <h1 className="hidden sm:block font-inter tracking-[.03em] text-[20px] font-[600]">
             {t("navbar.title")}

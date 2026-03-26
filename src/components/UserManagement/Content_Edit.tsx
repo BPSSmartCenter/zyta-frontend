@@ -6,13 +6,14 @@ import { useToast } from "../../hook/toastProvider";
 import type { AdminRow } from "./user.constant";
 import { listSites } from "../../api/sites";
 import { getUser } from "../../api/adminUsers";
+import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type Props = {
   actorRole?: "admin" | "manager" | "officer" | "user";
   actorSiteIds?: string[];
   user: AdminRow;
   onCancel: () => void;
-  onSave: (next: AdminRow & { siteIds?: string[] }) => void;
+  onSave: (next: AdminRow & { siteIds?: string[]; brandingLogoDataUrl?: string; removeBrandingLogo?: boolean }) => void;
   allUsers?: AdminRow[];
 };
 
@@ -125,6 +126,47 @@ export default function Content_Edit({
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
   const [initialSiteIds, setInitialSiteIds] = React.useState<string[]>([]);
 
+  // branding logo state
+  const [existingLogoUrl, setExistingLogoUrl] = React.useState<string | null>(null);
+  const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);   // base64 → ส่ง backend
+  const [logoPreviewUrl, setLogoPreviewUrl] = React.useState<string | null>(null); // blob URL → แสดงผล
+  const [removeLogo, setRemoveLogo] = React.useState(false);
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const logoFileRef = React.useRef<HTMLInputElement>(null);
+  const MAX_LOGO_BYTES = 2.5 * 1024 * 1024;
+
+  // cleanup blob URL เมื่อ component unmount หรือ preview เปลี่ยน
+  React.useEffect(() => {
+    return () => { if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl); };
+  }, [logoPreviewUrl]);
+
+  const handleLogoFile = React.useCallback((file: File | null) => {
+    setLogoError(null);
+    if (!file) {
+      setLogoDataUrl(null);
+      setLogoPreviewUrl(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setLogoError(t("form.brandingLogo.errorType", { defaultValue: "File must be an image (PNG, JPG, WEBP)" }));
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError(t("form.brandingLogo.errorSize", { defaultValue: "File must not exceed 2.5MB" }));
+      return;
+    }
+    setRemoveLogo(false);
+    // preview ด้วย blob URL (เร็ว ไม่มีปัญหา CSP)
+    const blobUrl = URL.createObjectURL(file);
+    setLogoPreviewUrl(blobUrl);
+    // base64 สำหรับส่ง backend
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setLogoDataUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }, [t]);
+
   const [dupModal, setDupModal] = React.useState<{
     open: boolean;
     title: string;
@@ -144,6 +186,9 @@ export default function Content_Edit({
           ? (u.sites as any[]).map((s) => s.id).filter(Boolean)
           : [];
         setInitialSiteIds(ids);
+        setExistingLogoUrl((u as any).brandingLogoUrl ?? null);
+        setLogoDataUrl(null);
+        setRemoveLogo(false);
       } catch {
         setInitialSiteIds([]);
       }
@@ -295,7 +340,11 @@ export default function Content_Edit({
       return;
     }
 
-    onSave(next);
+    onSave({
+      ...next,
+      brandingLogoDataUrl: logoDataUrl ?? undefined,
+      removeBrandingLogo: removeLogo,
+    });
   };
 
   return (
@@ -304,6 +353,62 @@ export default function Content_Edit({
       <hr className="mt-3" />
 
       <div className="mt-6 space-y-5 max-w-3xl">
+        {/* Branding Logo — เฉพาะ admin เท่านั้น */}
+        {actorRole === "admin" && <div className="grid grid-cols-12 items-start gap-4">
+          <label className="col-span-12 md:col-span-3 font-medium pt-2">
+            {t("form.brandingLogo.label", { defaultValue: "Brand logo" })}
+          </label>
+          <div className="col-span-12 md:col-span-9">
+            <input
+              ref={logoFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              aria-label={t("form.brandingLogo.upload", { defaultValue: "Upload logo" })}
+              onChange={(e) => handleLogoFile(e.target.files?.[0] ?? null)}
+            />
+            {logoPreviewUrl ? (
+              /* กรณีเลือกไฟล์ใหม่แล้ว - ใช้ blob URL สำหรับ preview */
+              <div className="flex items-center gap-3">
+                <img src={logoPreviewUrl} alt="logo preview" className="h-14 w-auto max-w-[140px] object-contain border border-gray-200 rounded" />
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => logoFileRef.current?.click()} className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm">
+                    {t("form.brandingLogo.change", { defaultValue: "Change logo" })}
+                  </button>
+                  <button type="button" onClick={() => { setLogoDataUrl(null); setLogoPreviewUrl(null); setRemoveLogo(false); if (logoFileRef.current) logoFileRef.current.value = ""; }} className="px-3 py-1.5 rounded-md border border-red-200 text-red-600 text-sm">
+                    {t("form.brandingLogo.remove", { defaultValue: "Remove logo" })}
+                  </button>
+                </div>
+              </div>
+            ) : existingLogoUrl && !removeLogo ? (
+              /* กรณีมี logo เดิมจาก server */
+              <div className="flex items-center gap-3">
+                <img
+                  src={buildBrandingLogoSrc(existingLogoUrl) ?? existingLogoUrl}
+                  alt="logo preview"
+                  className="h-14 w-auto max-w-[140px] object-contain border border-gray-200 rounded"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => logoFileRef.current?.click()} className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm">
+                    {t("form.brandingLogo.change", { defaultValue: "Change logo" })}
+                  </button>
+                  <button type="button" onClick={() => { setExistingLogoUrl(null); setRemoveLogo(true); if (logoFileRef.current) logoFileRef.current.value = ""; }} className="px-3 py-1.5 rounded-md border border-red-200 text-red-600 text-sm">
+                    {t("form.brandingLogo.remove", { defaultValue: "Remove logo" })}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* กรณียังไม่มี logo หรือลบแล้ว */
+              <button type="button" onClick={() => logoFileRef.current?.click()} className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm">
+                {t("form.brandingLogo.upload", { defaultValue: "Upload logo" })}
+              </button>
+            )}
+            <p className="text-[12px] text-gray-500 mt-1">{t("form.brandingLogo.hint", { defaultValue: "PNG, JPG or WEBP, max 2.5MB" })}</p>
+            {logoError && <p className="text-[12px] text-red-500 mt-1">{logoError}</p>}
+          </div>
+        </div>}
+
         <div className="grid grid-cols-12 items-center gap-4">
           <label className="col-span-12 md:col-span-3 font-medium">
             {texts.labels.firstName} <span className="text-red-500">*</span>

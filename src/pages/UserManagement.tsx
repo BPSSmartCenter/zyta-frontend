@@ -355,7 +355,7 @@ function UserManagementInner() {
           actorSiteIds={actorSiteIds}
           managerAssignWidget={managerAssignWidget}
           onCancel={() => setCreating(false)}
-          onCreate={async ({ password, siteIds, ...created }) => {
+          onCreate={async ({ password, siteIds, brandingLogoDataUrl, ...created }) => {
             try {
               const [firstName, ...rest] = (created.fullName || "").split(" ");
               const lastName = rest.join(" ");
@@ -373,6 +373,7 @@ function UserManagementInner() {
                     ? "officer"
                     : "user",
                 ...(Array.isArray(siteIds) ? { siteIds } : {}),
+                ...(brandingLogoDataUrl ? { brandingLogoDataUrl } : {}),
               });
               await refresh();
               setCreating(false);
@@ -424,6 +425,8 @@ function UserManagementInner() {
                 ...(Array.isArray((next as any).siteIds)
                   ? { siteIds: (next as any).siteIds as string[] }
                   : {}),
+                ...((next as any).brandingLogoDataUrl ? { brandingLogoDataUrl: (next as any).brandingLogoDataUrl } : {}),
+                ...((next as any).removeBrandingLogo ? { removeBrandingLogo: true } : {}),
               });
               await refresh();
               setEditing(null);

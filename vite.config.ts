@@ -17,6 +17,14 @@ export default defineConfig(() => {
           target: "http://localhost:3001",
           changeOrigin: true,
         },
+        "/site-branding": {
+          target: "http://localhost:3001",
+          changeOrigin: true,
+        },
+        "/user-branding": {
+          target: "http://localhost:3001",
+          changeOrigin: true,
+        },
       },
     },
   };

@@ -109,6 +109,10 @@ export default function Dashboard() {
   const [role, setRole] = React.useState<"admin" | "manager" | "officer" | "user" | null>(
     null
   );
+  const LOGO_CACHE_KEY = "bps_user_branding_logo";
+  const [userLogoSrc, setUserLogoSrc] = React.useState<string | undefined>(() => {
+    try { return localStorage.getItem(LOGO_CACHE_KEY) || undefined; } catch { return undefined; }
+  });
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
   React.useEffect(() => {
     (async () => {
@@ -117,6 +121,15 @@ export default function Dashboard() {
         const myRole =
           (String(me?.role || "user").toLowerCase() as any) ?? "user";
         setRole(myRole);
+        if (me?.brandingLogoUrl) {
+          const { buildBrandingLogoSrc } = await import("../utils/branding");
+          const resolved = buildBrandingLogoSrc(me.brandingLogoUrl) ?? undefined;
+          setUserLogoSrc(resolved);
+          try { if (resolved) localStorage.setItem(LOGO_CACHE_KEY, resolved); } catch {}
+        } else {
+          setUserLogoSrc(undefined);
+          try { localStorage.removeItem(LOGO_CACHE_KEY); } catch {}
+        }
         const meSites = Array.isArray((me as any)?.sites) ? (me as any).sites : [];
         if (meSites.length > 0) {
           setAccessibleSites(meSites as any);
@@ -346,6 +359,7 @@ export default function Dashboard() {
           enableGroupSiteSelection={true}
           date={globalDate as any}
           setDate={setGlobalDate as any}
+          logoSrc={userLogoSrc}
         />
 
         <Header

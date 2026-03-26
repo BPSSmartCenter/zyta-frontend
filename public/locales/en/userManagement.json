@@ -102,7 +102,16 @@
     "confirmError": "Passwords do not match.",
     "resetNote": "After confirmation, this user's password will change and they must log in again.",
     "groupsSelectedLabel": "{{count}} group sites selected",
-    "noGroupSites": "No grouped sites available"
+    "noGroupSites": "No grouped sites available",
+    "brandingLogo": {
+      "label": "Brand logo",
+      "upload": "Upload logo",
+      "change": "Change logo",
+      "remove": "Remove logo",
+      "hint": "PNG, JPG or WEBP, max 2.5MB",
+      "errorType": "File must be an image (PNG, JPG, WEBP)",
+      "errorSize": "File must not exceed 2.5MB"
+    }
   },
   "create": {
     "title": "Create admin",

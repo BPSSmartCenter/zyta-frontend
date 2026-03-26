@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { brandImage, sidebarIcon, userIcon } from "../assets/index";
+import { buildBrandingLogoSrc } from "../utils/branding";
 import SearchInput from "./SearchInput";
 import { useTranslation } from "react-i18next";
 import Modal from "./Modal";
@@ -48,11 +49,21 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     return navigate(abs(path));
   };
 
+  const LOGO_CACHE_KEY = "bps_user_branding_logo";
+
   const [account, setAccount] = useState<{
     name: string;
     email: string;
     role?: "admin" | "manager" | "officer" | "user";
   } | null>(null);
+  // initialize จาก cache ทันทีเพื่อไม่ให้ flash
+  const [sidebarLogoSrc, setSidebarLogoSrc] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LOGO_CACHE_KEY) || brandImage;
+    } catch {
+      return brandImage;
+    }
+  });
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -62,6 +73,17 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
         const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
         const fallback = u.email.split("@")[0];
         setAccount({ name: fullName || fallback, email: u.email, role: u.role as any });
+        if (u.brandingLogoUrl) {
+          const resolved = buildBrandingLogoSrc(u.brandingLogoUrl);
+          if (resolved) {
+            setSidebarLogoSrc(resolved);
+            try { localStorage.setItem(LOGO_CACHE_KEY, resolved); } catch {}
+          }
+        } else {
+          // user ไม่มี logo → clear cache → fallback
+          setSidebarLogoSrc(brandImage);
+          try { localStorage.removeItem(LOGO_CACHE_KEY); } catch {}
+        }
         return;
       } catch {
         const u = mockMe();
@@ -271,12 +293,13 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
           {/* Header */}
           <header className="p-4 flex flex-col items-center gap-x-2">
             <img
-              src={brandImage}
+              src={sidebarLogoSrc}
               alt={t("aria.brandAlt")}
               width={70}
               height={70}
               className="block select-none cursor-pointer"
               onClick={() => go("/dashboard")}
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = brandImage; }}
             />
 
             {/* Search filters menu in realtime */}

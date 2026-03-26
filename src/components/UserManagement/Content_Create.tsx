@@ -14,6 +14,7 @@ type Props = {
       password: string;
       avatarFile?: File | null;
       siteIds?: string[];
+      brandingLogoDataUrl?: string;
     }
   ) => void;
 };
@@ -123,6 +124,38 @@ export default function Content_Create({
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
+
+  // branding logo
+  const [logoDataUrl, setLogoDataUrl] = React.useState<string | null>(null);   // base64 → ส่ง backend
+  const [logoPreviewUrl, setLogoPreviewUrl] = React.useState<string | null>(null); // blob URL → แสดงผล
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const logoFileRef = React.useRef<HTMLInputElement>(null);
+  const MAX_LOGO_BYTES = 2.5 * 1024 * 1024;
+
+  React.useEffect(() => {
+    return () => { if (logoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(logoPreviewUrl); };
+  }, [logoPreviewUrl]);
+
+  const handleLogoFile = React.useCallback((file: File | null) => {
+    setLogoError(null);
+    if (!file) { setLogoDataUrl(null); setLogoPreviewUrl(null); return; }
+    if (!file.type.startsWith("image/")) {
+      setLogoError(t("form.brandingLogo.errorType", { defaultValue: "File must be an image (PNG, JPG, WEBP)" }));
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError(t("form.brandingLogo.errorSize", { defaultValue: "File must not exceed 2.5MB" }));
+      return;
+    }
+    // preview ด้วย blob URL
+    setLogoPreviewUrl(URL.createObjectURL(file));
+    // base64 สำหรับส่ง backend
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setLogoDataUrl(reader.result);
+    };
+    reader.readAsDataURL(file);
+  }, [t]);
 
   // fields
   const [first, setFirst] = React.useState("");
@@ -273,6 +306,7 @@ export default function Content_Create({
       password,
       avatarFile,
       siteIds: role === "Admin" ? undefined : selectedSiteIds,
+      brandingLogoDataUrl: logoDataUrl ?? undefined,
     });
   };
 
@@ -350,6 +384,42 @@ export default function Content_Create({
             </div>
           </div>
         </div>
+
+        {/* Branding Logo — เฉพาะ admin เท่านั้น */}
+        {actorRole === "admin" && <div className="grid grid-cols-12 items-start gap-4">
+          <label className="col-span-12 md:col-span-3 font-medium pt-2">
+            {t("form.brandingLogo.label", { defaultValue: "Brand logo" })}
+          </label>
+          <div className="col-span-12 md:col-span-9">
+            <input
+              ref={logoFileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              aria-label={t("form.brandingLogo.upload", { defaultValue: "Upload logo" })}
+              onChange={(e) => handleLogoFile(e.target.files?.[0] ?? null)}
+            />
+            {logoPreviewUrl ? (
+              <div className="flex items-center gap-3">
+                <img src={logoPreviewUrl} alt="logo preview" className="h-14 w-auto max-w-[140px] object-contain border border-gray-200 rounded" />
+                <div className="flex flex-col gap-1">
+                  <button type="button" onClick={() => logoFileRef.current?.click()} className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm">
+                    {t("form.brandingLogo.change", { defaultValue: "Change logo" })}
+                  </button>
+                  <button type="button" onClick={() => { setLogoDataUrl(null); setLogoPreviewUrl(null); if (logoFileRef.current) logoFileRef.current.value = ""; }} className="px-3 py-1.5 rounded-md border border-red-200 text-red-600 text-sm">
+                    {t("form.brandingLogo.remove", { defaultValue: "Remove logo" })}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => logoFileRef.current?.click()} className="px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 text-sm">
+                {t("form.brandingLogo.upload", { defaultValue: "Upload logo" })}
+              </button>
+            )}
+            <p className="text-[12px] text-gray-500 mt-1">{t("form.brandingLogo.hint", { defaultValue: "PNG, JPG or WEBP, max 2.5MB" })}</p>
+            {logoError && <p className="text-[12px] text-red-500 mt-1">{logoError}</p>}
+          </div>
+        </div>}
 
         {/* First name */}
         <div className="grid grid-cols-12 items-center gap-4">
