@@ -503,8 +503,7 @@ const GenerateBillForm: React.FC = () => {
       setLoadingOptions(false);
       setMeterOptions([]);
       setSiteInfo(null);
-      setCustomLogoDataUrl(null);
-      setCustomLogoError(null);
+      setLogoError(null);
       setFormState((prev) => ({ ...prev, meterId: "" }));
       setMeterDashboard(null);
       setMeterDashboardError(null);
@@ -698,8 +697,7 @@ const GenerateBillForm: React.FC = () => {
           setLoadError(loadMetersErrorText);
           setMeterOptions([]);
           setSiteInfo(null);
-          setCustomLogoDataUrl(null);
-          setCustomLogoError(null);
+          setLogoError(null);
           setFormState((prev) => ({ ...prev, meterId: "" }));
         }
       } finally {
