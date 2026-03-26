@@ -23,7 +23,7 @@ import { getBillingReadingsData, getSiteBillingReadingsData } from "../api/billi
 import Dropdown from "../components/Dropdown";
 import DatePicker, { type DateValue } from "../components/DateInput";
 import { buildBrandingLogoSrc } from "../utils/branding";
-import { brandImage } from "../assets";
+import { brandImage, meaLogo, peaLogo } from "../assets";
 
 type ManualFormState = {
   meterId: string;
@@ -40,6 +40,61 @@ type ManualFormState = {
 };
 
 type BillingMode = "monthly" | "daily";
+
+type LogoSlotConfig = {
+  visible: boolean;
+  customDataUrl: string | null;
+};
+
+type ReportCustomization = {
+  leftLogo: LogoSlotConfig;
+  rightLogo: LogoSlotConfig;
+  logosSwapped: boolean;
+  lineColor: string;
+};
+
+const DEFAULT_REPORT_CUSTOMIZATION: ReportCustomization = {
+  leftLogo: { visible: true, customDataUrl: null },
+  rightLogo: { visible: true, customDataUrl: null },
+  logosSwapped: false,
+  lineColor: "#d40000",
+};
+
+function loadReportCustomization(siteCode: string): ReportCustomization {
+  try {
+    const raw = localStorage.getItem(`bps-report-custom-${siteCode}`);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULT_REPORT_CUSTOMIZATION));
+    const parsed = JSON.parse(raw) as Partial<ReportCustomization>;
+    return {
+      leftLogo: {
+        visible: parsed.leftLogo?.visible ?? true,
+        customDataUrl: parsed.leftLogo?.customDataUrl ?? null,
+      },
+      rightLogo: {
+        visible: parsed.rightLogo?.visible ?? true,
+        customDataUrl: parsed.rightLogo?.customDataUrl ?? null,
+      },
+      logosSwapped: parsed.logosSwapped ?? false,
+      lineColor: parsed.lineColor ?? "#d40000",
+    };
+  } catch {
+    return JSON.parse(JSON.stringify(DEFAULT_REPORT_CUSTOMIZATION));
+  }
+}
+
+function saveReportCustomization(siteCode: string, custom: ReportCustomization) {
+  try {
+    // ไม่บันทึก customDataUrl ที่เป็น data URL ขนาดใหญ่ลง localStorage
+    const toSave: ReportCustomization = {
+      ...custom,
+      leftLogo: { visible: custom.leftLogo.visible, customDataUrl: null },
+      rightLogo: { visible: custom.rightLogo.visible, customDataUrl: null },
+    };
+    localStorage.setItem(`bps-report-custom-${siteCode}`, JSON.stringify(toSave));
+  } catch {
+    // ignore
+  }
+}
 
 type SummaryTotals = {
   onPeak: number;
@@ -286,9 +341,12 @@ const GenerateBillForm: React.FC = () => {
     address?: string;
     brandingLogoUrl?: string | null;
   } | null>(null);
-  const customLogoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [customLogoDataUrl, setCustomLogoDataUrl] = React.useState<string | null>(null);
-  const [customLogoError, setCustomLogoError] = React.useState<string | null>(null);
+  const leftLogoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const rightLogoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const [reportCustomization, setReportCustomization] = React.useState<ReportCustomization>(
+    () => JSON.parse(JSON.stringify(DEFAULT_REPORT_CUSTOMIZATION))
+  );
   const [loadingOptions, setLoadingOptions] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [meterDashboard, setMeterDashboard] =
@@ -371,8 +429,12 @@ const GenerateBillForm: React.FC = () => {
     normalizedSite !== "all" &&
     guardForSite?.allowElectricBilling === false;
   React.useEffect(() => {
-    setCustomLogoDataUrl(null);
-    setCustomLogoError(null);
+    setLogoError(null);
+    if (normalizedSite && normalizedSite !== "all") {
+      setReportCustomization(loadReportCustomization(normalizedSite));
+    } else {
+      setReportCustomization(JSON.parse(JSON.stringify(DEFAULT_REPORT_CUSTOMIZATION)));
+    }
   }, [normalizedSite]);
   const inventoryEnabled = !requiresSiteSelection && !permissionBlocked;
   useDeviceInventoryLoader({
@@ -850,48 +912,117 @@ const GenerateBillForm: React.FC = () => {
       : generateText.siteGuard.select;
 
   const siteBrandingLogo = siteInfo?.brandingLogoUrl ?? null;
-  const brandingPreviewSrc = React.useMemo(
-    () => customLogoDataUrl ?? siteBrandingLogo ?? brandImage,
-    [customLogoDataUrl, siteBrandingLogo]
+
+  // utility logo ของ site นี้ (PEA / MEA)
+  const currentSiteOption = React.useMemo(
+    () => siteOptions.find((o) => o.value === normalizedSite) ?? null,
+    [siteOptions, normalizedSite]
   );
-  const showBrandingPreview = Boolean(siteInfo || customLogoDataUrl);
+  const utilityLabel = currentSiteOption?.utilityLabel ?? "";
+  const utilityLogo = React.useMemo(() => {
+    const upper = utilityLabel.toUpperCase();
+    if (upper.includes("PEA")) return peaLogo;
+    return meaLogo;
+  }, [utilityLabel]);
 
-  const handleCustomLogoFile = React.useCallback((file: File | null) => {
-    if (!file) {
-      setCustomLogoDataUrl(null);
-      setCustomLogoError(null);
-      if (customLogoInputRef.current) {
-        customLogoInputRef.current.value = "";
+  // site logo ที่ใช้จริง (custom หรือจาก branding)
+  const siteLogo = siteBrandingLogo ? buildBrandingLogoSrc(siteBrandingLogo) ?? brandImage : brandImage;
+
+  // preview สำหรับแต่ละ slot — คำนึง swap และ custom override
+  const leftSlotDefaultSrc = reportCustomization.logosSwapped ? utilityLogo : siteLogo;
+  const rightSlotDefaultSrc = reportCustomization.logosSwapped ? siteLogo : utilityLogo;
+  const leftLogoPreviewSrc = reportCustomization.leftLogo.customDataUrl ?? leftSlotDefaultSrc;
+  const rightLogoPreviewSrc = reportCustomization.rightLogo.customDataUrl ?? rightSlotDefaultSrc;
+
+  const showCustomizationPanel = Boolean(siteInfo || reportCustomization.leftLogo.customDataUrl);
+
+  const updateReportCustomization = React.useCallback(
+    (updater: (prev: ReportCustomization) => ReportCustomization) => {
+      setReportCustomization((prev) => {
+        const next = updater(prev);
+        if (normalizedSite && normalizedSite !== "all") {
+          saveReportCustomization(normalizedSite, next);
+        }
+        return next;
+      });
+    },
+    [normalizedSite]
+  );
+
+  const handleLogoFile = React.useCallback(
+    (slot: "left" | "right", file: File | null, inputRef: React.RefObject<HTMLInputElement | null>) => {
+      if (!file) {
+        updateReportCustomization((prev) => ({
+          ...prev,
+          [slot === "left" ? "leftLogo" : "rightLogo"]: {
+            ...prev[slot === "left" ? "leftLogo" : "rightLogo"],
+            customDataUrl: null,
+          },
+        }));
+        setLogoError(null);
+        if (inputRef.current) inputRef.current.value = "";
+        return;
       }
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      setCustomLogoError(generateText.branding.errors.invalidType);
-      return;
-    }
-    if (file.size > 2.5 * 1024 * 1024) {
-      setCustomLogoError(generateText.branding.errors.fileTooLarge);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : null;
-      setCustomLogoDataUrl(result);
-      setCustomLogoError(null);
-    };
-    reader.onerror = () => {
-      setCustomLogoError(generateText.branding.errors.readFail);
-    };
-    reader.readAsDataURL(file);
-  }, [generateText.branding.errors.invalidType, generateText.branding.errors.fileTooLarge, generateText.branding.errors.readFail]);
+      if (!file.type.startsWith("image/")) {
+        setLogoError(generateText.branding.errors.invalidType);
+        return;
+      }
+      if (file.size > 2.5 * 1024 * 1024) {
+        setLogoError(generateText.branding.errors.fileTooLarge);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === "string" ? reader.result : null;
+        updateReportCustomization((prev) => ({
+          ...prev,
+          [slot === "left" ? "leftLogo" : "rightLogo"]: {
+            ...prev[slot === "left" ? "leftLogo" : "rightLogo"],
+            customDataUrl: result,
+          },
+        }));
+        setLogoError(null);
+      };
+      reader.onerror = () => {
+        setLogoError(generateText.branding.errors.readFail);
+      };
+      reader.readAsDataURL(file);
+    },
+    [updateReportCustomization, generateText.branding.errors]
+  );
 
-  const handleRemoveCustomLogo = React.useCallback(() => {
-    setCustomLogoDataUrl(null);
-    setCustomLogoError(null);
-    if (customLogoInputRef.current) {
-      customLogoInputRef.current.value = "";
-    }
-  }, []);
+  const handleClearLogoCustom = React.useCallback(
+    (slot: "left" | "right") => {
+      const ref = slot === "left" ? leftLogoInputRef : rightLogoInputRef;
+      updateReportCustomization((prev) => ({
+        ...prev,
+        [slot === "left" ? "leftLogo" : "rightLogo"]: {
+          ...prev[slot === "left" ? "leftLogo" : "rightLogo"],
+          customDataUrl: null,
+        },
+      }));
+      setLogoError(null);
+      if (ref.current) ref.current.value = "";
+    },
+    [updateReportCustomization]
+  );
+
+  const handleToggleLogoVisible = React.useCallback(
+    (slot: "left" | "right") => {
+      updateReportCustomization((prev) => ({
+        ...prev,
+        [slot === "left" ? "leftLogo" : "rightLogo"]: {
+          ...prev[slot === "left" ? "leftLogo" : "rightLogo"],
+          visible: !prev[slot === "left" ? "leftLogo" : "rightLogo"].visible,
+        },
+      }));
+    },
+    [updateReportCustomization]
+  );
+
+  const handleSwapLogos = React.useCallback(() => {
+    updateReportCustomization((prev) => ({ ...prev, logosSwapped: !prev.logosSwapped }));
+  }, [updateReportCustomization]);
 
   // const handleInputChange = React.useCallback(
   //   (field: keyof ManualFormState) =>
@@ -916,14 +1047,14 @@ const GenerateBillForm: React.FC = () => {
       const selectedMeter = meterOptions.find(
         (m) => m.value === formState.meterId
       );
+      const leftCustomDataUrl = reportCustomization.leftLogo.customDataUrl;
       const previewSite = siteInfo
         ? {
             ...siteInfo,
-            brandingLogoUrl:
-              customLogoDataUrl ?? siteInfo.brandingLogoUrl ?? null,
+            brandingLogoUrl: leftCustomDataUrl ?? siteInfo.brandingLogoUrl ?? null,
           }
-        : customLogoDataUrl
-        ? { brandingLogoUrl: customLogoDataUrl }
+        : leftCustomDataUrl
+        ? { brandingLogoUrl: leftCustomDataUrl }
         : undefined;
       setSubmitting(true);
       try {
@@ -932,7 +1063,6 @@ const GenerateBillForm: React.FC = () => {
           ...formState,
           billingMode: mode,
           dailyDate: mode === "daily" ? toDateOnly(dailyDate) : undefined,
-          customLogoDataUrl: customLogoDataUrl ?? undefined,
         };
         const params = new URLSearchParams();
         params.set("mode", mode);
@@ -961,7 +1091,7 @@ const GenerateBillForm: React.FC = () => {
                 form: formPayload,
                 dashboard: meterDashboard ?? undefined,
                 siteCode: normalizedSite,
-                customLogoDataUrl: customLogoDataUrl ?? undefined,
+                reportCustomization,
               },
             },
           }
@@ -983,7 +1113,7 @@ const GenerateBillForm: React.FC = () => {
       dailyDate,
       siteInfo,
       meterDashboard,
-      customLogoDataUrl,
+      reportCustomization,
       selectMeterRequiredText,
       selectSiteRequiredText,
     ]
@@ -1034,59 +1164,200 @@ const GenerateBillForm: React.FC = () => {
             <h1 className="text-center text-2xl font-semibold text-slate-900">
               {generateText.title}
             </h1>
-            {showBrandingPreview && (
+            {showCustomizationPanel && (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-700">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className="flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3">
-                    <img
-                      src={brandingPreviewSrc}
-                      alt={generateText.branding.previewAlt}
-                      className="h-20 w-32 object-contain"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-900">
-                      {siteInfo?.name ?? generateText.branding.siteFallback}
+                <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  ปรับแต่ง Report
+                </p>
+
+                {/* ── สองช่องโลโก้ + ปุ่มสลับ ── */}
+                <div className="flex items-start gap-3">
+                  {/* โลโก้ซ้าย */}
+                  <div className="flex flex-1 flex-col gap-2">
+                    <p className="text-xs font-semibold text-slate-500">
+                      โลโก้ซ้าย {reportCustomization.logosSwapped ? "(Utility)" : "(Site)"}
                     </p>
-                    <p className="mt-1">
-                      {generateText.branding.addressLabel}{" "}
-                      {siteInfo?.address ?? generateText.branding.addressUnknown}
+                    <div
+                      className={`flex items-center justify-center rounded-2xl border border-dashed p-3 transition ${
+                        reportCustomization.leftLogo.visible
+                          ? "border-slate-200 bg-slate-50"
+                          : "border-slate-100 bg-slate-50/50 opacity-40"
+                      }`}
+                    >
+                      <img
+                        src={leftLogoPreviewSrc}
+                        alt="โลโก้ซ้าย"
+                        className="h-16 w-28 object-contain"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center">
+                      {reportCustomization.logosSwapped ? "Utility (PEA/MEA)" : "Site Logo"}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
-                        onClick={() => customLogoInputRef.current?.click()}
-                        className="rounded-xl bg-cyan px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 cursor-pointer"
+                        onClick={() => leftLogoInputRef.current?.click()}
+                        className="rounded-lg bg-cyan px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-cyan-500 cursor-pointer"
                       >
-                        {customLogoDataUrl
+                        {reportCustomization.leftLogo.customDataUrl
                           ? generateText.branding.change
                           : generateText.branding.upload}
                       </button>
-                      {customLogoDataUrl && (
+                      {reportCustomization.leftLogo.customDataUrl && (
                         <button
                           type="button"
-                          onClick={handleRemoveCustomLogo}
-                          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 cursor-pointer"
+                          onClick={() => handleClearLogoCustom("left")}
+                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 cursor-pointer"
                         >
                           {generateText.branding.clear}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLogoVisible("left")}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                          reportCustomization.leftLogo.visible
+                            ? "border-slate-200 text-slate-500 hover:bg-slate-50"
+                            : "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                        }`}
+                      >
+                        {reportCustomization.leftLogo.visible ? "ซ่อน" : "แสดง"}
+                      </button>
                     </div>
-                    {customLogoError && (
-                      <p className="mt-1 text-xs text-red-500">
-                        {customLogoError}
-                      </p>
+                  </div>
+
+                  {/* ปุ่มสลับ */}
+                  <div className="flex flex-col items-center justify-center gap-1 pt-7">
+                    <button
+                      type="button"
+                      onClick={handleSwapLogos}
+                      title="สลับตำแหน่งโลโก้"
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-500 transition hover:bg-slate-100 cursor-pointer"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M7 16V4m0 0L3 8m4-4l4 4" />
+                        <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+                      </svg>
+                    </button>
+                    {reportCustomization.logosSwapped && (
+                      <span className="text-[10px] font-semibold text-cyan-500">สลับแล้ว</span>
                     )}
                   </div>
+
+                  {/* โลโก้ขวา */}
+                  <div className="flex flex-1 flex-col gap-2">
+                    <p className="text-xs font-semibold text-slate-500">
+                      โลโก้ขวา {reportCustomization.logosSwapped ? "(Site)" : "(Utility)"}
+                    </p>
+                    <div
+                      className={`flex items-center justify-center rounded-2xl border border-dashed p-3 transition ${
+                        reportCustomization.rightLogo.visible
+                          ? "border-slate-200 bg-slate-50"
+                          : "border-slate-100 bg-slate-50/50 opacity-40"
+                      }`}
+                    >
+                      <img
+                        src={rightLogoPreviewSrc}
+                        alt="โลโก้ขวา"
+                        className="h-16 w-28 object-contain"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center">
+                      {reportCustomization.logosSwapped ? "Site Logo" : "Utility"}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => rightLogoInputRef.current?.click()}
+                        className="rounded-lg bg-cyan px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-cyan-500 cursor-pointer"
+                      >
+                        {reportCustomization.rightLogo.customDataUrl
+                          ? generateText.branding.change
+                          : generateText.branding.upload}
+                      </button>
+                      {reportCustomization.rightLogo.customDataUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleClearLogoCustom("right")}
+                          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 cursor-pointer"
+                        >
+                          {generateText.branding.clear}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLogoVisible("right")}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+                          reportCustomization.rightLogo.visible
+                            ? "border-slate-200 text-slate-500 hover:bg-slate-50"
+                            : "border-amber-300 bg-amber-50 text-amber-600 hover:bg-amber-100"
+                        }`}
+                      >
+                        {reportCustomization.rightLogo.visible ? "ซ่อน" : "แสดง"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* ข้อมูล site */}
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <p className="font-semibold text-slate-900">
+                    {siteInfo?.name ?? generateText.branding.siteFallback}
+                  </p>
+                  <p className="mt-0.5 text-slate-500">
+                    {generateText.branding.addressLabel}{" "}
+                    {siteInfo?.address ?? generateText.branding.addressUnknown}
+                  </p>
+                </div>
+
+                {logoError && (
+                  <p className="mt-2 text-xs text-red-500">{logoError}</p>
+                )}
+
+                {/* เลือกสีเส้น */}
+                <div className="mt-4 border-t border-slate-100 pt-4">
+                  <p className="mb-2 text-xs font-semibold text-slate-500">สีเส้นแบ่ง</p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-4 flex-1 rounded-full"
+                      style={{ backgroundColor: reportCustomization.lineColor }}
+                    />
+                    <input
+                      type="color"
+                      value={reportCustomization.lineColor}
+                      onChange={(e) =>
+                        updateReportCustomization((prev) => ({ ...prev, lineColor: e.target.value }))
+                      }
+                      className="h-9 w-12 cursor-pointer rounded-lg border border-slate-200 bg-white p-0.5"
+                      title="เลือกสีเส้น"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateReportCustomization((prev) => ({ ...prev, lineColor: "#d40000" }))
+                      }
+                      className="shrink-0 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 cursor-pointer"
+                    >
+                      รีเซ็ต
+                    </button>
+                  </div>
+                </div>
+
                 <input
-                  ref={customLogoInputRef}
+                  ref={leftLogoInputRef}
                   type="file"
+                  title="อัปโหลดโลโก้ซ้าย"
                   accept="image/png,image/jpeg,image/webp,image/svg+xml"
                   className="hidden"
-                  onChange={(event) =>
-                    handleCustomLogoFile(event.target.files?.[0] ?? null)
-                  }
+                  onChange={(e) => handleLogoFile("left", e.target.files?.[0] ?? null, leftLogoInputRef)}
+                />
+                <input
+                  ref={rightLogoInputRef}
+                  type="file"
+                  title="อัปโหลดโลโก้ขวา"
+                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={(e) => handleLogoFile("right", e.target.files?.[0] ?? null, rightLogoInputRef)}
                 />
               </div>
             )}

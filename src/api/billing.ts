@@ -159,6 +159,12 @@ export type PreviewBillExcelPayload = {
   brandingLogoDataUrl?: string | null;
   customLogoDataUrl?: string | null;
   utilityCode?: string | null;
+  // report customization
+  leftLogoDataUrl?: string | null;
+  rightLogoDataUrl?: string | null;
+  leftLogoVisible?: boolean;
+  rightLogoVisible?: boolean;
+  lineColor?: string | null;
 };
 
 export async function downloadPreviewBillExcel(
@@ -179,6 +185,12 @@ type BillExcelPayload = {
   billingMonth?: number | string;
   billingYear?: number | string;
   utilityCode?: string | null;
+  // report customization
+  leftLogoDataUrl?: string | null;
+  rightLogoDataUrl?: string | null;
+  leftLogoVisible?: boolean;
+  rightLogoVisible?: boolean;
+  lineColor?: string | null;
 };
 
 export async function generateBillExcel(billId: string, payload?: BillExcelPayload) {

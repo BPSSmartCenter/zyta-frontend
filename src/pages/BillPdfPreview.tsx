@@ -58,6 +58,18 @@ type PreviewFormState = {
 
 type BillFormLike = PreviewFormState | Record<string, any> | null | undefined;
 
+type LogoSlotConfig = {
+  visible: boolean;
+  customDataUrl: string | null;
+};
+
+type ReportCustomization = {
+  leftLogo: LogoSlotConfig;
+  rightLogo: LogoSlotConfig;
+  logosSwapped: boolean;
+  lineColor: string;
+};
+
 type BillPreviewPayload = {
   site?: { name?: string; address?: string; brandingLogoUrl?: string | null };
   siteCode?: string;
@@ -65,6 +77,7 @@ type BillPreviewPayload = {
   form?: PreviewFormState;
   dashboard?: MeterDashboard;
   customLogoDataUrl?: string | null;
+  reportCustomization?: ReportCustomization;
 };
 
 type TableDataRow = {
@@ -242,9 +255,26 @@ const BillPdfPreview: React.FC = () => {
     previewCustomLogo ?? preferredData?.site?.brandingLogoUrl ?? null;
   const normalizedLogo = buildBrandingLogoSrc(rawLogo);
   const siteLogoUrl = normalizedLogo ?? null;
-  const leftLogoSrc =
+  const siteBrandLogoSrc =
     (normalizedLogo && normalizedLogo.length > 0 ? normalizedLogo : null) ??
     brandImage;
+
+  const reportCustomization: ReportCustomization = React.useMemo(() => {
+    const custom = preview?.reportCustomization;
+    return {
+      leftLogo: {
+        visible: custom?.leftLogo?.visible ?? true,
+        customDataUrl: custom?.leftLogo?.customDataUrl ?? null,
+      },
+      rightLogo: {
+        visible: custom?.rightLogo?.visible ?? true,
+        customDataUrl: custom?.rightLogo?.customDataUrl ?? null,
+      },
+      logosSwapped: custom?.logosSwapped ?? false,
+      lineColor: custom?.lineColor ?? "#d40000",
+    };
+  }, [preview?.reportCustomization]);
+
   const previewMeterDescription = getPreviewMeterDescription(
     preferredData?.meter
   );
@@ -814,6 +844,68 @@ const BillPdfPreview: React.FC = () => {
   const handleDownloadExcel = React.useCallback(async () => {
     setDownloadingExcel(true);
     try {
+      // ── helper: URL / path → data URL ──────────────────────────────
+      const toDataUrl = async (src: string): Promise<string | null> => {
+        if (/^data:/i.test(src)) return src;
+        try {
+          const resp = await fetch(src);
+          if (!resp.ok) return null;
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          return await new Promise<string | null>((resolve) => {
+            reader.onload = () =>
+              resolve(typeof reader.result === "string" ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      // ── resolve logo ทั้งสอง slot ───────────────────────────────────
+      const isSwapped = reportCustomization.logosSwapped;
+      const rawSiteLogo = preferredData?.site?.brandingLogoUrl
+        ? buildBrandingLogoSrc(preferredData.site.brandingLogoUrl) ?? preferredData.site.brandingLogoUrl
+        : null;
+      const siteLogoDataUrl = rawSiteLogo
+        ? await toDataUrl(rawSiteLogo)
+        : await toDataUrl(brandImage);
+      const utilityLogoDataUrl = await toDataUrl(utilityLogo);
+
+      const leftDefaultSrc = isSwapped ? utilityLogoDataUrl : siteLogoDataUrl;
+      const rightDefaultSrc = isSwapped ? siteLogoDataUrl : utilityLogoDataUrl;
+
+      const resolvedLeftLogo = reportCustomization.leftLogo.visible
+        ? (reportCustomization.leftLogo.customDataUrl ?? leftDefaultSrc)
+        : null;
+      const resolvedRightLogo = reportCustomization.rightLogo.visible
+        ? (reportCustomization.rightLogo.customDataUrl ?? rightDefaultSrc)
+        : null;
+
+      // utilityCode ส่งไปก็ต่อเมื่อ right slot แสดง utility logo จริงๆ
+      // (ไม่ swap, ไม่ซ่อน, ไม่มี custom override) — ป้องกัน backend วาด utility ทับ
+      const effectiveUtilityCode =
+        reportCustomization.rightLogo.visible &&
+        !isSwapped &&
+        !reportCustomization.rightLogo.customDataUrl
+          ? (utilityCode ?? null)
+          : null;
+
+      const logoCustomFields = {
+        // new fields (รองรับ backend ที่ implement แล้ว)
+        leftLogoDataUrl: resolvedLeftLogo,
+        rightLogoDataUrl: resolvedRightLogo,
+        leftLogoVisible: reportCustomization.leftLogo.visible,
+        rightLogoVisible: reportCustomization.rightLogo.visible,
+        lineColor: reportCustomization.lineColor,
+        // backward-compat: left logo via old field name
+        brandingLogoDataUrl: resolvedLeftLogo,
+        customLogoDataUrl: reportCustomization.leftLogo.customDataUrl ?? null,
+        utilityCode: effectiveUtilityCode,
+      };
+
+      // ── Path 1: preview (ยังไม่บันทึก bill) ───────────────────────
       if (!currentBillId) {
         if (!siteCodeForCreate || siteCodeForCreate === "all") {
           throw new Error("missing site for preview export");
@@ -825,32 +917,6 @@ const BillPdfPreview: React.FC = () => {
           reportMode === "monthly"
             ? monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues)
             : null;
-        const toDataUrl = async (src: string): Promise<string | null> => {
-          try {
-            const resp = await fetch(src);
-            if (!resp.ok) return null;
-            const blob = await resp.blob();
-            const reader = new FileReader();
-            return await new Promise<string | null>((resolve) => {
-              reader.onload = () =>
-                resolve(typeof reader.result === "string" ? reader.result : null);
-              reader.onerror = () => resolve(null);
-              reader.readAsDataURL(blob);
-            });
-          } catch {
-            return null;
-          }
-        };
-
-        let logoForExcel =
-          preview?.customLogoDataUrl ?? preferredData?.site?.brandingLogoUrl ?? null;
-        if (logoForExcel && !/^data:/i.test(logoForExcel)) {
-          const normalized = buildBrandingLogoSrc(logoForExcel) ?? logoForExcel;
-          logoForExcel = await toDataUrl(normalized);
-        }
-        if (!logoForExcel) {
-          logoForExcel = await toDataUrl(brandImage);
-        }
 
         const previewPayload = {
           meterId: preferredDeviceId,
@@ -864,32 +930,34 @@ const BillPdfPreview: React.FC = () => {
           billingFtRate: formValues.billingFtRate,
           billingCo2Factor: formValues.billingCo2Factor,
           billingTreeFactor: formValues.billingTreeFactor,
-          brandingLogoDataUrl: logoForExcel,
-          customLogoDataUrl: preview?.customLogoDataUrl ?? null,
-          utilityCode: utilityCode ?? null,
+          ...logoCustomFields,
         };
-        const blob = await downloadPreviewBillExcel(
-          siteCodeForCreate,
-          previewPayload
-        );
+        const blob = await downloadPreviewBillExcel(siteCodeForCreate, previewPayload);
         saveBlobAsFile(blob, `${reportFileBase}.xlsx`);
         return;
       }
+
+      // ── Path 2: saved bill ────────────────────────────────────────
+      // logoCustomFields มี utilityCode ที่ปรับแล้ว → ไม่ต้องใส่ซ้ำ
       let excelPayload: Parameters<typeof generateBillExcelApi>[1] | undefined;
       if (reportMode === "daily" && resolvedDailyDate) {
-        excelPayload = { mode: "daily", dailyDate: resolvedDailyDate, utilityCode: utilityCode ?? null };
+        excelPayload = {
+          mode: "daily",
+          dailyDate: resolvedDailyDate,
+          ...logoCustomFields,
+        };
       } else if (reportMode === "monthly") {
-        const period =
-          monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
+        const period = monthlyPeriod ?? getPeriodMonthYear(billDetail, formValues);
         if (period) {
           excelPayload = {
             mode: "monthly",
             billingMonth: period.month,
             billingYear: period.year,
-            utilityCode: utilityCode ?? null,
+            ...logoCustomFields,
           };
         }
       }
+      // เสมอ regenerate เมื่อ customization เปลี่ยน
       const payloadKey = JSON.stringify(excelPayload ?? {});
       const needsGenerate =
         !hasStoredExcel || lastExcelContextRef.current !== payloadKey;
@@ -911,7 +979,8 @@ const BillPdfPreview: React.FC = () => {
     siteCodeForCreate,
     preferredDeviceId,
     preferredData?.site?.brandingLogoUrl,
-    preview?.customLogoDataUrl,
+    reportCustomization,
+    utilityLogo,
     hasStoredExcel,
     reportMode,
     resolvedDailyDate,
@@ -1086,12 +1155,21 @@ const BillPdfPreview: React.FC = () => {
                 className="space-y-6 px-6 md:px-10"
               >
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-around">
-                    <img
-                      src={leftLogoSrc}
-                      alt={siteLogoUrl ? "Site logo" : "Brand"}
-                      className="h-34 w-40 object-contain"
-                    />
+                  <div className="grid grid-cols-3 items-center">
+                    {/* ช่องซ้าย */}
+                    <div className="flex justify-start">
+                      {reportCustomization.leftLogo.visible && (() => {
+                        const isSwapped = reportCustomization.logosSwapped;
+                        const src = reportCustomization.leftLogo.customDataUrl
+                          ?? (isSwapped ? utilityLogo : siteBrandLogoSrc);
+                        const alt = isSwapped ? (utilityCode ?? "Utility") : (siteLogoUrl ? "Site logo" : "Brand");
+                        return (
+                          <img src={src} alt={alt} className="h-34 w-40 object-contain" />
+                        );
+                      })()}
+                    </div>
+
+                    {/* ช่องกลาง — หัวข้อ Report อยู่ตรงกลางเสมอ */}
                     <div className="text-center text-slate-900">
                       <p className="text-xl font-semibold">{siteName}</p>
                       <p className="text-lg">
@@ -1102,13 +1180,24 @@ const BillPdfPreview: React.FC = () => {
                       <p className="text-sm">{reportDate}</p>
                       <p className="text-sm">{meterName}</p>
                     </div>
-                    <img
-                      src={utilityLogo}
-                      alt={utilityCode ?? "MEA"}
-                      className="h-34 w-40 object-contain"
-                    />
+
+                    {/* ช่องขวา */}
+                    <div className="flex justify-end">
+                      {reportCustomization.rightLogo.visible && (() => {
+                        const isSwapped = reportCustomization.logosSwapped;
+                        const src = reportCustomization.rightLogo.customDataUrl
+                          ?? (isSwapped ? siteBrandLogoSrc : utilityLogo);
+                        const alt = isSwapped ? (siteLogoUrl ? "Site logo" : "Brand") : (utilityCode ?? "Utility");
+                        return (
+                          <img src={src} alt={alt} className="h-34 w-40 object-contain" />
+                        );
+                      })()}
+                    </div>
                   </div>
-                  <div className="h-[2px] w-full bg-[#d40000]" />
+                  <div
+                    className="h-[2px] w-full"
+                    style={{ backgroundColor: reportCustomization.lineColor }}
+                  />
                 </div>
                 <div className="grid gap-40 px-1 text-sm text-black md:grid-cols-2">
                   <div className="space-y-1">
