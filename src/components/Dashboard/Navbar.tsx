@@ -108,11 +108,11 @@ export default function Navbar({
   return (
     <div className="bg-[#FFFFFF] w-full rounded-lg border-b border-none">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-3">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-2 h-[64px] sm:h-[80px] md:h-[100px] lg:h-[120px]">
         {/* Brand */}
         <div className="flex items-center gap-4 sm:gap-6 md:gap-3">
           <img
-            className="w-[110px] sm:w-[125px] md:w-[146px]"
+            className="h-[48px] sm:h-[60px] md:h-[76px] lg:h-[240px] w-auto object-contain"
             src={logoSrc ?? brandImage}
             alt=""
             onError={(e) => { (e.currentTarget as HTMLImageElement).src = brandImage; }}

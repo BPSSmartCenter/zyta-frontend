@@ -295,8 +295,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
             <img
               src={sidebarLogoSrc}
               alt={t("aria.brandAlt")}
-              width={70}
-              height={70}
+              width={110}
+              height={110}
               className="block select-none cursor-pointer"
               onClick={() => go("/dashboard")}
               onError={(e) => { (e.currentTarget as HTMLImageElement).src = brandImage; }}
