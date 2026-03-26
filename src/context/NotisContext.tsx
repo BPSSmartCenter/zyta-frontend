@@ -45,21 +45,38 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>();
 
+  // Build set of allowed site codes from siteOptions (excludes "all" sentinel)
+  // ใช้เป็น defensive client-side guard เมื่อ selectedSite === "all"
+  const allowedSiteCodes = React.useMemo<Set<string>>(() => {
+    const codes = new Set<string>();
+    for (const opt of siteOptions) {
+      const code = String(opt.value || "").trim();
+      if (!code || code.toLowerCase() === "all") continue;
+      codes.add(code);
+    }
+    return codes;
+  }, [siteOptions]);
+
   // Build set of site codes that match the current utility/group scope
   const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {
     const isAll = !selectedSite || selectedSite === "all";
     if (!isAll) return null; // single site — no client filter needed
-    if (!selectedUtility?.id && !selectedGroupSite?.id) return null; // truly all
+
+    // เมื่อ "all": เสมอกรองด้วย allowedSiteCodes เพื่อป้องกัน data leak
+    // จากนั้น narrow ลงอีกถ้ามี utility/group filter
+    const hasGroupFilter = !!(selectedUtility?.id || selectedGroupSite?.id);
 
     const codes = new Set<string>();
     for (const opt of siteOptions) {
       const code = String(opt.value || "").trim();
       if (!code || code.toLowerCase() === "all") continue;
-      if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
-      if (selectedGroupSite?.id) {
-        const gId = (opt as any).groupId;
-        const gLabel = (opt as any).groupLabel;
-        if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
+      if (hasGroupFilter) {
+        if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
+        if (selectedGroupSite?.id) {
+          const gId = (opt as any).groupId;
+          const gLabel = (opt as any).groupLabel;
+          if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
+        }
       }
       codes.add(code);
     }
@@ -76,11 +93,15 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
         siteCode: selectedSite && selectedSite !== "all" ? selectedSite : undefined,
         limit: 500,
       });
-      // Client-side filter when utility/group scope is active
-      const filtered = scopedSiteCodes
+      // Client-side filter:
+      // - ถ้า scopedSiteCodes มีค่า (selectedSite=all หรือมี utility/group filter) ใช้ filter นั้น
+      // - ถ้า selectedSite=all และ allowedSiteCodes ไม่ว่าง ให้กรองตาม allowedSiteCodes เสมอ
+      const isAll = !selectedSite || selectedSite === "all";
+      const activeFilter = scopedSiteCodes ?? (isAll && allowedSiteCodes.size > 0 ? allowedSiteCodes : null);
+      const filtered = activeFilter
         ? fetched.filter((n) => {
             const code = (n as any).siteCode ?? (n as any).site_code ?? "";
-            return scopedSiteCodes.has(String(code).trim());
+            return activeFilter.has(String(code).trim());
           })
         : fetched;
       setItems(prepareNotis(filtered));
@@ -92,7 +113,7 @@ export function NotisProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [date, selectedSite, scopedSiteCodes]);
+  }, [date, selectedSite, scopedSiteCodes, allowedSiteCodes]);
 
   React.useEffect(() => {
     let cancelled = false;

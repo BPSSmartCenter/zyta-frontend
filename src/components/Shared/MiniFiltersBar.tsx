@@ -29,14 +29,17 @@ export default function MiniFiltersBar({ page, className = "" }: Props) {
   const params = useParams();
   const location = useLocation();
 
-  // Sync context with current route param if present
+  // Sync context with current route param if present — validate against allowed options
   React.useEffect(() => {
     const routeSite = params.siteCode ? String(params.siteCode) : null;
-    if (routeSite && routeSite !== selectedSite) {
+    if (!routeSite || routeSite === selectedSite) return;
+    // ตรวจว่า routeSite อยู่ใน siteOptions ที่ user มีสิทธิ์เท่านั้น
+    const allowed = siteOptions.some((o) => o.value === routeSite);
+    if (allowed) {
       setSelectedSite(routeSite);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.siteCode]);
+  }, [params.siteCode, siteOptions]);
 
   const navigateToPage = React.useCallback(
     (siteCode?: string) => {

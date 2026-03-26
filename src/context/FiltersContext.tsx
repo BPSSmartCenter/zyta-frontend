@@ -305,6 +305,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const currentUser = await apiMe();
+        // role === "admin" หมายถึง SuperAdmin/Global Admin ที่เห็นทุกไซต์ได้
         const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
         const assignedOptions = Array.isArray(currentUser?.sites)
           ? currentUser.sites
@@ -313,13 +314,16 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
           : [];
 
         let baseOptions: SiteOption[] = [];
-        const catalogOptions = await fetchSitesFromApi();
-        const catalogByValue = new Map(
-          catalogOptions.map((opt) => [String(opt.value).toLowerCase(), opt] as const)
-        );
         if (isAdmin) {
+          // Admin เห็นทุกไซต์ในระบบ — ดึง catalog ทั้งหมด
+          const catalogOptions = await fetchSitesFromApi();
           baseOptions = catalogOptions;
         } else if (assignedOptions.length > 0) {
+          // Non-admin ที่มี sites assigned — เสริม metadata จาก catalog แต่ไม่เพิ่มไซต์นอก scope
+          const catalogOptions = await fetchSitesFromApi();
+          const catalogByValue = new Map(
+            catalogOptions.map((opt) => [String(opt.value).toLowerCase(), opt] as const)
+          );
           baseOptions = assignedOptions.map((opt) => {
             const key = String(opt.value).toLowerCase();
             const catalog = catalogByValue.get(key);
@@ -333,7 +337,8 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
             };
           });
         } else {
-          baseOptions = catalogOptions;
+          // Non-admin ที่ไม่มี sites assigned — ไม่แสดงไซต์ใดเลย (ห้าม fallback ไป global catalog)
+          baseOptions = [];
         }
 
         const uniqueOptions = (() => {
