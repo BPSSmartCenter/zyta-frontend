@@ -13,6 +13,7 @@ import ElectricMeter from "./ElectricMeterPage";
 import BillingOverview from "./BillingOverviewPage";
 import GenerateBillForm from "./GenerateBillFormPage";
 import BillPdfPreview from "./BillPdfPreviewPage";
+import CardSandbox from "./CardSandboxPage";
 
 export {
   Dashboard,
@@ -30,4 +31,5 @@ export {
   BillingOverview,
   GenerateBillForm,
   BillPdfPreview,
+  CardSandbox,
 };

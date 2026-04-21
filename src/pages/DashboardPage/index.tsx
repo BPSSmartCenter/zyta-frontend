@@ -1,14 +1,10 @@
 // src/pages/DashboardPage/index.tsx
 import React from "react";
-import Navbar from "../../components/Dashboard/Navbar";
 import ContentLayout from "../../components/Dashboard/ContentLayout";
-import Header from "../../components/Dashboard/Header";
 import SnapshotChartSection from "../../components/Chart";
-import { useTranslation } from "react-i18next";
 import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
 import { notis as mockNotis } from "../../data/Dashboard/notis";
-import { statItems } from "../../components/Dashboard/dashboard.constants";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -34,6 +30,60 @@ type Site = {
   utility?: string;
   groupSite?: string;
 };
+
+type DashboardRole = "admin" | "manager" | "officer" | "user";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function optionalString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  const text = String(value).trim();
+  return text ? text : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeRole(value: unknown): DashboardRole {
+  const role = String(value || "user").toLowerCase();
+  if (
+    role === "admin" ||
+    role === "manager" ||
+    role === "officer" ||
+    role === "user"
+  ) {
+    return role;
+  }
+  return "user";
+}
+
+function normalizeSiteList(value: unknown): Site[] {
+  const list = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.items)
+    ? value.items
+    : [];
+
+  return list
+    .filter(isRecord)
+    .map((site) => ({
+      id: optionalString(site.id),
+      code: optionalString(site.code),
+      name: optionalString(site.name),
+      province_code: optionalString(site.province_code),
+      lat: optionalNumber(site.lat),
+      lng: optionalNumber(site.lng),
+      utility: optionalString(site.utility),
+      groupSite: optionalString(site.groupSite ?? site.group_site),
+    }))
+    .filter((site) => Boolean(site.id || site.code || site.name));
+}
 
 const isDefaultEventCategory = (n: Noti): boolean => {
   const img = resolveDefaultNotiImage(n);
@@ -87,66 +137,30 @@ const isZytaNoti = (n: Noti): boolean => {
 };
 
 export default function Dashboard() {
-  const { t } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
 
-  // Navbar state
-  const {
-    date: globalDate,
-    setDate: setGlobalDate,
-    selectedSite,
-    setSelectedSite,
-    selectedGroupSite,
-    setSelectedGroupSite,
-    selectedUtility,
-    setSelectedUtility,
-    siteOptions,
-    searchSite,
-    setSearchSite,
-  } = useFilters();
+  const { date: globalDate, selectedSite } = useFilters();
   // Role + sites for ContentLayout behavior similar to original
-  const [role, setRole] = React.useState<"admin" | "manager" | "officer" | "user" | null>(
-    null
-  );
-  const LOGO_CACHE_KEY = "bps_user_branding_logo";
-  const [userLogoSrc, setUserLogoSrc] = React.useState<string | undefined>(() => {
-    try { return localStorage.getItem(LOGO_CACHE_KEY) || undefined; } catch { return undefined; }
-  });
+  const [role, setRole] = React.useState<DashboardRole | null>(null);
   const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
   React.useEffect(() => {
     (async () => {
       try {
         const me = await apiMe();
-        const myRole =
-          (String(me?.role || "user").toLowerCase() as any) ?? "user";
-        setRole(myRole);
-        if (me?.brandingLogoUrl) {
-          const { buildBrandingLogoSrc } = await import("../../utils/branding");
-          const resolved = buildBrandingLogoSrc(me.brandingLogoUrl) ?? undefined;
-          setUserLogoSrc(resolved);
-          try { if (resolved) localStorage.setItem(LOGO_CACHE_KEY, resolved); } catch {}
-        } else {
-          setUserLogoSrc(undefined);
-          try { localStorage.removeItem(LOGO_CACHE_KEY); } catch {}
-        }
-        const meSites = Array.isArray((me as any)?.sites) ? (me as any).sites : [];
+        setRole(normalizeRole(me?.role));
+        const meSites = normalizeSiteList(me?.sites);
         if (meSites.length > 0) {
-          setAccessibleSites(meSites as any);
+          setAccessibleSites(meSites);
           return;
         }
-        const resp = await listSites();
-        const items = Array.isArray((resp as any)?.items)
-          ? (resp as any).items
-          : Array.isArray(resp)
-          ? (resp as any)
-          : [];
-        setAccessibleSites(items as any);
+        const resp: unknown = await listSites();
+        setAccessibleSites(normalizeSiteList(resp));
       } catch {
         setRole((r) => r ?? "user");
         setAccessibleSites([]);
       }
     })();
-  }, [t]);
+  }, []);
 
   // Filters and derived data for ContentLayout
   const [searchEvent, setSearchEvent] = React.useState("");
@@ -200,30 +214,43 @@ export default function Dashboard() {
   );
 
   const faceRecognizeItems = React.useMemo(() => {
-    const normalize = (value?: any) =>
+    const normalize = (value?: unknown) =>
       value === undefined || value === null ? undefined : String(value);
 
     const toFacePlateItem = (n: Noti): Noti => {
-      const meta = (n.meta ?? {}) as any;
+      const meta = isRecord(n.meta) ? n.meta : {};
+      const row = isRecord(meta.row) ? meta.row : {};
+      const faceRow = isRecord(meta.faceRow) ? meta.faceRow : {};
+      const device = isRecord(meta.device) ? meta.device : {};
+      const deviceHeaders = isRecord(meta.deviceHeaders)
+        ? meta.deviceHeaders
+        : {};
+      const person = isRecord(meta.person) ? meta.person : {};
       const key = String(n.titleKey || n.title || "").toLowerCase();
       const isFace = key.includes("facedetected");
       const isPlate = key.includes("platedetected");
       const occurredAt = n.occurredAt ?? n.date ?? new Date().toISOString();
       const rawId =
-        normalize(meta?.rawId) ||
-        normalize(meta?.row?.id) ||
-        normalize(meta?.faceRow?.id) ||
+        normalize(meta.rawId) ||
+        normalize(row.id) ||
+        normalize(faceRow.id) ||
         n.id ||
         occurredAt;
       const cameraName =
-        meta?.cameraName ?? meta?.device?.name ?? meta?.deviceHeaders?.deviceKey;
-      const siteLabel = n.site ?? meta?.siteName ?? meta?.siteCode ?? "-";
+        normalize(meta.cameraName) ??
+        normalize(device.name) ??
+        normalize(deviceHeaders.deviceKey);
+      const siteLabel =
+        n.site ?? normalize(meta.siteName) ?? normalize(meta.siteCode) ?? "-";
       const title = isFace
-        ? meta?.person?.fullName ?? n.title ?? "Face detected"
-        : meta?.plateText ?? n.title ?? "License plate detected";
+        ? normalize(person.fullName) ?? n.title ?? "Face detected"
+        : normalize(meta.plateText) ?? n.title ?? "License plate detected";
       const img = isFace
-        ? meta?.faceCropImg ?? meta?.faceFullImg ?? meta?.picture ?? n.img
-        : meta?.platePicture ?? meta?.picture ?? n.img;
+        ? normalize(meta.faceCropImg) ??
+          normalize(meta.faceFullImg) ??
+          normalize(meta.picture) ??
+          n.img
+        : normalize(meta.platePicture) ?? normalize(meta.picture) ?? n.img;
       const enhancedMeta = {
         ...meta,
         kind: isPlate ? "plate" : "face",
@@ -308,11 +335,9 @@ export default function Dashboard() {
       setSite: setMapSeverity,
       province,
       setProvince,
-      mapNotis: ((): any[] => {
-        return [...rawAlertEvents, ...filteredWellBeginNotis].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
-      })(),
+      mapNotis: [...rawAlertEvents, ...filteredWellBeginNotis].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      ),
       searchFR,
       setSearchFR,
       filteredRecognize,
@@ -330,6 +355,7 @@ export default function Dashboard() {
       filteredWellBeginNotis,
       selectedEvents,
       buttonLabel,
+      toggleEvent,
       mapSeverity,
       province,
       filteredRecognize,
@@ -344,35 +370,13 @@ export default function Dashboard() {
 
   return (
     <div className="p-0 min-h-screen bg-[#F8FBFE] flex flex-col gap-3 sm:gap-4 lg:gap-6">
-      <Navbar
-        searchSite={searchSite}
-        setSearchSite={setSearchSite}
-        siteOptions={siteOptions}
-        selectedSite={selectedSite}
-        setSelectedSite={setSelectedSite}
-        selectedGroupSite={selectedGroupSite}
-        setSelectedGroupSite={setSelectedGroupSite}
-        selectedUtility={selectedUtility}
-        setSelectedUtility={setSelectedUtility}
-        enableGroupSiteSelection={true}
-        date={globalDate as any}
-        setDate={setGlobalDate as any}
-        logoSrc={userLogoSrc}
-      />
-
-      {/* <Header
-        statItems={statItems as any}
-        selectedSiteCode={selectedSite}
-        events={dateScopedNotis}
-      />
-
-      <ContentLayout {...(contentLayoutProps as any)} />
+      <ContentLayout {...contentLayoutProps} />
 
       <SnapshotChartSection
         buttonLabel={buttonLabel}
         selectedEvents={selectedEvents}
         toggleEvent={toggleEvent}
-      /> */}
+      />
     </div>
   );
 }

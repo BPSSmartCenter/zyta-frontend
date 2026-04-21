@@ -11,6 +11,10 @@ import {
 import { logout as mockLogout } from "../data/Dashboard/auth";
 import { authActions, selectAuthUser } from "../features/auth";
 import {
+  clearAllStoredSites,
+  siteSelectionActions,
+} from "../features/siteSelection";
+import {
   selectSidebarOpen,
   selectSidebarSearchQuery,
   sidebarActions,
@@ -165,6 +169,12 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       /* ignore mock logout failures */
     }
     dispatch(authActions.clearAuthUser());
+    dispatch(siteSelectionActions.resetSiteSelection());
+    try {
+      clearAllStoredSites();
+    } catch {
+      /* ignore storage errors */
+    }
     closeSidebar();
     setLogoutOpen(false);
     navigate("/", { replace: true });

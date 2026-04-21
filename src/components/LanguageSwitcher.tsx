@@ -1,9 +1,35 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
+import DatePicker, { type DateValue } from "./DateInput";
+import {
+  dateFilterActions,
+  selectDateFilterValue,
+} from "../features/dateFilter";
+import {
+  selectAccessibleSites,
+  selectHasHydrated,
+  siteSelectionActions,
+} from "../features/siteSelection";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+
+function isDashboardRoute(pathname: string) {
+  return /^\/u\/[^/]+(?:\/site\/[^/]+)?\/dashboard\/?$/.test(pathname);
+}
 
 export default function LanguageSwitcher() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation(["dashboard"]);
+  const location = useLocation();
+  const dispatch = useAppDispatch();
+  const sites = useAppSelector(selectAccessibleSites);
+  const hasHydrated = useAppSelector(selectHasHydrated);
+  const filterDate = useAppSelector(selectDateFilterValue);
   const [pendingLng, setPendingLng] = React.useState<"th" | "en" | null>(null);
+  const isSandboxRoute =
+    location.pathname.startsWith("/sandbox/") ||
+    /^\/u\/[^/]+\/sandbox\//.test(location.pathname);
+  const canUseDashboardFilters = isDashboardRoute(location.pathname) && hasHydrated;
+  const canSwitchSite = canUseDashboardFilters && sites.length > 1;
 
   // เปลี่ยนภาษาแบบไม่รีโหลดทั้งหน้า
   const setLng = (lng: "th" | "en") => {
@@ -39,6 +65,12 @@ export default function LanguageSwitcher() {
      hover:bg-gray-600 hover:text-white ${
        isActive(lng) ? "bg-gray-900 text-white" : "bg-white text-gray-700"
      }`;
+  const openSitePicker = () => {
+    dispatch(siteSelectionActions.openPicker({ reason: "manual" }));
+  };
+  const setFilterDate = (value: DateValue) => {
+    dispatch(dateFilterActions.setDate(value));
+  };
 
   // แยก class เดิมออกเป็นส่วน ๆ เพื่อประกอบเหมือนเดิม
   const base =
@@ -46,40 +78,75 @@ export default function LanguageSwitcher() {
   const visible = "opacity-100 translate-y-0 pointer-events-auto";
   const hidden = "opacity-0 -translate-y-2 pointer-events-none";
 
-  const content = (
-    <fieldset
-      aria-label="Language switcher"
-      aria-busy={pendingLng ? "true" : "false"}
-      className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
-    >
-      {/* TH */}
-      <input
-        id="lng-th"
-        type="radio"
-        name="lng"
-        className="sr-only"
-        checked={isActive("th")}
-         disabled={Boolean(pendingLng)}
-        onChange={() => setLng("th")}
-      />
-      <label htmlFor="lng-th" className={btnClass("th")}>
-        ไทย
-      </label>
+  if (isSandboxRoute) return null;
 
-      {/* EN */}
-      <input
-        id="lng-en"
-        type="radio"
-        name="lng"
-        className="sr-only"
-        checked={isActive("en")}
-        disabled={Boolean(pendingLng)}
-        onChange={() => setLng("en")}
-      />
-      <label htmlFor="lng-en" className={btnClass("en")}>
-        EN
-      </label>
-    </fieldset>
+  const content = (
+    <div className="inline-flex items-center gap-2">
+      {canSwitchSite && (
+        <button
+          type="button"
+          aria-label={t("siteSelection.changeSite", {
+            defaultValue: "เปลี่ยนไซต์",
+          })}
+          title={t("siteSelection.changeSite", {
+            defaultValue: "เปลี่ยนไซต์",
+          })}
+          onClick={openSitePicker}
+          className="grid h-[30px] w-[34px] place-items-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+        >
+          <span className="material-icons-outlined text-[19px]">domain</span>
+        </button>
+      )}
+
+      {canUseDashboardFilters && (
+        <DatePicker
+          value={filterDate}
+          onChange={setFilterDate}
+          buttonVariant="icon"
+          popoverAlign="right"
+          buttonAriaLabel={t("date.selectDate", {
+            defaultValue: "เลือกวันที่",
+          })}
+          buttonTitle={t("date.selectDate", {
+            defaultValue: "เลือกวันที่",
+          })}
+        />
+      )}
+
+      <fieldset
+        aria-label="Language switcher"
+        aria-busy={pendingLng ? "true" : "false"}
+        className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
+      >
+        {/* TH */}
+        <input
+          id="lng-th"
+          type="radio"
+          name="lng"
+          className="sr-only"
+          checked={isActive("th")}
+          disabled={Boolean(pendingLng)}
+          onChange={() => setLng("th")}
+        />
+        <label htmlFor="lng-th" className={btnClass("th")}>
+          ไทย
+        </label>
+
+        {/* EN */}
+        <input
+          id="lng-en"
+          type="radio"
+          name="lng"
+          className="sr-only"
+          checked={isActive("en")}
+          disabled={Boolean(pendingLng)}
+          onChange={() => setLng("en")}
+        />
+        <label htmlFor="lng-en" className={btnClass("en")}>
+          EN
+        </label>
+      </fieldset>
+    </div>
   );
 
   // เรนเดอร์ 2 กรณี เพื่อให้ aria-hidden เป็น string literal

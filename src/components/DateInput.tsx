@@ -27,6 +27,10 @@ type Props = {
   iconClassName?: string;
   align?: "left" | "full";
   textAlign?: "left" | "center";
+  buttonVariant?: "field" | "icon";
+  buttonAriaLabel?: string;
+  buttonTitle?: string;
+  popoverAlign?: "left" | "right";
 };
 
 export default function DatePicker({
@@ -40,6 +44,10 @@ export default function DatePicker({
   iconClassName = "",
   align = "left",
   textAlign = "center",
+  buttonVariant = "field",
+  buttonAriaLabel,
+  buttonTitle,
+  popoverAlign = "left",
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
 
@@ -53,7 +61,9 @@ export default function DatePicker({
   const selectedKey = selected ? `${selected.y}-${selected.m}-${selected.d}` : "";
   const [cursor, setCursor] = useState<Date>(() => toDate(selected ?? today)); // เดือนที่กำลังดู
   useEffect(() => {
-    if (selected) setCursor(toDate(selected));
+    if (!selectedKey) return;
+    const [y, m, d] = selectedKey.split("-").map(Number);
+    setCursor(toDate({ y, m, d }));
   }, [selectedKey]);
 
   const [open, setOpen] = useState(false);
@@ -173,6 +183,8 @@ export default function DatePicker({
     (displayMode === "monthYear"
       ? "MM/YYYY"
       : t("date.placeholder", { defaultValue: "YYYY-MM-DD" }));
+  const isIconButton = buttonVariant === "icon";
+  const label = value ? toDisplayLabel(value) : placeholderText;
 
   return (
     <div ref={wrapRef} className={`relative inline-block ${align === "full" ? "w-full" : ""}`}>
@@ -180,20 +192,37 @@ export default function DatePicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`relative h-[40px] ${align === "full" ? "w-full" : "w-[240px]"} rounded-md border border-gray-300 bg-white
+        aria-label={buttonAriaLabel}
+        title={buttonTitle}
+        className={
+          isIconButton
+            ? `grid h-[30px] w-[34px] place-items-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow transition-colors hover:bg-gray-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 ${className}`
+            : `relative h-[40px] ${align === "full" ? "w-full" : "w-[240px]"} rounded-md border border-gray-300 bg-white
                    pl-3 pr-10 text-gray-800 flex items-center
-                   focus:outline-none focus:bg-gray-50 hover:cursor-pointer ${className}`}
+                   focus:outline-none focus:bg-gray-50 hover:cursor-pointer ${className}`
+        }
       >
-        <span
-          className={`truncate w-full ${
-            textAlign === "center" ? "text-center" : "text-left"
-          }`}
-        >
-          {value ? toDisplayLabel(value) : placeholderText}{" "}
-        </span>
-        <i className={`material-icons absolute right-2  text-gray-300 ${iconClassName}`}>
-          calendar_today
-        </i>
+        {isIconButton ? (
+          <span
+            className={`material-icons-outlined text-[19px] ${iconClassName}`}
+            aria-hidden="true"
+          >
+            calendar_today
+          </span>
+        ) : (
+          <>
+            <span
+              className={`truncate w-full ${
+                textAlign === "center" ? "text-center" : "text-left"
+              }`}
+            >
+              {label}{" "}
+            </span>
+            <i className={`material-icons absolute right-2  text-gray-300 ${iconClassName}`}>
+              calendar_today
+            </i>
+          </>
+        )}
       </button>
 
       {/* ปฏิทิน */}
@@ -202,7 +231,9 @@ export default function DatePicker({
           className={`absolute z-50 w-[240px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg ${
             align === "full"
               ? "bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2"
-              : "mt-2 left-0"
+              : popoverAlign === "right"
+                ? "mt-2 right-0"
+                : "mt-2 left-0"
           }`}
         >
           {/* Header */}
@@ -300,4 +331,3 @@ export default function DatePicker({
     </div>
   );
 }
-

@@ -31,6 +31,11 @@ type GroupedSiteDropdownProps = {
 /* ── Tree data types ── */
 
 type SiteNode = SiteOption;
+type DropdownOption = { label: string; value: string };
+type GetItemProps = (
+  opt: DropdownOption,
+  extra?: React.ButtonHTMLAttributes<HTMLButtonElement>
+) => React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 type GroupNode = {
   id: string;
@@ -52,6 +57,27 @@ type HierarchyTree = {
   /** Sites without group and utility */
   ungrouped: SiteNode[];
 };
+
+const BPS_UTILITY: Pick<UtilityNode, "id" | "label"> = {
+  id: "__bps",
+  label: "BPS",
+};
+
+function standaloneGroupForSite(site: SiteNode): GroupNode {
+  return {
+    id: `__site:${site.value}`,
+    label: site.label,
+    sites: [site],
+  };
+}
+
+function bpsGroupForSite(site: SiteNode): GroupNode {
+  return {
+    id: `__bps:${site.value}`,
+    label: site.label,
+    sites: [site],
+  };
+}
 
 /* ── Build hierarchy from flat options ── */
 
@@ -81,7 +107,7 @@ function buildHierarchyTree(options: SiteOption[]): HierarchyTree {
         }
         gNode.sites.push(opt);
       } else {
-        uNode.ungroupedSites.push(opt);
+        uNode.groups.push(standaloneGroupForSite(opt));
       }
       continue;
     }
@@ -104,13 +130,26 @@ function buildHierarchyTree(options: SiteOption[]): HierarchyTree {
 
   const sortTh = (a: { label: string }, b: { label: string }) =>
     a.label.localeCompare(b.label, "th");
+  const sortUtility = (a: UtilityNode, b: UtilityNode) => {
+    if (a.id === BPS_UTILITY.id && b.id !== BPS_UTILITY.id) return 1;
+    if (b.id === BPS_UTILITY.id && a.id !== BPS_UTILITY.id) return -1;
+    return sortTh(a, b);
+  };
 
-  const utilities = Array.from(utilityMap.values()).sort(sortTh);
+  const utilities = Array.from(utilityMap.values()).sort(sortUtility);
   for (const u of utilities) u.groups.sort(sortTh);
 
   const orphanGroups = Array.from(orphanGroupMap.values()).sort(sortTh);
 
-  return { utilities, orphanGroups, ungrouped };
+  if (ungrouped.length > 0) {
+    utilities.push({
+      ...BPS_UTILITY,
+      groups: ungrouped.map(bpsGroupForSite),
+      ungroupedSites: [],
+    });
+  }
+
+  return { utilities, orphanGroups, ungrouped: [] };
 }
 
 /* ── Helpers ── */
@@ -212,7 +251,7 @@ export default function SiteDropdownGrouped({
   const renderSiteItem = (
     opt: SiteOption,
     indent: number,
-    getItemProps: any
+    getItemProps: GetItemProps
   ) => (
     <button
       key={opt.value}
@@ -231,7 +270,7 @@ export default function SiteDropdownGrouped({
   const renderGroupNode = (
     group: GroupNode,
     indent: number,
-    getItemProps: any
+    getItemProps: GetItemProps
   ) => {
     const isExpanded = expandedGroups.has(group.id);
     const count = group.sites.length;
@@ -277,7 +316,7 @@ export default function SiteDropdownGrouped({
 
   const renderUtilityNode = (
     utility: UtilityNode,
-    getItemProps: any
+    getItemProps: GetItemProps
   ) => {
     const isExpanded = expandedUtilities.has(utility.id);
     const count = countSites(utility);
@@ -328,7 +367,7 @@ export default function SiteDropdownGrouped({
 
   return (
     <Dropdown
-      options={options as any}
+      options={options}
       value={value}
       onChange={(val) => onChange(val)}
       onOpenChange={setMenuOpen}
