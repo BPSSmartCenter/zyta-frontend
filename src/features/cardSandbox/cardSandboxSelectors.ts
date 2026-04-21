@@ -9,8 +9,29 @@ export const selectSandboxCards = (state: RootState) =>
 export const selectSandboxSelectedId = (state: RootState) =>
   state.cardSandbox.selectedId;
 
-export const selectSandboxMapPanel = (state: RootState) =>
-  state.cardSandbox.mapPanel;
+export const selectSandboxFilterGroups = (state: RootState) =>
+  state.cardSandbox.filterGroups;
+
+export const selectSandboxFilterGroupList = createSelector(
+  [selectSandboxFilterGroups],
+  (groups) => Object.values(groups)
+);
+
+export const selectSandboxActiveFilterGroupId = (state: RootState) =>
+  state.cardSandbox.activeFilterGroupId;
+
+export const selectSandboxFilterGroupForCard = (
+  state: RootState,
+  cardId: string
+) => {
+  const card = state.cardSandbox.cards.find((item) => item.id === cardId);
+  if (!card) return null;
+  return (
+    state.cardSandbox.filterGroups[card.filterGroupId] ??
+    state.cardSandbox.filterGroups[state.cardSandbox.activeFilterGroupId] ??
+    null
+  );
+};
 
 export const selectSandboxEventPanels = (state: RootState) =>
   state.cardSandbox.eventPanels;

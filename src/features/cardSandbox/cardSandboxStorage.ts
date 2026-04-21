@@ -2,12 +2,17 @@ import type {
   CardSandboxState,
   SandboxCard,
   SandboxCardKind,
+  SandboxDateValue,
+  SandboxFilterGroup,
+  SandboxFilterGroupId,
+  SandboxScopeOption,
 } from "./types";
 
 const STORAGE_KEY = "bps.cardSandbox.v1";
 const STORAGE_VERSION = 1;
 const CARD_KINDS = new Set<SandboxCardKind>([
   "blank",
+  "filters",
   "map",
   "alerts",
   "wellbeing",
@@ -17,6 +22,21 @@ const CARD_KINDS = new Set<SandboxCardKind>([
   "users",
   "snapshot",
 ]);
+const DEFAULT_FILTER_GROUP_ID = "group-blue";
+const FILTER_GROUP_DEFS = [
+  { id: "group-blue", label: "Blue", color: "#dbeafe" },
+  { id: "group-green", label: "Green", color: "#dcfce7" },
+  { id: "group-amber", label: "Amber", color: "#fef3c7" },
+  { id: "group-violet", label: "Violet", color: "#fae8ff" },
+  { id: "group-rose", label: "Rose", color: "#fee2e2" },
+] satisfies Array<{
+  id: SandboxFilterGroupId;
+  label: string;
+  color: string;
+}>;
+const FILTER_GROUP_IDS = new Set(
+  FILTER_GROUP_DEFS.map((group) => group.id)
+);
 
 type PersistedCardSandboxState = {
   version: typeof STORAGE_VERSION;
@@ -44,6 +64,85 @@ function sanitizeStringArray(value: unknown, fallback: string[]) {
   return strings.length > 0 ? strings : fallback;
 }
 
+function todayValue(): SandboxDateValue {
+  const date = new Date();
+  return {
+    y: date.getFullYear(),
+    m: date.getMonth() + 1,
+    d: date.getDate(),
+  };
+}
+
+function sanitizeDateValue(value: unknown): SandboxDateValue {
+  if (!isRecord(value)) return todayValue();
+  const { y, m, d } = value;
+  if (!isFiniteNumber(y) || !isFiniteNumber(m) || !isFiniteNumber(d)) {
+    return todayValue();
+  }
+  return { y, m, d };
+}
+
+function sanitizeScopeOption(value: unknown): SandboxScopeOption {
+  if (!isRecord(value)) return null;
+  if (typeof value.id !== "string" || typeof value.label !== "string") {
+    return null;
+  }
+  return {
+    id: value.id,
+    label: value.label,
+  };
+}
+
+function createDefaultFilterValues() {
+  return {
+    selectedSite: "all",
+    selectedGroupSite: null,
+    selectedUtility: null,
+    date: todayValue(),
+    selectedEvents: ["all"],
+    severity: "all",
+    province: "all",
+  };
+}
+
+function createDefaultFilterGroup(
+  group: (typeof FILTER_GROUP_DEFS)[number]
+): SandboxFilterGroup {
+  return {
+    ...group,
+    ...createDefaultFilterValues(),
+  };
+}
+
+function createDefaultFilterGroups() {
+  return Object.fromEntries(
+    FILTER_GROUP_DEFS.map((group) => [group.id, createDefaultFilterGroup(group)])
+  ) as Record<SandboxFilterGroupId, SandboxFilterGroup>;
+}
+
+function sanitizeFilterGroup(
+  id: SandboxFilterGroupId,
+  value: unknown
+): SandboxFilterGroup {
+  const def =
+    FILTER_GROUP_DEFS.find((group) => group.id === id) ??
+    FILTER_GROUP_DEFS[0];
+  const base = createDefaultFilterGroup(def);
+  if (!isRecord(value)) return base;
+
+  return {
+    ...base,
+    selectedSite:
+      typeof value.selectedSite === "string" ? value.selectedSite : base.selectedSite,
+    selectedGroupSite: sanitizeScopeOption(value.selectedGroupSite),
+    selectedUtility: sanitizeScopeOption(value.selectedUtility),
+    date: sanitizeDateValue(value.date),
+    selectedEvents: sanitizeStringArray(value.selectedEvents, base.selectedEvents),
+    severity: typeof value.severity === "string" ? value.severity : base.severity,
+    province: typeof value.province === "string" ? value.province : base.province,
+  };
+}
+
 function sanitizeCard(value: unknown): SandboxCard | null {
   if (!isRecord(value)) return null;
   if (typeof value.id !== "string") return null;
@@ -66,6 +165,11 @@ function sanitizeCard(value: unknown): SandboxCard | null {
   const card: SandboxCard = {
     id: value.id,
     kind: value.kind as SandboxCardKind,
+    filterGroupId:
+      typeof value.filterGroupId === "string" &&
+      FILTER_GROUP_IDS.has(value.filterGroupId)
+        ? value.filterGroupId
+        : DEFAULT_FILTER_GROUP_ID,
     title: value.title,
     x: value.x,
     y: value.y,
@@ -93,22 +197,32 @@ function sanitizeState(value: unknown): CardSandboxState | null {
   const cards = value.cards.map(sanitizeCard).filter((card): card is SandboxCard => Boolean(card));
   if (cards.length !== value.cards.length) return null;
 
-  const mapPanel = isRecord(value.mapPanel) ? value.mapPanel : {};
+  const rawFilterGroups = isRecord(value.filterGroups)
+    ? value.filterGroups
+    : {};
   const eventPanels = isRecord(value.eventPanels) ? value.eventPanels : {};
   const selectedId =
     typeof value.selectedId === "string" &&
     cards.some((card) => card.id === value.selectedId)
       ? value.selectedId
       : null;
-
+  const filterGroups = createDefaultFilterGroups();
+  for (const group of FILTER_GROUP_DEFS) {
+    filterGroups[group.id] = sanitizeFilterGroup(
+      group.id,
+      rawFilterGroups[group.id]
+    );
+  }
+  const activeFilterGroupId =
+    typeof value.activeFilterGroupId === "string" &&
+    FILTER_GROUP_IDS.has(value.activeFilterGroupId)
+      ? value.activeFilterGroupId
+      : DEFAULT_FILTER_GROUP_ID;
   return {
     cards,
     selectedId,
-    mapPanel: {
-      selectedEvents: sanitizeStringArray(mapPanel.selectedEvents, ["all"]),
-      severity: typeof mapPanel.severity === "string" ? mapPanel.severity : "all",
-      province: typeof mapPanel.province === "string" ? mapPanel.province : "all",
-    },
+    filterGroups,
+    activeFilterGroupId,
     eventPanels: {
       alertSearch:
         typeof eventPanels.alertSearch === "string" ? eventPanels.alertSearch : "",

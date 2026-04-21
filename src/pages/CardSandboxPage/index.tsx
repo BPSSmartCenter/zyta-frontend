@@ -1,14 +1,20 @@
 import React from "react";
 import {
+  cardSandboxActions,
+  selectSandboxFilterGroupForCard,
+  selectSandboxFilterGroupList,
   type ResizeHandle,
   type SandboxCard,
+  type SandboxFilterGroup,
   SandboxDashboardEventsCard,
   SandboxDashboardWidgetCard,
+  SandboxFilterControlCard,
   SandboxMapPanelCard,
   useCardBoardInteractions,
   useLayeredCards,
   useSandboxPan,
 } from "../../features/cardSandbox";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
@@ -162,6 +168,11 @@ export default function CardSandboxPage() {
 
         <div className="flex items-center gap-2">
           <ToolButton icon="add" label="Add card" onClick={() => addCard()} />
+          <ToolButton
+            icon="tune"
+            label="Add filter card"
+            onClick={() => addCard("filters")}
+          />
           <ToolButton
             icon="map"
             label="Add map card"
@@ -432,6 +443,12 @@ function SandboxLayerCard({
     handle: ResizeHandle
   ) => void;
 }) {
+  const dispatch = useAppDispatch();
+  const filterGroups = useAppSelector(selectSandboxFilterGroupList);
+  const filterGroup = useAppSelector((state) =>
+    selectSandboxFilterGroupForCard(state, card.id)
+  );
+  const groupColor = filterGroup?.color ?? card.color;
   const cardNumber = getCardNumber(card.title);
 
   if (card.collapsed) {
@@ -461,7 +478,7 @@ function SandboxLayerCard({
           width: card.width,
           height: card.height,
           zIndex: card.zIndex,
-          backgroundColor: card.color,
+          backgroundColor: groupColor,
         }}
       >
         <button
@@ -500,7 +517,7 @@ function SandboxLayerCard({
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") onSelect(card.id);
       }}
-      className={`absolute overflow-hidden rounded-lg border bg-white text-left shadow-[0_14px_36px_rgba(15,23,42,0.16)] outline-none transition-shadow ${
+      className={`absolute overflow-visible rounded-lg border bg-white text-left shadow-[0_14px_36px_rgba(15,23,42,0.16)] outline-none transition-shadow ${
         selected
           ? "border-[#3AB8EE] ring-2 ring-[#3AB8EE]/35"
           : "border-slate-300"
@@ -515,13 +532,31 @@ function SandboxLayerCard({
     >
       <div
         onPointerDown={(event) => onStartDrag(event, card)}
-        className="flex h-10 cursor-grab items-center justify-between gap-2 border-b border-slate-200 px-3 active:cursor-grabbing"
-        style={{ backgroundColor: card.color }}
+        className="grid h-11 cursor-grab grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-t-lg border-b border-slate-200 px-3 active:cursor-grabbing"
+        style={{ backgroundColor: groupColor }}
       >
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
-          {card.title}
-        </span>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <SandboxGroupColorPicker
+            cardId={card.id}
+            groups={filterGroups}
+            selectedGroup={filterGroup}
+            onSelect={(filterGroupId) =>
+              dispatch(
+                cardSandboxActions.setCardFilterGroup({
+                  cardId: card.id,
+                  filterGroupId,
+                })
+              )
+            }
+          />
+          <span className="min-w-0 truncate text-xs font-bold uppercase text-slate-900">
+            {card.title}
+          </span>
+        </div>
+
+        <span aria-hidden="true" />
+
+        <div className="flex shrink-0 items-center justify-self-end gap-1">
           <span className="rounded bg-white/60 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
             z {card.zIndex}
           </span>
@@ -548,27 +583,35 @@ function SandboxLayerCard({
         </div>
       </div>
 
-      <div className="h-[calc(100%-2.5rem)] p-3">
-        {card.kind === "map" ? (
+      <div
+        className={`h-[calc(100%-2.75rem)] rounded-b-lg p-3 ${
+          card.kind === "filters" ? "overflow-visible" : "overflow-hidden"
+        }`}
+      >
+        {card.kind === "filters" ? (
+          <div className="h-full overflow-visible rounded-md border border-slate-200 bg-white">
+            <SandboxFilterControlCard cardId={card.id} />
+          </div>
+        ) : card.kind === "map" ? (
           <div
             data-sandbox-card-scroll="true"
             className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
           >
-            <SandboxMapPanelCard />
+            <SandboxMapPanelCard cardId={card.id} />
           </div>
         ) : card.kind === "alerts" || card.kind === "wellbeing" ? (
           <div
             data-sandbox-card-scroll="true"
             className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
           >
-            <SandboxDashboardEventsCard variant={card.kind} />
+            <SandboxDashboardEventsCard cardId={card.id} variant={card.kind} />
           </div>
         ) : isDashboardWidgetKind(card.kind) ? (
           <div
             data-sandbox-card-scroll="true"
             className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
           >
-            <SandboxDashboardWidgetCard variant={card.kind} />
+            <SandboxDashboardWidgetCard cardId={card.id} variant={card.kind} />
           </div>
         ) : (
           <div className="h-full rounded-md border border-dashed border-slate-300 bg-white/70" />
@@ -586,6 +629,79 @@ function SandboxLayerCard({
             className={`absolute h-3 w-3 rounded-full border border-[#0063bf] bg-white shadow ${handle.className} ${handle.cursor}`}
           />
         ))}
+    </div>
+  );
+}
+
+function SandboxGroupColorPicker({
+  cardId,
+  groups,
+  selectedGroup,
+  onSelect,
+}: {
+  cardId: string;
+  groups: SandboxFilterGroup[];
+  selectedGroup: SandboxFilterGroup | null;
+  onSelect: (filterGroupId: string) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      className="relative shrink-0"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        aria-label={`Select group for ${cardId}`}
+        title={selectedGroup?.label ?? "Select group"}
+        onClick={() => setOpen((value) => !value)}
+        className="grid h-7 w-7 place-items-center rounded-md bg-white/65 shadow-sm ring-1 ring-white/70 transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+      >
+        <span
+          className="h-4 w-4 rounded-full border border-slate-400/35"
+          style={{ backgroundColor: selectedGroup?.color ?? "#e2e8f0" }}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-[1500] mt-2 w-36 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+          {groups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => {
+                onSelect(group.id);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <span
+                className="h-4 w-4 rounded-full border border-slate-300"
+                style={{ backgroundColor: group.color }}
+              />
+              <span className="min-w-0 flex-1 truncate">{group.label}</span>
+              {selectedGroup?.id === group.id && (
+                <span className="material-icons-outlined text-[15px] text-[#0877A8]">
+                  check
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

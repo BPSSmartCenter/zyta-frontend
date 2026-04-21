@@ -2,6 +2,7 @@ import React from "react";
 import MapPanel from "../../components/Dashboard/MapPanel";
 import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
+import { listNotis } from "../../api/notis";
 import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
@@ -14,7 +15,7 @@ import {
 } from "../../utils/notis";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { cardSandboxActions } from "./cardSandboxSlice";
-import { selectSandboxMapPanel } from "./cardSandboxSelectors";
+import { selectSandboxFilterGroupForCard } from "./cardSandboxSelectors";
 
 type SandboxSite = {
   id?: string;
@@ -26,6 +27,12 @@ type SandboxSite = {
   utility?: string;
   groupSite?: string;
 };
+
+type Props = {
+  cardId: string;
+};
+
+const DEFAULT_SELECTED_EVENTS = ["all"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -104,12 +111,47 @@ function mergeSiteMetadata(
   });
 }
 
-export default function SandboxMapPanelCard() {
+function toIsoRangeForDate(date: { y: number; m: number; d: number }) {
+  const from = new Date(date.y, date.m - 1, date.d, 0, 0, 0, 0);
+  const to = new Date(date.y, date.m - 1, date.d, 23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
+function todayValue() {
+  const date = new Date();
+  return { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() };
+}
+
+function matchesScopedSiteCode(noti: Noti, codes: Set<string>) {
+  const candidates = [
+    noti.siteCode,
+    noti.siteId,
+    noti.siteName,
+    noti.site,
+    (noti as Record<string, unknown>).site_code,
+    (noti as Record<string, unknown>).site_id,
+  ];
+  return candidates
+    .filter((candidate): candidate is string => typeof candidate === "string")
+    .some((candidate) => codes.has(candidate.trim()));
+}
+
+export default function SandboxMapPanelCard({ cardId }: Props) {
   const dispatch = useAppDispatch();
-  const mapPanel = useAppSelector(selectSandboxMapPanel);
-  const { date, selectedSite } = useFilters();
+  const filterGroup = useAppSelector((state) =>
+    selectSandboxFilterGroupForCard(state, cardId)
+  );
+  const { siteOptions } = useFilters();
   const { items: liveNotis } = useNotisFeed();
   const [accessibleSites, setAccessibleSites] = React.useState<SandboxSite[]>([]);
+  const [remoteNotis, setRemoteNotis] = React.useState<Noti[] | null>(null);
+
+  const fallbackDate = React.useMemo(() => todayValue(), []);
+  const selectedDate = filterGroup?.date ?? fallbackDate;
+  const selectedSite = filterGroup?.selectedSite ?? "all";
+  const selectedEvents = filterGroup?.selectedEvents ?? DEFAULT_SELECTED_EVENTS;
+  const severity = filterGroup?.severity ?? "all";
+  const province = filterGroup?.province ?? "all";
 
   React.useEffect(() => {
     let cancelled = false;
@@ -141,7 +183,36 @@ export default function SandboxMapPanelCard() {
     };
   }, []);
 
-  const selectedDateKey = React.useMemo(() => toDateKey(date), [date]);
+  const selectedDateKey = React.useMemo(
+    () => toDateKey(selectedDate),
+    [selectedDate]
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const range = toIsoRangeForDate(selectedDate);
+
+    setRemoteNotis(null);
+    listNotis({
+      from: range.from,
+      to: range.to,
+      siteCode: selectedSite && selectedSite !== "all" ? selectedSite : undefined,
+      limit: 500,
+    })
+      .then((items) => {
+        if (!cancelled) {
+          setRemoteNotis(sortByNewest(items.map((noti) => decorateNotiForDisplay(noti))));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteNotis(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, selectedSite]);
+
   const matchGlobalDate = React.useCallback(
     (value: string) => {
       if (!selectedDateKey) return true;
@@ -150,40 +221,108 @@ export default function SandboxMapPanelCard() {
     [selectedDateKey]
   );
 
+  const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {
+    const isAll = !selectedSite || selectedSite === "all";
+    if (!isAll) return null;
+
+    const selectedUtility = filterGroup?.selectedUtility;
+    const selectedGroupSite = filterGroup?.selectedGroupSite;
+    const hasScope = Boolean(selectedUtility?.id || selectedGroupSite?.id);
+    const codes = new Set<string>();
+
+    for (const option of siteOptions) {
+      const code = String(option.value || "").trim();
+      if (!code || code.toLowerCase() === "all") continue;
+      if (hasScope) {
+        if (selectedUtility?.id && option.utilityId !== selectedUtility.id) {
+          continue;
+        }
+        if (selectedGroupSite?.id) {
+          const groupId = option.groupId;
+          const groupLabel = option.groupLabel;
+          if (
+            groupId !== selectedGroupSite.id &&
+            groupLabel !== selectedGroupSite.label
+          ) {
+            continue;
+          }
+        }
+      }
+      codes.add(code);
+    }
+
+    return codes.size > 0 ? codes : null;
+  }, [
+    filterGroup?.selectedGroupSite,
+    filterGroup?.selectedUtility,
+    selectedSite,
+    siteOptions,
+  ]);
+
   const mapNotis = React.useMemo<Noti[]>(() => {
     const base =
-      Array.isArray(liveNotis) && liveNotis.length
+      remoteNotis !== null
+        ? remoteNotis
+        : Array.isArray(liveNotis) && liveNotis.length
         ? liveNotis
         : ((mockNotis as Noti[]) ?? []).map((noti) =>
             decorateNotiForDisplay(noti)
           );
     const siteScoped =
       !selectedSite || selectedSite === "all"
-        ? sortByNewest(base)
+        ? scopedSiteCodes
+          ? sortByNewest(
+              base.filter((noti) => matchesScopedSiteCode(noti, scopedSiteCodes))
+            )
+          : sortByNewest(base)
         : sortByNewest(base.filter((noti) => matchesSite(noti, selectedSite)));
     return siteScoped
       .filter((noti) => matchGlobalDate(noti?.date))
       .filter((noti) => buildNotiKeywordBag(noti) !== null);
-  }, [liveNotis, matchGlobalDate, selectedSite]);
+  }, [liveNotis, matchGlobalDate, remoteNotis, scopedSiteCodes, selectedSite]);
 
   const buttonLabel = React.useMemo(
     () =>
-      mapPanel.selectedEvents.includes("all")
+      selectedEvents.includes("all")
         ? "all"
-        : mapPanel.selectedEvents.join(", "),
-    [mapPanel.selectedEvents]
+        : selectedEvents.join(", "),
+    [selectedEvents]
   );
 
   return (
     <div className="min-h-full bg-white">
       <MapPanel
-        selectedEvents={mapPanel.selectedEvents}
+        selectedEvents={selectedEvents}
         buttonLabel={buttonLabel}
-        toggleEvent={(value) => dispatch(cardSandboxActions.toggleMapEvent(value))}
-        site={mapPanel.severity}
-        setSite={(value) => dispatch(cardSandboxActions.setMapSeverity(value))}
-        province={mapPanel.province}
-        setProvince={(value) => dispatch(cardSandboxActions.setMapProvince(value))}
+        toggleEvent={(value) =>
+          filterGroup &&
+          dispatch(
+            cardSandboxActions.toggleFilterGroupEvent({
+              id: filterGroup.id,
+              value,
+            })
+          )
+        }
+        site={severity}
+        setSite={(value) =>
+          filterGroup &&
+          dispatch(
+            cardSandboxActions.setFilterGroupSeverity({
+              id: filterGroup.id,
+              value,
+            })
+          )
+        }
+        province={province}
+        setProvince={(value) =>
+          filterGroup &&
+          dispatch(
+            cardSandboxActions.setFilterGroupProvince({
+              id: filterGroup.id,
+              value,
+            })
+          )
+        }
         selectedSiteCode={selectedSite || "all"}
         accessibleSites={accessibleSites}
         overrideNotis={mapNotis}

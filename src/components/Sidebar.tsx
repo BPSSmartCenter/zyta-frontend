@@ -187,6 +187,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const pathScoped = pathNoBase.replace(/^\/site\/[^/]+/, "");
 
   const active = {
+    sandbox:
+      location.pathname.startsWith("/sandbox/") ||
+      pathScoped.startsWith("/sandbox"),
     home: pathScoped === "/dashboard",
     alert: pathScoped.startsWith("/alert"),
     alertEvent: (key: string) =>
@@ -294,6 +297,16 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   });
 
   const navItems: GlassHoverSidebarItem[] = [
+    {
+      id: "sandbox",
+      label: t("menu.sandbox", { defaultValue: "Sandbox" }),
+      icon: "dashboard_customize",
+      active: active.sandbox,
+      onSelect: () => {
+        navigate("/sandbox/card-board");
+        closeSidebar();
+      },
+    },
     {
       id: "home",
       label: t("menu.home", { defaultValue: "หน้าแรก" }),

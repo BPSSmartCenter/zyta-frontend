@@ -3,6 +3,7 @@ import { getSiteDetails, listSites } from "../api/sites";
 import { getIoTDevices } from "../api/iot";
 import { useDeviceInventory } from "../context/DeviceInventoryContext";
 import { useFilters } from "../context/FiltersContext";
+import type { SiteOption } from "../components/Shared/SiteDropdownGrouped";
 
 type DeviceCounts = Partial<{
   cameras: number;
@@ -21,6 +22,22 @@ type DeviceCounts = Partial<{
 
 type DeviceTotals = { online: number; offline: number };
 
+type DeviceAggregate = {
+  total: number;
+  cameras: number;
+  intercom: number;
+  water: number;
+  electric: number;
+  electricOnline: number;
+  electricOffline: number;
+  air: number;
+  iot: number;
+  iotOffline: number;
+  caregiver: number;
+  caregiverOffline: number;
+  zyta: number;
+};
+
 type SiteSummary = {
   id?: string;
   code?: string;
@@ -31,10 +48,30 @@ type SiteSummary = {
 type Options = {
   selectedSiteCode?: string | null;
   accessibleSites?: Array<SiteSummary | null | undefined> | null;
+  selectedUtility?: { id: string; label: string } | null;
+  selectedGroupSite?: { id: string; label: string } | null;
+  siteOptions?: SiteOption[] | null;
   enabled?: boolean;
 };
 
+type SiteDetails = {
+  counters?: Record<string, unknown>;
+};
+
+type IotDevice = {
+  type?: unknown;
+  status?: unknown;
+  snapshot?: {
+    pm25?: unknown;
+    eco2?: unknown;
+  } | null;
+};
+
 const EMPTY_TOTALS: DeviceTotals = { online: 0, offline: 0 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 const normalizeSite = (site: SiteSummary | null | undefined): SiteSummary => {
   if (!site || typeof site !== "object") return {};
@@ -43,7 +80,7 @@ const normalizeSite = (site: SiteSummary | null | undefined): SiteSummary => {
   return { ...site, code, id };
 };
 
-async function fetchSiteDetailsFor(site: SiteSummary): Promise<any | null> {
+async function fetchSiteDetailsFor(site: SiteSummary): Promise<SiteDetails | null> {
   const attempts = [site.code, site.id].filter(
     (v, idx, arr) => typeof v === "string" && v.trim().length > 0 && arr.indexOf(v) === idx
   ) as string[];
@@ -51,8 +88,9 @@ async function fetchSiteDetailsFor(site: SiteSummary): Promise<any | null> {
   for (const key of attempts) {
     try {
       const res = await getSiteDetails(key);
-      return res?.data ?? res;
-    } catch (e) {
+      const data = isRecord(res) && "data" in res ? res.data : res;
+      return isRecord(data) ? { counters: data.counters as Record<string, unknown> | undefined } : null;
+    } catch {
       // try next key
     }
   }
@@ -65,22 +103,13 @@ async function fetchSiteDetailsFor(site: SiteSummary): Promise<any | null> {
 }
 
 const reduceDeviceCounters = (
-  acc: {
-    total: number;
-    cameras: number;
-    intercom: number;
-    water: number;
-    electric: number;
-    electricOnline: number;
-    electricOffline: number;
-    air: number;
-    iot: number;
-  },
-  item: any | null
+  acc: DeviceAggregate,
+  item: SiteDetails | null
 ) => {
   if (!item) return acc;
-  const counters = (item?.counters ?? {}) as Record<string, any>;
+  const counters = item.counters ?? {};
   return {
+    ...acc,
     total: acc.total + Number(counters.devices_total ?? 0),
     cameras: acc.cameras + Number(counters.devices_camera ?? 0),
     intercom: acc.intercom + Number(counters.devices_intercom ?? 0),
@@ -95,16 +124,56 @@ const reduceDeviceCounters = (
   };
 };
 
+function createEmptyAggregate(): DeviceAggregate {
+  return {
+    total: 0,
+    cameras: 0,
+    intercom: 0,
+    water: 0,
+    electric: 0,
+    electricOnline: 0,
+    electricOffline: 0,
+    air: 0,
+    iot: 0,
+    iotOffline: 0,
+    caregiver: 0,
+    caregiverOffline: 0,
+    zyta: 0,
+  };
+}
+
 export function useDeviceInventoryLoader({
   selectedSiteCode,
   accessibleSites,
+  selectedUtility: selectedUtilityOverride,
+  selectedGroupSite: selectedGroupSiteOverride,
+  siteOptions: siteOptionsOverride,
   enabled = true,
 }: Options = {}) {
   const [counts, setCountsState] = React.useState<DeviceCounts>({});
   const [totals, setTotalsState] = React.useState<DeviceTotals>(EMPTY_TOTALS);
   const [loading, setLocalLoading] = React.useState<boolean>(false);
   const { setCounts, setLoading } = useDeviceInventory();
-  const { selectedUtility, selectedGroupSite, siteOptions } = useFilters();
+  const {
+    selectedUtility: contextSelectedUtility,
+    selectedGroupSite: contextSelectedGroupSite,
+    siteOptions: contextSiteOptions,
+  } = useFilters();
+  const selectedUtility =
+    selectedUtilityOverride === undefined
+      ? contextSelectedUtility
+      : selectedUtilityOverride;
+  const selectedGroupSite =
+    selectedGroupSiteOverride === undefined
+      ? contextSelectedGroupSite
+      : selectedGroupSiteOverride;
+  const siteOptions = React.useMemo(
+    () =>
+      siteOptionsOverride === undefined
+        ? contextSiteOptions
+        : siteOptionsOverride ?? [],
+    [contextSiteOptions, siteOptionsOverride]
+  );
 
   const sitesCacheRef = React.useRef<SiteSummary[] | null>(null);
 
@@ -116,7 +185,7 @@ export function useDeviceInventoryLoader({
           .map((s) => (s ? { code: s.code ?? null, id: s.id ?? null } : null))
           .filter(Boolean)
       );
-    } catch (_err) {
+    } catch {
       return String(accessibleSites.length);
     }
   }, [accessibleSites]);
@@ -174,10 +243,10 @@ export function useDeviceInventoryLoader({
           for (const opt of siteOptions) {
             const code = String(opt.value || "").trim();
             if (!code || code.toLowerCase() === "all") continue;
-            if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
+            if (selectedUtility?.id && opt.utilityId !== selectedUtility.id) continue;
             if (selectedGroupSite?.id) {
-              const gId = (opt as any).groupId;
-              const gLabel = (opt as any).groupLabel;
+              const gId = opt.groupId;
+              const gLabel = opt.groupLabel;
               if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
             }
             scopedCodes.add(code);
@@ -188,17 +257,7 @@ export function useDeviceInventoryLoader({
         }
 
         // Initialize aggregation with zeros
-        let aggregated = {
-          total: 0,
-          cameras: 0,
-          intercom: 0,
-          water: 0,
-          electric: 0,
-          electricOnline: 0,
-          electricOffline: 0,
-          air: 0,
-          iot: 0,
-        };
+        let aggregated = createEmptyAggregate();
 
         if (targetSites.length > 0) {
           const detailsList = await Promise.all(
@@ -207,17 +266,7 @@ export function useDeviceInventoryLoader({
 
           aggregated = detailsList.reduce(
             reduceDeviceCounters,
-            {
-              total: 0,
-              cameras: 0,
-              intercom: 0,
-              water: 0,
-              electric: 0,
-              electricOnline: 0,
-              electricOffline: 0,
-              air: 0,
-              iot: 0,
-            }
+            createEmptyAggregate()
           );
         }
 
@@ -236,8 +285,9 @@ export function useDeviceInventoryLoader({
           const iotDevices = await getIoTDevices();
           console.log("[useDeviceInventoryLoader] Fetched IoT devices:", iotDevices?.length);
           if (Array.isArray(iotDevices)) {
+            const devices = iotDevices as IotDevice[];
             // Count "IoT" devices exactly (inclusive check)
-            const iotDevicesList = iotDevices.filter((d) =>
+            const iotDevicesList = devices.filter((d) =>
               String(d.type || "").toLowerCase().includes("iot")
             );
             const iotCount = iotDevicesList.length;
@@ -251,7 +301,7 @@ export function useDeviceInventoryLoader({
             // Count devices that look like Air Sensors (have pm25 or eco2 in snapshot)
             // Note: If they also have type='IoT', they might be double counted if we aren't careful, 
             // but for now we follow the existing logic for Air Sensors which relies on snapshot fields.
-            const airCount = iotDevices.filter(d =>
+            const airCount = devices.filter(d =>
               d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
             ).length;
 
@@ -260,7 +310,7 @@ export function useDeviceInventoryLoader({
             }
 
             // Count Medical devices for Caregiver (inclusive check)
-            const medicalDevicesList = iotDevices.filter((d) =>
+            const medicalDevicesList = devices.filter((d) =>
               String(d.type || "").toLowerCase().includes("medical")
             );
             const medicalCount = medicalDevicesList.length;
@@ -272,28 +322,25 @@ export function useDeviceInventoryLoader({
 
             // Only update caregiver count if we found medical devices
             if (medicalCount > 0) {
-              // @ts-ignore
               aggregated.caregiver = medicalCount;
-              // @ts-ignore
               aggregated.caregiverOffline = medicalOfflineCount;
             }
 
             // Assign IoT Offline
-            // @ts-ignore
             aggregated.iotOffline = iotOfflineCount;
 
             fetchedRealData = true;
             const iotOnlineCount = iotDevicesList.length - iotOfflineCount;
 
             // Re-calculate Air components
-            const airDevs = iotDevices.filter(d =>
+            const airDevs = devices.filter(d =>
               d.snapshot && (d.snapshot.pm25 !== undefined || d.snapshot.eco2 !== undefined)
             );
             const airOff = airDevs.filter(d => String(d.status || "").toLowerCase() === "offline").length;
             const airOn = airDevs.length - airOff;
 
             // Re-calculate Medical components
-            const medDevs = iotDevices.filter((d) => String(d.type || "").toLowerCase() === "medical");
+            const medDevs = devices.filter((d) => String(d.type || "").toLowerCase() === "medical");
             const medOff = medDevs.filter(d => String(d.status || "").toLowerCase() === "offline").length;
             const medOn = medDevs.length - medOff;
 
@@ -316,10 +363,9 @@ export function useDeviceInventoryLoader({
           electricOffline: aggregated.electricOffline,
           airSensor: aggregated.air,
           iot: aggregated.iot,
-          iotOffline: (aggregated as any).iotOffline || 0,
-          // @ts-ignore
+          iotOffline: aggregated.iotOffline || 0,
           caregiver: aggregated.caregiver || 0,
-          caregiverOffline: (aggregated as any).caregiverOffline || 0,
+          caregiverOffline: aggregated.caregiverOffline || 0,
         };
 
         const electricOffline = Number(aggregated.electricOffline ?? 0);
@@ -337,7 +383,7 @@ export function useDeviceInventoryLoader({
             aggregated.intercom +
             aggregated.water +
             aggregated.electric +
-            ((aggregated as any).zyta || 0);
+            (aggregated.zyta || 0);
 
           const electricOnline = Math.max(
             0,
@@ -386,8 +432,19 @@ export function useDeviceInventoryLoader({
       cancelled = true;
       clearInterval(interval);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessDigest, selectedKey, enabled, setCounts, setLoading, accessibleSites, selectedUtility?.id, selectedGroupSite?.id]);
+  }, [
+    accessDigest,
+    accessibleSites,
+    enabled,
+    selectedGroupSite?.id,
+    selectedGroupSite?.label,
+    selectedKey,
+    selectedUtility?.id,
+    selectedUtility?.label,
+    setCounts,
+    setLoading,
+    siteOptions,
+  ]);
 
   return { counts, totals, loading };
 }

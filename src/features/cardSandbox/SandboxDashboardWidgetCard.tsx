@@ -23,7 +23,10 @@ import {
   toDateKey,
 } from "../../utils/notis";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import { selectSandboxEventPanels, selectSandboxMapPanel } from "./cardSandboxSelectors";
+import {
+  selectSandboxEventPanels,
+  selectSandboxFilterGroupForCard,
+} from "./cardSandboxSelectors";
 import { cardSandboxActions } from "./cardSandboxSlice";
 
 type DashboardRole = "admin" | "manager" | "officer" | "user";
@@ -41,6 +44,7 @@ type SandboxSite = {
 
 type Props = {
   variant: "zyta" | "facerec" | "devices" | "users" | "snapshot";
+  cardId: string;
 };
 
 type FaceRecognizeItem = React.ComponentProps<
@@ -142,6 +146,31 @@ function mergeSiteMetadata(
       groupSite: site.groupSite ?? catalog.groupSite,
     };
   });
+}
+
+function todayValue() {
+  const date = new Date();
+  return { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() };
+}
+
+function matchesScopedSiteCode(noti: Noti, codes: Set<string>) {
+  const candidates = [
+    noti.siteCode,
+    noti.siteId,
+    noti.siteName,
+    noti.site,
+    (noti as Record<string, unknown>).site_code,
+    (noti as Record<string, unknown>).site_id,
+  ];
+  return candidates
+    .filter((candidate): candidate is string => typeof candidate === "string")
+    .some((candidate) => codes.has(candidate.trim()));
+}
+
+function matchesSiteSummary(site: SandboxSite, codes: Set<string>) {
+  return [site.code, site.id, site.name]
+    .filter((candidate): candidate is string => typeof candidate === "string")
+    .some((candidate) => codes.has(candidate.trim()));
 }
 
 function isZytaNoti(noti: Noti): boolean {
@@ -246,10 +275,19 @@ function useSandboxAccessibleSites() {
   return { accessibleSites, role };
 }
 
-function useSandboxScopedNotis() {
-  const { date, selectedSite } = useFilters();
+function useSandboxScopedNotis(cardId: string) {
+  const filterGroup = useAppSelector((state) =>
+    selectSandboxFilterGroupForCard(state, cardId)
+  );
+  const { siteOptions } = useFilters();
   const { items: liveNotis } = useNotisFeed();
-  const selectedDateKey = React.useMemo(() => toDateKey(date), [date]);
+  const fallbackDate = React.useMemo(() => todayValue(), []);
+  const selectedDate = filterGroup?.date ?? fallbackDate;
+  const selectedSite = filterGroup?.selectedSite ?? "all";
+  const selectedDateKey = React.useMemo(
+    () => toDateKey(selectedDate),
+    [selectedDate]
+  );
   const matchGlobalDate = React.useCallback(
     (value: string) => {
       if (!selectedDateKey) return true;
@@ -265,22 +303,84 @@ function useSandboxScopedNotis() {
     );
   }, [liveNotis]);
 
-  return React.useMemo(() => {
+  const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {
+    const isAll = !selectedSite || selectedSite === "all";
+    if (!isAll) return null;
+
+    const selectedUtility = filterGroup?.selectedUtility;
+    const selectedGroupSite = filterGroup?.selectedGroupSite;
+    const hasScope = Boolean(selectedUtility?.id || selectedGroupSite?.id);
+    if (!hasScope) return null;
+
+    const codes = new Set<string>();
+    for (const option of siteOptions) {
+      const code = String(option.value || "").trim();
+      if (!code || code.toLowerCase() === "all") continue;
+      if (selectedUtility?.id && option.utilityId !== selectedUtility.id) {
+        continue;
+      }
+      if (selectedGroupSite?.id) {
+        const groupId = option.groupId;
+        const groupLabel = option.groupLabel;
+        if (
+          groupId !== selectedGroupSite.id &&
+          groupLabel !== selectedGroupSite.label
+        ) {
+          continue;
+        }
+      }
+      codes.add(code);
+    }
+
+    return codes.size > 0 ? codes : null;
+  }, [
+    filterGroup?.selectedGroupSite,
+    filterGroup?.selectedUtility,
+    selectedSite,
+    siteOptions,
+  ]);
+
+  const dateScopedNotis = React.useMemo(() => {
     const siteScoped =
       !selectedSite || selectedSite === "all"
-        ? sortByNewest(baseNotis)
+        ? scopedSiteCodes
+          ? sortByNewest(
+              baseNotis.filter((noti) =>
+                matchesScopedSiteCode(noti, scopedSiteCodes)
+              )
+            )
+          : sortByNewest(baseNotis)
         : sortByNewest(baseNotis.filter((noti) => matchesSite(noti, selectedSite)));
     return siteScoped.filter((noti) => matchGlobalDate(noti?.date));
-  }, [baseNotis, matchGlobalDate, selectedSite]);
+  }, [baseNotis, matchGlobalDate, scopedSiteCodes, selectedSite]);
+
+  return {
+    dateScopedNotis,
+    filterGroup,
+    scopedSiteCodes,
+    selectedSite,
+    siteOptions,
+  };
 }
 
-export default function SandboxDashboardWidgetCard({ variant }: Props) {
+export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
   const dispatch = useAppDispatch();
-  const mapPanel = useAppSelector(selectSandboxMapPanel);
   const { faceSearch, zytaSearch } = useAppSelector(selectSandboxEventPanels);
-  const { selectedSite } = useFilters();
   const { accessibleSites, role } = useSandboxAccessibleSites();
-  const dateScopedNotis = useSandboxScopedNotis();
+  const {
+    dateScopedNotis,
+    filterGroup,
+    scopedSiteCodes,
+    selectedSite,
+    siteOptions,
+  } = useSandboxScopedNotis(cardId);
+
+  const scopedAccessibleSites = React.useMemo(() => {
+    if (!scopedSiteCodes || selectedSite !== "all") return accessibleSites;
+    return accessibleSites.filter((site) =>
+      matchesSiteSummary(site, scopedSiteCodes)
+    );
+  }, [accessibleSites, scopedSiteCodes, selectedSite]);
 
   const faceRecognizeItems = React.useMemo(
     () =>
@@ -315,18 +415,21 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
       "10": 2,
       "73": 3,
     };
-    for (const site of accessibleSites) {
+    for (const site of scopedAccessibleSites) {
       const code = String(site?.province_code ?? "").trim();
       const idx = map[code] ?? 3;
       counts[idx] += 1;
     }
     return counts;
-  }, [accessibleSites]);
+  }, [scopedAccessibleSites]);
 
   const { counts: deviceCounts, totals: deviceTotals } =
     useDeviceInventoryLoader({
       selectedSiteCode: selectedSite,
-      accessibleSites,
+      accessibleSites: scopedAccessibleSites,
+      selectedGroupSite: filterGroup?.selectedGroupSite ?? null,
+      selectedUtility: filterGroup?.selectedUtility ?? null,
+      siteOptions,
       enabled: variant === "devices",
     });
 
@@ -341,7 +444,8 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
       try {
         const raw = String(selectedSite ?? "").trim();
         const isAll = !raw || raw === "all";
-        const hasAnySite = accessibleSites.length > 0;
+        const hasAnySite = scopedAccessibleSites.length > 0;
+        const hasGroupScope = Boolean(scopedSiteCodes);
 
         if (role !== "admin" && !hasAnySite) {
           if (!cancelled) setRoleSeriesFromApi([0, 0, 0]);
@@ -349,7 +453,7 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
         }
 
         if (isAll) {
-          if (role === "admin") {
+          if (role === "admin" && !hasGroupScope) {
             const global = await getUserStats();
             if (!cancelled) {
               setRoleSeriesFromApi([
@@ -361,7 +465,7 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
             return;
           }
 
-          const codes = accessibleSites
+          const codes = scopedAccessibleSites
             .map((site) => String(site.code || "").trim())
             .filter(Boolean);
           if (codes.length === 0) {
@@ -407,14 +511,14 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [accessibleSites, role, selectedSite, variant]);
+  }, [role, scopedAccessibleSites, scopedSiteCodes, selectedSite, variant]);
 
   const buttonLabel = React.useMemo(
     () =>
-      mapPanel.selectedEvents.includes("all")
+      (filterGroup?.selectedEvents ?? ["all"]).includes("all")
         ? "all"
-        : mapPanel.selectedEvents.join(", "),
-    [mapPanel.selectedEvents]
+        : (filterGroup?.selectedEvents ?? ["all"]).join(", "),
+    [filterGroup?.selectedEvents]
   );
 
   if (variant === "zyta") {
@@ -464,8 +568,16 @@ export default function SandboxDashboardWidgetCard({ variant }: Props) {
   return (
     <SnapshotChartSection
       buttonLabel={buttonLabel}
-      selectedEvents={mapPanel.selectedEvents}
-      toggleEvent={(value) => dispatch(cardSandboxActions.toggleMapEvent(value))}
+      selectedEvents={filterGroup?.selectedEvents ?? ["all"]}
+      toggleEvent={(value) =>
+        filterGroup &&
+        dispatch(
+          cardSandboxActions.toggleFilterGroupEvent({
+            id: filterGroup.id,
+            value,
+          })
+        )
+      }
     />
   );
 }

@@ -1,6 +1,7 @@
 export type SandboxCardId = string;
 export type SandboxCardKind =
   | "blank"
+  | "filters"
   | "map"
   | "alerts"
   | "wellbeing"
@@ -17,9 +18,36 @@ export type SandboxCardRect = {
   height: number;
 };
 
+export type SandboxDateValue = {
+  y: number;
+  m: number;
+  d: number;
+};
+
+export type SandboxScopeOption = {
+  id: string;
+  label: string;
+} | null;
+
+export type SandboxFilterGroupId = string;
+
+export type SandboxFilterGroup = {
+  id: SandboxFilterGroupId;
+  label: string;
+  color: string;
+  selectedSite: string;
+  selectedGroupSite: SandboxScopeOption;
+  selectedUtility: SandboxScopeOption;
+  date: SandboxDateValue;
+  selectedEvents: string[];
+  severity: string;
+  province: string;
+};
+
 export type SandboxCard = SandboxCardRect & {
   id: SandboxCardId;
   kind: SandboxCardKind;
+  filterGroupId: SandboxFilterGroupId;
   title: string;
   color: string;
   zIndex: number;
@@ -33,11 +61,8 @@ export type SandboxCard = SandboxCardRect & {
 export type CardSandboxState = {
   cards: SandboxCard[];
   selectedId: SandboxCardId | null;
-  mapPanel: {
-    selectedEvents: string[];
-    severity: string;
-    province: string;
-  };
+  filterGroups: Record<SandboxFilterGroupId, SandboxFilterGroup>;
+  activeFilterGroupId: SandboxFilterGroupId;
   eventPanels: {
     alertSearch: string;
     wellbeingSearch: string;
