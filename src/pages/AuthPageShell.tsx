@@ -12,7 +12,7 @@ export default function AuthPageShell({
   title,
   subtitle,
   children,
-  maxWidthClassName = "max-w-[448px]",
+  maxWidthClassName = "max-w-lg",
 }: AuthPageShellProps) {
   return (
     <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-[#123A42] px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
@@ -29,11 +29,11 @@ export default function AuthPageShell({
         className="absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(245,248,251,0.18))]"
       />
       <main className={`relative z-10 w-full ${maxWidthClassName}`}>
-        <div className="w-full rounded-[8px] border border-white/70 bg-white px-5 py-7 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-8 sm:py-9">
+        <div className="w-full rounded-[8px] border border-white/70 bg-white/90 px-5 py-7 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-4 sm:py-6">
           <div className="mb-8 flex flex-col items-center text-center sm:mb-9">
-            <div className="mb-5 grid h-20 w-20 place-items-center rounded-[8px] border border-slate-100 bg-white shadow-sm sm:h-24 sm:w-24">
+            <div className="mb-5 grid h-20 w-20 place-items-center sm:h-24 sm:w-24">
               <img
-                className="h-16 w-16 object-contain sm:h-20 sm:w-20"
+                className="h-20 w-20 object-contain sm:h-20 sm:w-20"
                 src={brandImage}
                 alt="BPS"
               />

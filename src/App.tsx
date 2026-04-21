@@ -1,6 +1,5 @@
 // src/App.tsx
-import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import {
   Dashboard,
   Register,
@@ -24,22 +23,18 @@ import ScrollUnlocker from "./hook/ScrollUnlocker";
 import ScrollToTop from "./hook/useScrollToTop";
 import RequireAuth from "./routes/RequireAuth";
 import { AppLayout } from "./layouts";
-import { me as apiMe, type MeResponse } from "./api/user";
 import { FiltersProvider } from "./context/FiltersContext";
 import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 import { FaceRecProvider } from "./context/FaceRecContext";
 import { NotisProvider } from "./context/NotisContext";
+import { useAppSelector } from "./store/hooks";
+import {
+  selectAuthUser,
+  selectIsAuthBooting,
+} from "./features/auth";
+import type { AuthUser } from "./features/auth";
 
-const AUTH_BOOT_TIMEOUT_MS = 8000;
-
-async function meWithTimeout(timeoutMs = AUTH_BOOT_TIMEOUT_MS) {
-  return Promise.race([
-    apiMe(),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
-  ]);
-}
-
-function dashboardPathFor(user: MeResponse | null) {
+function dashboardPathFor(user: AuthUser | null) {
   return user?.id ? `/u/${encodeURIComponent(user.id)}/dashboard` : "/";
 }
 
@@ -51,33 +46,51 @@ function AppBootLoading() {
   );
 }
 
+/**
+ * รวม providers ที่ **ต้องเรียก API ผู้ใช้** (apiMe, listSites, listNotis, ฯลฯ)
+ * ไว้ใต้ RequireAuth เท่านั้น เพื่อไม่ให้ยิง request ตอนยังไม่ได้ login
+ * (หน้า public เช่น /, /register, /forgot, /reset จะไม่ mount providers เหล่านี้)
+ */
+function AuthedProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <DeviceInventoryProvider>
+      <FaceRecProvider>
+        <FiltersProvider>
+          <NotisProvider>{children}</NotisProvider>
+        </FiltersProvider>
+      </FaceRecProvider>
+    </DeviceInventoryProvider>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <DeviceInventoryProvider>
-        <FaceRecProvider>
-          <FiltersProvider>
-            <NotisProvider>
-              <ScrollToTop smooth={true} />
-              <ScrollUnlocker />
-              <LanguageSwitcher />
-              <Routes>
-                {/* public */}
-                <Route path="/" element={<RootLoginOrDashboard />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
-                <Route path="/forgot" element={<Forgot />} />
-                <Route path="/reset" element={<Reset />} />
+      <ScrollToTop smooth={true} />
+      <ScrollUnlocker />
+      <LanguageSwitcher />
+      <Routes>
+        {/* public — ไม่ mount authed providers */}
+        <Route path="/" element={<RootLoginOrDashboard />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="/reset" element={<Reset />} />
 
-                {/* legacy path */}
-                <Route
-                  path="/dashboard"
-                  element={<LegacyDashboardRedirect />}
-                />
+        {/* legacy path */}
+        <Route path="/dashboard" element={<LegacyDashboardRedirect />} />
 
-                {/* protected */}
-                <Route element={<RequireAuth />}>
-                  <Route element={<AppLayout />}>
+        {/* protected — mount providers หลังผ่าน RequireAuth แล้ว */}
+        <Route
+          element={
+            <RequireAuth>
+              <AuthedProviders>
+                <Outlet />
+              </AuthedProviders>
+            </RequireAuth>
+          }
+        >
+          <Route element={<AppLayout />}>
                     <Route path="/u/:uid">
                       <Route path="dashboard" element={<Dashboard />} />
                       <Route path="electric" element={<BillingOverview />} />
@@ -122,63 +135,36 @@ function App() {
                   </Route>
                 </Route>
 
-                {/* catch-all */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </NotisProvider>
-          </FiltersProvider>
-        </FaceRecProvider>
-      </DeviceInventoryProvider>
+        {/* catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
 
+/**
+ * Legacy `/dashboard` path → redirect ไปยัง `/u/:uid/dashboard`
+ * อ่าน user จาก Redux (ซึ่งถูก bootstrap แล้วจาก main.tsx) ไม่ต้อง fetch ซ้ำ
+ */
 function LegacyDashboardRedirect() {
-  const [to, setTo] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const user = await meWithTimeout();
-        if (!alive) return;
-        setTo(dashboardPathFor(user));
-      } catch {
-        if (!alive) return;
-        setTo("/");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-  if (!to) return <AppBootLoading />;
-  return <Navigate to={to} replace />;
+  const booting = useAppSelector(selectIsAuthBooting);
+  const user = useAppSelector(selectAuthUser);
+
+  if (booting) return <AppBootLoading />;
+  return <Navigate to={dashboardPathFor(user)} replace />;
 }
 
 /**
- * If already authenticated, redirect root "/" to "/u/:uid/dashboard".
- * Otherwise render the normal Login page.
+ * หน้า root "/" : ถ้า login แล้ว → redirect ไป dashboard, ถ้ายัง → แสดง Login
+ * อ่าน user จาก Redux (bootstrap ใน main.tsx) — ไม่ fetch /users/me ซ้ำ
  */
 function RootLoginOrDashboard() {
-  const [to, setTo] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const user = await meWithTimeout();
-        if (!alive) return;
-        setTo(dashboardPathFor(user));
-      } catch {
-        if (!alive) return;
-        setTo("/");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-  if (!to) return <AppBootLoading />;
-  if (to === "/") return <Login />;
-  return <Navigate to={to} replace />;
+  const booting = useAppSelector(selectIsAuthBooting);
+  const user = useAppSelector(selectAuthUser);
+
+  if (booting) return <AppBootLoading />;
+  if (!user) return <Login />;
+  return <Navigate to={dashboardPathFor(user)} replace />;
 }
+
 export default App;

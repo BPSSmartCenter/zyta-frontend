@@ -12,8 +12,20 @@ export type MeResponse = {
   brandingLogoUrl?: string | null;
 };
 
-export async function me(): Promise<MeResponse> {
-  const { data } = await api.get("/users/me");
+/**
+ * GET /users/me
+ *
+ * @param opts.silent401
+ *   ถ้า true: axios interceptor จะไม่ redirect/log เมื่อเจอ 401
+ *   เหมาะกับเคส "probe cookie" ตอน boot app เพื่อเช็คว่ามี session valid ไหม
+ *   — 401 ที่นี่เป็น expected, ไม่ใช่ bug
+ */
+export async function me(opts?: { silent401?: boolean }): Promise<MeResponse> {
+  const { data } = await api.get("/users/me", {
+    // ส่ง flag ผ่าน request config เพื่อให้ axios interceptor รู้ว่า 401 ครั้งนี้ตั้งใจ
+    // (ดู src/api/axios.ts)
+    ...(opts?.silent401 ? { _silent401: true } : {}),
+  } as import("axios").AxiosRequestConfig);
   return data;
 }
 

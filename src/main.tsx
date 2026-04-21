@@ -5,6 +5,12 @@ import App from "./App.tsx";
 import "./i18n";
 import "preline/preline";
 import { store } from "./store/store";
+import { bootstrapAuth } from "./features/auth";
+
+// เริ่ม probe session ก่อน render UI ทำงาน parallel กับการ mount React
+// ผลลัพธ์จะถูกเก็บใน state.auth (bootStatus, user)
+// App.tsx จะรอ bootStatus === "ready" ก่อนตัดสินใจ route
+store.dispatch(bootstrapAuth());
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

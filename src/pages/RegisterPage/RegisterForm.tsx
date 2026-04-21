@@ -75,11 +75,7 @@ export default function RegisterForm({
   };
 
   return (
-    <AuthPageShell
-      title={t("title")}
-      subtitle={t("subtitle")}
-      maxWidthClassName="max-w-[560px]"
-    >
+    <AuthPageShell title={t("title")} subtitle={t("subtitle")}>
       <form
         className="flex w-full flex-col gap-5"
         onSubmit={handleSubmit}

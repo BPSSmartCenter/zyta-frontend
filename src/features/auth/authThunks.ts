@@ -9,35 +9,126 @@ import {
   resetPassword as apiResetPassword,
 } from "../../api/auth";
 import { me as apiMe } from "../../api/user";
-import type {
-  AuthRejectValue,
-  AuthUser,
-  ForgotPasswordInput,
-  LoginCredentials,
-  RegisterAccountInput,
-  ResetPasswordInput,
+import {
+  AUTH_ERROR_CODES,
+  type AuthRejectValue,
+  type AuthUser,
+  type ForgotPasswordInput,
+  type LoginCredentials,
+  type RegisterAccountInput,
+  type ResetPasswordInput,
 } from "./authTypes";
 
+/**
+ * Map HTTP status codes and API error codes to typed AuthErrorResponse
+ * This provides consistent error handling across all auth thunks
+ */
 function rejectFromError(error: unknown): AuthRejectValue {
   if (!isAxiosError(error)) {
-    return { code: "UNKNOWN" };
+    return {
+      code: AUTH_ERROR_CODES.UNKNOWN,
+      message: "Unknown error occurred",
+      statusCode: undefined,
+    };
   }
 
   const status = error.response?.status;
-  const code = error.response?.data?.code;
+  const apiCode = error.response?.data?.code;
+  const apiMessage = error.response?.data?.message;
 
-  if (status === 403 && code === "ACCOUNT_INACTIVE") {
-    return { code: "ACCOUNT_INACTIVE" };
+  // Handle known HTTP status codes
+  if (status === 401 || status === 403) {
+    if (apiCode === "ACCOUNT_INACTIVE") {
+      return {
+        code: AUTH_ERROR_CODES.ACCOUNT_INACTIVE,
+        message: apiMessage || "Account is inactive",
+        statusCode: status,
+      };
+    }
+    if (apiCode === "EMAIL_NOT_VERIFIED") {
+      return {
+        code: AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED,
+        message: apiMessage || "Email not verified",
+        statusCode: status,
+      };
+    }
+    return {
+      code: AUTH_ERROR_CODES.INVALID_CREDENTIALS,
+      message: apiMessage || "Invalid credentials",
+      statusCode: status,
+    };
   }
-  if (status === 403 && code === "EMAIL_NOT_VERIFIED") {
-    return { code: "EMAIL_NOT_VERIFIED" };
-  }
+
   if (status === 409) {
-    return { code: "EMAIL_ALREADY_EXISTS" };
+    return {
+      code: AUTH_ERROR_CODES.EMAIL_ALREADY_EXISTS,
+      message: apiMessage || "Email already exists",
+      statusCode: status,
+    };
   }
 
-  return { code: "UNKNOWN", message: error.message };
+  if (status === 400) {
+    return {
+      code: AUTH_ERROR_CODES.WEAK_PASSWORD,
+      message: apiMessage || "Invalid input data",
+      statusCode: status,
+    };
+  }
+
+  if (status && status >= 500) {
+    return {
+      code: AUTH_ERROR_CODES.SERVER_ERROR,
+      message: apiMessage || "Server error",
+      statusCode: status,
+    };
+  }
+
+  if (error.code === "ERR_NETWORK" || !status) {
+    return {
+      code: AUTH_ERROR_CODES.NETWORK_ERROR,
+      message: "Network error. Please check your connection.",
+      statusCode: undefined,
+    };
+  }
+
+  return {
+    code: AUTH_ERROR_CODES.UNKNOWN,
+    message: apiMessage || error.message || "Unknown error occurred",
+    statusCode: status,
+  };
 }
+
+/**
+ * Bootstrap authentication — "probe" ว่ามี valid session (cookie) อยู่ไหม
+ *
+ * เรียก **ครั้งเดียว** ตอน app boot (ใน main.tsx) แล้วเก็บผลไว้ใน Redux
+ * - success (user object)  → มี session valid, render app ได้
+ * - success (null)         → ยังไม่ได้ login หรือ session หมดอายุ — ไม่ใช่ error
+ * - rejected               → network/server error จริง ๆ เท่านั้น
+ *
+ * ใช้ silent401: true เพื่อไม่ให้ axios interceptor redirect/log 401
+ * (เพราะเป็น expected outcome ไม่ใช่ bug)
+ */
+export const bootstrapAuth = createAsyncThunk<
+  AuthUser | null,
+  void,
+  { rejectValue: AuthRejectValue }
+>("auth/bootstrap", async (_, { rejectWithValue }) => {
+  try {
+    const user = await apiMe({ silent401: true });
+    return user;
+  } catch (error) {
+    // 401/403 = ยังไม่ได้ login — ถือเป็น "unauthenticated", ไม่ใช่ error
+    if (isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) {
+        return null;
+      }
+    }
+    // Network/server error จริง → reject เพื่อให้ component แสดง error state
+    return rejectWithValue(rejectFromError(error));
+  }
+});
 
 export const loginWithCredentials = createAsyncThunk<
   AuthUser,
@@ -73,7 +164,10 @@ export const forgotPassword = createAsyncThunk<
   try {
     const result = await checkEmailExists(email);
     if (!result?.exists) {
-      return rejectWithValue({ code: "EMAIL_NOT_FOUND" });
+      return rejectWithValue({
+        code: AUTH_ERROR_CODES.EMAIL_NOT_FOUND,
+        message: "Email not found in system",
+      });
     }
     await requestPasswordReset(email);
     return { email };
@@ -88,7 +182,10 @@ export const resetPassword = createAsyncThunk<
   { rejectValue: AuthRejectValue }
 >("auth/resetPassword", async ({ token, password }, { rejectWithValue }) => {
   if (!token) {
-    return rejectWithValue({ code: "MISSING_RESET_TOKEN" });
+    return rejectWithValue({
+      code: AUTH_ERROR_CODES.MISSING_RESET_TOKEN,
+      message: "Reset token is missing",
+    });
   }
 
   try {
