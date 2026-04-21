@@ -1,7 +1,6 @@
 // src/pages/SiteManagementPage/index.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/SiteManagement/Navbar";
 import Content from "../../components/SiteManagement/Content";
 import ContentCreate from "../../components/SiteManagement/Content_Create";
@@ -15,11 +14,9 @@ import Modal from "../../components/Modal";
 
 export default function SiteManagement() {
   return (
-    <Sidebar>
-      <ToastProvider>
-        <SiteManagementGuarded />
-      </ToastProvider>
-    </Sidebar>
+    <ToastProvider>
+      <SiteManagementGuarded />
+    </ToastProvider>
   );
 }
 

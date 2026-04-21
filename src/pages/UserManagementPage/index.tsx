@@ -1,6 +1,5 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/UserManagement/Navbar";
 import Content from "../../components/UserManagement/Content";
 import Content_Edit from "../../components/UserManagement/Content_Edit";
@@ -22,11 +21,9 @@ import { ADMIN_ROWS, type AdminRow } from "../../components/UserManagement/user.
 
 export default function UserManagement() {
   return (
-    <Sidebar>
-      <ToastProvider>
-        <UserManagementGuarded />
-      </ToastProvider>
-    </Sidebar>
+    <ToastProvider>
+      <UserManagementGuarded />
+    </ToastProvider>
   );
 }
 

@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type {
   AuthRejectValue,
   AuthUser,
@@ -55,6 +55,15 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
+    setAuthUser(state, action: PayloadAction<AuthUser>) {
+      state.user = action.payload;
+    },
+    clearAuthUser(state) {
+      state.user = null;
+      state.loginStatus = "idle";
+      state.loginIssue = null;
+      state.resendStatus = "idle";
+    },
     clearLoginFeedback(state) {
       state.loginIssue = null;
       state.loginStatus = "idle";

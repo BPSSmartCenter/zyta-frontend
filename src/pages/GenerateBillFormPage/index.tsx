@@ -2,7 +2,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/Dashboard/Navbar";
 import Modal from "../../components/Modal";
 import { useFilters } from "../../context/FiltersContext";
@@ -1128,7 +1127,7 @@ const GenerateBillForm: React.FC = () => {
   }, [navigate, abs]);
 
   return (
-    <Sidebar>
+    <>
       <div className="min-h-screen bg-slate-50">
         <Navbar
           searchSite={searchSite}
@@ -1816,7 +1815,7 @@ const GenerateBillForm: React.FC = () => {
         closeLabel={generateText.buttons.modalClose}
         onClose={() => setErrorModalMessage(null)}
       />
-    </Sidebar>
+    </>
   );
 };
 
@@ -1959,4 +1958,3 @@ function dateToValue(date: Date): DateValue {
     d: date.getDate(),
   };
 }
-

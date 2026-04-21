@@ -1,7 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/Dashboard/Navbar";
 import { useFilters } from "../../context/FiltersContext";
 import { useUserLogo } from "../../hooks/useUserLogo";
@@ -629,7 +628,7 @@ const BillingOverview: React.FC = () => {
         : overviewText.siteGuard.select;
 
   return (
-    <Sidebar>
+    <>
       <div className="min-h-screen bg-slate-50">
         <Navbar
           searchSite={searchSite}
@@ -1109,7 +1108,7 @@ const BillingOverview: React.FC = () => {
         onConfirm={() => handleDeleteConfirm(deleteTarget)}
         onClose={handleDeleteCancel}
       />
-    </Sidebar>
+    </>
   );
 };
 

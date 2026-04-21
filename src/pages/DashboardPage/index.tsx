@@ -1,6 +1,5 @@
-﻿// src/pages/DashboardPage/index.tsx
+// src/pages/DashboardPage/index.tsx
 import React from "react";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/Dashboard/Navbar";
 import ContentLayout from "../../components/Dashboard/ContentLayout";
 import Header from "../../components/Dashboard/Header";
@@ -344,38 +343,36 @@ export default function Dashboard() {
   );
 
   return (
-    <Sidebar>
-      <div className="p-0 min-h-screen bg-[#F8FBFE] flex flex-col gap-3 sm:gap-4 lg:gap-6">
-        <Navbar
-          searchSite={searchSite}
-          setSearchSite={setSearchSite}
-          siteOptions={siteOptions}
-          selectedSite={selectedSite}
-          setSelectedSite={setSelectedSite}
-          selectedGroupSite={selectedGroupSite}
-          setSelectedGroupSite={setSelectedGroupSite}
-          selectedUtility={selectedUtility}
-          setSelectedUtility={setSelectedUtility}
-          enableGroupSiteSelection={true}
-          date={globalDate as any}
-          setDate={setGlobalDate as any}
-          logoSrc={userLogoSrc}
-        />
+    <div className="p-0 min-h-screen bg-[#F8FBFE] flex flex-col gap-3 sm:gap-4 lg:gap-6">
+      <Navbar
+        searchSite={searchSite}
+        setSearchSite={setSearchSite}
+        siteOptions={siteOptions}
+        selectedSite={selectedSite}
+        setSelectedSite={setSelectedSite}
+        selectedGroupSite={selectedGroupSite}
+        setSelectedGroupSite={setSelectedGroupSite}
+        selectedUtility={selectedUtility}
+        setSelectedUtility={setSelectedUtility}
+        enableGroupSiteSelection={true}
+        date={globalDate as any}
+        setDate={setGlobalDate as any}
+        logoSrc={userLogoSrc}
+      />
 
-        <Header
-          statItems={statItems as any}
-          selectedSiteCode={selectedSite}
-          events={dateScopedNotis}
-        />
+      {/* <Header
+        statItems={statItems as any}
+        selectedSiteCode={selectedSite}
+        events={dateScopedNotis}
+      />
 
-        <ContentLayout {...(contentLayoutProps as any)} />
+      <ContentLayout {...(contentLayoutProps as any)} />
 
-        <SnapshotChartSection
-          buttonLabel={buttonLabel}
-          selectedEvents={selectedEvents}
-          toggleEvent={toggleEvent}
-        />
-      </div>
-    </Sidebar>
+      <SnapshotChartSection
+        buttonLabel={buttonLabel}
+        selectedEvents={selectedEvents}
+        toggleEvent={toggleEvent}
+      /> */}
+    </div>
   );
 }

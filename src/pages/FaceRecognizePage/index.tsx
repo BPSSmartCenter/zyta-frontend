@@ -1,5 +1,4 @@
 // src/pages/FaceRecognizePage/index.tsx
-import Sidebar from "../../components/Sidebar";
 import Content from "../../components/FaceRec/Content";
 import { useLocation } from "react-router-dom";
 import { resolveFaceRecKind } from "../../utils/notis";
@@ -24,10 +23,8 @@ export default function FaceRecognize() {
   })();
 
   return (
-    <Sidebar>
-      <div className="p-4 bg-[#F8FBFE]">
-        <Content defaultActive={derivedDefaultActive} />
-      </div>
-    </Sidebar>
+    <div className="p-4 bg-[#F8FBFE]">
+      <Content defaultActive={derivedDefaultActive} />
+    </div>
   );
 }

@@ -1,11 +1,10 @@
-﻿// src/pages/ElectricMeterPage/index.tsx
+// src/pages/ElectricMeterPage/index.tsx
 import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import type { AxisSeries } from "../../types/apexSeries";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/Dashboard/Navbar";
 import { useFilters } from "../../context/FiltersContext";
 import { useUserLogo } from "../../hooks/useUserLogo";
@@ -566,12 +565,11 @@ export const ElectricMeter: React.FC = () => {
 
   return (
     <>
-      <Sidebar>
-        <div className="min-h-screen bg-[#eef6ff]">
-          <Navbar
-            searchSite={searchSite}
-            setSearchSite={setSearchSite}
-            siteOptions={siteOptions}
+      <div className="min-h-screen bg-[#eef6ff]">
+        <Navbar
+          searchSite={searchSite}
+          setSearchSite={setSearchSite}
+          siteOptions={siteOptions}
           selectedSite={selectedSite}
           setSelectedSite={setSelectedSite}
           date={date as any}
@@ -925,7 +923,6 @@ export const ElectricMeter: React.FC = () => {
           </div>
         </div>
       </div>
-    </Sidebar>
     <Modal
       open={siteGuardOpen}
       id="electric-site-required"
@@ -1221,4 +1218,3 @@ function formatRangeDate(date: Date, locale = "th-TH") {
     year: "numeric",
   });
 }
-

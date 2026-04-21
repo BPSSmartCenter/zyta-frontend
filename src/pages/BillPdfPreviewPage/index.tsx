@@ -1,5 +1,4 @@
-﻿import React from "react";
-import Sidebar from "../../components/Sidebar";
+import React from "react";
 import Navbar from "../../components/Dashboard/Navbar";
 import Modal from "../../components/Modal";
 import { useFilters } from "../../context/FiltersContext";
@@ -1043,7 +1042,7 @@ const BillPdfPreview: React.FC = () => {
   const showZoomControls = isMobileViewport;
   const zoomPercentage = Math.round(previewScale * 100);
   return (
-    <Sidebar>
+    <>
       <div className="min-h-screen bg-[#e9eef5]">
         <Navbar
           searchSite={searchSite}
@@ -1429,7 +1428,7 @@ const BillPdfPreview: React.FC = () => {
         closeLabel="โอเค"
         onClose={handleSiteGuardClose}
       />
-    </Sidebar>
+    </>
   );
 };
 

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import LoginForm from "./LoginForm";
 import Modal from "../../components/Modal";
 import { useTranslation, Trans } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   authActions,
@@ -10,13 +10,19 @@ import {
   resendVerificationEmail,
   selectLoginState,
 } from "../../features/auth";
+import {
+  buildPostLoginPath,
+  getReturnToFromState,
+} from "../../routes/authRedirect";
 
 export default function Login() {
   const { t } = useTranslation("signin");
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const loginState = useAppSelector(selectLoginState);
   const submitting = loginState.status === "pending";
+  const returnTo = getReturnToFromState(location.state);
 
   const resendState =
     loginState.resendStatus === "pending"
@@ -38,12 +44,12 @@ export default function Login() {
           })
         ).unwrap();
         if (!user?.id) throw new Error("No UID");
-        navigate(`/u/${user.id}/dashboard`, { replace: true });
+        navigate(buildPostLoginPath(user.id, returnTo), { replace: true });
       } catch (error) {
         console.error("Login failed", error);
       }
     },
-    [dispatch, navigate]
+    [dispatch, navigate, returnTo]
   );
 
   const handleResend = useCallback(async () => {

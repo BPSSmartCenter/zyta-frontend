@@ -1,4 +1,4 @@
-﻿// src/App.tsx
+// src/App.tsx
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import {
@@ -23,12 +23,12 @@ import "./App.css";
 import ScrollUnlocker from "./hook/ScrollUnlocker";
 import ScrollToTop from "./hook/useScrollToTop";
 import RequireAuth from "./routes/RequireAuth";
-import { me as apiMe } from "./api/user";
+import { AppLayout } from "./layouts";
+import { me as apiMe, type MeResponse } from "./api/user";
 import { FiltersProvider } from "./context/FiltersContext";
 import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 import { FaceRecProvider } from "./context/FaceRecContext";
 import { NotisProvider } from "./context/NotisContext";
-import { API_BASE_URL } from "./api/axios";
 
 const AUTH_BOOT_TIMEOUT_MS = 8000;
 
@@ -37,6 +37,10 @@ async function meWithTimeout(timeoutMs = AUTH_BOOT_TIMEOUT_MS) {
     apiMe(),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
   ]);
+}
+
+function dashboardPathFor(user: MeResponse | null) {
+  return user?.id ? `/u/${encodeURIComponent(user.id)}/dashboard` : "/";
 }
 
 function AppBootLoading() {
@@ -48,7 +52,6 @@ function AppBootLoading() {
 }
 
 function App() {
-  console.log(`API Base URL: ${API_BASE_URL}`);
   return (
     <BrowserRouter>
       <DeviceInventoryProvider>
@@ -66,7 +69,7 @@ function App() {
                 <Route path="/forgot" element={<Forgot />} />
                 <Route path="/reset" element={<Reset />} />
 
-                {/* legacy path: redirect เนเธ /u/:uid/dashboard */}
+                {/* legacy path */}
                 <Route
                   path="/dashboard"
                   element={<LegacyDashboardRedirect />}
@@ -74,27 +77,47 @@ function App() {
 
                 {/* protected */}
                 <Route element={<RequireAuth />}>
-                  <Route path="/u/:uid">
-                    <Route path="dashboard" element={<Dashboard />} />
-                    <Route path="electric" element={<BillingOverview />} />
-                    <Route path="electric/meter" element={<ElectricMeter />} />
-                    <Route path="electric/generate-bill" element={<GenerateBillForm />} />
-                    <Route path="electric/generate-bill/preview" element={<BillPdfPreview />} />
-                    <Route path="alert" element={<TotalAlert />} />
-                    <Route path="facerec" element={<FaceRecognize />} />
-                    <Route path="devices" element={<Devices />} />
-                    <Route path="usermanage" element={<UserManagement />} />
-                    <Route path="sitemanage" element={<SiteManagement />} />
-                    {/* site-scoped routes */}
-                    <Route path="site/:siteCode">
+                  <Route element={<AppLayout />}>
+                    <Route path="/u/:uid">
                       <Route path="dashboard" element={<Dashboard />} />
                       <Route path="electric" element={<BillingOverview />} />
-                      <Route path="electric/meter" element={<ElectricMeter />} />
-                      <Route path="electric/generate-bill" element={<GenerateBillForm />} />
-                      <Route path="electric/generate-bill/preview" element={<BillPdfPreview />} />
+                      <Route
+                        path="electric/meter"
+                        element={<ElectricMeter />}
+                      />
+                      <Route
+                        path="electric/generate-bill"
+                        element={<GenerateBillForm />}
+                      />
+                      <Route
+                        path="electric/generate-bill/preview"
+                        element={<BillPdfPreview />}
+                      />
                       <Route path="alert" element={<TotalAlert />} />
-                      <Route path="devices" element={<Devices />} />
                       <Route path="facerec" element={<FaceRecognize />} />
+                      <Route path="devices" element={<Devices />} />
+                      <Route path="usermanage" element={<UserManagement />} />
+                      <Route path="sitemanage" element={<SiteManagement />} />
+                      {/* site-scoped routes */}
+                      <Route path="site/:siteCode">
+                        <Route path="dashboard" element={<Dashboard />} />
+                        <Route path="electric" element={<BillingOverview />} />
+                        <Route
+                          path="electric/meter"
+                          element={<ElectricMeter />}
+                        />
+                        <Route
+                          path="electric/generate-bill"
+                          element={<GenerateBillForm />}
+                        />
+                        <Route
+                          path="electric/generate-bill/preview"
+                          element={<BillPdfPreview />}
+                        />
+                        <Route path="alert" element={<TotalAlert />} />
+                        <Route path="devices" element={<Devices />} />
+                        <Route path="facerec" element={<FaceRecognize />} />
+                      </Route>
                     </Route>
                   </Route>
                 </Route>
@@ -110,7 +133,6 @@ function App() {
   );
 }
 
-/** เธ•เธฑเธงเธเนเธงเธข: เธ–เนเธฒเนเธเธฃเธขเธฑเธเธเธ” /dashboard เธญเธขเธนเน เนเธซเน redirect เนเธ /u/:myUid/dashboard */
 function LegacyDashboardRedirect() {
   const [to, setTo] = useState<string | null>(null);
   useEffect(() => {
@@ -119,8 +141,7 @@ function LegacyDashboardRedirect() {
       try {
         const user = await meWithTimeout();
         if (!alive) return;
-        if (user && (user as any)?.id) setTo(`/u/${(user as any).id}/dashboard`);
-        else setTo("/");
+        setTo(dashboardPathFor(user));
       } catch {
         if (!alive) return;
         setTo("/");
@@ -146,8 +167,7 @@ function RootLoginOrDashboard() {
       try {
         const user = await meWithTimeout();
         if (!alive) return;
-        if (user && (user as any)?.id) setTo(`/u/${(user as any).id}/dashboard`);
-        else setTo("/");
+        setTo(dashboardPathFor(user));
       } catch {
         if (!alive) return;
         setTo("/");
