@@ -16,12 +16,19 @@
   "reset": {
     "title": "Set a new password",
     "subtitle": "Create a new password that meets the requirements below",
-    "actions": { "submit": "Change password" },
+    "actions": {
+      "submit": "Change password",
+      "loading": "Changing password"
+    },
     "login_link": "Back to sign in",
     "modal": {
       "title": "Success",
       "success": "Your password has been changed successfully",
       "close": "Go to sign in"
+    },
+    "errors": {
+      "missing_token": "This reset link is invalid. Please request a new link.",
+      "server": "Unable to change password, please try again"
     }
   },
   "fields": {

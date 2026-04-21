@@ -1,12 +1,12 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/UserManagement/Navbar";
-import Content from "../components/UserManagement/Content";
-import Content_Edit from "../components/UserManagement/Content_Edit";
-import Content_Create from "../components/UserManagement/Content_Create";
-import Content_Reset from "../components/UserManagement/Content_Reset";
-import { ToastProvider, useToast } from "../hook/toastProvider";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/UserManagement/Navbar";
+import Content from "../../components/UserManagement/Content";
+import Content_Edit from "../../components/UserManagement/Content_Edit";
+import Content_Create from "../../components/UserManagement/Content_Create";
+import Content_Reset from "../../components/UserManagement/Content_Reset";
+import { ToastProvider, useToast } from "../../hook/toastProvider";
 import {
   listUsers,
   createUser as apiCreateUser,
@@ -17,8 +17,8 @@ import {
   assignUserSites as apiAssignUserSites,
   type AdminUserDto,
   type UserSearchDto,
-} from "../api/adminUsers";
-import { ADMIN_ROWS, type AdminRow } from "../components/UserManagement/user.constant";
+} from "../../api/adminUsers";
+import { ADMIN_ROWS, type AdminRow } from "../../components/UserManagement/user.constant";
 
 export default function UserManagement() {
   return (
@@ -37,7 +37,7 @@ function UserManagementGuarded() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../api/user")).me();
+        const me = await (await import("../../api/user")).me();
         const role = String(me.role).toLowerCase();
         setAllowed(role === "admin" || role === "manager");
       } catch {
@@ -167,7 +167,7 @@ function UserManagementInner() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../api/user")).me();
+        const me = await (await import("../../api/user")).me();
         setActorRole((String(me?.role || "user").toLowerCase() as any) || "user");
         const siteIds = Array.isArray(me?.sites)
           ? me.sites.map((s: any) => s?.id).filter(Boolean)

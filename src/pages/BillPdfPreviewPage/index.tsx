@@ -1,21 +1,21 @@
 ﻿import React from "react";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Dashboard/Navbar";
-import Modal from "../components/Modal";
-import { useFilters } from "../context/FiltersContext";
-import { useUserLogo } from "../hooks/useUserLogo";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Dashboard/Navbar";
+import Modal from "../../components/Modal";
+import { useFilters } from "../../context/FiltersContext";
+import { useUserLogo } from "../../hooks/useUserLogo";
 
 import {
   useDeviceInventory,
   getCountForType,
-} from "../context/DeviceInventoryContext";
-import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
-import { useUserPath } from "../routes/useUserPath";
+} from "../../context/DeviceInventoryContext";
+import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
+import { useUserPath } from "../../routes/useUserPath";
 import { useLocation, useNavigate } from "react-router-dom";
-import { brandImage, meaLogo, peaLogo } from "../assets";
+import { brandImage, meaLogo, peaLogo } from "../../assets";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
-import type { MeterDashboard } from "../api/meter";
+import type { MeterDashboard } from "../../api/meter";
 import {
   downloadBillExcel,
   downloadPreviewBillExcel,
@@ -26,9 +26,9 @@ import {
   generateBillExcel as generateBillExcelApi,
   type BillDetailPayload,
   type BillingReadingsPayload,
-} from "../api/billing";
-import { saveBlobAsFile } from "../utils/download";
-import { buildBrandingLogoSrc } from "../utils/branding";
+} from "../../api/billing";
+import { saveBlobAsFile } from "../../utils/download";
+import { buildBrandingLogoSrc } from "../../utils/branding";
 type BillingMode = "monthly" | "daily";
 
 const CHART_POINTS = [

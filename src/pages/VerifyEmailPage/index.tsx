@@ -1,7 +1,7 @@
-// src/pages/VerifyEmail.tsx
+// src/pages/VerifyEmailPage/index.tsx
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { verifyEmail } from "../api/auth";
+import { verifyEmail } from "../../api/auth";
 import { isAxiosError } from "axios";
 import { useTranslation } from "react-i18next";
 

@@ -1,11 +1,11 @@
 {
-  "title": "Log in to your account",
-  "subtitle": "Welcome back! Please enter your details.",
+  "title": "Welcome back",
+  "subtitle": "Sign in to manage your sites, devices, and alerts.",
   "fields": {
     "email": {
-      "label": "Email",
-      "placeholder": "Enter your email",
-      "invalid": "Email is invalid"
+      "label": "Work email",
+      "placeholder": "name@company.com",
+      "invalid": "Please enter a valid email address"
     },
     "password": {
       "label": "Password",
@@ -13,18 +13,18 @@
     }
   },
   "modal": {
-    "title": "Account Not Found",
-    "top": "This account was not found in the system",
-    "mid": "Please check that your account information is correct",
-    "bottom": "or register a new account",
+    "title": "Unable to sign in",
+    "top": "The email or password is incorrect",
+    "mid": "Please check your details and try again",
+    "bottom": "If you still cannot access your account, contact an administrator",
     "close": "OK"
   },
   "modalNotVerified": {
-    "title": "Email not verified",
-    "top": "This account has not been verified yet",
-    "bottom": "We have sent a verification link to <bold>{{lastEmail}}</bold>",
+    "title": "Please verify your email",
+    "top": "This account has not verified its email address",
+    "bottom": "We sent a verification link to <bold>{{lastEmail}}</bold>",
     "close": "OK",
-    "no_email": "Didn't receive the email",
+    "no_email": "Still did not receive the email",
     "resend": "Resend",
     "resent": "Resent",
     "sending": "Sending...",
@@ -32,18 +32,21 @@
     "check_spam": "Please also check your Spam/Promotions folder"
   },
   "modalInactive": {
-    "title": "Account restricted",
-    "top": "Your account is currently inactive and cannot be used to sign in.",
-    "mid": "Please contact the administrator to restore access,",
-    "bottom": "or try again later after your access is reinstated.",
+    "title": "Account unavailable",
+    "top": "Your account is temporarily restricted",
+    "mid": "Please contact an administrator to restore access",
+    "bottom": "Once access is restored, you can sign in again",
     "close": "OK"
   },
-  "remember": "Remember for 30 days",
-  "forgot": "Forgot password?",
+  "remember": "Keep me signed in for 30 days",
+  "forgot": "Forgot password",
   "actions": {
     "signin": "Sign in",
-    "signin_google": "Sign in with Google",
-    "signup_question": "Don't have an account?",
-    "signup": "Sign up"
+    "signing_in": "Signing in",
+    "show_password": "Show password",
+    "hide_password": "Hide password",
+    "signin_google": "Continue with Google",
+    "signup_question": "Need an account?",
+    "signup": "Create one"
   }
 }

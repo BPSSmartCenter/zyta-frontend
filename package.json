@@ -11,6 +11,7 @@
     "mock:fixtures": "node scripts/generate-mock-fixtures.mjs --dump \"D:\\Code\\_BPS\\bps_prod_backup.sql\" --scope medium --anonymize true"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.11.2",
     "@tailwindcss/vite": "^4.1.11",
     "apexcharts": "^5.3.4",
     "axios": "^1.12.2",
@@ -32,6 +33,7 @@
     "react-dom": "^19.0.0-rc.1",
     "react-i18next": "^15.7.3",
     "react-leaflet": "^5.0.0-rc.2",
+    "react-redux": "^9.2.0",
     "react-router-dom": "^7.7.0",
     "react-to-print": "^3.2.0",
     "tailwindcss": "^4.1.11"

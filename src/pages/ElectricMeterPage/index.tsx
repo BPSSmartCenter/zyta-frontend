@@ -1,26 +1,26 @@
-﻿// src/pages/ElectricMeter.tsx
+﻿// src/pages/ElectricMeterPage/index.tsx
 import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
-import type { AxisSeries } from "../types/apexSeries";
+import type { AxisSeries } from "../../types/apexSeries";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Dashboard/Navbar";
-import { useFilters } from "../context/FiltersContext";
-import { useUserLogo } from "../hooks/useUserLogo";
-import { useDeviceInventory, getCountForType } from "../context/DeviceInventoryContext";
-import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
-import RingRunner from "../components/RingRunner";
-import MeterDetail from "../components/ElectricMeterDashboard/MeterDetail";
-import BillingHistoryTable from "../components/ElectricMeterDashboard/BillingHistoryTable";
-import Modal from "../components/Modal";
-import { useUserPath } from "../routes/useUserPath";
-import type { MeterOption } from "../types/meter";
-import { getElectricDevices } from "../api/electric";
-import { getMeterDashboard, getSiteMetersDashboard, type MeterDashboard } from "../api/meter";
-import { downloadBillPdf } from "../api/billing";
-import { saveBlobAsFile } from "../utils/download";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Dashboard/Navbar";
+import { useFilters } from "../../context/FiltersContext";
+import { useUserLogo } from "../../hooks/useUserLogo";
+import { useDeviceInventory, getCountForType } from "../../context/DeviceInventoryContext";
+import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
+import RingRunner from "../../components/RingRunner";
+import MeterDetail from "../../components/ElectricMeterDashboard/MeterDetail";
+import BillingHistoryTable from "../../components/ElectricMeterDashboard/BillingHistoryTable";
+import Modal from "../../components/Modal";
+import { useUserPath } from "../../routes/useUserPath";
+import type { MeterOption } from "../../types/meter";
+import { getElectricDevices } from "../../api/electric";
+import { getMeterDashboard, getSiteMetersDashboard, type MeterDashboard } from "../../api/meter";
+import { downloadBillPdf } from "../../api/billing";
+import { saveBlobAsFile } from "../../utils/download";
 
 const OVERVIEW_METER_ID = "overview";
 

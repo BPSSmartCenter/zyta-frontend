@@ -1,17 +1,17 @@
-// src/pages/SiteManagement.tsx
+// src/pages/SiteManagementPage/index.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/SiteManagement/Navbar";
-import Content from "../components/SiteManagement/Content";
-import ContentCreate from "../components/SiteManagement/Content_Create";
-import ContentEdit from "../components/SiteManagement/Content_Edit";
-import ContentDetail from "../components/SiteManagement/Content_Detail";
-import { ToastProvider, useToast } from "../hook/toastProvider";
-import { listSites, registerSite, updateSite, deleteSite } from "../api/sites";
-import { PROVINCE_CODE_TO_TH } from "../data/Dashboard/data";
-import type { SiteRow } from "../components/SiteManagement/site.constant";
-import Modal from "../components/Modal";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/SiteManagement/Navbar";
+import Content from "../../components/SiteManagement/Content";
+import ContentCreate from "../../components/SiteManagement/Content_Create";
+import ContentEdit from "../../components/SiteManagement/Content_Edit";
+import ContentDetail from "../../components/SiteManagement/Content_Detail";
+import { ToastProvider, useToast } from "../../hook/toastProvider";
+import { listSites, registerSite, updateSite, deleteSite } from "../../api/sites";
+import { PROVINCE_CODE_TO_TH } from "../../data/Dashboard/data";
+import type { SiteRow } from "../../components/SiteManagement/site.constant";
+import Modal from "../../components/Modal";
 
 export default function SiteManagement() {
   return (
@@ -29,7 +29,7 @@ function SiteManagementGuarded() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../api/user")).me();
+        const me = await (await import("../../api/user")).me();
         setAllowed(String(me.role).toLowerCase() === "admin");
       } catch {
         setAllowed(false);

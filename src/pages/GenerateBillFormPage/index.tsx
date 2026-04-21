@@ -1,30 +1,30 @@
-// src/pages/GenerateBillForm.tsx
+// src/pages/GenerateBillFormPage/index.tsx
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useLocation } from "react-router-dom";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Dashboard/Navbar";
-import Modal from "../components/Modal";
-import { useFilters } from "../context/FiltersContext";
-import { useUserLogo } from "../hooks/useUserLogo";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Dashboard/Navbar";
+import Modal from "../../components/Modal";
+import { useFilters } from "../../context/FiltersContext";
+import { useUserLogo } from "../../hooks/useUserLogo";
 import {
   useDeviceInventory,
   getCountForType,
-} from "../context/DeviceInventoryContext";
-import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
-import { useUserPath } from "../routes/useUserPath";
-import { listSiteDevices } from "../api/devices";
-import { getSiteDetails } from "../api/sites";
+} from "../../context/DeviceInventoryContext";
+import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
+import { useUserPath } from "../../routes/useUserPath";
+import { listSiteDevices } from "../../api/devices";
+import { getSiteDetails } from "../../api/sites";
 import {
   getMeterDashboard,
   getSiteMetersDashboard,
   type MeterDashboard,
-} from "../api/meter";
-import { getBillingReadingsData, getSiteBillingReadingsData } from "../api/billing";
-import Dropdown from "../components/Dropdown";
-import DatePicker, { type DateValue } from "../components/DateInput";
-import { buildBrandingLogoSrc } from "../utils/branding";
-import { brandImage, meaLogo, peaLogo } from "../assets";
+} from "../../api/meter";
+import { getBillingReadingsData, getSiteBillingReadingsData } from "../../api/billing";
+import Dropdown from "../../components/Dropdown";
+import DatePicker, { type DateValue } from "../../components/DateInput";
+import { buildBrandingLogoSrc } from "../../utils/branding";
+import { brandImage, meaLogo, peaLogo } from "../../assets";
 
 type ManualFormState = {
   meterId: string;

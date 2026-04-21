@@ -2,10 +2,13 @@
 import axios from "axios";
 import { isAxiosError } from "axios";
 
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? "/api" : "https://zyta.net/api";
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
+export const API_BASE_URL = (configuredApiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+
 export const api = axios.create({
-  // baseURL: "/api",
-  // Force using proxy to avoid CORS
-  baseURL: "/api",
+  baseURL: API_BASE_URL,
   withCredentials: true, // ให้ส่ง/รับ cookie (token) ไปกับ request
   headers: { "Content-Type": "application/json" },
 });

@@ -1,18 +1,18 @@
-import Dashboard from "./Dashboard";
-import Login from "./Login";
-import Register from "./Register";
-import TotalAlert from "./TotalAlert";
-import FaceRecognize from "./FaceReconize";
-import Devices from "./Devices";
-import UserManagement from "./UserManagement";
-import SiteManagement from "./SiteManagement";
-import VerifyEmail from "./VerifyEmail";
-import Forgot from "./Forgot";
-import Reset from "./Reset";
-import ElectricMeter from "./ElectricMeter";
-import BillingOverview from "./BillingOverview";
-import GenerateBillForm from "./GenerateBillForm";
-import BillPdfPreview from "./BillPdfPreview";
+import Dashboard from "./DashboardPage";
+import Login from "./LoginPage";
+import Register from "./RegisterPage";
+import TotalAlert from "./TotalAlertPage";
+import FaceRecognize from "./FaceRecognizePage";
+import Devices from "./DevicesPage";
+import UserManagement from "./UserManagementPage";
+import SiteManagement from "./SiteManagementPage";
+import VerifyEmail from "./VerifyEmailPage";
+import Forgot from "./ForgotPage";
+import Reset from "./ResetPage";
+import ElectricMeter from "./ElectricMeterPage";
+import BillingOverview from "./BillingOverviewPage";
+import GenerateBillForm from "./GenerateBillFormPage";
+import BillPdfPreview from "./BillPdfPreviewPage";
 
 export {
   Dashboard,

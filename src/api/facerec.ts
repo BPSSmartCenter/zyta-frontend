@@ -1,5 +1,5 @@
 ﻿// src/api/facerec.ts
-import { api } from "./axios";
+import { API_BASE_URL, api } from "./axios";
 
 export type FaceRecWebhookPayload = {
   id: string;
@@ -37,7 +37,5 @@ export async function listFaceRecEvents(): Promise<{ items: any[]; plateItems?: 
 }
 
 export function faceRecStreamUrl(): string {
-  // VITE_API_BASE_URL includes "/api"; append relative stream path only once
-  const base = (import.meta as any).env.VITE_API_BASE_URL || "";
-  return `${base}/facerec/stream`;
+  return `${API_BASE_URL}/facerec/stream`;
 }

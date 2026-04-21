@@ -28,6 +28,7 @@ import { FiltersProvider } from "./context/FiltersContext";
 import { DeviceInventoryProvider } from "./context/DeviceInventoryContext";
 import { FaceRecProvider } from "./context/FaceRecContext";
 import { NotisProvider } from "./context/NotisContext";
+import { API_BASE_URL } from "./api/axios";
 
 const AUTH_BOOT_TIMEOUT_MS = 8000;
 
@@ -47,7 +48,7 @@ function AppBootLoading() {
 }
 
 function App() {
-  console.log(`API Base URL: ${import.meta.env.VITE_API_BASE_URL}/api`);
+  console.log(`API Base URL: ${API_BASE_URL}`);
   return (
     <BrowserRouter>
       <DeviceInventoryProvider>

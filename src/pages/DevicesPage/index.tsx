@@ -1,6 +1,6 @@
-// src/pages/Devices.tsx
-import Sidebar from "../components/Sidebar";
-import Content from "../components/Devices/Content";
+// src/pages/DevicesPage/index.tsx
+import Sidebar from "../../components/Sidebar";
+import Content from "../../components/Devices/Content";
 
 export default function DevicesPage() {
   return (

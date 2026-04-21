@@ -10,19 +10,19 @@ export default defineConfig(() => {
     server: {
       proxy: {
         "/api/devices": {
-          target: "http://localhost:3001",
+          target: "https://zyta.net",
           changeOrigin: true,
         },
         "/api": {
-          target: "http://localhost:3001",
+          target: "https://zyta.net",
           changeOrigin: true,
         },
         "/site-branding": {
-          target: "http://localhost:3001",
+          target: "https://zyta.net",
           changeOrigin: true,
         },
         "/user-branding": {
-          target: "http://localhost:3001",
+          target: "https://zyta.net",
           changeOrigin: true,
         },
       },

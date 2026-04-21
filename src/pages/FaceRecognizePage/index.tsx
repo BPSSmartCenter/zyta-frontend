@@ -1,8 +1,8 @@
-// src/pages/FaceReconize.tsx
-import Sidebar from "../components/Sidebar";
-import Content from "../components/FaceRec/Content";
+// src/pages/FaceRecognizePage/index.tsx
+import Sidebar from "../../components/Sidebar";
+import Content from "../../components/FaceRec/Content";
 import { useLocation } from "react-router-dom";
-import { resolveFaceRecKind } from "../utils/notis";
+import { resolveFaceRecKind } from "../../utils/notis";
 
 type FaceRecRouteState = {
   defaultActive?: "licensePlates" | "faceScan";

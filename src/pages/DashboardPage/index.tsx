@@ -1,18 +1,18 @@
-﻿// src/pages/Dashboard/Dashboard.tsx
+﻿// src/pages/DashboardPage/index.tsx
 import React from "react";
-import Sidebar from "../components/Sidebar";
-import Navbar from "../components/Dashboard/Navbar";
-import ContentLayout from "../components/Dashboard/ContentLayout";
-import Header from "../components/Dashboard/Header";
-import SnapshotChartSection from "../components/Chart";
+import Sidebar from "../../components/Sidebar";
+import Navbar from "../../components/Dashboard/Navbar";
+import ContentLayout from "../../components/Dashboard/ContentLayout";
+import Header from "../../components/Dashboard/Header";
+import SnapshotChartSection from "../../components/Chart";
 import { useTranslation } from "react-i18next";
-import { me as apiMe } from "../api/user";
-import { listSites } from "../api/sites";
-import { notis as mockNotis } from "../data/Dashboard/notis";
-import { statItems } from "../components/Dashboard/dashboard.constants";
-import { useFilters } from "../context/FiltersContext";
-import { useNotisFeed } from "../context/NotisContext";
-import type { Noti } from "../data/Dashboard/notis";
+import { me as apiMe } from "../../api/user";
+import { listSites } from "../../api/sites";
+import { notis as mockNotis } from "../../data/Dashboard/notis";
+import { statItems } from "../../components/Dashboard/dashboard.constants";
+import { useFilters } from "../../context/FiltersContext";
+import { useNotisFeed } from "../../context/NotisContext";
+import type { Noti } from "../../data/Dashboard/notis";
 import {
   matchesSite,
   sortByNewest,
@@ -20,8 +20,8 @@ import {
   decorateNotiForDisplay,
   resolveDefaultNotiImage,
   buildNotiKeywordBag,
-} from "../utils/notis";
-import { alertImage } from "../assets";
+} from "../../utils/notis";
+import { alertImage } from "../../assets";
 
 // keep master key seeded in backend; not used for dashboard gating
 
@@ -122,7 +122,7 @@ export default function Dashboard() {
           (String(me?.role || "user").toLowerCase() as any) ?? "user";
         setRole(myRole);
         if (me?.brandingLogoUrl) {
-          const { buildBrandingLogoSrc } = await import("../utils/branding");
+          const { buildBrandingLogoSrc } = await import("../../utils/branding");
           const resolved = buildBrandingLogoSrc(me.brandingLogoUrl) ?? undefined;
           setUserLogoSrc(resolved);
           try { if (resolved) localStorage.setItem(LOGO_CACHE_KEY, resolved); } catch {}

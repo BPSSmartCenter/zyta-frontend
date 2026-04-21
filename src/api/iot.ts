@@ -1,7 +1,6 @@
-import { api } from "./axios";
+import { API_BASE_URL, api } from "./axios";
 
-// Use .env variable as requested by user
-const IOT_API_URL = `${import.meta.env.VITE_API_BASE_URL || "/api"}/devices`;
+const IOT_API_URL = `${API_BASE_URL}/devices`;
 export interface IoTDevice {
     id?: string | number;
     deviceId?: string;
