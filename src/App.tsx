@@ -108,10 +108,10 @@ function App() {
             </RequireAuth>
           }
         >
-          <Route path="/u/:uid/sandbox/card-board" element={<CardSandbox />} />
-
           <Route element={<AppLayout />}>
             <Route path="/u/:uid">
+              <Route path="sandbox/card-board" element={<CardSandbox />} />
+
               {/* data routes — require a selected site (or "all") */}
               <Route element={<RequireSiteSelected />}>
                 <Route path="dashboard" element={<Dashboard />} />

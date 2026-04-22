@@ -66,7 +66,7 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
     navigate(abs("/facerec"), { state: { noti: n, defaultActive } });
   };
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3">
+    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <h1 className="text-[18px] font-inter font-semibold text-[#1E1E1E]">
         {t("face.title")}
       </h1>

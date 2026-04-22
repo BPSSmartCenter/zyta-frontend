@@ -2,12 +2,10 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 type SidebarState = {
   open: boolean;
-  searchQuery: string;
 };
 
 const initialState: SidebarState = {
   open: false,
-  searchQuery: "",
 };
 
 const sidebarSlice = createSlice({
@@ -25,12 +23,6 @@ const sidebarSlice = createSlice({
     },
     setSidebarOpen(state, action: PayloadAction<boolean>) {
       state.open = action.payload;
-    },
-    setSidebarSearchQuery(state, action: PayloadAction<string>) {
-      state.searchQuery = action.payload;
-    },
-    clearSidebarSearchQuery(state) {
-      state.searchQuery = "";
     },
   },
 });

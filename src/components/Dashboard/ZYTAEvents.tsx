@@ -1,5 +1,7 @@
+import React from "react";
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
+import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { alertImage, insuranceImage } from "../../assets";
 
@@ -16,10 +18,35 @@ type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: Noti[];
+  showTitle?: boolean;
+  loading?: boolean;
 };
 
-export default function ZYTAEvents({ search, setSearch, items }: Props) {
+export default function ZYTAEvents({
+  search,
+  setSearch,
+  items,
+  showTitle = true,
+  loading = false,
+}: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
+
+  const list = React.useMemo(() => {
+    const q = (search || "").toLowerCase().trim();
+    const sorted = [...items].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    if (!q) return sorted;
+
+    return sorted.filter((n) =>
+      [n.titleKey, n.title, n.site, n.type, n.date]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [items, search]);
 
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
@@ -34,10 +61,12 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
   };
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[19px] font-inter font-semibold text-[#1E1E1E]">
-        {t("zyta.title")}
-      </h1>
+    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {showTitle && (
+        <h1 className="text-[19px] font-inter font-semibold text-[#1E1E1E]">
+          {t("zyta.title")}
+        </h1>
+      )}
 
       <SearchInput
         value={search}
@@ -47,14 +76,18 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
         disableMenu
       />
 
-      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2">
-        <div className="space-y-2">
-          {items.length === 0 ? (
-            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
-              {t("common.noResults")}
-            </div>
-          ) : (
-            items.map((n, i) => {
+      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {list.length === 0 ? (
+          <EventPanelState
+            loading={loading}
+            emptyText={t("common.noResults")}
+            loadingText={t("common.loadingEvents", {
+              defaultValue: "Loading events...",
+            })}
+          />
+        ) : (
+          <div className="space-y-2">
+            {list.map((n, i) => {
               const key = String(n.titleKey || "").toLowerCase();
               const isSos = key === "zytanotis.sos";
               const isAssistant = key === "zytanotis.assistant";
@@ -83,9 +116,9 @@ export default function ZYTAEvents({ search, setSearch, items }: Props) {
                   meta={(n as any)?.meta ?? undefined}
                 />
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </form>
   );

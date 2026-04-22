@@ -1,5 +1,6 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
+import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -18,9 +19,15 @@ type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: Noti[];
+  loading?: boolean;
 };
 
-export default function AlertEvents({ search, setSearch, items }: Props) {
+export default function AlertEvents({
+  search,
+  setSearch,
+  items,
+  loading = false,
+}: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
   const { setSelectedSite, setSelectedGroupSite } = useFilters();
@@ -88,10 +95,7 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
   }, [items, search, i18n.language]);
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        {t("alerts.allTimeTitle")}
-      </h1>
+    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
       <SearchInput
         value={search}
@@ -101,14 +105,18 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
         disableMenu
       />
 
-      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2">
-        <div className="space-y-2">
-          {list.length === 0 ? (
-            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
-              {t("common.noResults")}
-            </div>
-          ) : (
-            list.map((n, i) => {
+      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {list.length === 0 ? (
+          <EventPanelState
+            loading={loading}
+            emptyText={t("common.noResults")}
+            loadingText={t("common.loadingEvents", {
+              defaultValue: "Loading events...",
+            })}
+          />
+        ) : (
+          <div className="space-y-2">
+            {list.map((n, i) => {
               const key = String(n.titleKey || "").toLowerCase();
               const isZyta = key.startsWith("zytanotis.");
               const eventKey = resolveAlertEventKey(n);
@@ -171,9 +179,9 @@ export default function AlertEvents({ search, setSearch, items }: Props) {
               />
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </form>
   );

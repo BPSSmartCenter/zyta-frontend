@@ -1,4 +1,5 @@
 import React from "react";
+import { brandImage } from "../../assets";
 import {
   cardSandboxActions,
   selectSandboxFilterGroupForCard,
@@ -88,10 +89,6 @@ export default function CardSandboxPage() {
     duplicateSelected,
     deleteSelected,
     deleteCard,
-    bringSelectedFront,
-    sendSelectedBack,
-    bringSelectedForward,
-    sendSelectedBackward,
   } = useLayeredCards();
   const { activeCardId, interactionKind, startDrag, startResize } =
     useCardBoardInteractions({
@@ -150,24 +147,68 @@ export default function CardSandboxPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#eef2f7] text-slate-900">
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#123A42] text-white shadow-sm">
-            <span className="material-icons-outlined text-[20px]">dashboard_customize</span>
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold text-slate-950">
-              Card Sandbox
-            </h1>
-            <p className="truncate text-xs text-slate-500">
-              Layered draggable and resizable card prototype
-            </p>
-          </div>
-        </div>
+    <main className="relative min-h-screen bg-[#eef2f7] text-slate-900">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex justify-center bg-transparent px-4">
+        <img
+          src={brandImage}
+          alt="BPS"
+          className="h-20 w-auto object-contain drop-shadow-[0_8px_22px_rgba(15,23,42,0.18)]"
+        />
+      </header>
 
-        <div className="flex items-center gap-2">
-          <ToolButton icon="add" label="Add card" onClick={() => addCard()} />
+      <div className="grid h-screen grid-cols-[minmax(0,1fr)]">
+        <section
+          ref={viewportRef}
+          onPointerDown={startPan}
+          onWheel={handleWheelZoom}
+          className={`overflow-auto overscroll-contain bg-[#dfe6ef] ${
+            isPanning ? "cursor-grabbing" : "cursor-grab"
+          }`}
+        >
+          <div className="p-0">
+            <div
+              className="relative"
+              style={{
+                width: BOARD_WIDTH * zoom,
+                height: BOARD_HEIGHT * zoom,
+              }}
+            >
+              <div
+                ref={boardRef}
+                className="relative origin-top-left rounded-lg border border-slate-300 bg-white shadow-sm"
+                style={{
+                  width: BOARD_WIDTH,
+                  height: BOARD_HEIGHT,
+                  transform: `scale(${zoom})`,
+                  backgroundImage:
+                    "linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)",
+                  backgroundSize: "24px 24px",
+                }}
+              >
+                <ScreenGuides />
+                {renderOrder.map((card) => (
+                  <SandboxLayerCard
+                    key={card.id}
+                    card={card}
+                    selected={selectedId === card.id}
+                    active={activeCardId === card.id}
+                    interactionKind={interactionKind}
+                    onSelect={selectCard}
+                    onToggleCollapsed={toggleCardCollapsed}
+                    onDelete={deleteCard}
+                    onStartDrag={startDrag}
+                    onStartResize={startResize}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-[1000] flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-[calc(100vw-2rem)] items-center gap-2 overflow-x-auto rounded-2xl border border-white/70 bg-white/70 p-2 shadow-[0_18px_54px_rgba(15,23,42,0.22)] backdrop-blur-2xl ring-1 ring-slate-900/5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ToolButton
             icon="tune"
             label="Add filter card"
@@ -226,32 +267,7 @@ export default function CardSandboxPage() {
             disabled={!selectedCard}
             danger
           />
-          <div className="mx-1 h-6 w-px bg-slate-200" />
-          <ToolButton
-            icon="flip_to_front"
-            label="Bring front"
-            onClick={bringSelectedFront}
-            disabled={!selectedCard}
-          />
-          <ToolButton
-            icon="keyboard_arrow_up"
-            label="Bring forward"
-            onClick={bringSelectedForward}
-            disabled={!selectedCard}
-          />
-          <ToolButton
-            icon="keyboard_arrow_down"
-            label="Send backward"
-            onClick={sendSelectedBackward}
-            disabled={!selectedCard}
-          />
-          <ToolButton
-            icon="flip_to_back"
-            label="Send back"
-            onClick={sendSelectedBack}
-            disabled={!selectedCard}
-          />
-          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <div className="mx-1 h-6 w-px shrink-0 bg-slate-300/70" />
           <ToolButton
             icon="zoom_out"
             label="Zoom out"
@@ -263,7 +279,7 @@ export default function CardSandboxPage() {
             onClick={resetZoom}
             title="Reset zoom"
             aria-label="Reset zoom"
-            className="h-9 min-w-[64px] rounded-md border border-slate-200 px-2 text-sm font-semibold tabular-nums text-slate-700 transition hover:bg-slate-100"
+            className="h-9 min-w-[64px] shrink-0 rounded-md border border-white/70 bg-white/45 px-2 text-sm font-semibold tabular-nums text-slate-700 shadow-sm transition hover:bg-white/75"
           >
             {zoomPercent}%
           </button>
@@ -273,110 +289,9 @@ export default function CardSandboxPage() {
             onClick={zoomIn}
             disabled={zoom >= MAX_ZOOM}
           />
-          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <div className="mx-1 h-6 w-px shrink-0 bg-slate-300/70" />
           <ToolButton icon="restart_alt" label="Reset" onClick={reset} />
         </div>
-      </header>
-
-      <div className="grid h-[calc(100vh-4rem)] grid-cols-[minmax(0,1fr)]">
-        <section
-          ref={viewportRef}
-          onPointerDown={startPan}
-          onWheel={handleWheelZoom}
-          className={`overflow-auto overscroll-contain bg-[#dfe6ef] ${
-            isPanning ? "cursor-grabbing" : "cursor-grab"
-          }`}
-        >
-          <div className="p-0">
-            <div
-              className="relative"
-              style={{
-                width: BOARD_WIDTH * zoom,
-                height: BOARD_HEIGHT * zoom,
-              }}
-            >
-              <div
-                ref={boardRef}
-                className="relative origin-top-left rounded-lg border border-slate-300 bg-white shadow-sm"
-                style={{
-                  width: BOARD_WIDTH,
-                  height: BOARD_HEIGHT,
-                  transform: `scale(${zoom})`,
-                  backgroundImage:
-                    "linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)",
-                  backgroundSize: "24px 24px",
-                }}
-              >
-                <ScreenGuides />
-                {renderOrder.map((card) => (
-                  <SandboxLayerCard
-                    key={card.id}
-                    card={card}
-                    selected={selectedId === card.id}
-                    active={activeCardId === card.id}
-                    interactionKind={interactionKind}
-                    onSelect={selectCard}
-                    onToggleCollapsed={toggleCardCollapsed}
-                    onDelete={deleteCard}
-                    onStartDrag={startDrag}
-                    onStartResize={startResize}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* <aside className="border-l border-slate-200 bg-white">
-          <div className="border-b border-slate-100 px-4 py-4">
-            <h2 className="text-sm font-semibold text-slate-950">Inspector</h2>
-            {selectedCard ? (
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <Metric label="X" value={Math.round(selectedCard.x)} />
-                <Metric label="Y" value={Math.round(selectedCard.y)} />
-                <Metric label="W" value={Math.round(selectedCard.width)} />
-                <Metric label="H" value={Math.round(selectedCard.height)} />
-                <Metric label="Zoom" value={zoomPercent} suffix="%" />
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-slate-400">No selection</p>
-            )}
-          </div>
-
-          <div className="px-4 py-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-950">Layers</h2>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                {cards.length}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1">
-              {layerOrder.map((card) => (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => selectCard(card.id)}
-                  className={`flex h-10 items-center gap-2 rounded-md border px-2 text-left transition ${
-                    selectedId === card.id
-                      ? "border-[#3AB8EE] bg-[#3AB8EE]/10 text-[#0063bf]"
-                      : "border-transparent bg-white text-slate-700 hover:border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <span
-                    className="h-4 w-4 shrink-0 rounded border border-slate-300"
-                    style={{ backgroundColor: card.color }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                    {card.title}
-                  </span>
-                  <span className="text-xs tabular-nums text-slate-400">
-                    {card.zIndex}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside> */}
       </div>
     </main>
   );
@@ -449,6 +364,10 @@ function SandboxLayerCard({
     selectSandboxFilterGroupForCard(state, card.id)
   );
   const groupColor = filterGroup?.color ?? card.color;
+  const displayTitle =
+    card.kind === "filters" && filterGroup
+      ? getFilterGroupTitle(filterGroup)
+      : card.title;
   const cardNumber = getCardNumber(card.title);
 
   if (card.collapsed) {
@@ -485,7 +404,7 @@ function SandboxLayerCard({
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => onDelete(card.id)}
-          aria-label={`Close ${card.title}`}
+          aria-label={`Close ${displayTitle}`}
           title="Close card"
           className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded bg-white/60 text-slate-600 opacity-75 transition hover:bg-white hover:text-red-600 hover:opacity-100"
         >
@@ -495,7 +414,7 @@ function SandboxLayerCard({
           type="button"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => onToggleCollapsed(card.id)}
-          aria-label={`Expand ${card.title}`}
+          aria-label={`Expand ${displayTitle}`}
           title="Expand card"
           className="grid h-10 w-10 place-items-center rounded-md text-2xl font-black tabular-nums text-slate-950 transition hover:bg-white/45"
         >
@@ -550,21 +469,18 @@ function SandboxLayerCard({
             }
           />
           <span className="min-w-0 truncate text-xs font-bold uppercase text-slate-900">
-            {card.title}
+            {displayTitle}
           </span>
         </div>
 
         <span aria-hidden="true" />
 
         <div className="flex shrink-0 items-center justify-self-end gap-1">
-          <span className="rounded bg-white/60 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-            z {card.zIndex}
-          </span>
           <button
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onToggleCollapsed(card.id)}
-            aria-label={`Collapse ${card.title}`}
+            aria-label={`Collapse ${displayTitle}`}
             title="Collapse card"
             className="grid h-6 w-6 place-items-center rounded bg-white/55 text-slate-600 transition hover:bg-white hover:text-slate-950"
           >
@@ -574,7 +490,7 @@ function SandboxLayerCard({
             type="button"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onDelete(card.id)}
-            aria-label={`Close ${card.title}`}
+            aria-label={`Close ${displayTitle}`}
             title="Close card"
             className="grid h-6 w-6 place-items-center rounded bg-white/55 text-slate-600 transition hover:bg-white hover:text-red-600"
           >
@@ -584,37 +500,37 @@ function SandboxLayerCard({
       </div>
 
       <div
-        className={`h-[calc(100%-2.75rem)] rounded-b-lg p-3 ${
+        className={`h-[calc(100%-2.75rem)] rounded-b-lg ${
           card.kind === "filters" ? "overflow-visible" : "overflow-hidden"
         }`}
       >
         {card.kind === "filters" ? (
-          <div className="h-full overflow-visible rounded-md border border-slate-200 bg-white">
+          <div className="h-full overflow-visible bg-white">
             <SandboxFilterControlCard cardId={card.id} />
           </div>
         ) : card.kind === "map" ? (
           <div
             data-sandbox-card-scroll="true"
-            className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
+            className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <SandboxMapPanelCard cardId={card.id} />
           </div>
         ) : card.kind === "alerts" || card.kind === "wellbeing" ? (
           <div
             data-sandbox-card-scroll="true"
-            className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
+            className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <SandboxDashboardEventsCard cardId={card.id} variant={card.kind} />
           </div>
         ) : isDashboardWidgetKind(card.kind) ? (
           <div
             data-sandbox-card-scroll="true"
-            className="h-full overflow-auto rounded-md border border-slate-200 bg-white"
+            className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <SandboxDashboardWidgetCard cardId={card.id} variant={card.kind} />
           </div>
         ) : (
-          <div className="h-full rounded-md border border-dashed border-slate-300 bg-white/70" />
+          <div className="h-full border border-dashed border-slate-300 bg-white/70" />
         )}
       </div>
 
@@ -706,6 +622,17 @@ function SandboxGroupColorPicker({
   );
 }
 
+function getFilterGroupTitle(group: SandboxFilterGroup) {
+  if (group.selectedSite && group.selectedSite !== "all") {
+    return group.selectedSite;
+  }
+  return (
+    group.selectedGroupSite?.label ??
+    group.selectedUtility?.label ??
+    "All sites"
+  );
+}
+
 function getCardNumber(title: string) {
   return title.match(/\d+/)?.[0] ?? "#";
 }
@@ -732,8 +659,8 @@ function ToolButton({
       aria-label={label}
       className={`grid h-9 w-9 place-items-center rounded-md border text-sm transition ${
         danger
-          ? "border-red-100 text-red-600 hover:bg-red-50"
-          : "border-slate-200 text-slate-700 hover:bg-slate-100"
+          ? "border-red-100/80 bg-white/45 text-red-600 shadow-sm hover:bg-red-50/90"
+          : "border-white/70 bg-white/45 text-slate-700 shadow-sm hover:bg-white/75 hover:text-slate-950"
       } disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent`}
     >
       <span className="material-icons-outlined text-[20px]">{icon}</span>

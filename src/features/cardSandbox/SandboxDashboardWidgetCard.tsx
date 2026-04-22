@@ -280,7 +280,7 @@ function useSandboxScopedNotis(cardId: string) {
     selectSandboxFilterGroupForCard(state, cardId)
   );
   const { siteOptions } = useFilters();
-  const { items: liveNotis } = useNotisFeed();
+  const { items: liveNotis, loading: notisLoading } = useNotisFeed();
   const fallbackDate = React.useMemo(() => todayValue(), []);
   const selectedDate = filterGroup?.date ?? fallbackDate;
   const selectedSite = filterGroup?.selectedSite ?? "all";
@@ -357,6 +357,7 @@ function useSandboxScopedNotis(cardId: string) {
   return {
     dateScopedNotis,
     filterGroup,
+    notisLoading,
     scopedSiteCodes,
     selectedSite,
     siteOptions,
@@ -370,6 +371,7 @@ export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
   const {
     dateScopedNotis,
     filterGroup,
+    notisLoading,
     scopedSiteCodes,
     selectedSite,
     siteOptions,
@@ -527,6 +529,8 @@ export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
         search={zytaSearch}
         setSearch={(value) => dispatch(cardSandboxActions.setZytaSearch(value))}
         items={filteredZyta}
+        showTitle={false}
+        loading={notisLoading}
       />
     );
   }

@@ -1,6 +1,7 @@
 import React from "react";
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
+import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
@@ -20,6 +21,8 @@ type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: WB[];
+  showTitle?: boolean;
+  loading?: boolean;
 };
 
 /* ----- helpers: map noti -> event key ----- */
@@ -31,7 +34,13 @@ const getEventKey = (n: WB): EventKey | null => {
 };
 /* ------------------------------------------ */
 
-export default function WellBeingEvents({ search, setSearch, items }: Props) {
+export default function WellBeingEvents({
+  search,
+  setSearch,
+  items,
+  showTitle = true,
+  loading = false,
+}: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
 
@@ -69,10 +78,12 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
   };
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3">
-      <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
-        {t("wellbeing.title")}
-      </h1>
+    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {showTitle && (
+        <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
+          {t("wellbeing.title")}
+        </h1>
+      )}
       <SearchInput
         value={search}
         placeholder={t("search.placeholder")}
@@ -80,14 +91,22 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
         className="font-poppins"
         disableMenu
       />
-      <div className="h-[340px] lg-1399:h-[490px] overflow-y-auto px-2">
-        <div className="space-y-2">
-          {list.length === 0 ? (
-            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
-              {t("common.noResults")}
-            </div>
-          ) : (
-            list.map((n, i) => {
+      <div
+        className={`${
+          showTitle ? "h-[340px] lg-1399:h-[490px]" : "h-[350px] lg:h-[558px]"
+        } overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+      >
+        {list.length === 0 ? (
+          <EventPanelState
+            loading={loading}
+            emptyText={t("common.noResults")}
+            loadingText={t("common.loadingEvents", {
+              defaultValue: "Loading events...",
+            })}
+          />
+        ) : (
+          <div className="space-y-2">
+            {list.map((n, i) => {
               const title = n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
@@ -124,9 +143,9 @@ export default function WellBeingEvents({ search, setSearch, items }: Props) {
                 />
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </form>
   );

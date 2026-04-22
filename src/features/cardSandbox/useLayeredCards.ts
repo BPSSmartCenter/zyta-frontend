@@ -63,18 +63,6 @@ export function useLayeredCards() {
     },
     [dispatch]
   );
-  const bringSelectedFront = React.useCallback(() => {
-    if (selectedId) dispatch(cardSandboxActions.bringCardFront(selectedId));
-  }, [dispatch, selectedId]);
-  const sendSelectedBack = React.useCallback(() => {
-    if (selectedId) dispatch(cardSandboxActions.sendCardBack(selectedId));
-  }, [dispatch, selectedId]);
-  const bringSelectedForward = React.useCallback(() => {
-    if (selectedId) dispatch(cardSandboxActions.bringCardForward(selectedId));
-  }, [dispatch, selectedId]);
-  const sendSelectedBackward = React.useCallback(() => {
-    if (selectedId) dispatch(cardSandboxActions.sendCardBackward(selectedId));
-  }, [dispatch, selectedId]);
 
   return {
     cards,
@@ -89,9 +77,5 @@ export function useLayeredCards() {
     duplicateSelected,
     deleteSelected,
     deleteCard,
-    bringSelectedFront,
-    sendSelectedBack,
-    bringSelectedForward,
-    sendSelectedBackward,
   };
 }

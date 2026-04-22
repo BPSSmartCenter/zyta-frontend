@@ -60,22 +60,22 @@ function SidebarItem({
   depth?: number;
 }) {
   const interactiveClassName = cx(
-    "group/item flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-left text-sm font-semibold outline-none transition",
+    "group/item flex h-12 w-full items-center gap-2 rounded-md border px-3 text-left text-sm font-semibold shadow-sm outline-none transition",
     "focus-visible:ring-4 focus-visible:ring-cyan-400/20",
-    depth > 0 && "py-2 text-[13px] font-medium",
+    depth > 0 && "text-[13px] font-semibold",
     item.active
-      ? "bg-[#0877A8] text-white shadow-[0_14px_30px_rgba(8,119,168,0.24)]"
-      : "text-slate-700 hover:bg-white/75 hover:text-slate-950",
+      ? "border-[#3AB8EE]/55 bg-gradient-to-r from-cyan-50/95 via-white/90 to-sky-50/85 text-slate-950 ring-1 ring-[#3AB8EE]/20"
+      : "border-white/70 bg-white/45 text-slate-700 hover:border-cyan-200/70 hover:bg-gradient-to-r hover:from-cyan-50/75 hover:via-white/80 hover:to-sky-50/65 hover:text-slate-950",
     item.disabled && "pointer-events-none cursor-not-allowed opacity-40"
   );
 
   const icon = item.icon ? (
     <span
       className={cx(
-        "material-icons-outlined grid h-8 w-8 shrink-0 place-items-center rounded-[10px] text-[19px] transition",
+        "material-icons-outlined flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[19px] transition",
         item.active
-          ? "bg-white/18 text-white"
-          : "bg-white/60 text-slate-500 group-hover/item:text-[#0877A8]"
+          ? "bg-[#EAF7FD] text-[#0877A8]"
+          : "bg-white/45 text-slate-600 group-hover/item:text-slate-950"
       )}
       aria-hidden="true"
     >
@@ -125,7 +125,7 @@ function SidebarItem({
       )}
 
       {item.children?.length ? (
-        <ul className="mt-1 space-y-1 pl-11">
+        <ul className="mt-2 space-y-2 pl-11">
           {item.children.map((child) => (
             <SidebarItem key={child.id} item={child} depth={depth + 1} />
           ))}
@@ -151,10 +151,10 @@ export default function GlassHoverSidebar({
   onLogout,
 }: GlassHoverSidebarProps) {
   const cardClassName = cx(
-    "rounded-[24px] border border-white/45 bg-white/68 backdrop-blur-2xl ring-1 ring-slate-900/5",
+    "rounded-2xl border border-white/70 bg-white/70 backdrop-blur-2xl ring-1 ring-slate-900/5",
     open
-      ? "shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
-      : "shadow-none group-hover/sidebar:shadow-[0_24px_80px_rgba(15,23,42,0.22)] focus-within:shadow-[0_24px_80px_rgba(15,23,42,0.22)]"
+      ? "shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
+      : "shadow-none group-hover/sidebar:shadow-[0_18px_54px_rgba(15,23,42,0.22)] focus-within:shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
   );
 
   return (
@@ -181,7 +181,7 @@ export default function GlassHoverSidebar({
       >
         <button
           type="button"
-          className="absolute right-[-24px] top-1/2 z-10 flex h-28 w-[24px] -translate-y-1/2 items-center justify-center rounded-r-full bg-white/68 shadow-[0_10px_30px_rgba(15,23,42,0.18)] backdrop-blur-2xl outline-none transition [clip-path:inset(-60px_-60px_-60px_0)] hover:bg-white/75 focus-visible:ring-4 focus-visible:ring-cyan-400/20"
+          className="absolute right-[-24px] top-1/2 z-10 flex h-28 w-[24px] -translate-y-1/2 items-center justify-center rounded-r-md border border-white/70 bg-white/70 shadow-[0_10px_30px_rgba(15,23,42,0.16)] backdrop-blur-2xl outline-none transition [clip-path:inset(-60px_-60px_-60px_0)] hover:bg-white/80 focus-visible:ring-4 focus-visible:ring-cyan-400/20"
           aria-label={toggleLabel}
           aria-expanded={open}
           onClick={() => onOpenChange?.(!open)}
@@ -197,9 +197,9 @@ export default function GlassHoverSidebar({
         </button>
 
         <div className="flex h-full flex-col gap-3">
-          <div className={cx(cardClassName, "shrink-0 overflow-hidden px-4 py-4")}>
+          <div className={cx(cardClassName, "shrink-0 overflow-hidden p-3")}>
             <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-[14px] bg-white/70 shadow-sm ring-1 ring-white/70">
+              <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md border border-white/70 bg-white/45 shadow-sm">
                 {logo ?? (
                   <span className="material-icons-outlined text-[24px] text-[#0877A8]">
                     dashboard
@@ -219,15 +219,15 @@ export default function GlassHoverSidebar({
           </div>
 
           <div className={cx(cardClassName, "min-h-0 flex-1 overflow-hidden")}>
-            <nav className="flex h-full flex-col overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <ul className="space-y-1.5">
+            <nav className="flex h-full flex-col overflow-y-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <ul className="space-y-2">
                 {items.map((item) => (
                   <SidebarItem key={item.id} item={item} />
                 ))}
               </ul>
 
               {footerItems.length > 0 && (
-                <ul className="mt-4 space-y-1.5 pt-3">
+                <ul className="mt-4 space-y-2 pt-3 ">
                   {footerItems.map((item) => (
                     <SidebarItem key={item.id} item={item} />
                   ))}
@@ -238,7 +238,7 @@ export default function GlassHoverSidebar({
 
           {(account || onLogout) && (
             <div className={cx(cardClassName, "shrink-0 overflow-hidden p-3")}>
-              <div className="flex items-center gap-3 rounded-[16px] bg-white/58 p-2 shadow-sm ring-1 ring-white/60">
+              <div className="flex items-center gap-3 rounded-md border border-white/70 bg-white/45 p-2 shadow-sm">
                 <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-100">
                   {account?.avatarSrc ? (
                     <img
@@ -266,7 +266,7 @@ export default function GlassHoverSidebar({
                   <button
                     type="button"
                     onClick={onLogout}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-slate-500 transition hover:bg-white hover:text-[#D90452] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/20"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/70 bg-white/45 text-slate-500 shadow-sm transition hover:bg-white/75 hover:text-[#D90452] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/20"
                     aria-label="Sign out"
                   >
                     <span className="material-icons-outlined text-[20px]">

@@ -10,6 +10,7 @@ import type {
   SandboxCardRect,
   SandboxScopeOption,
 } from "./types";
+import { getCardResizeConstraints } from "./geometry";
 import { loadCardSandboxState } from "./cardSandboxStorage";
 
 const CARD_COLORS = [
@@ -44,8 +45,8 @@ const initialCards: SandboxCard[] = [
     title: "Main Filters",
     x: 120,
     y: 120,
-    width: 520,
-    height: 280,
+    width: 360,
+    height: 250,
     color: "#dbeafe",
     zIndex: 110,
     collapsed: false,
@@ -83,8 +84,8 @@ const initialCards: SandboxCard[] = [
     title: "Card 3",
     x: 2040,
     y: 120,
-    width: 620,
-    height: 760,
+    width: 360,
+    height: 540,
     color: "#fef3c7",
     zIndex: 30,
     collapsed: false,
@@ -93,11 +94,11 @@ const initialCards: SandboxCard[] = [
     id: "card-4",
     kind: "wellbeing",
     filterGroupId: DEFAULT_FILTER_GROUP_ID,
-    title: "Card 4",
+    title: "Well-being Events",
     x: 120,
     y: 1200,
-    width: 620,
-    height: 760,
+    width: 360,
+    height: 540,
     color: "#fae8ff",
     zIndex: 40,
     collapsed: false,
@@ -122,8 +123,8 @@ const initialCards: SandboxCard[] = [
     title: "ZYTA Events",
     x: 2720,
     y: 120,
-    width: 620,
-    height: 760,
+    width: 360,
+    height: 540,
     color: "#e0e7ff",
     zIndex: 60,
     collapsed: false,
@@ -257,27 +258,6 @@ function normalizeLayers(cards: SandboxCard[]) {
     .map((card, index) => ({ ...card, zIndex: (index + 1) * 10 }));
 }
 
-function swapLayer(
-  cards: SandboxCard[],
-  id: SandboxCardId,
-  direction: "up" | "down"
-) {
-  const sorted = normalizeLayers(cards);
-  const currentIndex = sorted.findIndex((card) => card.id === id);
-  const targetIndex =
-    direction === "up" ? currentIndex + 1 : currentIndex - 1;
-  if (currentIndex < 0 || targetIndex < 0 || targetIndex >= sorted.length) {
-    return sorted;
-  }
-  const currentZ = sorted[currentIndex].zIndex;
-  sorted[currentIndex] = {
-    ...sorted[currentIndex],
-    zIndex: sorted[targetIndex].zIndex,
-  };
-  sorted[targetIndex] = { ...sorted[targetIndex], zIndex: currentZ };
-  return normalizeLayers(sorted);
-}
-
 function createCard(
   kind: SandboxCardKind,
   index: number,
@@ -285,11 +265,11 @@ function createCard(
   filterGroupId: SandboxFilterGroupId
 ) {
   const isMap = kind === "map";
-  const isEventPanel =
+  const isAlerts =
     kind === "alerts" ||
     kind === "wellbeing" ||
-    kind === "zyta" ||
-    kind === "facerec";
+    kind === "zyta";
+  const isEventPanel = kind === "facerec";
   const isStatsPanel = kind === "devices" || kind === "users";
   const isSnapshot = kind === "snapshot";
   const isFilters = kind === "filters";
@@ -316,21 +296,27 @@ function createCard(
       ? 1320
       : isMap
       ? 960
+      : isAlerts
+      ? 360
       : isEventPanel
       ? 620
       : isStatsPanel
       ? 560
+      : isFilters
+      ? 360
       : 520,
     height: isSnapshot
       ? 720
       : isMap
       ? 780
+      : isAlerts
+      ? 540
       : isEventPanel
       ? 760
       : isStatsPanel
       ? 520
       : isFilters
-      ? 280
+      ? 250
       : 300,
     color: CARD_COLORS[index % CARD_COLORS.length],
     zIndex: maxZ + 10,
@@ -369,6 +355,13 @@ const slice = createSlice({
     },
     selectCard(state, action: PayloadAction<SandboxCardId | null>) {
       state.selectedId = action.payload;
+      if (!action.payload) return;
+      const maxZ = Math.max(0, ...state.cards.map((card) => card.zIndex));
+      state.cards = normalizeLayers(
+        state.cards.map((card) =>
+          card.id === action.payload ? { ...card, zIndex: maxZ + 10 } : card
+        )
+      );
     },
     updateCardRect(
       state,
@@ -381,16 +374,24 @@ const slice = createSlice({
       const card = state.cards.find((item) => item.id === action.payload);
       if (!card) return;
       if (card.collapsed) {
+        const constraints = getCardResizeConstraints(card.kind);
         card.collapsed = false;
-        card.width = card.expandedSize?.width ?? 260;
-        card.height = card.expandedSize?.height ?? 160;
+        card.width = Math.max(
+          card.expandedSize?.width ?? constraints.minWidth,
+          constraints.minWidth
+        );
+        card.height = Math.max(
+          card.expandedSize?.height ?? constraints.minHeight,
+          constraints.minHeight
+        );
         card.expandedSize = undefined;
         return;
       }
+      const constraints = getCardResizeConstraints(card.kind);
       card.collapsed = true;
       card.expandedSize = {
-        width: card.width,
-        height: card.height,
+        width: Math.max(card.width, constraints.minWidth),
+        height: Math.max(card.height, constraints.minHeight),
       };
       card.width = COLLAPSED_CARD_WIDTH;
       card.height = COLLAPSED_CARD_HEIGHT;
@@ -433,28 +434,6 @@ const slice = createSlice({
     setActiveFilterGroup(state, action: PayloadAction<SandboxFilterGroupId>) {
       ensureFilterGroup(state, action.payload);
       state.activeFilterGroupId = action.payload;
-    },
-    bringCardFront(state, action: PayloadAction<SandboxCardId>) {
-      const maxZ = Math.max(0, ...state.cards.map((card) => card.zIndex));
-      state.cards = normalizeLayers(
-        state.cards.map((card) =>
-          card.id === action.payload ? { ...card, zIndex: maxZ + 10 } : card
-        )
-      );
-    },
-    sendCardBack(state, action: PayloadAction<SandboxCardId>) {
-      const minZ = Math.min(0, ...state.cards.map((card) => card.zIndex));
-      state.cards = normalizeLayers(
-        state.cards.map((card) =>
-          card.id === action.payload ? { ...card, zIndex: minZ - 10 } : card
-        )
-      );
-    },
-    bringCardForward(state, action: PayloadAction<SandboxCardId>) {
-      state.cards = swapLayer(state.cards, action.payload, "up");
-    },
-    sendCardBackward(state, action: PayloadAction<SandboxCardId>) {
-      state.cards = swapLayer(state.cards, action.payload, "down");
     },
     resetCardSandbox() {
       return createDefaultState();

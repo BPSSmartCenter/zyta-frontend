@@ -1,5 +1,10 @@
 import React from "react";
-import { moveRect, resizeRect } from "./geometry";
+import {
+  getCardResizeConstraints,
+  moveRect,
+  resizeRect,
+  type CardResizeConstraints,
+} from "./geometry";
 import type {
   BoardBounds,
   ResizeHandle,
@@ -17,6 +22,7 @@ type Interaction =
       startRect: SandboxCardRect;
       bounds: BoardBounds;
       scale: number;
+      constraints: CardResizeConstraints;
     }
   | {
       kind: "resize";
@@ -27,6 +33,7 @@ type Interaction =
       startRect: SandboxCardRect;
       bounds: BoardBounds;
       scale: number;
+      constraints: CardResizeConstraints;
     };
 
 type Input = {
@@ -67,13 +74,20 @@ export function useCardBoardInteractions({
       const dy = (event.clientY - interaction.startY) / interaction.scale;
       const rect =
         interaction.kind === "drag"
-          ? moveRect(interaction.startRect, dx, dy, interaction.bounds)
+          ? moveRect(
+              interaction.startRect,
+              dx,
+              dy,
+              interaction.bounds,
+              interaction.constraints
+            )
           : resizeRect(
               interaction.startRect,
               interaction.handle,
               dx,
               dy,
-              interaction.bounds
+              interaction.bounds,
+              interaction.constraints
             );
       updateCardRect(interaction.cardId, rect);
     };
@@ -110,6 +124,7 @@ export function useCardBoardInteractions({
         },
         bounds: resolveBoardBounds(boardRef),
         scale: Math.max(viewportScale, 0.1),
+        constraints: getCardResizeConstraints(card.kind),
       });
     },
     [boardRef, selectCard, viewportScale]
@@ -139,6 +154,7 @@ export function useCardBoardInteractions({
         },
         bounds: resolveBoardBounds(boardRef),
         scale: Math.max(viewportScale, 0.1),
+        constraints: getCardResizeConstraints(card.kind),
       });
     },
     [boardRef, selectCard, viewportScale]

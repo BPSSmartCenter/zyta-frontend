@@ -14,16 +14,11 @@ import {
   clearAllStoredSites,
   siteSelectionActions,
 } from "../features/siteSelection";
-import {
-  selectSidebarOpen,
-  selectSidebarSearchQuery,
-  sidebarActions,
-} from "../features/sidebar";
+import { selectSidebarOpen, sidebarActions } from "../features/sidebar";
 import { useUserPath } from "../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { buildBrandingLogoSrc } from "../utils/branding";
 import Modal from "./Modal";
-import SearchInput from "./SearchInput";
 import { GlassHoverSidebar, type GlassHoverSidebarItem } from "./ui";
 
 const DISABLED_DEVICE_TYPES = new Set<SidebarDeviceKey>(["cctv"]);
@@ -55,29 +50,6 @@ function useIsDesktop1024() {
   return isDesktop;
 }
 
-function filterSidebarItems(
-  items: GlassHoverSidebarItem[],
-  searchTerm: string
-): GlassHoverSidebarItem[] {
-  if (!searchTerm) return items;
-
-  return items.reduce<GlassHoverSidebarItem[]>((result, item) => {
-    const labelMatches = item.label.toLocaleLowerCase().includes(searchTerm);
-    const matchedChildren = item.children
-      ? filterSidebarItems(item.children, searchTerm)
-      : undefined;
-
-    if (labelMatches || (matchedChildren?.length ?? 0) > 0) {
-      result.push({
-        ...item,
-        children: labelMatches ? item.children : matchedChildren,
-      });
-    }
-
-    return result;
-  }, []);
-}
-
 function isInventoryDeviceKey(key: SidebarDeviceKey): key is DeviceTypeKey {
   return key !== "digitaltwin";
 }
@@ -90,7 +62,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const dispatch = useAppDispatch();
   const authUser = useAppSelector(selectAuthUser);
   const sidebarOpen = useAppSelector(selectSidebarOpen);
-  const searchQ = useAppSelector(selectSidebarSearchQuery);
   const { abs, base, absSite } = useUserPath();
   const { counts: inventoryCounts } = useDeviceInventory();
 
@@ -303,8 +274,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       icon: "dashboard_customize",
       active: active.sandbox,
       onSelect: () => {
-        navigate("/sandbox/card-board");
-        closeSidebar();
+        go("/sandbox/card-board");
       },
     },
     {
@@ -358,8 +328,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     });
   }
 
-  const searchTerm = searchQ.trim().toLocaleLowerCase();
-  const filteredItems = filterSidebarItems(navItems, searchTerm);
   const footerItems: GlassHoverSidebarItem[] = [
     {
       id: "support",
@@ -403,18 +371,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
             />
           </button>
         }
-        headerSlot={
-          <SearchInput
-            value={searchQ}
-            onChange={(value) =>
-              dispatch(sidebarActions.setSidebarSearchQuery(value))
-            }
-            placeholder={t("search.placeholder", { defaultValue: "Search" })}
-            className="mt-3 w-full"
-            disableMenu={true}
-          />
-        }
-        items={filteredItems}
+        items={navItems}
         footerItems={footerItems}
         account={
           account

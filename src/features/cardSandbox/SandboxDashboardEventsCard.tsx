@@ -98,7 +98,7 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
     selectSandboxFilterGroupForCard(state, cardId)
   );
   const { siteOptions } = useFilters();
-  const { items: liveNotis } = useNotisFeed();
+  const { items: liveNotis, loading: notisLoading } = useNotisFeed();
   const fallbackDate = React.useMemo(() => todayValue(), []);
   const selectedDate = filterGroup?.date ?? fallbackDate;
   const selectedSite = filterGroup?.selectedSite ?? "all";
@@ -198,6 +198,8 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
           dispatch(cardSandboxActions.setWellbeingSearch(value))
         }
         items={wellbeingItems}
+        showTitle={false}
+        loading={notisLoading}
       />
     );
   }
@@ -207,6 +209,7 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
       search={alertSearch}
       setSearch={(value) => dispatch(cardSandboxActions.setAlertSearch(value))}
       items={alertItems}
+      loading={notisLoading}
     />
   );
 }

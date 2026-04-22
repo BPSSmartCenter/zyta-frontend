@@ -1,5 +1,2 @@
 export { default as sidebarReducer, sidebarActions } from "./sidebarSlice";
-export {
-  selectSidebarOpen,
-  selectSidebarSearchQuery,
-} from "./sidebarSelectors";
+export { selectSidebarOpen } from "./sidebarSelectors";

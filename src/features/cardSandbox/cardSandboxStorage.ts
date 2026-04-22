@@ -7,6 +7,7 @@ import type {
   SandboxFilterGroupId,
   SandboxScopeOption,
 } from "./types";
+import { getCardResizeConstraints } from "./geometry";
 
 const STORAGE_KEY = "bps.cardSandbox.v1";
 const STORAGE_VERSION = 1;
@@ -162,9 +163,12 @@ function sanitizeCard(value: unknown): SandboxCard | null {
     return null;
   }
 
+  const kind = value.kind as SandboxCardKind;
+  const constraints = getCardResizeConstraints(kind);
+  const collapsed = value.collapsed;
   const card: SandboxCard = {
     id: value.id,
-    kind: value.kind as SandboxCardKind,
+    kind,
     filterGroupId:
       typeof value.filterGroupId === "string" &&
       FILTER_GROUP_IDS.has(value.filterGroupId)
@@ -173,17 +177,20 @@ function sanitizeCard(value: unknown): SandboxCard | null {
     title: value.title,
     x: value.x,
     y: value.y,
-    width: value.width,
-    height: value.height,
+    width: collapsed ? value.width : Math.max(value.width, constraints.minWidth),
+    height: collapsed ? value.height : Math.max(value.height, constraints.minHeight),
     color: value.color,
     zIndex: value.zIndex,
-    collapsed: value.collapsed,
+    collapsed,
   };
 
   if (isRecord(value.expandedSize)) {
     const { width, height } = value.expandedSize;
     if (isFiniteNumber(width) && isFiniteNumber(height)) {
-      card.expandedSize = { width, height };
+      card.expandedSize = {
+        width: Math.max(width, constraints.minWidth),
+        height: Math.max(height, constraints.minHeight),
+      };
     }
   }
 

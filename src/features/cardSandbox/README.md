@@ -10,7 +10,7 @@
 - card resize ได้
 - card ย่อ/ขยายได้
 - card ปิด/ลบได้
-- card ซ้อน layer ได้ด้วย `zIndex`
+- card ที่ click ล่าสุดจะถูกยกขึ้นบนสุดอัตโนมัติ
 - sandbox board pan ได้ด้วยการกดค้างแล้วลากพื้นที่ว่าง
 - mouse wheel ใช้ zoom board
 - layout ถูก persist ลง `localStorage` หลัง refresh แล้วยังอยู่เหมือนเดิม
@@ -127,7 +127,7 @@ Field สำคัญ:
 - `kind` ใช้ตัดสินว่าจะ render component อะไร
 - `filterGroupId` ชี้ว่า card นี้ใช้ filter group สีไหน
 - `x`, `y`, `width`, `height` คือ layout ของ card
-- `zIndex` คือ layer
+- `zIndex` ใช้ภายในสำหรับเรียง layer เท่านั้น ไม่แสดงใน UI
 - `collapsed` คือสถานะย่อ card
 - `expandedSize` เก็บขนาดก่อนย่อ เพื่อ restore ตอนขยายกลับ
 
@@ -183,6 +183,8 @@ Rendering หลักอยู่ใน `src/pages/CardSandboxPage/index.tsx`
 3. render `SandboxLayerCard` ทีละใบ
 4. `SandboxLayerCard` สร้าง shell ให้ทุก card เหมือนกัน
 5. content ข้างในเลือกจาก `card.kind`
+
+เมื่อผู้ใช้ click card ใด ๆ reducer `selectCard` จะปรับ `zIndex` ของ card นั้นให้สูงสุด แล้ว normalize layer ใหม่ ดังนั้นไม่ต้องมีปุ่ม bring front/back ใน UI
 
 Pattern render content:
 
@@ -394,7 +396,7 @@ card.kind === "weather" ? (
 ค่าที่ต้องระวัง:
 
 - `id` ควร unique
-- `zIndex` ควรเรียงเพิ่มทีละ 10 เพื่อให้ layer predict ได้
+- `zIndex` ควรเรียงเพิ่มทีละ 10 เพื่อให้ default stacking predict ได้ หลังจากใช้งานจริง card ที่ click ล่าสุดจะขึ้นบนสุดเอง
 - `x`, `y`, `width`, `height` อยู่ใน board size
 - `kind` ต้องมีอยู่ใน `SandboxCardKind`
 
@@ -542,7 +544,7 @@ npm run build
 - collapse/expand
 - close card
 - duplicate/delete
-- bring front/back
+- click card ที่ซ้อนกันแล้ว card นั้นขึ้นบนสุด
 - pan board ด้วย mouse drag
 - wheel zoom
 - refresh แล้ว layout ยังอยู่

@@ -68,25 +68,15 @@ export default function SandboxFilterControlCard({ cardId }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-5 bg-white p-4">
-      <div className="flex items-center gap-3">
+      {/* <div className="flex items-center gap-3">
         <span
           className="h-4 w-4 rounded-full border border-slate-300"
           style={{ backgroundColor: filterGroup.color }}
         />
-        <div className="min-w-0">
-          <div className="truncate text-xs font-bold uppercase text-slate-500">
-            {filterGroup.label}
-          </div>
-          <div className="truncate text-sm font-semibold text-slate-950">
-            {filterGroup.selectedSite === "all"
-              ? filterGroup.selectedGroupSite?.label ??
-                filterGroup.selectedUtility?.label ??
-                "All sites"
-              : siteOptions.find((site) => site.value === filterGroup.selectedSite)
-                  ?.label ?? filterGroup.selectedSite}
-          </div>
+        <div className="truncate text-xs font-bold uppercase text-slate-500">
+          {filterGroup.label}
         </div>
-      </div>
+      </div> */}
 
       <div className="grid gap-4">
         <div className="grid gap-1.5">
