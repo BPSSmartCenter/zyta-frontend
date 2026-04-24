@@ -28,6 +28,7 @@ import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
 import ScrollUnlocker from "./hook/ScrollUnlocker";
 import ScrollToTop from "./hook/useScrollToTop";
+import RequireAdmin from "./routes/RequireAdmin";
 import RequireAuth from "./routes/RequireAuth";
 import RequireSiteSelected from "./routes/RequireSiteSelected";
 import { AppLayout } from "./layouts";
@@ -46,7 +47,9 @@ function dashboardPathFor(user: AuthUser | null) {
 }
 
 function cardSandboxPathFor(user: AuthUser | null) {
-  return user?.id ? `/u/${encodeURIComponent(user.id)}/sandbox/card-board` : "/";
+  if (!user?.id) return "/";
+  if (user.role !== "admin") return dashboardPathFor(user);
+  return `/u/${encodeURIComponent(user.id)}/sandbox/card-board`;
 }
 
 function AppBootLoading() {
@@ -110,7 +113,9 @@ function App() {
         >
           <Route element={<AppLayout />}>
             <Route path="/u/:uid">
-              <Route path="sandbox/card-board" element={<CardSandbox />} />
+              <Route element={<RequireAdmin />}>
+                <Route path="sandbox/card-board" element={<CardSandbox />} />
+              </Route>
 
               {/* data routes — require a selected site (or "all") */}
               <Route element={<RequireSiteSelected />}>

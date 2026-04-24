@@ -1,5 +1,6 @@
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
+import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
@@ -13,13 +14,14 @@ type FR = {
   detail?: string;
   site: string;
   date: string;
-  meta?: Record<string, unknown>;
+  meta?: Record<string, unknown> | null;
 };
 
 type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: FR[];
+  loading?: boolean;
 };
 
 const USE_MOCK_REDIRECT = false;
@@ -34,11 +36,17 @@ const resolveDefaultTab = (n: FR): "licensePlates" | "faceScan" => {
   return "licensePlates";
 };
 
-export default function FaceRecognize({ search, setSearch, items }: Props) {
+export default function FaceRecognize({
+  search,
+  setSearch,
+  items,
+  loading = false,
+}: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
 
   const { abs } = useUserPath();
+  const list = items;
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -82,12 +90,16 @@ export default function FaceRecognize({ search, setSearch, items }: Props) {
 
       <div className="h-[350px] lg-1399:h-[500px] overflow-y-auto px-2">
         <div className="space-y-2">
-          {items.length === 0 ? (
-            <div className="rounded-md px-3 py-2 text-sm text-gray-500">
-              {t("common.noResults")}
-            </div>
+          {list.length === 0 ? (
+            <EventPanelState
+              loading={loading}
+              emptyText={t("common.noResults")}
+              loadingText={t("common.loadingEvents", {
+                defaultValue: "Loading events...",
+              })}
+            />
           ) : (
-            items.map((n, i) => {
+            list.map((n, i) => {
               const title = n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;

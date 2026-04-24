@@ -24,6 +24,12 @@ import {
 } from "../../utils/notis";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
+  collectDashboardFaceRecognizeItems,
+  collectDashboardZytaEvents,
+  filterDashboardFaceRecognizeItems,
+  filterDashboardZytaEvents,
+} from "../../features/dashboardNotis";
+import {
   selectSandboxEventPanels,
   selectSandboxFilterGroupForCard,
 } from "./cardSandboxSelectors";
@@ -45,17 +51,6 @@ type SandboxSite = {
 type Props = {
   variant: "zyta" | "facerec" | "devices" | "users" | "snapshot";
   cardId: string;
-};
-
-type FaceRecognizeItem = React.ComponentProps<
-  typeof FaceRecognize
->["items"][number] & {
-  id?: string;
-  occurredAt?: string;
-  createdAt?: string;
-  screenshot?: string;
-  deviceId?: string;
-  deviceModel?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -171,65 +166,6 @@ function matchesSiteSummary(site: SandboxSite, codes: Set<string>) {
   return [site.code, site.id, site.name]
     .filter((candidate): candidate is string => typeof candidate === "string")
     .some((candidate) => codes.has(candidate.trim()));
-}
-
-function isZytaNoti(noti: Noti): boolean {
-  const key = String(noti.titleKey || "").toLowerCase();
-  return key.startsWith("zytanotis.");
-}
-
-function toFacePlateItem(noti: Noti): FaceRecognizeItem {
-  const normalize = (value?: unknown) =>
-    value === undefined || value === null ? undefined : String(value);
-  const meta = isRecord(noti.meta) ? noti.meta : {};
-  const row = isRecord(meta.row) ? meta.row : {};
-  const faceRow = isRecord(meta.faceRow) ? meta.faceRow : {};
-  const device = isRecord(meta.device) ? meta.device : {};
-  const deviceHeaders = isRecord(meta.deviceHeaders)
-    ? meta.deviceHeaders
-    : {};
-  const person = isRecord(meta.person) ? meta.person : {};
-  const key = String(noti.titleKey || noti.title || "").toLowerCase();
-  const isFace = key.includes("facedetected");
-  const isPlate = key.includes("platedetected");
-  const occurredAt = noti.occurredAt ?? noti.date ?? new Date().toISOString();
-  const rawId =
-    normalize(meta.rawId) ||
-    normalize(row.id) ||
-    normalize(faceRow.id) ||
-    noti.id ||
-    occurredAt;
-  const cameraName =
-    normalize(meta.cameraName) ??
-    normalize(device.name) ??
-    normalize(deviceHeaders.deviceKey);
-  const siteLabel =
-    noti.site ?? normalize(meta.siteName) ?? normalize(meta.siteCode) ?? "-";
-  const title = isFace
-    ? normalize(person.fullName) ?? noti.title ?? "Face detected"
-    : normalize(meta.plateText) ?? noti.title ?? "License plate detected";
-  const img = isFace
-    ? normalize(meta.faceCropImg) ??
-      normalize(meta.faceFullImg) ??
-      normalize(meta.picture) ??
-      noti.img
-    : normalize(meta.platePicture) ?? normalize(meta.picture) ?? noti.img;
-
-  return {
-    ...noti,
-    id: rawId ?? noti.id ?? occurredAt,
-    title,
-    site: siteLabel,
-    occurredAt,
-    date: occurredAt,
-    img,
-    meta: {
-      ...meta,
-      kind: isPlate ? "plate" : "face",
-      rawId,
-      cameraName,
-    },
-  };
 }
 
 function useSandboxAccessibleSites() {
@@ -385,30 +321,19 @@ export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
   }, [accessibleSites, scopedSiteCodes, selectedSite]);
 
   const faceRecognizeItems = React.useMemo(
-    () =>
-      dateScopedNotis
-        .filter((noti) => {
-          const key = String(noti.titleKey || "").toLowerCase();
-          return key === "notis.facedetected" || key === "notis.platedetected";
-        })
-        .map(toFacePlateItem),
+    () => collectDashboardFaceRecognizeItems(dateScopedNotis),
     [dateScopedNotis]
   );
 
   const filteredRecognize = React.useMemo(() => {
-    const query = faceSearch.toLowerCase().trim();
-    return faceRecognizeItems.filter((noti) =>
-      query ? JSON.stringify(noti).toLowerCase().includes(query) : true
-    );
+    return filterDashboardFaceRecognizeItems(faceRecognizeItems, faceSearch);
   }, [faceRecognizeItems, faceSearch]);
 
   const filteredZyta = React.useMemo(() => {
-    const query = zytaSearch.toLowerCase().trim();
-    return dateScopedNotis
-      .filter(isZytaNoti)
-      .filter((noti) =>
-        query ? JSON.stringify(noti).toLowerCase().includes(query) : true
-      );
+    return filterDashboardZytaEvents(
+      collectDashboardZytaEvents(dateScopedNotis),
+      zytaSearch
+    );
   }, [dateScopedNotis, zytaSearch]);
 
   const regionSeriesFromSites = React.useMemo(() => {
@@ -541,6 +466,7 @@ export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
         search={faceSearch}
         setSearch={(value) => dispatch(cardSandboxActions.setFaceSearch(value))}
         items={filteredRecognize}
+        loading={notisLoading}
       />
     );
   }

@@ -6,6 +6,8 @@ import {
   saveCardSandboxState,
 } from "../features/cardSandbox/cardSandboxStorage";
 import { dateFilterReducer } from "../features/dateFilter";
+import { detectionSummaryReducer } from "../features/detectionSummary";
+import { notisFeedReducer } from "../features/notisFeed";
 import { sidebarReducer } from "../features/sidebar";
 import { siteSelectionReducer } from "../features/siteSelection";
 
@@ -14,6 +16,8 @@ export const store = configureStore({
     auth: authReducer,
     cardSandbox: cardSandboxReducer,
     dateFilter: dateFilterReducer,
+    detectionSummary: detectionSummaryReducer,
+    notisFeed: notisFeedReducer,
     sidebar: sidebarReducer,
     siteSelection: siteSelectionReducer,
   },

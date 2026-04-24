@@ -18,6 +18,13 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { me as apiMe } from "../../api/user";
+import {
+  combineDashboardNotis,
+  filterDashboardAlertEvents,
+  filterDashboardFaceRecognizeItems,
+  filterDashboardWellBeingEvents,
+  filterDashboardZytaEvents,
+} from "../../features/dashboardNotis";
 
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
 const USE_COMBINED_ALERT_WELLBEING_CARD = false; // set true to restore the previous single-card layout
@@ -29,7 +36,7 @@ type Props = {
   alertEvents: ReadonlyArray<any>;
   searchWB: string;
   setSearchWB: (v: string) => void;
-  filteredWellBeginNotis: ReadonlyArray<any>;
+  wellBeingEvents: ReadonlyArray<any>;
   // middle
   selectedEvents: string[];
   buttonLabel: string;
@@ -42,11 +49,12 @@ type Props = {
   // right
   searchFR: string;
   setSearchFR: (v: string) => void;
-  filteredRecognize: ReadonlyArray<any>;
+  faceRecognizeItems: ReadonlyArray<any>;
 
   searchZYTA: string;
   setSearchZYTA: (v: string) => void;
-  filterZYTA: ReadonlyArray<any>;
+  zytaItems: ReadonlyArray<any>;
+  notisLoading?: boolean;
   selectedSiteCode?: string;
   accessibleSites?: Array<{
     id?: string;
@@ -68,7 +76,7 @@ export default function ContentLayout(props: Props) {
     alertEvents,
     searchWB,
     setSearchWB,
-    filteredWellBeginNotis,
+    wellBeingEvents,
     // middle
     selectedEvents,
     buttonLabel,
@@ -80,10 +88,11 @@ export default function ContentLayout(props: Props) {
     // right
     searchFR,
     setSearchFR,
-    filteredRecognize,
+    faceRecognizeItems,
     searchZYTA,
     setSearchZYTA,
-    filterZYTA,
+    zytaItems,
+    notisLoading = false,
   } = props;
 
   const navigate = useNavigate();
@@ -101,33 +110,36 @@ export default function ContentLayout(props: Props) {
 
   const { abs } = useUserPath();
 
-  const sortedAlertEvents = React.useMemo(
-    () =>
-      [...(alertEvents ?? [])].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      ),
-    [alertEvents]
+  const filteredAlertEvents = React.useMemo(
+    () => filterDashboardAlertEvents(alertEvents as any[], searchEvent),
+    [alertEvents, searchEvent]
   );
 
-  const allItems = React.useMemo(() => {
-    const combined = [...sortedAlertEvents, ...filteredWellBeginNotis];
-    return combined.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-  }, [sortedAlertEvents, filteredWellBeginNotis]);
+  const filteredWellBeingItems = React.useMemo(
+    () => filterDashboardWellBeingEvents(wellBeingEvents as any[], searchWB),
+    [searchWB, wellBeingEvents]
+  );
 
-  const bag = (n: any) =>
-    [n?.event, n?.titleKey, n?.title, n?.site, n?.type, n?.date]
-      .filter(Boolean)
-      .map((x: any) => String(x).toLowerCase().trim())
-      .join(" ");
+  const filteredFaceRecognizeItems = React.useMemo(
+    () =>
+      filterDashboardFaceRecognizeItems(faceRecognizeItems as any[], searchFR),
+    [faceRecognizeItems, searchFR]
+  );
+
+  const filteredZytaItems = React.useMemo(
+    () => filterDashboardZytaEvents(zytaItems as any[], searchZYTA),
+    [searchZYTA, zytaItems]
+  );
+
+  const mapBaseItems = React.useMemo(
+    () => combineDashboardNotis(alertEvents as any[], filteredWellBeingItems),
+    [alertEvents, filteredWellBeingItems]
+  );
 
   // ลิสต์ “ผลลัพธ์จาก search ของ AlertEvents”
   const filteredAllForSearch = React.useMemo(() => {
-    const q = (searchEvent || "").toLowerCase().trim();
-    if (!q) return allItems;
-    return allItems.filter((n: any) => bag(n).includes(q));
-  }, [allItems, searchEvent]);
+    return filterDashboardAlertEvents(mapBaseItems as any[], searchEvent);
+  }, [mapBaseItems, searchEvent]);
 
   // Compute region-site counts from accessibleSites
   const regionSeriesFromSites = React.useMemo(() => {
@@ -266,14 +278,16 @@ export default function ContentLayout(props: Props) {
               <AlertEvents
                 search={searchEvent}
                 setSearch={setSearchEvent}
-                items={sortedAlertEvents as any[]}
+                items={filteredAlertEvents as any[]}
+                loading={notisLoading}
               />
             </div>
             <div className="w-full rounded-xl bg-white">
               <WellBeingEvents
                 search={searchWB}
                 setSearch={setSearchWB}
-                items={filteredWellBeginNotis as any[]}
+                items={filteredWellBeingItems as any[]}
+                loading={notisLoading}
               />
             </div>
           </div>
@@ -283,14 +297,16 @@ export default function ContentLayout(props: Props) {
               <AlertEvents
                 search={searchEvent}
                 setSearch={setSearchEvent}
-                items={sortedAlertEvents as any[]}
+                items={filteredAlertEvents as any[]}
+                loading={notisLoading}
               />
             </div>
             <div className="p-6 w-full rounded-xl bg-white">
               <WellBeingEvents
                 search={searchWB}
                 setSearch={setSearchWB}
-                items={filteredWellBeginNotis as any[]}
+                items={filteredWellBeingItems as any[]}
+                loading={notisLoading}
               />
             </div>
           </div>
@@ -362,7 +378,8 @@ export default function ContentLayout(props: Props) {
             <ZYTAEvents
               search={searchZYTA}
               setSearch={setSearchZYTA}
-              items={filterZYTA as any[]}
+              items={filteredZytaItems as any[]}
+              loading={notisLoading}
             />
           </div>
 
@@ -370,7 +387,8 @@ export default function ContentLayout(props: Props) {
             <FaceRecognize
               search={searchFR}
               setSearch={setSearchFR}
-              items={filteredRecognize as any[]}
+              items={filteredFaceRecognizeItems as any[]}
+              loading={notisLoading}
             />
           </div>
         </div>

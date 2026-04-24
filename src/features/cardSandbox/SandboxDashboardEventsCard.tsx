@@ -1,15 +1,12 @@
 import React from "react";
 import AlertEvents from "../../components/Dashboard/AlertEvents";
 import WellBeingEvents from "../../components/Dashboard/WellBeingEvents";
-import { alertImage } from "../../assets";
 import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
 import {
-  buildNotiKeywordBag,
   decorateNotiForDisplay,
   matchesSite,
-  resolveDefaultNotiImage,
   sortByNewest,
   toDateKey,
 } from "../../utils/notis";
@@ -19,44 +16,17 @@ import {
   selectSandboxFilterGroupForCard,
 } from "./cardSandboxSelectors";
 import { cardSandboxActions } from "./cardSandboxSlice";
+import {
+  collectDashboardAlertEvents,
+  collectDashboardWellBeingEvents,
+  filterDashboardAlertEvents,
+  filterDashboardWellBeingEvents,
+} from "../../features/dashboardNotis";
 
 type Props = {
   variant: "alerts" | "wellbeing";
   cardId: string;
 };
-
-const FALL_KEYWORDS = [
-  "notis.falldetected",
-  "fall",
-  "fall detected",
-  "ตรวจพบคนล้ม",
-  "คนล้ม",
-];
-const SLEEP_KEYWORDS = [
-  "notis.sleepinglong",
-  "sleep",
-  "sleeping",
-  "ตรวจพบคนหลับ",
-  "หลับ",
-  "นอนหลับ",
-];
-const EXCLUDED_KEYWORDS = [
-  "notis.firedetected",
-  "fire",
-  "ไฟไหม้",
-  "เพลิง",
-  "notis.motiondetected",
-  "motion",
-  "เคลื่อนไหว",
-  "ตรวจพบการเคลื่อนไหว",
-  "offline",
-  "camera offline",
-  "device offline",
-  "ออฟไลน์",
-];
-
-const includesAny = (text: string, keywords: string[]) =>
-  keywords.some((keyword) => text.includes(keyword));
 
 function todayValue() {
   const date = new Date();
@@ -75,18 +45,6 @@ function matchesScopedSiteCode(noti: Noti, codes: Set<string>) {
   return candidates
     .filter((candidate): candidate is string => typeof candidate === "string")
     .some((candidate) => codes.has(candidate.trim()));
-}
-
-function isDefaultEventCategory(noti: Noti): boolean {
-  const img = resolveDefaultNotiImage(noti);
-  return Boolean(img && img !== alertImage);
-}
-
-function isWellBeingNoti(noti: Noti): boolean {
-  const bag = buildNotiKeywordBag(noti);
-  if (!bag) return false;
-  if (includesAny(bag, EXCLUDED_KEYWORDS)) return false;
-  return includesAny(bag, FALL_KEYWORDS) || includesAny(bag, SLEEP_KEYWORDS);
 }
 
 export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
@@ -171,24 +129,23 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
   }, [liveNotis, matchGlobalDate, scopedSiteCodes, selectedSite]);
 
   const alertItems = React.useMemo(
-    () => sortByNewest(dateScopedNotis),
+    () => collectDashboardAlertEvents(dateScopedNotis),
     [dateScopedNotis]
   );
 
   const wellbeingItems = React.useMemo(() => {
-    return dateScopedNotis.filter((noti) => {
-      if (!isDefaultEventCategory(noti)) return false;
-      if (!isWellBeingNoti(noti)) return false;
-      const type = (noti.type || "").toLowerCase();
-      const severity = (noti.severity || "").toLowerCase();
-      return (
-        type === "alert" ||
-        type === "warning" ||
-        severity === "critical" ||
-        severity === "medium"
-      );
-    });
+    return collectDashboardWellBeingEvents(dateScopedNotis);
   }, [dateScopedNotis]);
+
+  const filteredAlertItems = React.useMemo(
+    () => filterDashboardAlertEvents(alertItems, alertSearch),
+    [alertItems, alertSearch]
+  );
+
+  const filteredWellBeingItems = React.useMemo(
+    () => filterDashboardWellBeingEvents(wellbeingItems, wellbeingSearch),
+    [wellbeingItems, wellbeingSearch]
+  );
 
   if (variant === "wellbeing") {
     return (
@@ -197,7 +154,7 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
         setSearch={(value) =>
           dispatch(cardSandboxActions.setWellbeingSearch(value))
         }
-        items={wellbeingItems}
+        items={filteredWellBeingItems}
         showTitle={false}
         loading={notisLoading}
       />
@@ -208,7 +165,7 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
     <AlertEvents
       search={alertSearch}
       setSearch={(value) => dispatch(cardSandboxActions.setAlertSearch(value))}
-      items={alertItems}
+      items={filteredAlertItems}
       loading={notisLoading}
     />
   );

@@ -1,4 +1,3 @@
-import React from "react";
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import EventPanelState from "./EventPanelState";
@@ -30,23 +29,7 @@ export default function ZYTAEvents({
   loading = false,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
-
-  const list = React.useMemo(() => {
-    const q = (search || "").toLowerCase().trim();
-    const sorted = [...items].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    if (!q) return sorted;
-
-    return sorted.filter((n) =>
-      [n.titleKey, n.title, n.site, n.type, n.date]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [items, search]);
+  const list = items;
 
   const formatDateForUI = (s: string) => {
     const d = new Date(s);

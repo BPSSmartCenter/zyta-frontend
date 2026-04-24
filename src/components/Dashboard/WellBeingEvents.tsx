@@ -1,4 +1,3 @@
-import React from "react";
 import SearchInput from "../SearchInput";
 import NotiCard from "../notiCard";
 import EventPanelState from "./EventPanelState";
@@ -45,20 +44,7 @@ export default function WellBeingEvents({
   const navigate = useNavigate();
 
   const { abs } = useUserPath();
-  const sortedItems = React.useMemo(
-    () =>
-      [...items].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      ),
-    [items]
-  );
-  const list = React.useMemo(() => {
-    const q = (search || "").toLowerCase().trim();
-    if (!q) return sortedItems;
-    return sortedItems.filter((n: any) =>
-      JSON.stringify(n).toLowerCase().includes(q)
-    );
-  }, [sortedItems, search]);
+  const list = items;
 
   const formatDateForUI = (s: string) => {
     const d = new Date(s);

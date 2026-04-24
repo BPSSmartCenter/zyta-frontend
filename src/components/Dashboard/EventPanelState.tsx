@@ -10,7 +10,7 @@ export default function EventPanelState({
   loadingText,
 }: EventPanelStateProps) {
   return (
-    <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-3 text-center text-sm font-medium text-slate-500">
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-3 text-center text-sm font-medium text-slate-500">
       {loading ? (
         <>
           <span

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export type GlassHoverSidebarItem = {
   id: string;
   label: string;
+  section?: boolean;
   icon?: string;
   href?: string;
   active?: boolean;
@@ -59,6 +60,16 @@ function SidebarItem({
   item: GlassHoverSidebarItem;
   depth?: number;
 }) {
+  if (item.section) {
+    return (
+      <li className={cx(depth > 0 && "pl-11")}>
+        <div className="px-1 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
+          {item.label}
+        </div>
+      </li>
+    );
+  }
+
   const interactiveClassName = cx(
     "group/item flex h-12 w-full items-center gap-2 rounded-md border px-3 text-left text-sm font-semibold shadow-sm outline-none transition",
     "focus-visible:ring-4 focus-visible:ring-cyan-400/20",
@@ -72,7 +83,7 @@ function SidebarItem({
   const icon = item.icon ? (
     <span
       className={cx(
-        "material-icons-outlined flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[19px] transition",
+        "material-icons-outlined flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[19px] leading-none transition",
         item.active
           ? "bg-[#EAF7FD] text-[#0877A8]"
           : "bg-white/45 text-slate-600 group-hover/item:text-slate-950"
