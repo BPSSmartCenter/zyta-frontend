@@ -22,6 +22,7 @@ type Props = {
   items: WB[];
   showTitle?: boolean;
   loading?: boolean;
+  fillAvailableHeight?: boolean;
 };
 
 /* ----- helpers: map noti -> event key ----- */
@@ -39,6 +40,7 @@ export default function WellBeingEvents({
   items,
   showTitle = true,
   loading = false,
+  fillAvailableHeight = false,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -64,7 +66,12 @@ export default function WellBeingEvents({
   };
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <form
+      className={[
+        "flex flex-col gap-3 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        fillAvailableHeight ? "h-full min-h-0" : "justify-center",
+      ].join(" ")}
+    >
       {showTitle && (
         <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
           {t("wellbeing.title")}
@@ -74,13 +81,18 @@ export default function WellBeingEvents({
         value={search}
         placeholder={t("search.placeholder")}
         onChange={setSearch}
-        className="font-poppins"
+        className="shrink-0 font-poppins"
         disableMenu
       />
       <div
-        className={`${
-          showTitle ? "h-[340px] lg-1399:h-[490px]" : "h-[350px] lg:h-[558px]"
-        } overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        className={[
+          "overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          fillAvailableHeight
+            ? "min-h-0 flex-1"
+            : showTitle
+              ? "h-[340px] lg-1399:h-[490px]"
+              : "h-[350px] lg:h-[558px]",
+        ].join(" ")}
       >
         {list.length === 0 ? (
           <EventPanelState

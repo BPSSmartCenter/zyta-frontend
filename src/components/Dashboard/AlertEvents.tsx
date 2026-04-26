@@ -18,6 +18,7 @@ type Props = {
   setSearch: (v: string) => void;
   items: Noti[];
   loading?: boolean;
+  fillAvailableHeight?: boolean;
 };
 
 export default function AlertEvents({
@@ -25,6 +26,7 @@ export default function AlertEvents({
   setSearch,
   items,
   loading = false,
+  fillAvailableHeight = false,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -73,17 +75,27 @@ export default function AlertEvents({
   const list = items;
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <form
+      className={[
+        "flex flex-col gap-3 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        fillAvailableHeight ? "h-full min-h-0" : "justify-center",
+      ].join(" ")}
+    >
 
       <SearchInput
         value={search}
         placeholder={t("search.placeholder")}
         onChange={setSearch}
-        className="font-poppins"
+        className="shrink-0 font-poppins"
         disableMenu
       />
 
-      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        className={[
+          "overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          fillAvailableHeight ? "min-h-0 flex-1" : "h-[350px] lg:h-[558px]",
+        ].join(" ")}
+      >
         {list.length === 0 ? (
           <EventPanelState
             loading={loading}

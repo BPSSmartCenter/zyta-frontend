@@ -62,8 +62,8 @@ function SidebarItem({
 }) {
   if (item.section) {
     return (
-      <li className={cx(depth > 0 && "pl-11")}>
-        <div className="px-1 pb-1 pt-3 text-[11px] font-bold uppercase tracking-[0.08em] text-slate-400">
+      <li className={cx(depth > 0 && "pl-8", "pt-4 first:pt-0")}>
+        <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
           {item.label}
         </div>
       </li>
@@ -71,22 +71,22 @@ function SidebarItem({
   }
 
   const interactiveClassName = cx(
-    "group/item flex h-12 w-full items-center gap-2 rounded-md border px-3 text-left text-sm font-semibold shadow-sm outline-none transition",
-    "focus-visible:ring-4 focus-visible:ring-cyan-400/20",
-    depth > 0 && "text-[13px] font-semibold",
+    "group/item flex min-h-[38px] w-full items-center gap-2.5 rounded-[16px] px-3 text-left text-[15px] font-medium outline-none transition",
+    "focus-visible:ring-4 focus-visible:ring-cyan-400/15",
+    depth > 0 && "min-h-[34px] text-[14px]",
     item.active
-      ? "border-[#3AB8EE]/55 bg-gradient-to-r from-cyan-50/95 via-white/90 to-sky-50/85 text-slate-950 ring-1 ring-[#3AB8EE]/20"
-      : "border-white/70 bg-white/45 text-slate-700 hover:border-cyan-200/70 hover:bg-gradient-to-r hover:from-cyan-50/75 hover:via-white/80 hover:to-sky-50/65 hover:text-slate-950",
-    item.disabled && "pointer-events-none cursor-not-allowed opacity-40"
+      ? "bg-gradient-to-r from-[#EAF7FD] via-[#F5FBFF] to-white text-[#0877A8] shadow-[inset_0_0_0_1px_rgba(58,184,238,0.18)]"
+      : "text-slate-600 hover:bg-gradient-to-r hover:from-[#EDF9FE] hover:via-white hover:to-[#F3FBFF] hover:text-[#0877A8]",
+    item.disabled && "pointer-events-none cursor-not-allowed opacity-35"
   );
 
   const icon = item.icon ? (
     <span
       className={cx(
-        "material-icons-outlined flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[19px] leading-none transition",
+        "material-icons-outlined flex h-5 w-5 shrink-0 items-center justify-center text-[20px] leading-none transition",
         item.active
-          ? "bg-[#EAF7FD] text-[#0877A8]"
-          : "bg-white/45 text-slate-600 group-hover/item:text-slate-950"
+          ? "text-[#0877A8]"
+          : "text-slate-500 group-hover/item:text-slate-900"
       )}
       aria-hidden="true"
     >
@@ -98,21 +98,21 @@ function SidebarItem({
     <>
       {icon}
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      {item.badge !== undefined && (
+      {item.badge !== undefined ? (
         <span
           className={cx(
             "rounded-full px-2 py-0.5 text-[11px] font-bold",
-            item.active ? "bg-white/20 text-white" : "bg-slate-900/5 text-slate-500"
+            item.active ? "bg-white text-[#0877A8]" : "bg-slate-100 text-slate-500"
           )}
         >
           {item.badge}
         </span>
-      )}
+      ) : null}
     </>
   );
 
   return (
-    <li>
+    <li className={cx(depth > 0 && "pl-8")}>
       {item.href ? (
         <a
           href={item.href}
@@ -136,7 +136,7 @@ function SidebarItem({
       )}
 
       {item.children?.length ? (
-        <ul className="mt-2 space-y-2 pl-11">
+        <ul className="mt-1 space-y-0.5">
           {item.children.map((child) => (
             <SidebarItem key={child.id} item={child} depth={depth + 1} />
           ))}
@@ -161,45 +161,38 @@ export default function GlassHoverSidebar({
   onOpenChange,
   onLogout,
 }: GlassHoverSidebarProps) {
-  const cardClassName = cx(
-    "rounded-2xl border border-white/70 bg-white/70 backdrop-blur-2xl ring-1 ring-slate-900/5",
-    open
-      ? "shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
-      : "shadow-none group-hover/sidebar:shadow-[0_18px_54px_rgba(15,23,42,0.22)] focus-within:shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
-  );
-
   return (
     <aside
       aria-label={ariaLabel}
       className={cx(
-        "group/sidebar pointer-events-none fixed left-0 top-0 z-[1100] h-dvh w-[320px]",
+        "group/sidebar pointer-events-none fixed left-0 top-0 z-[1100] h-dvh w-[296px]",
         className
       )}
     >
       <div
-        className="pointer-events-auto absolute left-0 top-0 h-full w-7"
+        className="pointer-events-auto absolute left-0 top-0 h-full w-6"
         aria-hidden="true"
       />
 
       <div
         className={cx(
-          "pointer-events-auto absolute left-0 top-4 h-[calc(100dvh-2rem)] w-[288px]",
+          "pointer-events-auto absolute left-0 top-0 h-full w-[272px]",
           "transition-transform duration-300 ease-out motion-reduce:transition-none",
           open
-            ? "translate-x-3"
-            : "translate-x-[calc(-100%-2px)] group-hover/sidebar:translate-x-3 focus-within:translate-x-3"
+            ? "translate-x-0"
+            : "translate-x-[calc(-100%+18px)] group-hover/sidebar:translate-x-0 focus-within:translate-x-0"
         )}
       >
         <button
           type="button"
-          className="absolute right-[-24px] top-1/2 z-10 flex h-28 w-[24px] -translate-y-1/2 items-center justify-center rounded-r-md border border-white/70 bg-white/70 shadow-[0_10px_30px_rgba(15,23,42,0.16)] backdrop-blur-2xl outline-none transition [clip-path:inset(-60px_-60px_-60px_0)] hover:bg-white/80 focus-visible:ring-4 focus-visible:ring-cyan-400/20"
+          className="absolute right-[-18px] top-[22px] z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white text-slate-500 shadow-[0_10px_24px_rgba(15,23,42,0.12)] outline-none transition hover:bg-white focus-visible:ring-4 focus-visible:ring-cyan-400/15"
           aria-label={toggleLabel}
           aria-expanded={open}
           onClick={() => onOpenChange?.(!open)}
         >
           <span
             className={cx(
-              "material-icons-outlined text-[18px] text-slate-500 transition group-hover/sidebar:rotate-180",
+              "material-icons-outlined text-[20px] transition",
               open && "rotate-180"
             )}
           >
@@ -207,10 +200,10 @@ export default function GlassHoverSidebar({
           </span>
         </button>
 
-        <div className="flex h-full flex-col gap-3">
-          <div className={cx(cardClassName, "shrink-0 overflow-hidden p-3")}>
+        <div className="flex h-full flex-col overflow-hidden rounded-r-[10px] border border-slate-200/70 border-l-0 bg-white/95 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="border-b border-slate-200/70 px-5 py-5">
             <div className="flex items-center gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md border border-white/70 bg-white/45 shadow-sm">
+              <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
                 {logo ?? (
                   <span className="material-icons-outlined text-[24px] text-[#0877A8]">
                     dashboard
@@ -226,68 +219,75 @@ export default function GlassHoverSidebar({
                 </p>
               </div>
             </div>
-            {headerSlot}
           </div>
 
-          <div className={cx(cardClassName, "min-h-0 flex-1 overflow-hidden")}>
-            <nav className="flex h-full flex-col overflow-y-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <ul className="space-y-2">
+          {headerSlot ? (
+            <div className="border-b border-slate-200/70 px-4 py-3">
+              {headerSlot}
+            </div>
+          ) : null}
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav>
+              <ul className="space-y-0.5">
                 {items.map((item) => (
                   <SidebarItem key={item.id} item={item} />
                 ))}
               </ul>
+            </nav>
+          </div>
 
-              {footerItems.length > 0 && (
-                <ul className="mt-4 space-y-2 pt-3 ">
+          {(footerItems.length > 0 || account || onLogout) ? (
+            <div className="shrink-0 border-t border-slate-200/70 px-3 py-3">
+              {footerItems.length > 0 ? (
+                <ul className="space-y-0.5">
                   {footerItems.map((item) => (
                     <SidebarItem key={item.id} item={item} />
                   ))}
                 </ul>
-              )}
-            </nav>
-          </div>
+              ) : null}
 
-          {(account || onLogout) && (
-            <div className={cx(cardClassName, "shrink-0 overflow-hidden p-3")}>
-              <div className="flex items-center gap-3 rounded-md border border-white/70 bg-white/45 p-2 shadow-sm">
-                <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-100">
-                  {account?.avatarSrc ? (
-                    <img
-                      src={account.avatarSrc}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="material-icons-outlined text-[20px] text-slate-500">
-                      person
-                    </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-slate-900">
-                    {account?.name ?? "Account"}
-                  </p>
-                  {account?.email && (
-                    <p className="truncate text-xs font-medium text-slate-500">
-                      {account.email}
+              {(account || onLogout) ? (
+                <div className="mt-3 flex items-center gap-3 rounded-[20px] bg-slate-50/80 px-3 py-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-100">
+                    {account?.avatarSrc ? (
+                      <img
+                        src={account.avatarSrc}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="material-icons-outlined text-[20px] text-slate-500">
+                        person
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold text-slate-900">
+                      {account?.name ?? "Account"}
                     </p>
-                  )}
+                    {account?.email ? (
+                      <p className="truncate text-xs font-medium text-slate-500">
+                        {account.email}
+                      </p>
+                    ) : null}
+                  </div>
+                  {onLogout ? (
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-500 transition hover:bg-white hover:text-[#D90452] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/20"
+                      aria-label="Sign out"
+                    >
+                      <span className="material-icons-outlined text-[20px]">
+                        logout
+                      </span>
+                    </button>
+                  ) : null}
                 </div>
-                {onLogout && (
-                  <button
-                    type="button"
-                    onClick={onLogout}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/70 bg-white/45 text-slate-500 shadow-sm transition hover:bg-white/75 hover:text-[#D90452] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/20"
-                    aria-label="Sign out"
-                  >
-                    <span className="material-icons-outlined text-[20px]">
-                      logout
-                    </span>
-                  </button>
-                )}
-              </div>
+              ) : null}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </aside>

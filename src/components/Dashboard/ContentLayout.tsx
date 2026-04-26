@@ -18,6 +18,8 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { me as apiMe } from "../../api/user";
+import SnapshotChartSection from "../Chart";
+import Switch from "../Switch";
 import {
   combineDashboardNotis,
   filterDashboardAlertEvents,
@@ -27,7 +29,53 @@ import {
 } from "../../features/dashboardNotis";
 
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
-const USE_COMBINED_ALERT_WELLBEING_CARD = false; // set true to restore the previous single-card layout
+
+const SURFACE_CARD_CLASS =
+  "rounded-[10px] border border-white/80 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]";
+
+function DashboardSurface({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <section className={[SURFACE_CARD_CLASS, className].join(" ")}>{children}</section>;
+}
+
+function RailCard({
+  title,
+  count,
+  className = "",
+  bodyClassName = "",
+  children,
+}: {
+  title: string;
+  count?: number;
+  className?: string;
+  bodyClassName?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <DashboardSurface className={["p-4", className].join(" ")}>
+      <div className="flex items-center justify-between gap-3 px-2 pb-3">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-900">
+          {title}
+        </h2>
+        {typeof count === "number" ? (
+          <span className="inline-flex min-w-[32px] items-center justify-center rounded-full bg-[#F3F0FF] px-2 py-1 text-xs font-semibold text-[#4A3AFF]">
+            {count}
+          </span>
+        ) : null}
+      </div>
+      <div className={["rounded-[22px] bg-[#F8FBFE]", bodyClassName].join(" ")}>
+        {children}
+      </div>
+    </DashboardSurface>
+  );
+}
+
+type AlertRailMode = "alert-events" | "special-events";
 
 type Props = {
   // left column
@@ -97,6 +145,15 @@ export default function ContentLayout(props: Props) {
 
   const navigate = useNavigate();
   const [isMaster, setIsMaster] = React.useState(false);
+  const [alertRailMode, setAlertRailMode] =
+    React.useState<AlertRailMode>("alert-events");
+  const alertAsideRef = React.useRef<HTMLElement | null>(null);
+  const mapSurfaceRef = React.useRef<HTMLDivElement | null>(null);
+  const [mapSurfaceHeight, setMapSurfaceHeight] = React.useState<number | null>(
+    null
+  );
+  const [alertViewportHeight, setAlertViewportHeight] =
+    React.useState<number | null>(null);
   React.useEffect(() => {
     (async () => {
       try {
@@ -107,6 +164,46 @@ export default function ContentLayout(props: Props) {
       }
     })();
   }, []);
+  React.useEffect(() => {
+    const node = mapSurfaceRef.current;
+    if (!node) return;
+
+    const updateHeight = () => {
+      const nextHeight = Math.round(node.getBoundingClientRect().height);
+      setMapSurfaceHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeight);
+      return () => window.removeEventListener("resize", updateHeight);
+    }
+
+    const observer = new ResizeObserver(() => updateHeight());
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  React.useEffect(() => {
+    const node = alertAsideRef.current;
+    if (!node) return;
+
+    const updateHeight = () => {
+      const absoluteTop = node.getBoundingClientRect().top + window.scrollY;
+      const viewportHeight = window.innerHeight;
+      const nextHeight = Math.max(0, Math.floor(viewportHeight - absoluteTop - 16));
+      setAlertViewportHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+    };
+
+    updateHeight();
+    const rafId = window.requestAnimationFrame(updateHeight);
+    window.addEventListener("resize", updateHeight);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateHeight);
+    };
+  }, [alertRailMode]);
 
   const { abs } = useUserPath();
 
@@ -255,67 +352,32 @@ export default function ContentLayout(props: Props) {
     JSON.stringify(props.accessibleSites),
   ]);
 
-  return (
-    <div className="flex flex-col px-6 gap-3">
-      {/* 
-        Responsive grid:
-        - mobile: 1 col
-        - tablet: 2 cols (ซ้าย + กลาง)
-        - desktop+: 3 cols: [ซ้ายแคบ] [กลางกว้าง] [ขวาแคบ]
-      */}
-      <div
-        className="
-          grid gap-3
-          grid-cols-1
-          md:grid-cols-
-          lg:[grid-template-columns:370px_minmax(0,1fr)_370px]
-        "
-      >
-        {/* LEFT: All-time Alerts + Well-being */}
-        {USE_COMBINED_ALERT_WELLBEING_CARD ? (
-          <div className="p-6 w-full flex-col lg:flex-col md:flex-row md:grid-cols-2 sm:grid-cols-1 rounded-xl flex gap-3 bg-white">
-            <div className="w-full rounded-xl bg-white">
-              <AlertEvents
-                search={searchEvent}
-                setSearch={setSearchEvent}
-                items={filteredAlertEvents as any[]}
-                loading={notisLoading}
-              />
-            </div>
-            <div className="w-full rounded-xl bg-white">
-              <WellBeingEvents
-                search={searchWB}
-                setSearch={setSearchWB}
-                items={filteredWellBeingItems as any[]}
-                loading={notisLoading}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 md:flex-row lg:flex-col">
-            <div className="p-6 w-full rounded-xl bg-white">
-              <AlertEvents
-                search={searchEvent}
-                setSearch={setSearchEvent}
-                items={filteredAlertEvents as any[]}
-                loading={notisLoading}
-              />
-            </div>
-            <div className="p-6 w-full rounded-xl bg-white">
-              <WellBeingEvents
-                search={searchWB}
-                setSearch={setSearchWB}
-                items={filteredWellBeingItems as any[]}
-                loading={notisLoading}
-              />
-            </div>
-          </div>
-        )}
+  const specialAlertCount =
+    filteredFaceRecognizeItems.length +
+    filteredZytaItems.length +
+    filteredWellBeingItems.length;
+  const activeAlertCount =
+    alertRailMode === "alert-events"
+      ? filteredAlertEvents.length
+      : specialAlertCount;
+  const alertAsideStyle = mapSurfaceHeight
+    ? ({
+        "--dashboard-map-card-height": `${mapSurfaceHeight}px`,
+        "--dashboard-alert-viewport-height": alertViewportHeight
+          ? `${alertViewportHeight}px`
+          : undefined,
+      } as React.CSSProperties)
+    : alertViewportHeight
+      ? ({
+          "--dashboard-alert-viewport-height": `${alertViewportHeight}px`,
+        } as React.CSSProperties)
+      : undefined;
 
-        {/* MIDDLE: Map ด้านบน + แถวล่าง UserManagement & Devices */}
-        <div className="flex flex-col gap-3 md:col-span-1">
-          {/* Map panel */}
-          <div className="p-6 w-full rounded-xl bg-white">
+  return (
+    <div className="grid grid-cols-1 gap-5 xl:[grid-template-columns:minmax(0,1fr)_348px] 2xl:[grid-template-columns:minmax(0,1fr)_368px]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <div ref={mapSurfaceRef}>
+          <DashboardSurface className="p-1">
             <MapPanel
               selectedEvents={selectedEvents}
               buttonLabel={buttonLabel}
@@ -328,16 +390,27 @@ export default function ContentLayout(props: Props) {
               accessibleSites={props.accessibleSites}
               overrideNotis={filteredAllForSearch as any[]}
             />
-          </div>
+          </DashboardSurface>
+        </div>
 
-          {/* Bottom row under the map: User Management (ซ้าย) + Devices (ขวา)
-              - บนจอเล็กให้ซ้อนลงมาเป็น 1 คอลัมน์
-              - บนจอใหญ่จัด 2 คอลัมน์เคียงกันให้เหมือนภาพ */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 lg-1399:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
+          <DashboardSurface className="p-6">
+            <DeviceCount
+              siteCode={props.selectedSiteCode}
+              counts={deviceCounts as any}
+              onlineCount={deviceTotals.online}
+              offlineCount={deviceTotals.offline}
+            />
+          </DashboardSurface>
+
+          <DashboardSurface
+            className={[
+              "p-6",
+              isMaster ? "cursor-pointer transition hover:-translate-y-0.5" : "opacity-95",
+            ].join(" ")}
+          >
             <div
-              className="p-6 w-full rounded-xl bg-white"
               onClick={() => {
-                // เปิดหน้า UserManagement เฉพาะ super admin เท่านั้น
                 try {
                   if (isMaster) {
                     navigate(abs("/usermanage"));
@@ -345,10 +418,6 @@ export default function ContentLayout(props: Props) {
                 } catch {
                   /* no-op */
                 }
-              }}
-              style={{
-                cursor: isMaster ? "pointer" : "default",
-                opacity: isMaster ? 1 : 0.9,
               }}
               aria-disabled={!isMaster}
             >
@@ -361,38 +430,128 @@ export default function ContentLayout(props: Props) {
                 roleColors={roleColors}
               />
             </div>
-            <div className="p-6 w-full rounded-xl bg-white">
-              <DeviceCount
-                siteCode={props.selectedSiteCode}
-                counts={deviceCounts as any}
-                onlineCount={deviceTotals.online}
-                offlineCount={deviceTotals.offline}
-              />
-            </div>
-          </div>
+          </DashboardSurface>
         </div>
 
-        {/* RIGHT: ZYTA Security Alert ด้านบน + Face Recognize/License Plates ด้านล่าง */}
-        <div className="flex flex-col md:flex-row lg:flex-col gap-3 grid-cols-1 md:grid-cols-2 md:col-span-1">
-          <div className="p-6 w-full rounded-xl bg-white">
-            <ZYTAEvents
-              search={searchZYTA}
-              setSearch={setSearchZYTA}
-              items={filteredZytaItems as any[]}
-              loading={notisLoading}
-            />
-          </div>
-
-          <div className="p-6 w-full rounded-xl bg-white">
-            <FaceRecognize
-              search={searchFR}
-              setSearch={setSearchFR}
-              items={filteredFaceRecognizeItems as any[]}
-              loading={notisLoading}
-            />
-          </div>
+        <div className="overflow-hidden rounded-[10px] border border-white/80 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+          <SnapshotChartSection
+            buttonLabel={buttonLabel}
+            selectedEvents={selectedEvents}
+            toggleEvent={toggleEvent}
+          />
         </div>
       </div>
+
+      <aside
+        ref={alertAsideRef}
+        className={[
+          "flex min-w-0 flex-col gap-5",
+          alertRailMode === "alert-events"
+            ? "min-h-0 xl:h-[var(--dashboard-alert-viewport-height)]"
+            : "min-h-0 xl:h-[var(--dashboard-alert-viewport-height)]",
+        ].join(" ")}
+        style={alertAsideStyle}
+      >
+        <div className="flex items-end justify-between gap-3 bg-white/90 rounded-[10px] py-2 px-3 pl-6">
+          <div>
+            <h2 className="text-[16px] font-semibold text-slate-950">ALERTS</h2>
+            <p className="text-sm text-slate-500">
+              {activeAlertCount} recent events
+            </p>
+          </div>
+
+          <div className="flex flex-row items-center gap-2 rounded-full p-2 ">
+            <span
+              className={[
+                "text-xs font-semibold transition",
+                alertRailMode === "alert-events"
+                  ? "text-slate-950"
+                  : "text-slate-400",
+              ].join(" ")}
+            >
+              All alert events
+            </span>
+            <Switch
+              checked={alertRailMode === "alert-events"}
+              onChange={(event) =>
+                setAlertRailMode(
+                  // event.target.checked ? "special-events" : "alert-events"
+                  event.target.checked ? "alert-events" : "special-events"
+                )
+              }
+              aria-label="Toggle alert rail mode"
+            />
+
+          </div>
+        </div>
+
+        {alertRailMode === "alert-events" ? (
+          <RailCard
+            title="Alert Events"
+            count={filteredAlertEvents.length}
+            className="flex min-h-0 flex-1 flex-col"
+            bodyClassName="flex min-h-0 flex-1 flex-col"
+          >
+            <AlertEvents
+              search={searchEvent}
+              setSearch={setSearchEvent}
+              items={filteredAlertEvents as any[]}
+              loading={notisLoading}
+              fillAvailableHeight
+            />
+          </RailCard>
+        ) : (
+          <>
+            <RailCard
+              title="Face Recognize / License Plates"
+              count={filteredFaceRecognizeItems.length}
+              className="flex min-h-0 flex-1 flex-col"
+              bodyClassName="flex min-h-0 flex-1 flex-col"
+            >
+              <FaceRecognize
+                search={searchFR}
+                setSearch={setSearchFR}
+                items={filteredFaceRecognizeItems as any[]}
+                loading={notisLoading}
+                showTitle={false}
+                fillAvailableHeight
+              />
+            </RailCard>
+
+            <RailCard
+              title="ZYTA Security Alert"
+              count={filteredZytaItems.length}
+              className="flex min-h-0 flex-1 flex-col"
+              bodyClassName="flex min-h-0 flex-1 flex-col"
+            >
+              <ZYTAEvents
+                search={searchZYTA}
+                setSearch={setSearchZYTA}
+                items={filteredZytaItems as any[]}
+                loading={notisLoading}
+                showTitle={false}
+                fillAvailableHeight
+              />
+            </RailCard>
+
+            <RailCard
+              title="Well-being Events"
+              count={filteredWellBeingItems.length}
+              className="flex min-h-0 flex-1 flex-col"
+              bodyClassName="flex min-h-0 flex-1 flex-col"
+            >
+              <WellBeingEvents
+                search={searchWB}
+                setSearch={setSearchWB}
+                items={filteredWellBeingItems as any[]}
+                loading={notisLoading}
+                showTitle={false}
+                fillAvailableHeight
+              />
+            </RailCard>
+          </>
+        )}
+      </aside>
     </div>
   );
 }

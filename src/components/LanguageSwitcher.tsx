@@ -78,7 +78,7 @@ export default function LanguageSwitcher() {
   const visible = "opacity-100 translate-y-0 pointer-events-auto";
   const hidden = "opacity-0 -translate-y-2 pointer-events-none";
 
-  if (isSandboxRoute) return null;
+  if (isSandboxRoute || isDashboardRoute(location.pathname)) return null;
 
   const content = (
     <div className="inline-flex items-center gap-2">

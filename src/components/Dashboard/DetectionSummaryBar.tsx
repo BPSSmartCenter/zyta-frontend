@@ -25,6 +25,7 @@ type DetectionSummaryBarProps = {
   events?: Noti[];
   selectedSiteCode?: string;
   className?: string;
+  variant?: "floating" | "inline";
 };
 
 function normalizeDetectionKey(value: string): DetectionSummaryKey {
@@ -69,6 +70,7 @@ export default function DetectionSummaryBar({
   events,
   selectedSiteCode,
   className = "",
+  variant = "floating",
 }: DetectionSummaryBarProps) {
   const { t } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -146,53 +148,88 @@ export default function DetectionSummaryBar({
     navigate(absSite(`/alert?event=${nextKey}`, siteCode));
   };
 
+  const isInline = variant === "inline";
+
   return (
     <section
       aria-label="Detection summary"
       className={[
-        "pointer-events-none fixed bottom-3 left-1/2 z-[900] w-[calc(100vw-8px)] max-w-[940px] -translate-x-1/2",
+        isInline
+          ? "w-full"
+          : "pointer-events-none fixed bottom-3 left-1/2 z-[900] w-[calc(100vw-8px)] max-w-[940px] -translate-x-1/2",
         className,
       ].join(" ")}
     >
-      <div className="pointer-events-auto flex flex-wrap items-end justify-center gap-2 bg-transparent">
+      <div
+        className={[
+          isInline
+            ? "flex items-center justify-start gap-2 lg:justify-end"
+            : "pointer-events-auto flex flex-wrap items-end justify-center gap-2 bg-transparent",
+        ].join(" ")}
+      >
         {syncedItems.map((item) => {
           const active = selectedKey === item.key;
+          const itemLabel = t(`stats.${item.key}`, { defaultValue: item.label });
           return (
             <button
               key={item.key}
               type="button"
               onClick={() => handleChange([active ? "" : item.key])}
+              title={itemLabel}
               className={[
-                "group flex h-14 w-20 min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border px-3 py-2 text-center shadow-[0_10px_28px_rgba(15,23,42,0.16)] outline-none backdrop-blur-2xl transition-all duration-300 hover:h-24 hover:w-[148px] hover:-translate-y-2 focus-visible:h-24 focus-visible:w-[148px] focus-visible:-translate-y-2",
-                "focus-visible:ring-4 focus-visible:ring-cyan-400/25",
+                isInline
+                  ? "inline-flex h-11 min-w-[66px] items-center justify-center gap-2 rounded-[18px] border px-3 text-sm font-semibold shadow-[0_12px_30px_rgba(15,23,42,0.08)] outline-none transition"
+                  : "group flex h-14 w-20 min-w-0 flex-col items-center justify-center overflow-hidden rounded-2xl border px-3 py-2 text-center shadow-[0_10px_28px_rgba(15,23,42,0.16)] outline-none backdrop-blur-2xl transition-all duration-300 hover:h-24 hover:w-[148px] hover:-translate-y-2 focus-visible:h-24 focus-visible:w-[148px] focus-visible:-translate-y-2",
+                isInline
+                  ? "focus-visible:ring-4 focus-visible:ring-[#39B8EE]/15"
+                  : "focus-visible:ring-4 focus-visible:ring-cyan-400/25",
                 active
-                  ? "border-cyan-300/80 bg-gradient-to-br from-cyan-500 to-sky-500 text-white shadow-[0_14px_30px_rgba(8,119,168,0.24)]"
-                  : "border-white/80 bg-white/45 text-slate-700 hover:border-cyan-200/80 hover:bg-gradient-to-br hover:from-cyan-50/90 hover:via-white/85 hover:to-sky-50/80 hover:text-slate-950",
+                  ? isInline
+                    ? "border-[#8CDEFF] bg-gradient-to-br from-[#E7F9FF] via-white to-[#F0FCFF] text-[#1689BC]"
+                    : "border-cyan-300/80 bg-gradient-to-br from-cyan-500 to-sky-500 text-white shadow-[0_14px_30px_rgba(8,119,168,0.24)]"
+                  : isInline
+                    ? "border-[#CDEFFF] bg-white text-slate-700 hover:-translate-y-0.5 hover:border-[#8CDEFF] hover:text-slate-950"
+                    : "border-white/80 bg-white/45 text-slate-700 hover:border-cyan-200/80 hover:bg-gradient-to-br hover:from-cyan-50/90 hover:via-white/85 hover:to-sky-50/80 hover:text-slate-950",
               ].join(" ")}
               aria-pressed={active}
+              aria-label={itemLabel}
             >
               <span className="flex items-center justify-center gap-2">
                 <span
                   className={[
-                    "grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
+                    isInline
+                      ? "grid h-7 w-7 shrink-0 place-items-center rounded-xl transition"
+                      : "grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
                     active
-                      ? "bg-white/20"
-                      : "bg-white/60 group-hover:bg-white/80",
+                      ? isInline
+                        ? "bg-[#39B8EE]/12"
+                        : "bg-white/20"
+                      : isInline
+                        ? "bg-[#EAF8FF]"
+                        : "bg-white/60 group-hover:bg-white/80",
                   ].join(" ")}
                 >
                   <img
                     src={active ? item.activeImg : item.img}
                     alt=""
-                    className="h-5 w-5 object-contain"
+                    className={isInline ? "h-4 w-4 object-contain" : "h-5 w-5 object-contain"}
                   />
                 </span>
-                <span className="text-[19px] font-semibold leading-none tabular-nums tracking-normal">
+                <span
+                  className={
+                    isInline
+                      ? "text-base font-semibold leading-none tabular-nums tracking-normal"
+                      : "text-[19px] font-semibold leading-none tabular-nums tracking-normal"
+                  }
+                >
                   {item.val}
                 </span>
               </span>
-              <span className="mt-0 block max-h-0 w-full translate-y-2 overflow-hidden text-xs font-extrabold uppercase leading-tight tracking-normal opacity-0 transition-all duration-300 group-hover:mt-2 group-hover:max-h-10 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:mt-2 group-focus-visible:max-h-10 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
-                {t(`stats.${item.key}`, { defaultValue: item.label })}
-              </span>
+              {!isInline ? (
+                <span className="mt-0 block max-h-0 w-full translate-y-2 overflow-hidden text-xs font-extrabold uppercase leading-tight tracking-normal opacity-0 transition-all duration-300 group-hover:mt-2 group-hover:max-h-10 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:mt-2 group-focus-visible:max-h-10 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+                  {itemLabel}
+                </span>
+              ) : null}
             </button>
           );
         })}

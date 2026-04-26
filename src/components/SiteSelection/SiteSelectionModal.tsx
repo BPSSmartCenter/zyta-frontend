@@ -16,7 +16,9 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   selectAccessibleSites,
   selectIsSitePickerOpen,
+  selectSelectedGroup,
   selectSelectedSite,
+  selectSelectedUtility,
   selectSitePickerReason,
   siteSelectionActions,
 } from "../../features/siteSelection";
@@ -41,6 +43,8 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
   const reason = useAppSelector(selectSitePickerReason);
   const sites = useAppSelector(selectAccessibleSites);
   const selected = useAppSelector(selectSelectedSite);
+  const selectedGroup = useAppSelector(selectSelectedGroup);
+  const selectedUtility = useAppSelector(selectSelectedUtility);
   const user = useAppSelector(selectAuthUser);
 
   const [query, setQuery] = useState("");
@@ -115,6 +119,29 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
     );
     if (!isForced) syncScopedDashboardPath(value);
   };
+
+  const handleSelectGroup = (group: { id: string; label: string }) => {
+    dispatch(
+      isForced
+        ? siteSelectionActions.selectSite("all")
+        : siteSelectionActions.selectSiteWithoutClosingPicker("all")
+    );
+    dispatch(siteSelectionActions.selectGroup(group));
+    if (!isForced) syncScopedDashboardPath("all");
+  };
+
+  const handleSelectUtility = (utility: { id: string; label: string }) => {
+    dispatch(
+      isForced
+        ? siteSelectionActions.selectSite("all")
+        : siteSelectionActions.selectSiteWithoutClosingPicker("all")
+    );
+    dispatch(siteSelectionActions.selectUtility(utility));
+    if (!isForced) syncScopedDashboardPath("all");
+  };
+
+  const isAllSitesActive =
+    selected === "all" && selectedGroup === null && selectedUtility === null;
 
   const handleBackdropClick = () => {
     if (!isForced) dispatch(siteSelectionActions.closePicker());
@@ -211,7 +238,7 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
                 <AllSitesCard
                   label={allSitesLabel}
                   count={sites.length}
-                  active={selected === "all"}
+                  active={isAllSitesActive}
                   onClick={() => handleSelect("all")}
                 />
               )}
@@ -227,6 +254,10 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
                 <SiteSelectionList
                   tree={filteredTree}
                   selectedValue={selected}
+                  selectedGroup={selectedGroup}
+                  onSelectGroup={handleSelectGroup}
+                  selectedUtility={selectedUtility}
+                  onSelectUtility={handleSelectUtility}
                   onSelect={handleSelect}
                   autoExpand={query.trim() !== ""}
                 />

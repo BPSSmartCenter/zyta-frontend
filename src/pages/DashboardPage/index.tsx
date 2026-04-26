@@ -1,11 +1,11 @@
 // src/pages/DashboardPage/index.tsx
 import React from "react";
 import ContentLayout from "../../components/Dashboard/ContentLayout";
-import SnapshotChartSection from "../../components/Chart";
 import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
 import { useFilters } from "../../context/FiltersContext";
 import DetectionSummaryBar from "../../components/Dashboard/DetectionSummaryBar";
+import DashboardTopBar from "../../components/Dashboard/DashboardTopBar";
 import { statItems } from "../../components/Dashboard/dashboard.constants";
 import { useAppSelector } from "../../store/hooks";
 import {
@@ -186,20 +186,23 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="relative p-0 min-h-screen bg-[#F8FBFE] flex flex-col gap-3 sm:gap-4 lg:gap-6">
-      <DetectionSummaryBar
-        statItems={statItems as any}
-        selectedSiteCode={selectedSite}
-        events={rawNotis}
-      />
-      
-      <ContentLayout {...contentLayoutProps} />
+    <div className="min-h-screen bg-[#F5F7FB] px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
+      <div className="flex flex-col gap-4 lg:gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6">
+          <div className="min-w-0">
+            <DashboardTopBar />
+          </div>
+          <DetectionSummaryBar
+            statItems={statItems as any}
+            selectedSiteCode={selectedSite}
+            events={rawNotis}
+            variant="inline"
+            className="shrink-0"
+          />
+        </div>
 
-      <SnapshotChartSection
-        buttonLabel={buttonLabel}
-        selectedEvents={selectedEvents}
-        toggleEvent={toggleEvent}
-      />
+        <ContentLayout {...contentLayoutProps} />
+      </div>
     </div>
   );
 }
