@@ -17,6 +17,10 @@ function isDashboardRoute(pathname: string) {
   return /^\/u\/[^/]+(?:\/site\/[^/]+)?\/dashboard\/?$/.test(pathname);
 }
 
+function isDevicesRoute(pathname: string) {
+  return /^\/u\/[^/]+(?:\/site\/[^/]+)?\/devices\/?$/.test(pathname);
+}
+
 export default function LanguageSwitcher() {
   const { t, i18n } = useTranslation(["dashboard"]);
   const location = useLocation();
@@ -78,7 +82,12 @@ export default function LanguageSwitcher() {
   const visible = "opacity-100 translate-y-0 pointer-events-auto";
   const hidden = "opacity-0 -translate-y-2 pointer-events-none";
 
-  if (isSandboxRoute || isDashboardRoute(location.pathname)) return null;
+  if (
+    isSandboxRoute ||
+    isDashboardRoute(location.pathname) ||
+    isDevicesRoute(location.pathname)
+  )
+    return null;
 
   const content = (
     <div className="inline-flex items-center gap-2">

@@ -19,7 +19,9 @@ import { selectNotisFeedLoading } from "../../features/notisFeed";
 
 // keep master key seeded in backend; not used for dashboard gating
 
-type Site = {
+type DashboardRole = "admin" | "manager" | "officer" | "user";
+
+type DashboardSiteSummary = {
   id?: string;
   code?: string;
   name?: string;
@@ -29,8 +31,6 @@ type Site = {
   utility?: string;
   groupSite?: string;
 };
-
-type DashboardRole = "admin" | "manager" | "officer" | "user";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -62,7 +62,7 @@ function normalizeRole(value: unknown): DashboardRole {
   return "user";
 }
 
-function normalizeSiteList(value: unknown): Site[] {
+function normalizeSiteList(value: unknown): DashboardSiteSummary[] {
   const list = Array.isArray(value)
     ? value
     : isRecord(value) && Array.isArray(value.items)
@@ -86,16 +86,25 @@ function normalizeSiteList(value: unknown): Site[] {
 
 export default function Dashboard() {
   const { selectedSite } = useFilters();
-  const rawNotis = useAppSelector(selectDashboardRawNotis);
-  const alertEvents = useAppSelector(selectDashboardAlertEventItems);
-  const wellBeingEvents = useAppSelector(selectDashboardWellBeingItems);
-  const faceRecognizeItems = useAppSelector(selectDashboardFaceRecognizeItems);
-  const zytaItems = useAppSelector(selectDashboardZytaItems);
-  const notisLoading = useAppSelector(selectNotisFeedLoading);
+  const liveRawNotis = useAppSelector(selectDashboardRawNotis);
+  const liveAlertEvents = useAppSelector(selectDashboardAlertEventItems);
+  const liveWellBeingEvents = useAppSelector(selectDashboardWellBeingItems);
+  const liveFaceRecognizeItems = useAppSelector(selectDashboardFaceRecognizeItems);
+  const liveZytaItems = useAppSelector(selectDashboardZytaItems);
+  const liveNotisLoading = useAppSelector(selectNotisFeedLoading);
+
+  const rawNotis = liveRawNotis;
+  const alertEvents = liveAlertEvents;
+  const wellBeingEvents = liveWellBeingEvents;
+  const faceRecognizeItems = liveFaceRecognizeItems;
+  const zytaItems = liveZytaItems;
+  const notisLoading = liveNotisLoading;
 
   // Role + sites for ContentLayout behavior similar to original
   const [role, setRole] = React.useState<DashboardRole | null>(null);
-  const [accessibleSites, setAccessibleSites] = React.useState<Site[]>([]);
+  const [accessibleSites, setAccessibleSites] = React.useState<
+    DashboardSiteSummary[]
+  >([]);
   React.useEffect(() => {
     (async () => {
       try {
@@ -163,6 +172,7 @@ export default function Dashboard() {
       selectedSiteCode: selectedSite,
       accessibleSites,
       role,
+      rawNotis,
     }),
     [
       alertEvents,
@@ -172,6 +182,7 @@ export default function Dashboard() {
       mapSeverity,
       notisLoading,
       province,
+      rawNotis,
       role,
       searchEvent,
       searchFR,

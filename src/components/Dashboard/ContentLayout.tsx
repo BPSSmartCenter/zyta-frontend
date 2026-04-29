@@ -14,12 +14,14 @@ import DeviceCount from "./DeviceCount";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import FaceRecognize from "./FaceRecognize";
 import ZYTAEvents from "./ZYTAEvents";
+import UtilityOverview from "./UtilityOverview";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { me as apiMe } from "../../api/user";
 import SnapshotChartSection from "../Chart";
 import Switch from "../Switch";
+import type { Noti } from "../../data/Dashboard/notis";
 import {
   combineDashboardNotis,
   filterDashboardAlertEvents,
@@ -29,6 +31,19 @@ import {
 } from "../../features/dashboardNotis";
 
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
+
+type DashboardRole = "admin" | "manager" | "officer" | "user";
+
+type DashboardSiteSummary = {
+  id?: string;
+  code?: string;
+  name?: string;
+  province_code?: string;
+  lat?: number;
+  lng?: number;
+  utility?: string;
+  groupSite?: string;
+};
 
 const SURFACE_CARD_CLASS =
   "rounded-[10px] border border-white/80 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]";
@@ -81,10 +96,10 @@ type Props = {
   // left column
   searchEvent: string;
   setSearchEvent: (v: string) => void;
-  alertEvents: ReadonlyArray<any>;
+  alertEvents: ReadonlyArray<Noti>;
   searchWB: string;
   setSearchWB: (v: string) => void;
-  wellBeingEvents: ReadonlyArray<any>;
+  wellBeingEvents: ReadonlyArray<Noti>;
   // middle
   selectedEvents: string[];
   buttonLabel: string;
@@ -97,23 +112,16 @@ type Props = {
   // right
   searchFR: string;
   setSearchFR: (v: string) => void;
-  faceRecognizeItems: ReadonlyArray<any>;
+  faceRecognizeItems: ReadonlyArray<Noti>;
 
   searchZYTA: string;
   setSearchZYTA: (v: string) => void;
-  zytaItems: ReadonlyArray<any>;
+  zytaItems: ReadonlyArray<Noti>;
   notisLoading?: boolean;
   selectedSiteCode?: string;
-  accessibleSites?: Array<{
-    id?: string;
-    code?: string;
-    name?: string;
-    province_code?: string;
-    lat?: number;
-    lng?: number;
-    utility?: string;
-    groupSite?: string;
-  }>;
+  accessibleSites?: DashboardSiteSummary[];
+  role?: DashboardRole | null;
+  rawNotis?: ReadonlyArray<Noti>;
 };
 
 export default function ContentLayout(props: Props) {
@@ -255,10 +263,13 @@ export default function ContentLayout(props: Props) {
     return counts;
   }, [JSON.stringify(props.accessibleSites)]);
 
-  const { counts: deviceCounts, totals: deviceTotals } = useDeviceInventoryLoader({
-    selectedSiteCode: props.selectedSiteCode,
-    accessibleSites: props.accessibleSites,
-  });
+  const { counts: liveDeviceCounts, totals: liveDeviceTotals } =
+    useDeviceInventoryLoader({
+      selectedSiteCode: props.selectedSiteCode,
+      accessibleSites: props.accessibleSites,
+    });
+  const deviceCounts = liveDeviceCounts;
+  const deviceTotals = liveDeviceTotals;
 
   // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
   // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)
@@ -271,7 +282,7 @@ export default function ContentLayout(props: Props) {
       try {
         const raw = (props.selectedSiteCode ?? "").toString().trim();
         const isAll = !raw || raw === "all";
-        const role = String((props as any)?.role || "").toLowerCase();
+        const role = String(props.role || "").toLowerCase();
         const hasAnySite = Array.isArray(props.accessibleSites) && props.accessibleSites.length > 0;
 
         // Wait for sites to load before deciding; avoid showing 0 on first paint
@@ -348,7 +359,7 @@ export default function ContentLayout(props: Props) {
     };
   }, [
     props.selectedSiteCode,
-    (props as any)?.role,
+    props.role,
     JSON.stringify(props.accessibleSites),
   ]);
 
@@ -388,10 +399,15 @@ export default function ContentLayout(props: Props) {
               setProvince={setProvince}
               selectedSiteCode={props.selectedSiteCode}
               accessibleSites={props.accessibleSites}
+              role={props.role}
               overrideNotis={filteredAllForSearch as any[]}
             />
           </DashboardSurface>
         </div>
+
+        <DashboardSurface className="p-5">
+          <UtilityOverview selectedSiteCode={props.selectedSiteCode} />
+        </DashboardSurface>
 
         <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(320px,0.92fr)_minmax(0,1.08fr)]">
           <DashboardSurface className="p-6">
@@ -438,6 +454,7 @@ export default function ContentLayout(props: Props) {
             buttonLabel={buttonLabel}
             selectedEvents={selectedEvents}
             toggleEvent={toggleEvent}
+            items={props.rawNotis}
           />
         </div>
       </div>

@@ -4,7 +4,7 @@ import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
-import { resolveFaceRecKind } from "../../utils/notis";
+import { resolveFaceRecPath } from "../../utils/faceRecRoutes";
 
 type FR = {
   type: any;
@@ -24,18 +24,6 @@ type Props = {
   loading?: boolean;
   showTitle?: boolean;
   fillAvailableHeight?: boolean;
-};
-
-const USE_MOCK_REDIRECT = false;
-const OPEN_IN_NEW_TAB = false;
-const MOCK_FACEREC_URL =
-  "https://bpstech.online/d/dbb32996-2e79-4e04-9963-48e62e2c885d/21062885-26cd-5e06-a9b8-67c449dc0cfb?orgId=1&from=1710928419213&to=1774000419213";
-
-const resolveDefaultTab = (n: FR): "licensePlates" | "faceScan" => {
-  const kind = resolveFaceRecKind(n as any);
-  if (kind === "face") return "faceScan";
-  if (kind === "plate") return "licensePlates";
-  return "licensePlates";
 };
 
 export default function FaceRecognize({
@@ -64,23 +52,12 @@ export default function FaceRecognize({
   };
 
   const handleClick = (n: FR) => {
-    if (USE_MOCK_REDIRECT) {
-      if (OPEN_IN_NEW_TAB) {
-        window.open(MOCK_FACEREC_URL, "_blank", "noopener");
-      } else {
-        window.location.href = MOCK_FACEREC_URL;
-      }
-      return;
-    }
-
-    // เส้นทางเดิม — พร้อมสลับกลับเมื่อไหร่ก็แค่ปิด USE_MOCK_REDIRECT
-    const defaultActive = resolveDefaultTab(n);
-    navigate(abs("/facerec"), { state: { noti: n, defaultActive } });
+    navigate(abs(resolveFaceRecPath(n)), { state: { noti: n } });
   };
   return (
     <form
       className={[
-        "flex flex-col gap-3 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex flex-col gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         fillAvailableHeight ? "h-full min-h-0" : "justify-center",
       ].join(" ")}
     >

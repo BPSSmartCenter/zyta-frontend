@@ -48,7 +48,7 @@ export default function ZYTAEvents({
   return (
     <form
       className={[
-        "flex flex-col gap-3 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex flex-col gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         fillAvailableHeight ? "h-full min-h-0" : "justify-center",
       ].join(" ")}
     >

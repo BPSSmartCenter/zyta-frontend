@@ -12,6 +12,7 @@ import {
   isFaceRecNoti,
   resolveElectricDeviceSn,
 } from "../../utils/notis";
+import { resolveFaceRecPath } from "../../utils/faceRecRoutes";
 
 type Props = {
   search: string;
@@ -77,7 +78,7 @@ export default function AlertEvents({
   return (
     <form
       className={[
-        "flex flex-col gap-3 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "flex flex-col gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         fillAvailableHeight ? "h-full min-h-0" : "justify-center",
       ].join(" ")}
     >
@@ -134,8 +135,7 @@ export default function AlertEvents({
 
               const handleClick = (n: any, eventKey: AlertEventKey | null) => {
                 if (isFaceRecNoti(n)) {
-                  // default เปิดแท็บตาม kind ได้ถ้าอยาก (faceScan/licensePlates)
-                  navigate(abs("/facerec"), { state: { noti: n } });
+                  navigate(abs(resolveFaceRecPath(n)), { state: { noti: n } });
                   return;
                 }
                 if (eventKey) navigateToEvent(eventKey, n);
@@ -150,7 +150,7 @@ export default function AlertEvents({
                   onKeyDown={(e) => {
                     if (!isNavigable) return;
                     if (e.key === "Enter" || e.key === " ") {
-                      navigateToEvent(eventKey, n);
+                      handleClick(n, eventKey);
                     }
                   }}
                   className={`${

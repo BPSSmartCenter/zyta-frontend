@@ -55,7 +55,7 @@ const BillingMeterModal: React.FC<Props> = ({
             <p className="text-sm text-[#7EAEDA]">
               {billingTarget
                 ? `รอบบิลย้อนหลัง: ${billingTarget}`
-                : "ระบบจำลองการคำนวณค่าไฟและแสดง QR Code mockup สำหรับชำระเงิน"}
+                : "ยังไม่มีรอบบิลสำหรับชำระเงินจากระบบ"}
             </p>
           </div>
           <button
@@ -95,31 +95,16 @@ const BillingMeterModal: React.FC<Props> = ({
 
           <div className="rounded-3xl border border-[#14334d] bg-[#071f35] p-6">
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#7EAEDA]">
-              QR PAYMENT MOCKUP
+              QR PAYMENT
             </p>
             <div className="mt-4 flex flex-col items-center gap-4">
-              <div className="rounded-3xl border border-[#10304b] bg-[#051326] p-4 shadow-inner">
-                <div className="grid grid-cols-8 gap-1 bg-white/95 p-4">
-                  {Array.from({ length: 64 }).map((_, idx) => (
-                    <span
-                      key={idx}
-                      className={`block h-3 w-3 ${
-                        (idx + Math.floor(idx / 8)) % 3 === 0
-                          ? "bg-slate-900"
-                          : "bg-white"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="text-center text-xs text-[#7EAEDA]">
-                สแกนเพื่อชำระเงิน (ตัวอย่าง QR code)
+              <div className="flex min-h-[168px] w-full items-center justify-center rounded-3xl border border-dashed border-[#2a5675] bg-[#051326] p-4 text-center text-sm text-[#9fb6cc]">
+                QR สำหรับชำระเงินจะแสดงเมื่อมีข้อมูลจากระบบ
               </div>
             </div>
             <div className="mt-6 rounded-2xl bg-[#0b2b45] px-4 py-3 text-sm text-[#9fb6cc]">
               <p>ผู้ชำระ: {meter ? meter.siteName : "ไม่ระบุ"}</p>
               <p>รอบบิลล่าสุด: วันนี้ เวลา 10:30 น.</p>
-              <p>หมายเหตุ: ข้อมูลทั้งหมดเป็น mock data</p>
             </div>
           </div>
         </div>

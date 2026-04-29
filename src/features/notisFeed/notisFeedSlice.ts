@@ -51,9 +51,6 @@ const slice = createSlice({
         state.error =
           payload?.message ?? action.error.message ?? "Failed to load notifications";
         state.status = "failed";
-        if (state.items.length === 0) {
-          state.items = payload?.fallbackItems ?? [];
-        }
         state.activeRequestId = null;
       });
   },

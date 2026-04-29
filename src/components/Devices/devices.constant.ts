@@ -131,7 +131,7 @@ export const ELECTRIC_CONVERSIONS_LIST: number[] = ELECTRIC_DAYS.map(
   (d) => ELECTRIC_CONVERSIONS_MAP[d]
 );
 
-/** ซีรีส์กราฟเส้นของแต่ละวัน (ตัวอย่าง mock) */
+/** ซีรีส์กราฟเส้นของแต่ละวัน */
 export const ELECTRIC_DAY_SERIES: Record<ElectricDay, AxisSeries> = {
   Sun: [
     { name: "Traffic", data: [0, 0, 0, 0, 0, 0, 0, 0, 0] },

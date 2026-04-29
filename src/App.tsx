@@ -12,6 +12,7 @@ import {
   Login,
   TotalAlert,
   FaceRecognize,
+  LicensePlates,
   Devices,
   UserManagement,
   SiteManagement,
@@ -132,6 +133,7 @@ function App() {
                 />
                 <Route path="alert" element={<TotalAlert />} />
                 <Route path="facerec" element={<FaceRecognize />} />
+                <Route path="license-plates" element={<LicensePlates />} />
                 <Route path="devices" element={<Devices />} />
               </Route>
 
@@ -155,6 +157,7 @@ function App() {
                 <Route path="alert" element={<TotalAlert />} />
                 <Route path="devices" element={<Devices />} />
                 <Route path="facerec" element={<FaceRecognize />} />
+                <Route path="license-plates" element={<LicensePlates />} />
               </Route>
             </Route>
           </Route>

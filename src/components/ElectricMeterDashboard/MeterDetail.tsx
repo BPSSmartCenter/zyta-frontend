@@ -10,9 +10,9 @@ type Props = {
 };
 
 const STATUS_COLOR: Record<MeterOption["status"], { dot: string; text: string }> = {
-  online: { dot: "bg-emerald-400", text: "text-emerald-300" },
-  warning: { dot: "bg-amber-400", text: "text-amber-300" },
-  offline: { dot: "bg-rose-400", text: "text-rose-300" },
+  online: { dot: "bg-emerald-400", text: "text-emerald-600" },
+  warning: { dot: "bg-amber-400", text: "text-amber-600" },
+  offline: { dot: "bg-rose-400", text: "text-rose-600" },
 };
 
 const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
@@ -39,21 +39,21 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
     : meter.name;
 
   return (
-    <div className="mt-4 rounded-3xl border border-[#14334d] bg-[#05172c] p-6 shadow-xl">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-4 rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-[20px] font-semibold uppercase tracking-[0.1em] text-white">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
             {t("view.active", { defaultValue: "Active View" })}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-lg font-semibold text-[#0bb1f4]">
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-lg font-semibold text-slate-900">
             {meter ? (
               <>
                 <span>{meter.siteName}</span>
-                <span className="text-[#51707f]">/</span>
-                <span>{viewName}</span>
+                <span className="text-slate-300">/</span>
+                <span className="text-slate-600">{viewName}</span>
                 {(meter.isOverall || meter.scope === "tag") &&
                 typeof meter.includedMeters === "number" ? (
-                  <span className="rounded-full bg-white/10 px-2 py-1 text-xs font-semibold text-white/80">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                     {t("view.overallCount", {
                       count: meter.includedMeters,
                       defaultValue: "{{count}} meters",
@@ -67,11 +67,11 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-end">
           <button
             type="button"
             onClick={() => navigate(abs("/electric"))}
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-400/60 px-4 py-2 text-sm font-medium text-white transition hover:border-white/70 hover:text-white/80 cursor-pointer"
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white cursor-pointer"
           >
             {t("view.goBilling", { defaultValue: "Billing overview" })}
           </button>
@@ -79,7 +79,7 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
           <button
             type="button"
             onClick={onChange}
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-400/60 px-4 py-2 text-sm font-medium text-white transition hover:border-white/70 hover:text-white/80 cursor-pointer"
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-white cursor-pointer"
           >
             {t("view.openPicker", { defaultValue: "Select view" })}
           </button>
@@ -95,10 +95,10 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
                 navigate(target, { state: { meterId: meter.id } });
               }}
               className={[
-                "inline-flex items-center justify-center rounded-2xl border border-slate-400/60 px-4 py-2 text-sm font-medium text-white transition",
+                "inline-flex items-center justify-center rounded-2xl border px-4 py-2 text-sm font-medium transition",
                 billDisabled
-                  ? "cursor-not-allowed border-white/20 text-white/40"
-                  : "hover:border-white/70 hover:text-white/80 cursor-pointer",
+                  ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                  : "cursor-pointer border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100",
               ].join(" ")}
               aria-disabled={billDisabled}
             >
@@ -108,12 +108,12 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 text-sm text-white sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/70">
+      <div className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
             {t("view.status", { defaultValue: "Status" })}
           </p>
-          <div className="mt-1 flex items-center gap-2 font-semibold">
+          <div className="mt-2 flex items-center gap-2 font-semibold">
             <span className={`h-2.5 w-2.5 rounded-full ${statusColor.dot}`} />
             <span className={statusColor.text}>
               {meter
@@ -123,35 +123,35 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
           </div>
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/70">
+        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
             {t("view.lastSync", { defaultValue: "Last update" })}
           </p>
-          <p className="mt-1 font-semibold text-[#01faf8]">{meter ? meter.lastSync : "-"}</p>
+          <p className="mt-2 font-semibold text-slate-800">{meter ? meter.lastSync : "-"}</p>
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/70">
+        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
             {t("view.location", { defaultValue: "Location" })}
           </p>
-          <p className="mt-1 font-semibold text-[#01faf8]">{meter?.location ?? "-"}</p>
+          <p className="mt-2 font-semibold text-slate-800">{meter?.location ?? "-"}</p>
         </div>
 
-        <div>
-          <p className="text-xs uppercase tracking-wide text-white/70">
+        <div className="rounded-[18px] border border-slate-200/80 bg-slate-50/80 px-4 py-3">
+          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
             {t("view.todayKwh", { defaultValue: "Today (kWh)" })}
           </p>
-          <p className="mt-1 font-semibold text-[#01faf8]">
+          <p className="mt-2 font-semibold text-slate-800">
             {meter ? meter.todayKwh.toLocaleString() : "-"}
           </p>
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-white/80">
-        <span className="font-semibold uppercase tracking-[0.2em]">
+      <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+        <span className="font-semibold uppercase tracking-[0.2em] text-slate-400">
           {t("view.monthData", { defaultValue: "Monthly data" })}
         </span>
-        <span className="rounded-full bg-white/10 px-3 py-1 text-sm text-white">
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
           {meter?.billingMonth ?? t("view.notSpecified", { defaultValue: "Not specified" })}
         </span>
       </div>
@@ -160,4 +160,3 @@ const MeterDetail: React.FC<Props> = ({ meter, onChange }) => {
 };
 
 export default MeterDetail;
-

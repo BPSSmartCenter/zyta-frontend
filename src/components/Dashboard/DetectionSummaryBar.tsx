@@ -10,6 +10,7 @@ import {
 import { useNotisFeed } from "../../context/NotisContext";
 import { useUserPath } from "../../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { FACE_RECOGNIZE_PATH } from "../../utils/faceRecRoutes";
 import { resolveAlertEventKey } from "../../utils/notis";
 
 export type DetectionSummaryStatItem = {
@@ -141,7 +142,7 @@ export default function DetectionSummaryBar({
         : undefined;
 
     if (nextKey === "face") {
-      navigate(absSite("/facerec", siteCode));
+      navigate(absSite(FACE_RECOGNIZE_PATH, siteCode));
       return;
     }
 

@@ -2,12 +2,6 @@
 import React from "react";
 import Switch from "../../Switch";
 import {
-  wifiImage,
-  wifiSelected,
-  tvImage,
-  tvSelected,
-  intercomeImage,
-  intercomeSelected,
   cloudyDay1,
 } from "../../../assets";
 
@@ -21,7 +15,6 @@ type DeviceTile = {
 };
 
 type Props = {
-  // ทั้งหมดเป็น optional — ถ้าไม่ส่งจะมีค่า mock ให้
   camera?: {
     title?: string;
     img?: string; // ส่งรูปมาเองได้; ถ้าไม่ส่งจะเป็นกล่องเทา
@@ -37,43 +30,18 @@ type Props = {
 
 export default function CCTVPanel({ camera, weather, devices }: Props) {
   const cam = {
-    title: camera?.title ?? "Camera 1",
+    title: camera?.title ?? "Camera",
     img: camera?.img,
-    status: camera?.status ?? "online",
+    status: camera?.status ?? "offline",
   };
 
   const met = {
-    location: weather?.location ?? "Lebak, Bangkok",
+    location: weather?.location ?? "-",
     tempC: weather?.tempC ?? 0,
-    description: weather?.description ?? "Outdoor Temperature",
+    description: weather?.description ?? "-",
   };
 
-  const tiles: DeviceTile[] = devices ?? [
-    {
-      id: "wifi",
-      title: "Nest Wifi",
-      subtitle: "Connected",
-      defaultOn: false,
-      icon: wifiImage,
-      activeImg: wifiSelected, // ← ใช้รูป Selected ตอน active
-    },
-    {
-      id: "tv",
-      title: "Benq TV",
-      subtitle: "Connect - Standby",
-      defaultOn: false,
-      icon: tvImage,
-      activeImg: tvSelected, // ← ใช้รูป Selected ตอน active
-    },
-    {
-      id: "lan",
-      title: "LAN",
-      subtitle: "Connected",
-      defaultOn: false,
-      icon: intercomeImage,
-      activeImg: intercomeSelected, // ← ใช้รูป Selected ตอน active
-    },
-  ];
+  const tiles: DeviceTile[] = devices ?? [];
 
   return (
     <section className="mt-6 grid grid-cols-1 lg-1291:grid-cols-[1.1fr_1fr] gap-4">

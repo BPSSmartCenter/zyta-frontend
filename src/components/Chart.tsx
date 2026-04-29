@@ -20,6 +20,7 @@ type Props = {
   buttonLabel: string;
   selectedEvents: string[]; // ["all"] หรือรายการ event ที่เลือก
   toggleEvent: (value: string) => void; // สลับเลือก event
+  items?: ReadonlyArray<Noti>;
 };
 
 function useLocaleFromI18n(i18nLang: string | undefined) {
@@ -201,7 +202,10 @@ function parseNotiDate(noti: Noti): Date | null {
   return parsed;
 }
 
-function buildSnapshotSeries(items: Noti[], shiftLabels: string[]): SnapshotSeriesMap {
+function buildSnapshotSeries(
+  items: ReadonlyArray<Noti>,
+  shiftLabels: string[]
+): SnapshotSeriesMap {
   const shiftCount = SHIFT_DEFINITIONS.length;
   const dailyCounts = Array.from({ length: shiftCount }, () =>
     Array(PERIOD_LENGTHS.daily).fill(0)
@@ -270,11 +274,13 @@ export default function Chart({
   buttonLabel,
   selectedEvents,
   toggleEvent,
+  items,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const locale = useLocaleFromI18n(i18n.language);
   const { t: tDash } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
+  const sourceItems = items ?? liveNotis;
 
   // Align event multi-select label with MapPanel behavior
   const multiEventLabel = React.useMemo(() => {
@@ -301,8 +307,8 @@ export default function Chart({
     [tDash]
   );
   const snapshotSeries = React.useMemo(
-    () => buildSnapshotSeries(liveNotis, shiftLabels),
-    [liveNotis, shiftLabels]
+    () => buildSnapshotSeries(sourceItems, shiftLabels),
+    [shiftLabels, sourceItems]
   );
 
   // เปลี่ยนช่วงเวลา (Daily ใช้ข้อมูลเดียวกับ Weekly)
@@ -773,36 +779,8 @@ export function WaterAreaStackedChart({
   yTitle = "ปริมาณน้ำ",
   xTitle = "Month",
 }: WaterAreaStackedProps) {
-  const cats = categories ?? [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  // mock ใกล้เคียงภาพ: เส้นเข้มล่างสุด ไล่โทนอ่อนไปด้านบน
-  const data: AxisSeries = series ?? [
-    {
-      name: "Series 1",
-      data: [60, 90, 120, 140, 250, 300, 260, 340, 360, 320, 380, 460],
-    },
-    {
-      name: "Series 2",
-      data: [360, 380, 420, 430, 450, 470, 440, 500, 520, 510, 530, 560],
-    },
-    {
-      name: "Series 3",
-      data: [540, 560, 590, 600, 650, 700, 660, 740, 780, 760, 800, 840],
-    },
-  ];
+  const cats = categories ?? [];
+  const data: AxisSeries = series ?? [];
 
   // คิด max แบบ "ไม่ลอย" (ฐาน 0 ตลอด)
   const stackedMax = (() => {
@@ -810,11 +788,11 @@ export function WaterAreaStackedChart({
     data.forEach((s) =>
       s.data.forEach((v, i) => (sums[i] += typeof v === "number" ? v : 0))
     );
-    return Math.max(...sums);
+    return sums.length ? Math.max(...sums) : 0;
   })();
   const stepCandidates = [100, 200];
   const pickStep = stepCandidates.find((st) => stackedMax / st <= 6) || 200;
-  const maxY = Math.ceil(stackedMax / pickStep) * pickStep;
+  const maxY = Math.max(pickStep, Math.ceil(stackedMax / pickStep) * pickStep);
   const ticks = Math.min(6, Math.max(3, Math.round(maxY / pickStep)));
 
   const options: ApexOptions = {

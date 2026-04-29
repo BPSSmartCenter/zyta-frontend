@@ -8,7 +8,6 @@ import {
   useDeviceInventory,
   type DeviceTypeKey,
 } from "../context/DeviceInventoryContext";
-import { logout as mockLogout } from "../data/Dashboard/auth";
 import { authActions, selectAuthUser } from "../features/auth";
 import {
   clearAllStoredSites,
@@ -18,6 +17,10 @@ import { selectSidebarOpen, sidebarActions } from "../features/sidebar";
 import { useUserPath } from "../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { buildBrandingLogoSrc } from "../utils/branding";
+import {
+  FACE_RECOGNIZE_PATH,
+  LICENSE_PLATES_PATH,
+} from "../utils/faceRecRoutes";
 import Modal from "./Modal";
 import { GlassHoverSidebar, type GlassHoverSidebarItem } from "./ui";
 
@@ -134,11 +137,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     } catch {
       /* ignore logout API failures */
     }
-    try {
-      mockLogout();
-    } catch {
-      /* ignore mock logout failures */
-    }
     dispatch(authActions.clearAuthUser());
     dispatch(siteSelectionActions.resetSiteSelection());
     try {
@@ -165,7 +163,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     alert: pathScoped.startsWith("/alert"),
     alertEvent: (key: string) =>
       pathScoped.startsWith("/alert") && url.get("event") === key,
-    facerec: pathScoped.startsWith("/facerec"),
+    facerec: pathScoped.startsWith(FACE_RECOGNIZE_PATH),
+    licensePlates: pathScoped.startsWith(LICENSE_PLATES_PATH),
     devices: pathScoped.startsWith("/devices"),
     devicesType: (key: string) =>
       pathScoped.startsWith("/devices") && url.get("type") === key,
@@ -328,7 +327,14 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       label: t("menu.facerec", { defaultValue: "การจดจำใบหน้า" }),
       icon: "face",
       active: active.facerec,
-      onSelect: () => go("/facerec"),
+      onSelect: () => go(FACE_RECOGNIZE_PATH),
+    },
+    {
+      id: "license-plates",
+      label: t("menu.license_plates", { defaultValue: "ป้ายทะเบียนรถ" }),
+      icon: "directions_car",
+      active: active.licensePlates,
+      onSelect: () => go(LICENSE_PLATES_PATH),
     },
     {
       id: "section-devices",
@@ -456,7 +462,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       />
 
       <div
-        className={["min-h-160 bg-white transition-all duration-300", contentClassName].join(
+        className={["min-h-160 bg-white transition-all duration-300 lg:pl-[76px]", contentClassName].join(
           " "
         )}
       >

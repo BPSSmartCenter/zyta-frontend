@@ -3,6 +3,7 @@ import Login from "./LoginPage";
 import Register from "./RegisterPage";
 import TotalAlert from "./TotalAlertPage";
 import FaceRecognize from "./FaceRecognizePage";
+import LicensePlates from "./LicensePlatePage";
 import Devices from "./DevicesPage";
 import UserManagement from "./UserManagementPage";
 import SiteManagement from "./SiteManagementPage";
@@ -21,6 +22,7 @@ export {
   Register,
   TotalAlert,
   FaceRecognize,
+  LicensePlates,
   Devices,
   UserManagement,
   SiteManagement,

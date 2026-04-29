@@ -14,10 +14,9 @@ import { listSites } from "../../api/sites";
 import { getUserStats, me as apiMe } from "../../api/user";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
-import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
+import type { Noti } from "../../data/Dashboard/notis";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import {
-  decorateNotiForDisplay,
   matchesSite,
   sortByNewest,
   toDateKey,
@@ -233,10 +232,7 @@ function useSandboxScopedNotis(cardId: string) {
   );
 
   const baseNotis = React.useMemo<Noti[]>(() => {
-    if (Array.isArray(liveNotis) && liveNotis.length) return liveNotis;
-    return ((mockNotis as Noti[]) ?? []).map((noti) =>
-      decorateNotiForDisplay(noti)
-    );
+    return Array.isArray(liveNotis) ? liveNotis : [];
   }, [liveNotis]);
 
   const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {

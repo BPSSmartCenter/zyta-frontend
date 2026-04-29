@@ -1,6 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { listNotis } from "../../api/notis";
-import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
+import type { Noti } from "../../data/Dashboard/notis";
 import type { RootState } from "../../store/store";
 import { decorateNotiForDisplay, sortByNewest } from "../../utils/notis";
 import { selectDateFilterValue } from "../dateFilter";
@@ -21,7 +21,6 @@ type FetchNotisFeedResult = {
 export type FetchNotisFeedError = {
   code: "FETCH_FAILED";
   message: string;
-  fallbackItems: Noti[];
 };
 
 type SiteScope = {
@@ -33,13 +32,6 @@ type SiteScope = {
 
 const prepareNotis = (items: Noti[]): Noti[] =>
   sortByNewest(items.map((item) => decorateNotiForDisplay(item)));
-
-const pickFallbackItems = (): Noti[] => {
-  if (Array.isArray(mockNotis) && mockNotis.length > 0) {
-    return prepareNotis(mockNotis as Noti[]);
-  }
-  return [];
-};
 
 const toIsoRangeForDate = (date: { y: number; m: number; d: number }) => {
   const from = new Date(date.y, date.m - 1, date.d, 0, 0, 0, 0);
@@ -158,7 +150,6 @@ export const fetchNotisFeed = createAsyncThunk<
     return rejectWithValue({
       code: "FETCH_FAILED",
       message: getErrorMessage(error),
-      fallbackItems: pickFallbackItems(),
     });
   }
 });

@@ -10,10 +10,13 @@ import { useNotisFeed } from "../../context/NotisContext";
 import {
   resolveDefaultNotiImage,
   resolveAlertEventKey,
-  resolveFaceRecKind,
   resolveElectricDeviceSn,
   type AlertEventKey,
 } from "../../utils/notis";
+import {
+  FACE_RECOGNIZE_PATH,
+  resolveFaceRecPath,
+} from "../../utils/faceRecRoutes";
 
 /* ---------- types ---------- */
 type EventKey =
@@ -52,13 +55,6 @@ type Props = {
 };
 
 const MAX_HEADER_IMAGES = 5;
-
-/* ---------- TEMP monitor URL (mock) ---------- */
-const MONITOR_URL =
-  "https://lh3.googleusercontent.com/d/1SyjAavZ0IP_VQU81tAmBmQE-AjFEhn6m=w600-h600-iv1";
-
-/* ---------- toggle: เปิด/ปิดการใช้รูป mock ---------- */
-const USE_MOCK_CAMERA = false;
 
 /* ---------- helpers ---------- */
 const pickMetaImage = (meta: any): string | undefined => {
@@ -211,17 +207,6 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
 
   // รูปแกลลอรี่ด้านบน
   const computedCamera: CameraItem[] = React.useMemo(() => {
-    if (USE_MOCK_CAMERA) {
-      // mock-only กดสวิตช์เอง (ปัจจุบัน false)
-      const mock: CameraItem = {
-        ringColor: "ring-[#AFEAFF]",
-        imgSrc: normalizeGoogleImg(MONITOR_URL),
-        embedUrl: undefined,
-        embedTitle: "Mock Camera",
-      };
-      return Array.from({ length: MAX_HEADER_IMAGES }, () => mock);
-    }
-
     const tiles: CameraItem[] = source
       .slice(0, MAX_HEADER_IMAGES)
       .map((n) => {
@@ -266,7 +251,7 @@ const handleStatChange = (ids: string[]) => {
   if (!id) return;
   const sc = selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
   if (id === "face") {
-    navigate(absSite("/facerec", sc));
+    navigate(absSite(FACE_RECOGNIZE_PATH, sc));
     return;
   }
   navigate(absSite(`/alert?event=${id}`, sc));
@@ -280,10 +265,8 @@ const handleCameraTileClick = (
   const sc =
     selectedSiteCode && selectedSiteCode !== "all" ? selectedSiteCode : undefined;
   if (eventKey === "face" || eventKey === "plate") {
-    const kind = resolveFaceRecKind(noti ?? undefined);
-    const defaultActive = kind === "face" ? "faceScan" : "licensePlates";
-    navigate(absSite("/facerec", sc), {
-      state: { noti, defaultActive },
+    navigate(absSite(resolveFaceRecPath(noti ?? undefined), sc), {
+      state: { noti },
     });
     return;
   }

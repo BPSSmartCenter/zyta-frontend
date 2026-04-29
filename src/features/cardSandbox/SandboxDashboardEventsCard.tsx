@@ -1,11 +1,10 @@
 import React from "react";
 import AlertEvents from "../../components/Dashboard/AlertEvents";
 import WellBeingEvents from "../../components/Dashboard/WellBeingEvents";
-import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
+import type { Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
 import {
-  decorateNotiForDisplay,
   matchesSite,
   sortByNewest,
   toDateKey,
@@ -111,12 +110,7 @@ export default function SandboxDashboardEventsCard({ variant, cardId }: Props) {
   ]);
 
   const dateScopedNotis = React.useMemo<Noti[]>(() => {
-    const base =
-      Array.isArray(liveNotis) && liveNotis.length
-        ? liveNotis
-        : ((mockNotis as Noti[]) ?? []).map((noti) =>
-            decorateNotiForDisplay(noti)
-          );
+    const base = Array.isArray(liveNotis) ? liveNotis : [];
     const siteScoped =
       !selectedSite || selectedSite === "all"
         ? scopedSiteCodes

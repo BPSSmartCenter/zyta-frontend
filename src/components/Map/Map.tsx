@@ -547,7 +547,7 @@ export default function Map({
       {/* Longdo map container */}
       <div
         ref={mapContainerRef}
-        className="relative z-0 h-[760px] w-full overflow-hidden rounded-lg bg-[#dff1ff] md:h-[620px] sm:h-[480px]"
+        className="relative z-0 h-[420px] w-full overflow-hidden rounded-lg bg-[#dff1ff] sm:h-[440px] md:h-[460px]"
       />
 
       {/* Hover tooltip */}

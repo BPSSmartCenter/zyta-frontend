@@ -1,7 +1,6 @@
 import MapView from "../Map/Map";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
-import { me } from "../../data/Dashboard/auth";
 import { useNotisFeed } from "../../context/NotisContext";
 import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
@@ -49,6 +48,7 @@ type Props = {
 
   overrideNotis?: Noti[];
   selectedSiteCode?: string;
+  role?: "admin" | "manager" | "officer" | "user" | null;
   accessibleSites?: Array<{
     id?: string;
     code?: string;
@@ -71,6 +71,7 @@ export default function MapPanel({
   setProvince,
   overrideNotis,
   selectedSiteCode,
+  role,
   accessibleSites,
 }: Props) {
   console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
@@ -96,7 +97,7 @@ export default function MapPanel({
   const handleZoomOutToCountry = useCallback(() => {
     setSelectedSite("all");
   }, [setSelectedSite]);
-  const userRole: "admin" | "manager" | "officer" | "user" = (me()?.role as any) || "admin";
+  const userRole: "admin" | "manager" | "officer" | "user" = role ?? "user";
   const [pinStatusBySite, setPinStatusBySite] = useState<Record<string, SitePinStatus>>({});
   const pinStatusRequestIdRef = useRef(0);
 

@@ -1,41 +1,22 @@
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import Dropdown from "../../Dropdown";
-import Thermostat from "../../Themorstats";
-import boltWhiteIcon from "../../../assets/bolt.png";
-import voltageIcon from "../../../assets/Voltage.png";
-import IletterIcon from "../../../assets/i.png";
-import plugIcon from "../../../assets/plug-cable.png";
-import wavesineIcon from "../../../assets/wave-sine.png";
-import transformIcon from "../../../assets/transformer-bolt.png";
-import plugWhiteIcon from "../../../assets/plug.png";
-import { ElectricRadialBasic } from "../../RadialBar";
 import { ElectricLineBasicChart } from "../../Chart";
 import { useFilters } from "../../../context/FiltersContext";
 import {
   getElectricOverview,
   getElectricDevices,
 } from "../../../api/electric";
+import {
+  UtilityHeroCard,
+  UtilityMetricTile,
+  UtilitySectionTitle,
+  UtilityStripCard,
+  UtilitySurface,
+} from "../../UtilityDashboard/UtilityDashboardLayout";
 
 type Props = {
   siteCode?: string;
   timeRange?: { from: string; to: string };
-};
-
-type CardValueProps = {
-  img: string;
-  value: number | string;
-  valueLabel: string;
-  valueLabel2: string;
-  onClick?: () => void; // ← เพิ่มสำหรับคลิก
-};
-
-type SideCardValueProps = {
-  img: string;
-  valueLabel: string;
-  value: number | string;
-  unit: string;
 };
 
 type ComparisonItem = {
@@ -209,56 +190,6 @@ function formatWithComma(v: number | string) {
     : v;
 }
 
-function CardValue({
-  img,
-  value,
-  valueLabel,
-  valueLabel2,
-  onClick,
-}: CardValueProps) {
-  const toNum = (x: number | string) =>
-    Number.isFinite(Number(x)) ? Number(x) : 0;
-  const shown = formatWithComma(Math.round(toNum(value)));
-  return (
-    <div
-      className="bg-cyan rounded-lg w-[139px] md:w-[145px] h-[190px] p-5 flex flex-col text-white gap-2 select-none cursor-pointer hover:brightness-90 transition"
-      onClick={onClick}
-    >
-      <div className="bg-white w-[48px] rounded-full ">
-        <img src={img} className="p-3 w-full" alt="" />
-      </div>
-      <h1 className="text-[24px] font-bold">{shown}</h1>
-      <div className="flex flex-col">
-        <span>{valueLabel}</span>
-        <p>{valueLabel2}</p>
-      </div>
-    </div>
-  );
-}
-
-function SideCardValue({ img, value, valueLabel, unit }: SideCardValueProps) {
-  const renderValue =
-    value === null || value === undefined
-      ? "-"
-      : typeof value === "number" && Number.isFinite(value)
-      ? Math.round(value).toLocaleString("en-US")
-      : value;
-
-  return (
-    <div className="font-poppins flex flex-col flex-1 text-center items-center justify-center p-5 bg-white w-full min-h-[100px] rounded-lg gap-5 select-none">
-      <div>
-        <h1 className="text-gray-600 text-[20px]">{valueLabel}</h1>
-        <p className="text-gray-600 font-bold text-[30px] whitespace-nowrap">
-          {renderValue} <span>{unit}</span>
-        </p>
-      </div>
-      <div className="rounded-full bg-[#A9DB4E]">
-        <img src={img} className="p-5 w-[90px]" alt="" />
-      </div>
-    </div>
-  );
-}
-
 // ------- helpers สำหรับ time dropdown -------
 const formatTime = (h: number, m: number) => {
   const ampm = h >= 12 ? "PM" : "AM";
@@ -277,10 +208,6 @@ const parseTimeLabel = (label?: string) => {
   if (ap === "PM" && hours !== 12) hours += 12;
   if (ap === "AM" && hours === 12) hours = 0;
   return { hours, minutes };
-};
-const minutesFromTimeLabel = (label?: string) => {
-  const { hours, minutes } = parseTimeLabel(label);
-  return hours * 60 + minutes;
 };
 const to24FromLabel = (label?: string) => {
   const { hours, minutes } = parseTimeLabel(label);
@@ -394,19 +321,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     [i18n.language]
   );
 
-  // options ทุก 30 นาที
-
-  const timeOptions = useMemo(
-    () =>
-      Array.from({ length: 24 * 2 }, (_, i) => {
-        const h = Math.floor(i / 2);
-        const m = (i % 2) * 30;
-        const label = formatTime(h, m);
-        return { label, value: label };
-      }),
-    []
-  );
-
   const defaultTimeRange = React.useMemo(() => {
     const now = new Date();
     const to = new Date(now);
@@ -434,24 +348,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     };
   }, []);
 
-  const [fromTime, setFromTime] = useState<string>(defaultTimeRange.from);
-  const [toTime, setToTime] = useState<string>(defaultTimeRange.to);
-  const fromMinutes = useMemo(() => minutesFromTimeLabel(fromTime), [fromTime]);
-  const toOptions = useMemo(() => {
-    const filtered = timeOptions.filter(
-      (opt) => minutesFromTimeLabel(opt.value) > fromMinutes
-    );
-    return filtered.length > 0 ? filtered : [];
-  }, [timeOptions, fromMinutes]);
-  useEffect(() => {
-    if (!toOptions.length) {
-      setToTime(fromTime);
-      return;
-    }
-    if (!toOptions.some((opt) => opt.value === toTime)) {
-      setToTime(toOptions[0].value);
-    }
-  }, [toOptions, toTime]);
+  const [fromTime] = useState<string>(defaultTimeRange.from);
+  const [toTime] = useState<string>(defaultTimeRange.to);
   const [selectedComparisonKey, setSelectedComparisonKey] = useState<string | null>(
     null
   );
@@ -470,32 +368,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
   // fetched data
 
-  const consumptionLabel = t("devices.electric.cards.consumption", {
-    defaultValue: "Power consumption",
-  });
-  const kwhUnitLabel = t("devices.electric.units.kwh", { defaultValue: "(kWh)" });
-
-  // ✅ state เฉพาะ Thermostat ตัวแรก (ซ้าย)
-  const [thermoOne, setThermoOne] = useState<{
-    initialValue: number;
-    valueLabel: string;
-    maxLabel: string;
-    useLifetimeMax?: boolean;
-    source: "auto" | "card";
-    cardKey?: string;
-  }>({
-    initialValue: 0,
-    valueLabel: consumptionLabel,
-    maxLabel: kwhUnitLabel,
-    useLifetimeMax: false,
-    source: "auto",
-    cardKey: undefined,
-  });
-
-  const toNumber = (v: number | string) => {
-    const n = typeof v === "number" ? v : Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
   const [metrics, setMetrics] = useState({
     voltage: 0,
     current: 0,
@@ -510,7 +382,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const [overviewThreshold90DayKwh, setOverviewThreshold90DayKwh] = useState<number | null>(null);
-  const [inverterApiType, setInverterApiType] = useState<string>("solaredge");
   const [overviewLastUpdateTime, setOverviewLastUpdateTime] = useState<string | null>(null);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
@@ -716,7 +587,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return deviceOptions.find((opt) => opt.id === selectedDeviceId) ?? null;
   }, [deviceOptions, selectedDeviceId, isOverviewSelected]);
 
-  const selectedDeviceStatus = (selectedDevice?.status || "").toLowerCase();
   const deviceStatusById = React.useMemo(() => {
     const map = new Map<string, string>();
     for (const opt of deviceOptions) {
@@ -724,13 +594,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     }
     return map;
   }, [deviceOptions]);
-  const statusBadge =
-    selectedDeviceStatus === "online"
-      ? { dot: "bg-emerald-500", text: "text-emerald-600", label: "Online" }
-      : selectedDeviceStatus === "offline"
-      ? { dot: "bg-rose-500", text: "text-rose-600", label: "Offline" }
-      : { dot: "bg-slate-300", text: "text-slate-500", label: "Unknown" };
-
   const deviceSN =
     isOverviewSelected
       ? OVERVIEW_DEVICE_ID
@@ -763,6 +626,53 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       ];
     },
     [deviceOptions, t, isGroupSiteSelected]
+  );
+  const [deviceTabsPerPage, setDeviceTabsPerPage] = useState(8);
+  React.useEffect(() => {
+    const updateTabsPerPage = () => {
+      if (typeof window === "undefined") return;
+      const width = window.innerWidth;
+      if (width >= 1800) {
+        setDeviceTabsPerPage(9);
+      } else if (width >= 1536) {
+        setDeviceTabsPerPage(8);
+      } else if (width >= 1280) {
+        setDeviceTabsPerPage(7);
+      } else if (width >= 1024) {
+        setDeviceTabsPerPage(6);
+      } else if (width >= 768) {
+        setDeviceTabsPerPage(4);
+      } else {
+        setDeviceTabsPerPage(2);
+      }
+    };
+
+    updateTabsPerPage();
+    window.addEventListener("resize", updateTabsPerPage);
+    return () => window.removeEventListener("resize", updateTabsPerPage);
+  }, []);
+  const selectedDeviceIndex = React.useMemo(
+    () =>
+      Math.max(
+        0,
+        deviceDropdownOptions.findIndex((opt) => opt.value === (selectedDeviceId ?? ""))
+      ),
+    [deviceDropdownOptions, selectedDeviceId]
+  );
+  const deviceWindowStart = React.useMemo(() => {
+    const total = deviceDropdownOptions.length;
+    if (total <= deviceTabsPerPage) return 0;
+    const half = Math.floor(deviceTabsPerPage / 2);
+    const maxStart = Math.max(0, total - deviceTabsPerPage);
+    return Math.max(0, Math.min(selectedDeviceIndex - half, maxStart));
+  }, [deviceDropdownOptions.length, deviceTabsPerPage, selectedDeviceIndex]);
+  const visibleDeviceTabs = React.useMemo(
+    () =>
+      deviceDropdownOptions.slice(
+        deviceWindowStart,
+        deviceWindowStart + deviceTabsPerPage
+      ),
+    [deviceDropdownOptions, deviceTabsPerPage, deviceWindowStart]
   );
 
   React.useEffect(() => {
@@ -1078,11 +988,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     () => dailySeries.find((item) => item.isToday) ?? null,
     [dailySeries]
   );
-  const yesterdaySeriesData = React.useMemo(
-    () => dailySeries.find((item) => !item.isToday) ?? null,
-    [dailySeries]
-  );
-
   const comparisonItems = React.useMemo<ComparisonItem[]>(() => {
     const today = dailySeries.find((item) => item.isToday);
     if (!today) return [];
@@ -1363,93 +1268,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     siteTargetsKey,
     selectedDeviceSiteForApi,
   ]);
-
-
-  const cardItems = React.useMemo(
-    () => [
-      {
-        id: "voltage",
-        img: voltageIcon,
-        value: metrics.voltage,
-        valueLabel: t("devices.electric.cards.voltage"),
-        valueLabel2: t("devices.electric.units.volt"),
-      },
-      {
-        id: "consumption",
-        img: plugIcon,
-        value: metrics.consumptionKwh,
-        valueLabel: t("devices.electric.cards.consumption"),
-        valueLabel2: t("devices.electric.units.kwh"),
-      },
-      {
-        id: "accumulated",
-        img: transformIcon,
-        value: metrics.lifetimeKwh,
-        valueLabel: t("devices.electric.cards.accumulated"),
-        valueLabel2: t("devices.electric.units.kwh"),
-      },
-      {
-        id: "current",
-        img: IletterIcon,
-        value: metrics.current,
-        valueLabel: t("devices.electric.cards.current"),
-        valueLabel2: t("devices.electric.units.amp"),
-      },
-      {
-        id: "frequency",
-        img: wavesineIcon,
-        value: metrics.frequency,
-        valueLabel: t("devices.electric.cards.frequency"),
-        valueLabel2: t("devices.electric.units.hz"),
-      },
-    ],
-    [metrics, t]
-  );
-
-  // Update left gauge from telemetry-based today consumption (kWh)
-  React.useEffect(() => {
-    const today = Number(metrics.consumptionKwh || 0);
-    setThermoOne((prev) => {
-      if (prev.source !== "auto") return prev;
-      const nextValue = Math.round(toNumber(today));
-      if (prev.initialValue === nextValue) return prev;
-      return { ...prev, initialValue: nextValue };
-    });
-  }, [metrics.consumptionKwh]);
-
-  React.useEffect(() => {
-    setThermoOne((prev) => {
-      if (prev.source !== "auto") return prev;
-      if (prev.valueLabel === consumptionLabel && prev.maxLabel === kwhUnitLabel) {
-        return prev;
-      }
-      return { ...prev, valueLabel: consumptionLabel, maxLabel: kwhUnitLabel };
-    });
-  }, [consumptionLabel, kwhUnitLabel]);
-
-  // Keep card-driven Thermostat in sync with live card values
-  React.useEffect(() => {
-    setThermoOne((prev) => {
-      if (prev.source !== "card" || !prev.cardKey) return prev;
-      const card = cardItems.find((item) => item.id === prev.cardKey);
-      if (!card) return prev;
-      const nextValue = Math.round(toNumber(card.value));
-      if (
-        prev.initialValue === nextValue &&
-        prev.valueLabel === card.valueLabel &&
-        prev.maxLabel === card.valueLabel2
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        initialValue: nextValue,
-        valueLabel: card.valueLabel,
-        maxLabel: card.valueLabel2,
-      };
-    });
-  }, [cardItems]);
-
   // Fetch threshold baseline (avg year/day * 90%) for the selected site.
   React.useEffect(() => {
     let active = true;
@@ -1474,15 +1292,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       active = false;
     };
   }, [isAllSitesSelected, siteForApi]);
-
-  const thermoOneTone: "normal" | "danger" = React.useMemo(() => {
-    if (thermoOne.source !== "auto") return "normal";
-    if (thermoOne.valueLabel !== consumptionLabel) return "normal";
-    const threshold = overviewThreshold90DayKwh;
-    if (!Number.isFinite(threshold) || !threshold || threshold <= 0) return "normal";
-    const today = Number(metrics.consumptionKwh || 0);
-    return today < threshold ? "danger" : "normal";
-  }, [thermoOne.source, thermoOne.valueLabel, consumptionLabel, overviewThreshold90DayKwh, metrics.consumptionKwh]);
 
   // Overview side cards come from backend aggregate only.
   React.useEffect(() => {
@@ -1524,7 +1333,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           // keep threshold in sync when overview is fetched here too
           const threshold = Number(data?.threshold_90_day_kwh);
           setOverviewThreshold90DayKwh(Number.isFinite(threshold) ? threshold : null);
-          if (typeof data?.inverterApiType === "string") setInverterApiType(data.inverterApiType);
           if (typeof data?.lastUpdateTime === "string") setOverviewLastUpdateTime(data.lastUpdateTime);
           if (Number.isFinite(month)) {
             setMetrics((m) => ({ ...m, monthKwh: Math.round(month) }));
@@ -1556,20 +1364,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     siteTargetsKey,
   ]);
 
-  const lifetimeMaxValue =
-    typeof overviewLifetimeValue === "number" && Number.isFinite(overviewLifetimeValue)
-      ? overviewLifetimeValue
-      : null;
-  const yesterdayMaxValue =
-    yesterdaySeriesData && Number.isFinite(yesterdaySeriesData.totalKwh)
-      ? Number(yesterdaySeriesData.totalKwh)
-      : null;
-  const thermoOneMax = Math.max(
-    1,
-    Number(yesterdayMaxValue ?? 0),
-    Number(lifetimeMaxValue ?? 0),
-    Number(thermoOne.initialValue ?? 0)
-  );
   const sideCardTodayValue =
     overviewTodayValue !== null && overviewTodayValue !== undefined
       ? overviewTodayValue
@@ -1594,415 +1388,437 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     ? undefined
     : t("devices.electric.noData", { defaultValue: "No data" });
 
+  const utilizationPercent = React.useMemo(() => {
+    const baseline =
+      typeof overviewThreshold90DayKwh === "number" && overviewThreshold90DayKwh > 0
+        ? overviewThreshold90DayKwh
+        : Math.max(1, Number(sideCardMonthValue || 0));
+    const current = Number(sideCardTodayValue || 0);
+    return Math.max(0, Math.min(100, Math.round((current / baseline) * 100)));
+  }, [overviewThreshold90DayKwh, sideCardMonthValue, sideCardTodayValue]);
+
+  const temperaturePercent = React.useMemo(() => {
+    if (!hasTemperature) return 0;
+    return Math.max(0, Math.min(100, Math.round((temperatureValue / 60) * 100)));
+  }, [hasTemperature, temperatureValue]);
+
+  const metricTiles = React.useMemo(
+    () => [
+      {
+        key: "voltage",
+        label: t("devices.electric.cards.voltage", { defaultValue: "Voltage" }),
+        value: `${formatWithComma(metrics.voltage)} V`,
+        tone: "amber" as const,
+        accent: <BoltIcon />,
+      },
+      {
+        key: "consumption",
+        label: t("devices.electric.cards.consumption", {
+          defaultValue: "Power consumption",
+        }),
+        value: `${formatWithComma(metrics.consumptionKwh)} kWh`,
+        tone: "orange" as const,
+        accent: <PulseIcon />,
+      },
+      {
+        key: "accumulated",
+        label: t("devices.electric.cards.accumulated", {
+          defaultValue: "Accumulated power",
+        }),
+        value: `${formatWithComma(metrics.lifetimeKwh)} kWh`,
+        tone: "amber" as const,
+        accent: <MeterIcon />,
+      },
+      {
+        key: "current",
+        label: t("devices.electric.cards.current", { defaultValue: "Current" }),
+        value: `${formatWithComma(metrics.current)} A`,
+        tone: "orange" as const,
+        accent: <CurrentIcon />,
+      },
+      {
+        key: "frequency",
+        label: t("devices.electric.cards.frequency", { defaultValue: "Frequency" }),
+        value: `${formatWithComma(metrics.frequency)} Hz`,
+        tone: "slate" as const,
+        accent: <WaveIcon />,
+      },
+    ],
+    [metrics, t]
+  );
+
+  const summaryTiles = React.useMemo(
+    () => [
+      {
+        key: "today",
+        label: t("devices.electric.side.today", { defaultValue: "Today's consumption" }),
+        value: `${formatWithComma(sideCardTodayValue ?? 0)} kWh`,
+      },
+      {
+        key: "month",
+        label: t("devices.electric.side.month", { defaultValue: "This month's consumption" }),
+        value: `${formatWithComma(sideCardMonthValue ?? 0)} kWh`,
+      },
+      {
+        key: "lifetime",
+        label: t("devices.electric.cards.accumulated", { defaultValue: "Accumulated power" }),
+        value: `${formatWithComma(overviewLifetimeValue ?? metrics.lifetimeKwh)} kWh`,
+      },
+    ],
+    [metrics.lifetimeKwh, overviewLifetimeValue, sideCardMonthValue, sideCardTodayValue, t]
+  );
+
   return (
     <>
-      <div className="grid grid-cols-1 lg-1355:grid-cols-5 gap-3 mt-6">
-        <div className="col-span-5 lg-1355:col-span-4 flex flex-col justify-center items-center bg-white rounded-xl gap-10 p-6 w-full">
-          <div className="w-full flex flex-col gap-2">
-            <span className="text-sm font-semibold text-gray-600">
-              {isGlobalAllOverview
-                ? t("devices.electric.deviceSelector.overview", {
-                    defaultValue: "Overview",
-                  })
-                : t("devices.electric.deviceSelector.label", { defaultValue: "Device" })}
-            </span>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              {isGlobalAllOverview ? (
-                <>
-                  <p className="text-xs text-gray-500">
-                    {t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" })}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Dropdown
-                    options={deviceDropdownOptions}
-                    value={selectedDeviceId ?? ""}
-                    onChange={(value) => setSelectedDeviceId(value || null)}
-                  >
-                    {({
-                      open,
-                      selected,
-                      getButtonProps,
-                      getMenuProps,
-                      getItemProps,
-                      options,
-                    }) => {
-                      const disabled = options.length === 0;
-                  return (
-                    <div className="relative w-full sm:w-[520px]">
-                          <button
-                            {...getButtonProps({
-                              disabled,
-                              className: [
-                                "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm font-medium transition",
-                                disabled
-                                  ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200"
-                                  : "bg-[#F6FBFF] text-cyan hover:bg-cyan-300 hover:text-white border-transparent",
-                              ].join(" "),
-                            })}
-                          >
-                            <span className="whitespace-nowrap">
-                              {deviceOptionsLoading
-                                ? t("devices.electric.loadingDevices", {
-                                    defaultValue: "Loading devices...",
-                                  })
-                                : selected?.label ??
-                                (disabled
-                                  ? t("devices.electric.deviceSelector.emptyShort", {
-                                      defaultValue: "No devices",
-                                    })
-                                  : t("devices.electric.deviceSelector.placeholder", {
-                                      defaultValue: "Select device",
-                                    }))}
-                            </span>
-                            <i className="material-icons text-base text-current">
-                              {open ? "expand_less" : "expand_more"}
-                            </i>
-                          </button>
-                          {open && !disabled && (
-                            <div
-                              {...getMenuProps({
-                                className:
-                                  "absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-64 overflow-auto",
-                              })}
-                            >
-                              {options.map((opt) => {
-                                const status = deviceStatusById.get(opt.value);
-                                const isOfflineOpt = status === "offline";
-                                return (
-                                  <button
-                                    key={opt.value}
-                                    {...getItemProps(opt, {
-                                  className: `w-full text-left px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer flex items-center justify-between ${
-                                    isOfflineOpt ? "text-rose-600 bg-rose-50" : ""
-                                  }`,
-                                })}
-                              >
-                                    <span className="whitespace-nowrap">{opt.label}</span>
-                                    {isOfflineOpt ? (
-                                      <span className="ml-2 inline-flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-pulse" />
-                                    ) : null}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }}
-                  </Dropdown>
-                  {selectedDevice && !isOverviewSelected && (
-                    <div className="flex items-center gap-2 text-xs font-semibold">
-                      <span className={`h-2.5 w-2.5 rounded-full ${statusBadge.dot}`} />
-                      <span className={statusBadge.text}>{statusBadge.label}</span>
-                    </div>
-                  )}
-                  {deviceOptionsLoading && (
-                    <span className="inline-flex items-center gap-2 text-xs text-cyan font-medium">
-                      <i className="material-icons text-sm animate-spin">autorenew</i>
-                      {t("devices.electric.loadingDevices", {
-                        defaultValue: "Loading devices...",
+      <div className="mt-6 space-y-4">
+        <UtilitySurface>
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  {isGlobalAllOverview
+                    ? t("devices.electric.deviceSelector.overview", {
+                        defaultValue: "Overview",
+                      })
+                    : t("devices.electric.deviceSelector.label", {
+                        defaultValue: "Device",
+                      })}
+                </span>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  {isGlobalAllOverview ? (
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+                      {t("navbar.allSites", {
+                        ns: "dashboard",
+                        defaultValue: "All Sites",
                       })}
                     </span>
-                  )}
-                </>
-              )}
-            </div>
-            {!isGlobalAllOverview && (isOverviewSelected ? (
-              <p className="text-xs text-gray-500">
-                {isGroupSiteSelected
-                  ? selectedGroupLabel
-                  : siteLabelByCode.get(siteForApi) ?? siteForApi}
-              </p>
-            ) : selectedDevice ? (
-              <p className="text-xs text-gray-500">
-                {selectedDevice.siteLabel ??
-                  siteLabelByCode.get(siteForApi) ??
-                  siteForApi}
-              </p>
-            ) : null)}
-            {!isGlobalAllOverview && !deviceOptionsLoading && deviceOptions.length === 0 && (
-              <p className="text-xs text-red-500">
-                {isGroupSiteSelected
-                  ? t("devices.electric.noDevicesForGroup", {
-                      defaultValue: "No electric devices found in this group",
-                    })
-                  : t("devices.electric.noDevices", {
-                      defaultValue: "No electric devices found for this site",
-                    })}
-              </p>
-            )}
-          </div>
-          {/* Time Range (Dropdown x2) — hidden for SolisCloud; show last update badge instead */}
-          {inverterApiType === "soliscloud" ? (
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm select-none">
-                {overviewLastUpdateTime
-                  ? (() => {
-                      const d = new Date(overviewLastUpdateTime);
-                      return isNaN(d.getTime())
-                        ? overviewLastUpdateTime
-                        : d.toLocaleTimeString(i18n.language, { hour: "2-digit", minute: "2-digit" });
-                    })()
-                  : "--:--"}
-              </span>
-            </div>
-          ) : (
-          <div className="flex items-center gap-3">
-            {/* From */}
-            <Dropdown
-              options={timeOptions}
-              value={fromTime}
-              onChange={(val) => setFromTime(val)}
-            >
-              {({
-                selected,
-                open,
-                getButtonProps,
-                getMenuProps,
-                getItemProps,
-                options,
-              }) => (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
-                    })}
-                  >
-                    {selected?.label ?? t("devices.electric.selectTime")}
-                  </button>
+                  ) : (
+                    <div className="min-w-0 flex-1">
+                      {deviceDropdownOptions.length > 0 ? (
+                        <div className="flex items-center gap-3">
+                          <div className="inline-flex shrink-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedDeviceId(deviceDropdownOptions[0]?.value ?? null)
+                              }
+                              disabled={selectedDeviceIndex <= 0}
+                              className="grid h-11 w-11 place-items-center border-r border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label="First device"
+                            >
+                              <span className="material-icons text-[20px]">
+                                keyboard_double_arrow_left
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedDeviceId(
+                                  deviceDropdownOptions[Math.max(0, selectedDeviceIndex - 1)]
+                                    ?.value ?? null
+                                )
+                              }
+                              disabled={selectedDeviceIndex <= 0}
+                              className="grid h-11 w-11 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label="Previous device"
+                            >
+                              <span className="material-icons text-[20px]">chevron_left</span>
+                            </button>
+                          </div>
 
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-20 mt-2 max-h-64 w-32 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
-                      })}
-                    >
-                      {options.map((opt) => (
-                        <button
-                          key={opt.value}
-                          {...getItemProps(opt, {
-                            className:
-                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap leading-none",
-                          })}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                          <div className="flex min-w-0 flex-1 items-center justify-center">
+                            <div className="flex min-w-0 flex-1 overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                            {visibleDeviceTabs.map((opt) => {
+                              const active = (selectedDeviceId ?? "") === opt.value;
+                              const status = deviceStatusById.get(opt.value);
+                              const isOfflineOpt = status === "offline";
+                              return (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => setSelectedDeviceId(opt.value || null)}
+                                  className={[
+                                    "inline-flex min-w-0 flex-1 items-center justify-center gap-2 border-r border-slate-200 px-4 py-3 text-sm font-medium transition cursor-pointer last:border-r-0",
+                                    active
+                                      ? "bg-[#4A90E2] text-white"
+                                      : "bg-white text-slate-600 hover:bg-slate-50",
+                                    isOfflineOpt && !active ? "text-rose-600" : "",
+                                  ].join(" ")}
+                                  title={opt.label}
+                                >
+                                  <span className="truncate">{opt.label}</span>
+                                  {isOfflineOpt ? (
+                                    <span
+                                      className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                                        active ? "bg-white/90" : "bg-rose-500"
+                                      }`}
+                                    />
+                                  ) : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          </div>
+
+                          <div className="inline-flex shrink-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedDeviceId(
+                                  deviceDropdownOptions[
+                                    Math.min(
+                                      deviceDropdownOptions.length - 1,
+                                      selectedDeviceIndex + 1
+                                    )
+                                  ]?.value ?? null
+                                )
+                              }
+                              disabled={selectedDeviceIndex >= deviceDropdownOptions.length - 1}
+                              className="grid h-11 w-11 place-items-center border-r border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label="Next device"
+                            >
+                              <span className="material-icons text-[20px]">chevron_right</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedDeviceId(
+                                  deviceDropdownOptions[deviceDropdownOptions.length - 1]
+                                    ?.value ?? null
+                                )
+                              }
+                              disabled={selectedDeviceIndex >= deviceDropdownOptions.length - 1}
+                              className="grid h-11 w-11 place-items-center text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                              aria-label="Last device"
+                            >
+                              <span className="material-icons text-[20px]">
+                                keyboard_double_arrow_right
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
+                          {deviceOptionsLoading
+                            ? t("devices.electric.loadingDevices", {
+                                defaultValue: "Loading devices...",
+                              })
+                            : t("devices.electric.deviceSelector.emptyShort", {
+                                defaultValue: "No devices",
+                              })}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </Dropdown>
-
-            <span className="text-cyan font-semibold text-sm select-none">
-              {t("devices.electric.to")}
-            </span>
-
-            {/* To */}
-            <Dropdown
-              options={
-                toOptions.length > 0
-                  ? toOptions
-                  : [{ label: fromTime, value: fromTime }]
-              }
-              value={toTime}
-              onChange={(val) => setToTime(val)}
-            >
-              {({
-                selected,
-                open,
-                getButtonProps,
-                getMenuProps,
-                getItemProps,
-                options,
-              }) => (
-                <div className="relative">
-                  <button
-                    {...getButtonProps({
-                      className:
-                        "px-3 py-2 rounded-lg bg-[#F6FBFF] text-cyan font-semibold text-sm shadow-sm hover:bg-cyan-300 hover:text-white cursor-pointer transition-all duration-300",
-                    })}
-                  >
-                    {selected?.label ?? t("devices.electric.selectTime")}
-                  </button>
-
-                  {open && (
-                    <div
-                      {...getMenuProps({
-                        className:
-                          "absolute z-20 mt-2 max-h-64 w-32 overflow-auto rounded-md bg-white ring-1 ring-black/5 shadow-lg p-1",
-                      })}
-                    >
-                      {options.map((opt) => (
-                        <button
-                          key={opt.value}
-                          {...getItemProps(opt, {
-                            className:
-                              "w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm cursor-pointer whitespace-nowrap leading-none",
-                          })}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </Dropdown>
-          </div>
-          )}
-          {/* ──────────────────────────────────── */}
-
-          <div className="flex flex-col md:flex-row w-full justify-around gap-10 lg:gap-0">
-            <div className="flex flex-col items-center gap-20">
-              {/* ✅ รี-mount เมื่อค่าเปลี่ยน */}
-              <Thermostat
-                key={`${thermoOne.initialValue}-${thermoOne.valueLabel}-${thermoOne.maxLabel}-${thermoOne.useLifetimeMax ? 'l' : 'n'}`}
-                initialValue={thermoOne.initialValue}
-                max={thermoOneMax}
-                maxLabel={thermoOne.maxLabel}
-                valueLabel={thermoOne.valueLabel}
-                tone={thermoOneTone}
-              />
-            </div>
-
-            <div className="flex flex-col items-center gap-20">
-              <Thermostat
-                initialValue={temperatureValue}
-                value={hasTemperature ? temperatureValue : undefined}
-                valueDisplay={temperatureDisplay}
-                max={60}
-                maxLabel={""}
-                valueLabel={t("devices.electric.cards.temperature", { defaultValue: "Temperature" })}
-                unit={hasTemperature ? "°C" : ""}
-              />
+                {!isGlobalAllOverview &&
+                (isOverviewSelected ? (
+                  <p className="text-sm text-slate-400">
+                    {isGroupSiteSelected
+                      ? selectedGroupLabel
+                      : siteLabelByCode.get(siteForApi) ?? siteForApi}
+                  </p>
+                ) : selectedDevice ? (
+                  <p className="text-sm text-slate-400">
+                    {selectedDevice.siteLabel ??
+                      siteLabelByCode.get(siteForApi) ??
+                      siteForApi}
+                  </p>
+                ) : null)}
+                {!isGlobalAllOverview &&
+                !deviceOptionsLoading &&
+                deviceOptions.length === 0 ? (
+                  <p className="text-sm text-rose-500">
+                    {isGroupSiteSelected
+                      ? t("devices.electric.noDevicesForGroup", {
+                          defaultValue: "No electric devices found in this group",
+                        })
+                      : t("devices.electric.noDevices", {
+                          defaultValue: "No electric devices found for this site",
+                        })}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </div>
+        </UtilitySurface>
 
-          {/* value cards */}
-          <div className="flex flex-wrap gap-4">
-            {cardItems.map((kpi) => (
-              <CardValue
-                key={kpi.id}
-                img={kpi.img}
-                value={kpi.value}
-                valueLabel={kpi.valueLabel}
-                valueLabel2={kpi.valueLabel2}
-                onClick={() => {
-                  const isAccumulated = kpi.id === "accumulated";
-                  setThermoOne({
-                    initialValue: toNumber(kpi.value),
-                    valueLabel: kpi.valueLabel,
-                    maxLabel: kpi.valueLabel2,
-                    useLifetimeMax: !!isAccumulated,
-                    source: "card",
-                    cardKey: kpi.id,
-                  })
-                }}
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_0.95fr]">
+          <UtilityHeroCard
+            eyebrow={t("devices.electric.cards.consumption", {
+              defaultValue: "Power consumption",
+            })}
+            title={t("devices.electric.cards.utilization", {
+              defaultValue: "Utilization",
+            })}
+            value={String(formatWithComma(sideCardTodayValue ?? 0))}
+            unit="kWh"
+            progressValue={utilizationPercent}
+            progressLabel={`${utilizationPercent}%`}
+            footer={
+              overviewLastUpdateTime
+                ? `${t("devices.electric.lastUpdate", {
+                    defaultValue: "Last sync",
+                  })} ${new Date(overviewLastUpdateTime).toLocaleTimeString(i18n.language, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}`
+                : selectedGroupLabel
+            }
+            tone="amber"
+          />
+          <UtilityHeroCard
+            eyebrow={t("devices.electric.cards.temperature", {
+              defaultValue: "Temperature",
+            })}
+            title={t("devices.electric.cards.temperature", {
+              defaultValue: "Temperature",
+            })}
+            value={hasTemperature ? String(formatWithComma(temperatureValue)) : "--"}
+            unit={hasTemperature ? "°C" : ""}
+            progressValue={temperaturePercent}
+            progressLabel={`${temperaturePercent}%`}
+            footer={temperatureDisplay ?? heroFooterStatus(hasTemperature, t)}
+            tone="orange"
+          />
         </div>
 
-        <div className="col-span-1 flex flex-wrap flex-row lg-1355:flex-col gap-3 ">
-          {[
-            {
-              img: plugWhiteIcon,
-              value: sideCardTodayValue,
-              valueLabel: t("devices.electric.side.today"),
-              unit: t("devices.electric.side.unitKwh"),
-            },
-            {
-              img: boltWhiteIcon,
-              value: sideCardMonthValue,
-              valueLabel: t("devices.electric.side.month"),
-              unit: t("devices.electric.side.unitKwh"),
-            },
-          ].map((kpi, idx) => (
-            <SideCardValue
-              key={idx}
-              img={kpi.img}
-              valueLabel={kpi.valueLabel}
-              value={kpi.value}
-              unit={kpi.unit}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {metricTiles.map((tile) => (
+            <UtilityMetricTile
+              key={tile.key}
+              label={tile.label}
+              value={tile.value}
+              tone={tile.tone}
+              accent={tile.accent}
             />
           ))}
         </div>
-      </div>
 
-      <div className="bg-white rounded-xl p-6">
-        {/* แถบรายวัน + วง Radial */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          {comparisonItems.length ? (
-            comparisonItems.map((item) => {
-              const isActive = item.key === selectedComparisonKey;
-              return (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {summaryTiles.map((tile) => (
+            <UtilitySurface key={tile.key} className="py-4">
+              <div className="text-[11px] font-medium text-slate-400">{tile.label}</div>
+              <div className="mt-1 text-[30px] font-semibold leading-none text-slate-900">
+                {tile.value}
+              </div>
+            </UtilitySurface>
+          ))}
+        </div>
+
+        <UtilitySurface>
+          <UtilitySectionTitle
+            title={t("devices.electric.dailyUtilization", {
+              defaultValue: "Daily utilization",
+            })}
+            subtitle={t("devices.electric.last7days", {
+              defaultValue: "Last 7 days",
+            })}
+          />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+            {comparisonItems.length ? (
+              comparisonItems.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setSelectedComparisonKey(item.key)}
-                  className={[
-                    "flex flex-col text-left border-b transition-colors",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan/50 cursor-pointer",
-                    isActive
-                      ? "border-b-2 border-cyan"
-                      : "border-b border-transparent",
-                  ].join(" ")}
+                  className="cursor-pointer rounded-[18px] border border-slate-200/70 bg-slate-50/90 text-left transition hover:border-slate-300 hover:bg-white"
                 >
-                  <div className="mb-1">
-                    <span className="text-xl font-semibold text-gray-800">{item.label}</span>
-                    <span className="ml-2 text-sm text-gray-400">{item.displayDate}</span>
-                  </div>
-                  <div className="flex items-center justify-between pb-2">
-                    <span className="text-2xl font-semibold text-gray-700">
-                      {item.percentLabel}
-                    </span>
-                    <ElectricRadialBasic
-                      value={Math.max(0, Math.min(100, item.percentage))}
-                    />
-                  </div>
+                  <UtilityStripCard
+                    title={`${item.label} ${item.displayDate}`}
+                    subtitle={t("devices.electric.utilizationLabel", {
+                      defaultValue: "Utilization",
+                    })}
+                    value={item.percentLabel}
+                    progressValue={Math.max(0, Math.min(100, item.percentage))}
+                    tone={item.key === selectedComparisonKey ? "amber" : "slate"}
+                  />
                 </button>
-              );
-            })
-          ) : (
-            <div className="col-span-full text-center text-sm text-gray-400">
-              {t("devices.electric.radial.noHistory", { defaultValue: "No historical data" })}
-            </div>
-          )}
-        </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-sm text-slate-400">
+                {t("devices.electric.radial.noHistory", {
+                  defaultValue: "No historical data",
+                })}
+              </div>
+            )}
+          </div>
+        </UtilitySurface>
 
-        {/* กราฟเส้นเปลี่ยนตามวัน */}
-        <ElectricLineBasicChart
-          key={selectedComparison?.key ?? "today"}
-          categories={chartCategories}
-          series={chartSeriesData}
-        />
+        <UtilitySurface>
+          <UtilitySectionTitle
+            title={t("devices.electric.powerTrend", {
+              defaultValue: "Power trend",
+            })}
+            subtitle={`${t("devices.electric.today", {
+              defaultValue: "Today",
+            })} · ${t("devices.electric.chartInterval", {
+              defaultValue: "kWh by 30 min",
+            })}`}
+          />
+          <ElectricLineBasicChart
+            key={selectedComparison?.key ?? "today"}
+            categories={chartCategories}
+            series={chartSeriesData}
+          />
+        </UtilitySurface>
       </div>
     </>
   );
 }
 
+function heroFooterStatus(
+  hasTemperature: boolean,
+  t: ReturnType<typeof useTranslation>["t"]
+) {
+  return hasTemperature
+    ? t("devices.electric.temperatureHealthy", {
+        defaultValue: "Temperature available",
+      })
+    : t("devices.electric.noData", { defaultValue: "No data" });
+}
 
+function BoltIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m13 2-9 12h7l-1 8 9-12h-7l1-8z" />
+    </svg>
+  );
+}
 
+function PulseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h4l2-5 4 10 2-5h6" />
+    </svg>
+  );
+}
 
+function MeterIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 14a8 8 0 1 1 16 0v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M12 14l3-3" />
+    </svg>
+  );
+}
 
+function CurrentIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </svg>
+  );
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
+function WaveIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12c2.5 0 2.5-6 5-6s2.5 12 5 12 2.5-12 5-12 2.5 6 5 6" />
+    </svg>
+  );
+}
 
 
 
