@@ -1,11 +1,24 @@
 
 // src/api/sites.ts
-import { api } from "./axios";
+import { api, unwrapApiData } from "./axios";
 import type { SiteBillingAccess } from "../types/billing";
 
-export async function listSites() {
+export type SiteListItem = {
+  id?: string;
+  code?: string;
+  name?: string;
+  province_code?: string;
+  [key: string]: unknown;
+};
+
+export type ListSitesResponse = {
+  items?: Array<SiteListItem | null | undefined>;
+  [key: string]: unknown;
+};
+
+export async function listSites(): Promise<ListSitesResponse> {
   const { data } = await api.get("/sites");
-  return data;
+  return unwrapApiData<ListSitesResponse>(data);
 }
 
 export async function getSiteInventory(siteId: string) {
@@ -13,7 +26,7 @@ export async function getSiteInventory(siteId: string) {
   try {
     const { data } = await api.get(`/sites/${encodeURIComponent(siteId)}/inventory`);
     return data;
-  } catch (e) {
+  } catch {
     // Fallback to singular route if backend uses /site/:id/inventory
     const { data } = await api.get(`/site/${encodeURIComponent(siteId)}/inventory`);
     return data;
@@ -48,7 +61,7 @@ export type RegisterSiteInput = {
 };
 
 export async function registerSite(input: RegisterSiteInput) {
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     name: input.name,
   };
   if (input.code) payload.code = input.code;
@@ -113,7 +126,7 @@ export type UpdateSiteInput = {
 };
 
 function normalizeSitePayload(input: UpdateSiteInput) {
-  const payload: any = {};
+  const payload: Record<string, unknown> = {};
   if (typeof input.name === "string" && input.name.trim()) {
     payload.name = input.name.trim();
   }

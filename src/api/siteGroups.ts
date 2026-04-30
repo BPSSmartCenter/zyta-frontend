@@ -1,4 +1,4 @@
-import { api } from "./axios";
+import { api, unwrapApiData } from "./axios";
 
 export type SiteGroup = {
   id: string;
@@ -10,7 +10,12 @@ export type SiteGroup = {
 
 export async function listSiteGroups(): Promise<SiteGroup[]> {
   const { data } = await api.get("/sites/site-groups");
-  return Array.isArray(data?.items) ? data.items : data?.items ?? data ?? [];
+  const payload = unwrapApiData(data) as { items?: SiteGroup[] } | SiteGroup[];
+  return Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+    ? payload.items
+    : [];
 }
 
 export async function createSiteGroup(input: {
@@ -18,7 +23,7 @@ export async function createSiteGroup(input: {
   code?: string;
   utilityId?: string;
 }) {
-  const payload: Record<string, any> = { name: input.name };
+  const payload: Record<string, unknown> = { name: input.name };
   if (input.code) payload.code = input.code;
   if (input.utilityId) payload.utilityId = input.utilityId;
   const { data } = await api.post("/sites/site-groups", payload);

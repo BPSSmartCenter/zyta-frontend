@@ -105,6 +105,7 @@ export default function Map({
   pinStatusBySite,
   focusSiteCenter,
   onPinClick,
+  lockZoomOut,
 }: Props) {
   console.log("🗺️ [Map] COMPONENT RENDER", { sitePoints: sitePoints?.length, focusSiteCenter });
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -244,7 +245,7 @@ export default function Map({
     const lat = groupSites.reduce((s, g) => s + g.lat, 0) / groupSites.length;
     const lng = groupSites.reduce((s, g) => s + g.lng, 0) / groupSites.length;
     const svg = buildGroupPinSvg(groupSites.length);
-    const iconUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const iconUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
     const label = groupName;
     const marker = new longdo.Marker(
       { lon: lng, lat },
@@ -452,6 +453,25 @@ export default function Map({
     if (matched) onPinClick?.(matched);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusSiteCenter, mapReady]);
+
+  /* ─── Reset to country view when returning to All Sites ─── */
+  useEffect(() => {
+    if (lockZoomOut !== false || !mapReady) return;
+    const map = mapRef.current as {
+      location: (l: { lon: number; lat: number }) => void;
+      zoom: (z?: number) => number;
+    } | null;
+    if (!map) return;
+
+    try {
+      map.location({ lon: 101.0, lat: 13.0 });
+      map.zoom(MAP_MIN_ZOOM);
+      zoomLevelRef.current = MAP_MIN_ZOOM;
+      setZoomLevel(MAP_MIN_ZOOM);
+    } catch {
+      /* noop */
+    }
+  }, [lockZoomOut, mapReady]);
 
   /* ─── Hover tooltip — ใช้ mousemove + distance-to-marker calculation ─── */
   useEffect(() => {

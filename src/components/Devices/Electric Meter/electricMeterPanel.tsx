@@ -10,7 +10,6 @@ import {
   UtilityHeroCard,
   UtilityMetricTile,
   UtilitySectionTitle,
-  UtilityStripCard,
   UtilitySurface,
 } from "../../UtilityDashboard/UtilityDashboardLayout";
 
@@ -230,6 +229,27 @@ type DailyTelemetryPoint = {
   totalWh: number;
 };
 
+type NormalizedTelemetrySummary = {
+  voltageAvg: number;
+  currentAvg: number;
+  frequencyAvg: number;
+  usageKwh: number;
+  accumulatedKwh: number;
+  productionTodayKwh: number;
+  productionMonthKwh: number;
+  temperatureC: number | null;
+};
+
+type OverviewInverterSummary = {
+  deviceId: string;
+  label: string;
+  sn: string;
+  siteIdOrCode?: string;
+  siteLabel?: string;
+  summary: NormalizedTelemetrySummary;
+  halfHourSeries: number[];
+};
+
 const HALF_HOUR_SLOTS = Array.from({ length: 24 * 2 }, (_, idx) => {
   const hour = Math.floor(idx / 2);
   const minute = (idx % 2) * 30;
@@ -313,6 +333,120 @@ const formatDateLabel = (date: Date, locale = "th-TH") =>
 const sanitizeSeries = (arr: number[]) =>
   arr.map((value) => (Number.isFinite(value) ? Math.round(value) : 0));
 
+const niceAxisMax = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) return 10;
+  const roughStep = value / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(roughStep, 1)));
+  const normalized = roughStep / magnitude;
+  const stepBase =
+    normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = stepBase * magnitude;
+  return Math.max(step, Math.ceil(value / step) * step);
+};
+
+const OVERVIEW_CONTRIBUTION_COLORS = [
+  "#22A9E0",
+  "#67C4F1",
+  "#B9E5FB",
+  "#F59E0B",
+  "#FF7A1A",
+  "#10B981",
+  "#8B5CF6",
+  "#F04444",
+  "#14B8A6",
+  "#A3E635",
+  "#38BDF8",
+  "#7DD3FC",
+  "#D0EEFF",
+  "#F59E0B",
+  "#FF7A1A",
+];
+
+const logElectricApiPayload = (label: string, payload: unknown) => {
+  if (typeof console === "undefined") return;
+  console.log(`[ElectricMeterPanel] ${label}`, payload);
+};
+
+const summarizeTelemetryPayload = (payload: any): NormalizedTelemetrySummary => {
+  const summary = payload?.summary ?? null;
+  const list: any[] = Array.isArray(payload?.telemetries) ? payload.telemetries : [];
+  const t1: any = payload?.telemetryFirst ?? list[0] ?? null;
+  const t2: any = payload?.telemetryLast ?? (list.length ? list[list.length - 1] : null);
+
+  if (summary && typeof summary === "object") {
+    const temperature =
+      summary?.temperatureC === null || summary?.temperatureC === undefined
+        ? null
+        : Math.round(Number(summary.temperatureC));
+    return {
+      voltageAvg: Math.round(Number(summary?.voltageAvg ?? 0) || 0),
+      currentAvg: Math.round(Number(summary?.currentAvg ?? 0) || 0),
+      frequencyAvg: Math.round(Number(summary?.frequencyAvg ?? 0) || 0),
+      usageKwh: Math.round(Number(summary?.usageKwh ?? 0) || 0),
+      accumulatedKwh: Math.round(Number(summary?.accumulatedKwh ?? 0) || 0),
+      productionTodayKwh: Math.round(Number(summary?.productionTodayKwh ?? 0) || 0),
+      productionMonthKwh: Math.round(Number(summary?.productionMonthKwh ?? 0) || 0),
+      temperatureC:
+        typeof temperature === "number" && Number.isFinite(temperature)
+          ? temperature
+          : null,
+    };
+  }
+
+  const last: any = t2 || t1 || {};
+  const phaseVs = [
+    last?.L1Data?.acVoltage,
+    last?.L2Data?.acVoltage,
+    last?.L3Data?.acVoltage,
+  ].filter((v: any) => Number.isFinite(Number(v))) as number[];
+  const voltageAvg = phaseVs.length
+    ? phaseVs.reduce((a, b) => a + Number(b), 0) / phaseVs.length
+    : (([last?.vL1To2, last?.vL2To3, last?.vL3To1]
+        .map(Number)
+        .filter((n) => Number.isFinite(n)) as number[]).reduce((a, b) => a + b, 0) /
+        3) ||
+      0;
+  const currents = [last?.L1Data?.acCurrent, last?.L2Data?.acCurrent, last?.L3Data?.acCurrent]
+    .map(Number)
+    .filter((n) => Number.isFinite(n)) as number[];
+  const currentAvg = currents.length
+    ? currents.reduce((a, b) => a + b, 0) / currents.length
+    : 0;
+  const freqs = [last?.L1Data?.acFrequency, last?.L2Data?.acFrequency, last?.L3Data?.acFrequency]
+    .map(Number)
+    .filter((n) => Number.isFinite(n)) as number[];
+  const frequencyAvg = freqs.length
+    ? freqs.reduce((a, b) => a + b, 0) / freqs.length
+    : 0;
+  const eFirst = Number(t1?.totalEnergy ?? 0);
+  const eLast = Number(t2?.totalEnergy ?? t1?.totalEnergy ?? 0);
+  const usageKwh = eLast > eFirst ? (eLast - eFirst) / 1000 : 0;
+  const accumulatedKwh = eLast / 1000;
+  const tempRaw =
+    last?.temperature ??
+    last?.Temperature ??
+    last?.L1Data?.temperature ??
+    last?.L1Data?.Temperature ??
+    last?.envTemp ??
+    null;
+  const temperature =
+    tempRaw === null || tempRaw === undefined ? null : Number(tempRaw);
+
+  return {
+    voltageAvg: Math.round(voltageAvg),
+    currentAvg: Math.round(currentAvg),
+    frequencyAvg: Math.round(frequencyAvg),
+    usageKwh: Math.round(usageKwh),
+    accumulatedKwh: Math.round(accumulatedKwh),
+    productionTodayKwh: 0,
+    productionMonthKwh: 0,
+    temperatureC:
+      typeof temperature === "number" && Number.isFinite(temperature)
+        ? Math.round(temperature)
+        : null,
+  };
+};
+
 export default function ElectricMeterPanel({ siteCode }: Props) {
   const { selectedSite, selectedGroupSite, selectedUtility, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
@@ -353,6 +487,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [selectedComparisonKey, setSelectedComparisonKey] = useState<string | null>(
     null
   );
+  const [activeChartTab, setActiveChartTab] = useState<"contribution" | "trend">(
+    "contribution"
+  );
   const [dailySeries, setDailySeries] = useState<DailySeries[]>([]);
   // Compute ISO date range from selected day/time (use selected date)
     const computeRange = React.useCallback(() => {
@@ -383,6 +520,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const [overviewThreshold90DayKwh, setOverviewThreshold90DayKwh] = useState<number | null>(null);
   const [overviewLastUpdateTime, setOverviewLastUpdateTime] = useState<string | null>(null);
+  const [overviewInverterSummaries, setOverviewInverterSummaries] = useState<
+    OverviewInverterSummary[]
+  >([]);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
@@ -546,15 +686,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           });
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
-          // Deep-link: if URL specifies inverterSN, prefer that selection even if the current state is "Overview".
-          if (prev === OVERVIEW_DEVICE_ID) {
-            const matchSn =
-              urlDeviceSN &&
-              filtered.find(
-                (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
-              );
-            if (matchSn) return matchSn.id;
-            return prev;
+          if (prev === OVERVIEW_DEVICE_ID && !urlDeviceSN) {
+            return OVERVIEW_DEVICE_ID;
           }
           if (prev && filtered.some((opt) => opt.id === prev)) return prev;
           const matchSn =
@@ -674,6 +807,68 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       ),
     [deviceDropdownOptions, deviceTabsPerPage, deviceWindowStart]
   );
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      if (!isOverviewSelected || !deviceOptions.length) {
+        if (!active) return;
+        setOverviewInverterSummaries([]);
+        return;
+      }
+      try {
+        const base =
+          typeof filtersDate === "object" && filtersDate
+            ? new Date(filtersDate.y, (filtersDate.m || 1) - 1, filtersDate.d || 1)
+            : new Date();
+        const dayStart = startOfDay(base);
+        const dayEnd = endOfDay(base);
+        const startTime = formatDateTimeForApi(dayStart);
+        const endTime = formatDateTimeForApi(dayEnd);
+        const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
+          const res = await fetchEquipmentTelemetry({
+            siteIdOrCode: device.siteIdOrCode || siteForApi,
+            sn: device.sn,
+            startTime,
+            endTime,
+            category: device.category,
+          });
+          const payload = (res as any)?.data ?? {};
+          const telemetries = normalizeTelemetries(
+            Array.isArray(payload?.telemetries) ? payload.telemetries : []
+          );
+          return {
+            deviceId: device.id,
+            label: device.label,
+            sn: device.sn,
+            siteIdOrCode: device.siteIdOrCode,
+            siteLabel: device.siteLabel,
+            summary: summarizeTelemetryPayload(payload),
+            halfHourSeries: buildHalfHourSeries(telemetries, dayStart),
+          } as OverviewInverterSummary;
+        });
+        if (!active) return;
+        const normalized = settled
+          .filter(
+            (result): result is PromiseFulfilledResult<OverviewInverterSummary> =>
+              result.status === "fulfilled"
+          )
+          .map((result) => result.value)
+          .sort((a, b) =>
+            String(a.label || "").localeCompare(String(b.label || ""), "th", {
+              numeric: true,
+            })
+          );
+        setOverviewInverterSummaries(normalized);
+      } catch {
+        if (!active) return;
+        setOverviewInverterSummaries([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [deviceOptions, filtersDate, isOverviewSelected, siteForApi]);
 
   React.useEffect(() => {
     let active = true;
@@ -1038,6 +1233,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     });
   }, [comparisonItems]);
 
+  React.useEffect(() => {
+    if (!isOverviewSelected && activeChartTab !== "trend") {
+      setActiveChartTab("trend");
+    }
+  }, [activeChartTab, isOverviewSelected]);
+
   const selectedComparison = React.useMemo(
     () => comparisonItems.find((item) => item.key === selectedComparisonKey) ?? null,
     [comparisonItems, selectedComparisonKey]
@@ -1089,6 +1290,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               category: deviceCategory,
             })
           );
+          logElectricApiPayload("fetchEquipmentTelemetry(all-sites overview settled)", settled);
           const summaries = settled
             .filter(
               (item): item is PromiseFulfilledResult<any> =>
@@ -1163,6 +1365,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             temperatureC: temperatureAvg,
           };
           res = { data: { summary: aggregatedSummary, telemetries: [] } };
+          logElectricApiPayload("fetchEquipmentTelemetry(all-sites overview aggregated)", res);
         } else {
           res = await fetchEquipmentTelemetry({
             siteIdOrCode: selectedDeviceSiteForApi,
@@ -1171,90 +1374,47 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             endTime: range.to,
             category: deviceCategory,
           });
+          logElectricApiPayload("fetchEquipmentTelemetry(single device)", {
+            siteIdOrCode: selectedDeviceSiteForApi,
+            sn: deviceSN,
+            range,
+            response: res,
+          });
         }
         const payload: any = (res as any)?.data ?? {};
-        const summary = payload?.summary ?? null;
+        logElectricApiPayload("fetchEquipmentTelemetry(payload.data)", payload);
         const list: any[] = payload?.telemetries ?? [];
-        const t1: any = payload?.telemetryFirst ?? list[0] ?? null;
-        const t2: any = payload?.telemetryLast ?? (list.length ? list[list.length - 1] : null);
         console.debug("[FE] rangeRes", { count: list.length });
-
-        if (summary && typeof summary === "object") {
-          const voltage = Math.round(Number(summary?.voltageAvg ?? 0) || 0);
-          const current = Math.round(Number(summary?.currentAvg ?? 0) || 0);
-          const frequency = Math.round(Number(summary?.frequencyAvg ?? 0) || 0);
-          const consumptionKwh = Math.round(
-            Number(summary?.usageKwh ?? 0) || 0
-          );
-          const lifetimeKwh = Math.round(
-            Number(summary?.accumulatedKwh ?? 0) || 0
-          );
-          const temperature =
-            summary?.temperatureC === null || summary?.temperatureC === undefined
-              ? null
-              : Math.round(Number(summary.temperatureC));
-          setMetrics((m) => ({
-            ...m,
-            voltage,
-            current,
-            frequency,
-            consumptionKwh,
-            lifetimeKwh,
-          }));
-          setTemperatureC(
-            typeof temperature === "number" && Number.isFinite(temperature)
-              ? temperature
-              : null
-          );
-          if (!isOverviewSelected) {
-            const todayProd = Number(summary?.productionTodayKwh);
-            const monthProd = Number(summary?.productionMonthKwh);
-            setOverviewTodayValue(
-              Number.isFinite(todayProd) ? Math.round(todayProd) : null
-            );
-            setOverviewMonthValue(
-              Number.isFinite(monthProd) ? Math.round(monthProd) : null
-            );
-            if (Number.isFinite(monthProd)) {
-              setMetrics((m) => ({ ...m, monthKwh: Math.round(monthProd) }));
-            }
-          }
-          return;
-        }
-
-        const last: any = (t2 || t1 || {});
-        const phaseVs = [last?.L1Data?.acVoltage, last?.L2Data?.acVoltage, last?.L3Data?.acVoltage].filter((v: any) => Number.isFinite(Number(v))) as number[];
-        const voltage = phaseVs.length ? phaseVs.reduce((a, b) => a + Number(b), 0) / phaseVs.length : (([last?.vL1To2, last?.vL2To3, last?.vL3To1].map(Number).filter((n) => Number.isFinite(n)) as number[]).reduce((a, b) => a + b, 0) / 3) || 0;
-        const currents = [last?.L1Data?.acCurrent, last?.L2Data?.acCurrent, last?.L3Data?.acCurrent].map(Number).filter((n) => Number.isFinite(n)) as number[];
-        const current = currents.length ? currents.reduce((a, b) => a + b, 0) / currents.length : 0;
-        const freqs = [last?.L1Data?.acFrequency, last?.L2Data?.acFrequency, last?.L3Data?.acFrequency].map(Number).filter((n) => Number.isFinite(n)) as number[];
-        const frequency = freqs.length ? freqs.reduce((a, b) => a + b, 0) / freqs.length : 0;
-        const eFirst = Number(t1?.totalEnergy ?? 0);
-        const eLast = Number(t2?.totalEnergy ?? t1?.totalEnergy ?? 0);
-        const consumptionKwh = eLast > eFirst ? (eLast - eFirst) / 1000 : 0;
-        const lifetimeKwh = eLast / 1000;
-        const tempRaw =
-          last?.temperature ??
-          last?.Temperature ??
-          last?.L1Data?.temperature ??
-          last?.L1Data?.Temperature ??
-          last?.envTemp ??
-          null;
-        const temperature =
-          tempRaw === null || tempRaw === undefined ? null : Number(tempRaw);
+        const summary = summarizeTelemetryPayload(payload);
+        logElectricApiPayload("fetchEquipmentTelemetry(summary)", summary);
         setMetrics((m) => ({
           ...m,
-          voltage: Math.round(voltage),
-          current: Math.round(current),
-          frequency: Math.round(frequency),
-          consumptionKwh: Math.round(consumptionKwh),
-          lifetimeKwh: Math.round(lifetimeKwh),
+          voltage: summary.voltageAvg,
+          current: summary.currentAvg,
+          frequency: summary.frequencyAvg,
+          consumptionKwh: summary.usageKwh,
+          lifetimeKwh: summary.accumulatedKwh,
         }));
         setTemperatureC(
-          typeof temperature === "number" && Number.isFinite(temperature)
-            ? Math.round(temperature)
+          typeof summary.temperatureC === "number" && Number.isFinite(summary.temperatureC)
+            ? Math.round(summary.temperatureC)
             : null
         );
+        if (!isOverviewSelected) {
+          setOverviewTodayValue(
+            Number.isFinite(summary.productionTodayKwh)
+              ? Math.round(summary.productionTodayKwh)
+              : null
+          );
+          setOverviewMonthValue(
+            Number.isFinite(summary.productionMonthKwh)
+              ? Math.round(summary.productionMonthKwh)
+              : null
+          );
+          if (Number.isFinite(summary.productionMonthKwh)) {
+            setMetrics((m) => ({ ...m, monthKwh: Math.round(summary.productionMonthKwh) }));
+          }
+        }
       } catch (e) {
         // ignore
       }
@@ -1279,6 +1439,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       }
       try {
         const resp = await getElectricOverview(siteForApi);
+        logElectricApiPayload("getElectricOverview(threshold)", {
+          siteForApi,
+          response: resp,
+        });
         const data = (resp as any)?.data ?? resp ?? {};
         const threshold = Number(data?.threshold_90_day_kwh);
         if (!active) return;
@@ -1304,6 +1468,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             const settled = await runWithConcurrency(siteTargets, 4, async (siteIdOrCode) =>
               getElectricOverview(siteIdOrCode)
             );
+            logElectricApiPayload("getElectricOverview(all-sites settled)", settled);
             const rows = settled
               .filter(
                 (item): item is PromiseFulfilledResult<any> =>
@@ -1317,10 +1482,16 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               month_kwh: sumField("month_kwh"),
               lifetime_kwh: sumField("lifetime_kwh"),
             };
+            logElectricApiPayload("getElectricOverview(all-sites aggregated)", data);
           } else {
             const resp = await getElectricOverview(siteForApi);
+            logElectricApiPayload("getElectricOverview(single site)", {
+              siteForApi,
+              response: resp,
+            });
             data = (resp as any)?.data ?? resp ?? {};
           }
+          logElectricApiPayload("getElectricOverview(normalized data)", data);
           if (!active) return;
           const today = Number(data?.today_kwh);
           const month = Number(data?.month_kwh);
@@ -1364,14 +1535,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     siteTargetsKey,
   ]);
 
-  const sideCardTodayValue =
-    overviewTodayValue !== null && overviewTodayValue !== undefined
-      ? overviewTodayValue
-      : metrics.consumptionKwh;
-  const sideCardMonthValue =
-    overviewMonthValue !== null && overviewMonthValue !== undefined
-      ? overviewMonthValue
-      : metrics.monthKwh;
   const selectedGroupLabel = React.useMemo(() => {
     if (!isAllSitesSelected) {
       return t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" });
@@ -1382,6 +1545,81 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     if (parts.length > 0) return parts.join(" › ");
     return t("navbar.allSites", { ns: "dashboard", defaultValue: "All Sites" });
   }, [isAllSitesSelected, selectedUtility, selectedGroupSite, t]);
+  const overviewInverterAggregate = React.useMemo(() => {
+    return overviewInverterSummaries.reduce(
+      (acc, item) => {
+        acc.todayKwh += Number(item.summary.productionTodayKwh || 0);
+        acc.monthKwh += Number(item.summary.productionMonthKwh || 0);
+        acc.lifetimeKwh += Number(item.summary.accumulatedKwh || 0);
+        return acc;
+      },
+      { todayKwh: 0, monthKwh: 0, lifetimeKwh: 0 }
+    );
+  }, [overviewInverterSummaries]);
+  const overviewContributionLegend = React.useMemo(
+    () =>
+      overviewInverterSummaries.map((item, index) => ({
+        name: item.label,
+        color:
+          OVERVIEW_CONTRIBUTION_COLORS[
+            index % OVERVIEW_CONTRIBUTION_COLORS.length
+          ],
+      })),
+    [overviewInverterSummaries]
+  );
+  const overviewContributionColumns = React.useMemo(() => {
+    const columns = HALF_HOUR_LABELS.map((label, index) => {
+      const bars = overviewInverterSummaries
+        .map((item, inverterIndex) => {
+          const value = Number(item.halfHourSeries[index] || 0);
+          return {
+            name: item.label,
+            value,
+            color:
+              OVERVIEW_CONTRIBUTION_COLORS[
+                inverterIndex % OVERVIEW_CONTRIBUTION_COLORS.length
+              ],
+          };
+        });
+      const maxValue = bars.reduce((max, item) => Math.max(max, item.value), 0);
+      return { label, bars, maxValue };
+    });
+    const maxValue = columns.reduce(
+      (max, column) => Math.max(max, column.maxValue),
+      0
+    );
+    return {
+      columns,
+      maxValue,
+    };
+  }, [overviewInverterSummaries]);
+  const overviewContributionAxis = React.useMemo(() => {
+    const max = niceAxisMax(overviewContributionColumns.maxValue * 1.1);
+    const ticks = Array.from({ length: 5 }, (_, index) => {
+      const value = max - (max / 4) * index;
+      return {
+        value,
+        label: formatWithComma(Math.round(value)),
+      };
+    });
+    return { max, ticks };
+  }, [overviewContributionColumns.maxValue]);
+  const sideCardTodayValue =
+    isOverviewSelected && overviewInverterSummaries.length
+      ? Math.round(overviewInverterAggregate.todayKwh)
+      : overviewTodayValue !== null && overviewTodayValue !== undefined
+      ? overviewTodayValue
+      : metrics.consumptionKwh;
+  const sideCardMonthValue =
+    isOverviewSelected && overviewInverterSummaries.length
+      ? Math.round(overviewInverterAggregate.monthKwh)
+      : overviewMonthValue !== null && overviewMonthValue !== undefined
+      ? overviewMonthValue
+      : metrics.monthKwh;
+  const sideCardLifetimeValue =
+    isOverviewSelected && overviewInverterSummaries.length
+      ? Math.round(overviewInverterAggregate.lifetimeKwh)
+      : overviewLifetimeValue ?? metrics.lifetimeKwh;
   const hasTemperature = typeof temperatureC === "number" && Number.isFinite(temperatureC);
   const temperatureValue = hasTemperature ? Math.round(Number(temperatureC)) : 0;
   const temperatureDisplay = hasTemperature
@@ -1462,10 +1700,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       {
         key: "lifetime",
         label: t("devices.electric.cards.accumulated", { defaultValue: "Accumulated power" }),
-        value: `${formatWithComma(overviewLifetimeValue ?? metrics.lifetimeKwh)} kWh`,
+        value: `${formatWithComma(sideCardLifetimeValue)} kWh`,
       },
     ],
-    [metrics.lifetimeKwh, overviewLifetimeValue, sideCardMonthValue, sideCardTodayValue, t]
+    [sideCardLifetimeValue, sideCardMonthValue, sideCardTodayValue, t]
   );
 
   return (
@@ -1612,20 +1850,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                   )}
                 </div>
                 {!isGlobalAllOverview &&
-                (isOverviewSelected ? (
-                  <p className="text-sm text-slate-400">
-                    {isGroupSiteSelected
-                      ? selectedGroupLabel
-                      : siteLabelByCode.get(siteForApi) ?? siteForApi}
-                  </p>
-                ) : selectedDevice ? (
-                  <p className="text-sm text-slate-400">
-                    {selectedDevice.siteLabel ??
-                      siteLabelByCode.get(siteForApi) ??
-                      siteForApi}
-                  </p>
-                ) : null)}
-                {!isGlobalAllOverview &&
                 !deviceOptionsLoading &&
                 deviceOptions.length === 0 ? (
                   <p className="text-sm text-rose-500">
@@ -1722,17 +1946,41 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                   key={item.key}
                   type="button"
                   onClick={() => setSelectedComparisonKey(item.key)}
-                  className="cursor-pointer rounded-[18px] border border-slate-200/70 bg-slate-50/90 text-left transition hover:border-slate-300 hover:bg-white"
+                  className={[
+                    "cursor-pointer rounded-[18px] border bg-white p-4 text-left transition",
+                    item.key === selectedComparisonKey
+                      ? "border-amber-200 shadow-[0_12px_28px_rgba(245,158,11,0.12)]"
+                      : "border-slate-200/80 hover:border-slate-300",
+                  ].join(" ")}
                 >
-                  <UtilityStripCard
-                    title={`${item.label} ${item.displayDate}`}
-                    subtitle={t("devices.electric.utilizationLabel", {
-                      defaultValue: "Utilization",
-                    })}
-                    value={item.percentLabel}
-                    progressValue={Math.max(0, Math.min(100, item.percentage))}
-                    tone={item.key === selectedComparisonKey ? "amber" : "slate"}
-                  />
+                  <div className="flex h-full min-h-[188px] flex-col">
+                    <div className="text-[11px] font-medium text-slate-500">
+                      {`${item.label} ${item.displayDate}`}
+                    </div>
+                    <div className="mt-1 text-[12px] text-slate-400">
+                      {t("devices.electric.utilizationLabel", {
+                        defaultValue: "Utilization",
+                      })}
+                    </div>
+                    <div className="mt-3 flex flex-1 items-end justify-center">
+                      <div className="flex h-[108px] w-12 items-end overflow-hidden rounded-[10px] bg-slate-100">
+                        <div
+                          className={[
+                            "w-full rounded-[10px] transition-all",
+                            item.key === selectedComparisonKey
+                              ? "bg-gradient-to-t from-[#f59e0b] to-[#fbbf24]"
+                              : "bg-gradient-to-t from-[#94a3b8] to-[#cbd5e1]",
+                          ].join(" ")}
+                          style={{
+                            height: `${Math.max(8, Math.min(100, item.percentage))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4 text-center text-[30px] font-semibold leading-none text-slate-700">
+                      {item.percentLabel}
+                    </div>
+                  </div>
                 </button>
               ))
             ) : (
@@ -1747,20 +1995,161 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
 
         <UtilitySurface>
           <UtilitySectionTitle
-            title={t("devices.electric.powerTrend", {
-              defaultValue: "Power trend",
-            })}
-            subtitle={`${t("devices.electric.today", {
-              defaultValue: "Today",
-            })} · ${t("devices.electric.chartInterval", {
-              defaultValue: "kWh by 30 min",
-            })}`}
+            title={
+              activeChartTab === "contribution"
+                ? t("devices.electric.inverterContribution", {
+                    defaultValue: "Inverter contribution",
+                  })
+                : t("devices.electric.powerTrend", {
+                    defaultValue: "Power trend",
+                  })
+            }
+            subtitle={
+              activeChartTab === "contribution"
+                ? t("devices.electric.inverterContributionHint", {
+                    defaultValue: "Today · kWh by 30 min",
+                  })
+                : `${t("devices.electric.today", {
+                    defaultValue: "Today",
+                  })} · ${t("devices.electric.chartInterval", {
+                    defaultValue: "kWh by 30 min",
+                  })}`
+            }
+            right={
+              isOverviewSelected ? (
+                <div className="inline-flex overflow-hidden rounded-[14px] border border-slate-200 bg-slate-50">
+                  {[
+                    {
+                      key: "contribution" as const,
+                      label: t("devices.electric.inverterContribution", {
+                        defaultValue: "Inverter contribution",
+                      }),
+                    },
+                    {
+                      key: "trend" as const,
+                      label: t("devices.electric.powerTrend", {
+                        defaultValue: "Power trend",
+                      }),
+                    },
+                  ].map((tab) => {
+                    const active = activeChartTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveChartTab(tab.key)}
+                        className={[
+                          "px-4 py-2 text-sm font-medium transition",
+                          active
+                            ? "bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.08)]"
+                            : "text-slate-500 hover:bg-white/70",
+                        ].join(" ")}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null
+            }
           />
-          <ElectricLineBasicChart
-            key={selectedComparison?.key ?? "today"}
-            categories={chartCategories}
-            series={chartSeriesData}
-          />
+          {activeChartTab === "contribution" && isOverviewSelected ? (
+            <>
+              {overviewContributionColumns.maxValue > 0 ? (
+                <div className="overflow-x-auto">
+                  <div className="min-w-[1440px]">
+                    <div className="grid h-[320px] grid-cols-[72px_1fr] gap-3 rounded-[18px] border border-slate-100 bg-slate-50/50 px-4 pb-8 pt-4">
+                      <div className="flex h-full flex-col justify-between pr-2 text-right">
+                        <div className="text-[11px] font-medium text-slate-400">kWh</div>
+                        {overviewContributionAxis.ticks.map((tick) => (
+                          <div
+                            key={tick.value}
+                            className="text-[11px] font-medium text-slate-400"
+                          >
+                            {tick.label}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="relative h-full">
+                        <div className="pointer-events-none absolute inset-x-0 top-0 bottom-8 flex flex-col justify-between">
+                          {overviewContributionAxis.ticks.map((tick) => (
+                            <div
+                              key={`grid-${tick.value}`}
+                              className="border-t border-dashed border-slate-200"
+                            />
+                          ))}
+                        </div>
+                        <div className="flex h-full items-end gap-1">
+                          {overviewContributionColumns.columns.map((column, index) => {
+                            const showLabel = index % 2 === 0;
+                            return (
+                              <div
+                                key={column.label}
+                                className="flex min-w-0 flex-1 flex-col items-center justify-end"
+                              >
+                                <div className="flex h-[260px] w-full items-end justify-center">
+                                  <div className="flex h-full w-full max-w-[32px] items-end justify-center gap-px">
+                                    {column.bars.map((bar) => (
+                                      <div
+                                        key={`${column.label}-${bar.name}`}
+                                        className="min-w-[1px] flex-1 rounded-t-[3px]"
+                                        style={{
+                                          height:
+                                            bar.value > 0
+                                              ? `${Math.max(
+                                                  2,
+                                                  (bar.value / overviewContributionAxis.max) * 100
+                                                )}%`
+                                              : "0%",
+                                          backgroundColor: bar.color,
+                                          opacity: bar.value > 0 ? 1 : 0.12,
+                                        }}
+                                        title={`${column.label} · ${bar.name}: ${formatWithComma(
+                                          Math.round(bar.value)
+                                        )} kWh`}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="mt-3 h-8 text-center text-[10px] text-slate-400">
+                                  {showLabel ? column.label : ""}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[18px] border border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-400 min-h-[300px]">
+                  {t("devices.electric.noData", { defaultValue: "No data" })}
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                {overviewContributionLegend.map((item) => (
+                  <div
+                    key={item.name}
+                    className="inline-flex min-w-0 items-center gap-2 text-sm text-slate-500"
+                    title={item.name}
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="max-w-[160px] truncate">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <ElectricLineBasicChart
+              key={selectedComparison?.key ?? "today"}
+              categories={chartCategories}
+              series={chartSeriesData}
+            />
+          )}
         </UtilitySurface>
       </div>
     </>
@@ -1819,14 +2208,3 @@ function WaveIcon() {
     </svg>
   );
 }
-
-
-
-
-
-
-
-
-
-
-

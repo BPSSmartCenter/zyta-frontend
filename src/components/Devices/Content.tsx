@@ -35,7 +35,7 @@ const TYPE_TO_ID: Record<string, string> = {
   digitaltwin: "digitaltwin-1",
 };
 
-const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>(["cctv"]);
+const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>();
 const DEFAULT_DEVICE_TYPE: keyof typeof TYPE_TO_ID = "watermeter";
 const BILLING_TYPE_BY_URL: Partial<Record<string, BillingType>> = {
   electricmeter: "electric",
@@ -280,10 +280,8 @@ export default function Content({}: Props) {
 
       {/* Panel/Table ตาม selectedId (คอมโพเนนต์คงตัว ไม่รี-mount จาก key/state) */}
       {selectedId === "cctv-1" ? (
-        <div className="mt-6 rounded-xl bg-white p-8 text-center text-gray-500 border border-dashed border-gray-300">
-          {tDevices("cctvDisabled", {
-            defaultValue: "CCTV view is temporarily unavailable.",
-          })}
+        <div className="mt-6">
+          <CCTVPanel siteCode={siteCode} />
         </div>
       ) : selectedId === "intercom-1" ? (
         <div className="flex flex-col gap-3">
@@ -291,9 +289,8 @@ export default function Content({}: Props) {
           <CCTVTable />
         </div>
       ) : selectedId === "water-1" ? (
-        <div className="flex flex-col gap-3">
+        <div className="mt-6">
           <WaterMeterPanel siteCode={siteCode} />
-          <CCTVTable />
         </div>
       ) : selectedId === "electric-1" ? (
         <div className="mt-6">
@@ -303,7 +300,6 @@ export default function Content({}: Props) {
       ) : selectedId === "air-1" ? (
         <div className="mt-6">
           <AirPanel siteCode={siteCode} />
-          <CCTVTable />
         </div>
       ) : selectedId === "iot-1" ? (
         <div className="mt-6">

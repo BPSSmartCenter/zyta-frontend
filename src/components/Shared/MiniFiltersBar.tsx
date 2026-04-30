@@ -4,6 +4,13 @@ import DatePicker from "../DateInput";
 import { useFilters } from "../../context/FiltersContext";
 import { useUserPath } from "../../routes/useUserPath";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+  selectAccessibleSites,
+  selectHasHydrated,
+  siteSelectionActions,
+} from "../../features/siteSelection";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 type Props = {
   page?: "devices" | "alert" | "facerec" | "dashboard";
@@ -16,6 +23,10 @@ export default function MiniFiltersBar({
   className = "",
   variant = "default",
 }: Props) {
+  const { t } = useTranslation(["dashboard"]);
+  const dispatch = useAppDispatch();
+  const accessibleSites = useAppSelector(selectAccessibleSites);
+  const hasHydrated = useAppSelector(selectHasHydrated);
   const {
     date,
     setDate,
@@ -81,6 +92,15 @@ export default function MiniFiltersBar({
   };
 
   const isHero = variant === "hero";
+  const heroSiteLabel = React.useMemo(() => {
+    if (!selectedSite || selectedSite === "all") {
+      return t("navbar.allSites", { defaultValue: "All Sites" });
+    }
+    return (
+      siteOptions.find((option) => option.value === selectedSite)?.label ??
+      selectedSite
+    );
+  }, [selectedSite, siteOptions, t]);
 
   return (
     <div
@@ -91,28 +111,47 @@ export default function MiniFiltersBar({
         className,
       ].join(" ")}
     >
-      <SiteDropdownGrouped
-        options={siteOptions as any}
-        value={selectedSite}
-        onChange={onChangeSite}
-        selectedGroup={selectedGroupSite}
-        onSelectGroup={onSelectGroup}
-        selectedUtility={selectedUtility}
-        onSelectUtility={onSelectUtility}
-        showUngrouped={true}
-        showUngroupedHeader={false}
-        rootClassName={isHero ? "min-w-0 flex-1" : undefined}
-        buttonClassName={
-          isHero
-            ? "inline-flex h-11 w-full items-center justify-between gap-2 rounded-[18px] border border-[#CDEFFF] bg-white px-4 text-left text-sm font-semibold text-[#2F3E56] shadow-[0_12px_30px_rgba(57,184,238,0.12)] hover:cursor-pointer"
-            : "inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
-        }
-        menuClassName={
-          isHero
-            ? "absolute left-0 top-full z-[1200] mt-2 min-w-[320px] max-w-[480px] max-h-[420px] overflow-auto whitespace-nowrap rounded-[18px] border border-[#CDEFFF] bg-white p-2 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
-            : "absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md"
-        }
-      />
+      {isHero ? (
+        <button
+          type="button"
+          disabled={!hasHydrated || accessibleSites.length <= 1}
+          onClick={() =>
+            dispatch(siteSelectionActions.openPicker({ reason: "manual" }))
+          }
+          className={[
+            "inline-flex h-11 w-full min-w-0 flex-1 items-center gap-2 rounded-[18px] border border-[#CDEFFF] bg-white px-4 text-left text-sm font-semibold text-[#2F3E56] shadow-[0_12px_30px_rgba(57,184,238,0.12)] transition hover:border-[#8CDEFF] hover:text-[#16324A] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#39B8EE]/15",
+            (!hasHydrated || accessibleSites.length <= 1) &&
+              "cursor-default opacity-80 hover:border-[#CDEFFF] hover:text-[#2F3E56]",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <span
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-[#E9F9FF] text-[#39B8EE]"
+            aria-hidden="true"
+          >
+            <span className="material-icons-outlined text-[18px]">
+              apartment
+            </span>
+          </span>
+          <span className="truncate">{heroSiteLabel}</span>
+        </button>
+      ) : (
+        <SiteDropdownGrouped
+          options={siteOptions as any}
+          value={selectedSite}
+          onChange={onChangeSite}
+          selectedGroup={selectedGroupSite}
+          onSelectGroup={onSelectGroup}
+          selectedUtility={selectedUtility}
+          onSelectUtility={onSelectUtility}
+          showUngrouped={true}
+          showUngroupedHeader={false}
+          rootClassName={isHero ? "min-w-0 flex-1" : undefined}
+          buttonClassName="inline-flex h-10 min-w-[180px] items-center justify-between gap-2 rounded-md border border-gray-300 px-3 text-sm hover:cursor-pointer focus:bg-gray-50"
+          menuClassName="absolute left-0 top-full z-[1200] mt-2 min-w-[280px] max-w-[420px] max-h-[420px] overflow-auto whitespace-nowrap rounded-md border border-gray-300 bg-white p-1 shadow-md"
+        />
+      )}
 
       <DatePicker
         value={date}

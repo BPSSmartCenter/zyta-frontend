@@ -115,7 +115,12 @@ export const UtilityHeroCard: React.FC<{
         <div className="flex items-center gap-4">
           <ProgressRing value={safeProgress} color={style.ring}>
             <div className="text-center leading-tight">
-              <div className="text-[30px] font-semibold text-slate-900">{value}</div>
+              <div
+                className="mx-auto max-w-[5.4rem] truncate text-[clamp(1.85rem,2vw,2.6rem)] font-semibold leading-none text-slate-900 tabular-nums"
+                title={value}
+              >
+                {value}
+              </div>
               {unit ? <div className="text-[11px] text-slate-500">{unit}</div> : null}
             </div>
           </ProgressRing>
@@ -206,7 +211,7 @@ export const UtilitySectionTitle: React.FC<{
   right?: React.ReactNode;
 }> = ({ title, subtitle, right }) => (
   <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-    <div>
+    <div className="">
       <h3 className="text-[18px] font-semibold text-slate-900">{title}</h3>
       {subtitle ? <p className="mt-1 text-sm text-slate-400">{subtitle}</p> : null}
     </div>
@@ -225,15 +230,14 @@ function ProgressRing({
 }) {
   return (
     <div
-      className="grid size-[78px] shrink-0 place-items-center rounded-full bg-white"
+      className="grid size-[92px] shrink-0 place-items-center rounded-full bg-white"
       style={{
         background: `conic-gradient(${color} ${value * 3.6}deg, rgba(226,232,240,0.9) 0deg)`,
       }}
     >
-      <div className="grid size-[64px] place-items-center rounded-full bg-white">
+      <div className="grid size-[74px] place-items-center rounded-full bg-white">
         {children}
       </div>
     </div>
   );
 }
-

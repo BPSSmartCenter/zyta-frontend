@@ -37,6 +37,9 @@ function asNullableText(value: unknown): string | null {
 function arrayFromResponse(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
   if (isRecord(value) && Array.isArray(value.items)) return value.items;
+  const data = isRecord(value) ? value.data : undefined;
+  if (Array.isArray(data)) return data;
+  if (isRecord(data) && Array.isArray(data.items)) return data.items;
   return [];
 }
 

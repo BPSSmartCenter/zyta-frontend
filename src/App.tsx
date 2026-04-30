@@ -199,7 +199,7 @@ function RootLoginOrDashboard() {
   const user = useAppSelector(selectAuthUser);
 
   if (booting) return <AppBootLoading />;
-  if (!user) return <Login />;
+  if (!user?.id) return <Login />;
   return <Navigate to={dashboardPathFor(user)} replace />;
 }
 

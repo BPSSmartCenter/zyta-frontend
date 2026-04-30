@@ -2,7 +2,13 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { getElectricOverview } from "../../api/electric";
+import {
+  selectAccessibleSites,
+  selectSelectedGroup,
+  selectSelectedUtility,
+} from "../../features/siteSelection";
 import { useUserPath } from "../../routes/useUserPath";
+import { useAppSelector } from "../../store/hooks";
 
 type CardKey = "water" | "electric" | "air";
 
@@ -109,11 +115,39 @@ function UtilityOverviewIcon({ kind }: { kind: CardKey }) {
   );
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+      ? Number(value)
+      : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function extractElectricOverview(payload: unknown) {
+  const data =
+    payload && typeof payload === "object" && "data" in payload
+      ? (payload as { data?: unknown }).data
+      : payload;
+  const record =
+    data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+
+  return {
+    todayKwh: toFiniteNumber(record.today_kwh),
+    monthKwh: toFiniteNumber(record.month_kwh),
+    lastUpdateTime:
+      typeof record.lastUpdateTime === "string" && record.lastUpdateTime.trim()
+        ? record.lastUpdateTime.trim()
+        : null,
+  };
+}
+
 function Sparkline() {
   return (
     <svg
       viewBox="0 0 160 72"
-      className="pointer-events-none absolute right-4 top-[6rem] h-20 w-[8.5rem] opacity-90 sm:w-[9rem]"
+      className="pointer-events-none absolute right-4 h-20 w-[8.5rem] opacity-90 sm:w-[9rem]"
       aria-hidden="true"
     >
       <defs>
@@ -253,7 +287,7 @@ function UtilityCard({
           )}
         </div>
 
-        <div className="mt-4 border-t border-white/20 bg-white/12 px-5 pb-4 pt-4 backdrop-blur-[1px]">
+        <div className="mt-4 px-5 pb-4 pt-4 backdrop-blur-[1px]">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {hasLiveElectric ? (
               <>
@@ -374,7 +408,7 @@ function UtilityCard({
             )}
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/16 pt-3">
+          <div className="flex items-center justify-between gap-3 border-t border-white/16 pt-3">
             <p className="text-sm font-medium text-white/82">
               {hasLiveElectric
                 ? t("utilityOverview.electricFooter", {
@@ -415,6 +449,9 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
   const { t } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { absSite, abs } = useUserPath();
+  const accessibleSites = useAppSelector(selectAccessibleSites);
+  const selectedGroup = useAppSelector(selectSelectedGroup);
+  const selectedUtility = useAppSelector(selectSelectedUtility);
   const [electricOverview, setElectricOverview] = React.useState<ElectricOverviewState>({
     loading: false,
     hasData: false,
@@ -423,9 +460,39 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     lastUpdateTime: null,
   });
 
+  const scopedSiteCodes = React.useMemo(() => {
+    try {
+      const visibleSites = accessibleSites.filter((site) => {
+        if (
+          selectedUtility &&
+          String(site.utilityId ?? "") !== String(selectedUtility.id)
+        ) {
+          return false;
+        }
+        if (
+          selectedGroup &&
+          String(site.groupId ?? "") !== String(selectedGroup.id) &&
+          String(site.groupLabel ?? "") !== String(selectedGroup.label)
+        ) {
+          return false;
+        }
+        return true;
+      });
+      return visibleSites
+        .map((site) => String(site.value ?? "").trim())
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  }, [accessibleSites, selectedGroup, selectedUtility]);
+
   React.useEffect(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
-    if (!siteCode || siteCode.toLowerCase() === "all") {
+    let cancelled = false;
+    const normalizedSiteCodes =
+      !siteCode || siteCode.toLowerCase() === "all" ? scopedSiteCodes : [siteCode];
+
+    if (normalizedSiteCodes.length === 0) {
       setElectricOverview({
         loading: false,
         hasData: false,
@@ -436,26 +503,42 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       return;
     }
 
-    let cancelled = false;
     setElectricOverview((prev) => ({ ...prev, loading: true }));
 
     (async () => {
       try {
-        const resp = await getElectricOverview(siteCode);
-        const data = (resp as any)?.data ?? resp ?? {};
-        const todayKwh = Number(data?.today_kwh);
-        const monthKwh = Number(data?.month_kwh);
-        const hasData = Number.isFinite(todayKwh) || Number.isFinite(monthKwh);
+        const responses = await Promise.allSettled(
+          normalizedSiteCodes.map((code) => getElectricOverview(code))
+        );
+
+        const snapshots = responses
+          .filter(
+            (entry): entry is PromiseFulfilledResult<unknown> =>
+              entry.status === "fulfilled"
+          )
+          .map((entry) => extractElectricOverview(entry.value));
+
+        const totalToday = snapshots.reduce(
+          (sum, item) => sum + (item.todayKwh ?? 0),
+          0
+        );
+        const totalMonth = snapshots.reduce(
+          (sum, item) => sum + (item.monthKwh ?? 0),
+          0
+        );
+        const lastUpdateTime =
+          snapshots.find((item) => item.lastUpdateTime)?.lastUpdateTime ?? null;
+        const hasData = snapshots.some(
+          (item) => item.todayKwh !== null || item.monthKwh !== null
+        );
+
         if (cancelled) return;
         setElectricOverview({
           loading: false,
           hasData,
-          todayKwh: Number.isFinite(todayKwh) ? Math.round(todayKwh) : 0,
-          monthKwh: Number.isFinite(monthKwh) ? Math.round(monthKwh) : 0,
-          lastUpdateTime:
-            typeof data?.lastUpdateTime === "string" && data.lastUpdateTime.trim().length > 0
-              ? data.lastUpdateTime
-              : null,
+          todayKwh: hasData ? Math.round(totalToday) : null,
+          monthKwh: hasData ? Math.round(totalMonth) : null,
+          lastUpdateTime,
         });
       } catch {
         if (cancelled) return;
@@ -472,7 +555,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [selectedSiteCode]);
+  }, [scopedSiteCodes, selectedSiteCode]);
 
   const handleOpenElectric = React.useCallback(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
