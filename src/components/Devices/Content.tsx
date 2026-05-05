@@ -2,8 +2,6 @@
 import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import { exportImage } from "../../assets";
 import { useTranslation } from "react-i18next";
-import StatCard, { StatCardGroup } from "../StatCard";
-import { DEVICE_CARDS } from "./devices.constant";
 import CCTVPanel from "./CCTV/cctvPanel";
 import CCTVTable from "./CCTV/cctvTable";
 import WaterMeterPanel from "./Water Meter/waterMeterPanel";
@@ -16,7 +14,11 @@ import { useUserPath } from "../../routes/useUserPath";
 import { useFilters } from "../../context/FiltersContext";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import MiniFiltersBar from "../Shared/MiniFiltersBar";
-import { useDeviceInventory, getCountForType } from "../../context/DeviceInventoryContext";
+import LanguagePillSwitcher from "../LanguagePillSwitcher";
+import {
+  useDeviceInventory,
+  getCountForType,
+} from "../../context/DeviceInventoryContext";
 import Modal from "../Modal";
 import { getSiteBillingAccess } from "../../api/sites";
 import type { BillingType, SiteBillingAccess } from "../../types/billing";
@@ -33,15 +35,7 @@ const TYPE_TO_ID: Record<string, string> = {
   digitaltwin: "digitaltwin-1",
 };
 
-const ID_TO_TYPE: Record<string, string> = Object.entries(TYPE_TO_ID).reduce(
-  (acc, [type, id]) => {
-    acc[id] = type;
-    return acc;
-  },
-  {} as Record<string, string>
-);
-
-const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>(["cctv"]);
+const DISABLED_DEVICE_TYPES = new Set<keyof typeof TYPE_TO_ID>();
 const DEFAULT_DEVICE_TYPE: keyof typeof TYPE_TO_ID = "watermeter";
 const BILLING_TYPE_BY_URL: Partial<Record<string, BillingType>> = {
   electricmeter: "electric",
@@ -52,7 +46,7 @@ const BILLING_FIELD_BY_TYPE: Record<BillingType, keyof SiteBillingAccess> = {
   water: "allowWaterBilling",
 };
 
-export default function Content({ }: Props) {
+export default function Content({}: Props) {
   const { t: tDevices } = useTranslation("devices");
   const { t: tSidebar } = useTranslation("sidebar");
   const location = useLocation();
@@ -60,7 +54,8 @@ export default function Content({ }: Props) {
 
   const { abs, absSite } = useUserPath();
   const { siteCode } = useParams();
-  const { counts: inventoryCounts, loading: inventoryLoading } = useDeviceInventory();
+  const { counts: inventoryCounts, loading: inventoryLoading } =
+    useDeviceInventory();
   const { selectedSite, siteOptions } = useFilters();
   const accessibleSitesFromFilters = useMemo(
     () =>
@@ -69,8 +64,10 @@ export default function Content({ }: Props) {
           code: String(opt?.value || "").trim(),
           name: String(opt?.label || "").trim(),
         }))
-        .filter((site) => site.code.length > 0 && site.code.toLowerCase() !== "all"),
-    [siteOptions]
+        .filter(
+          (site) => site.code.length > 0 && site.code.toLowerCase() !== "all",
+        ),
+    [siteOptions],
   );
 
   useDeviceInventoryLoader({
@@ -81,8 +78,12 @@ export default function Content({ }: Props) {
   const urlType = useMemo(() => {
     const q = new URLSearchParams(location.search).get("type")?.toLowerCase();
     const candidate =
-      q && TYPE_TO_ID[q as keyof typeof TYPE_TO_ID] ? (q as keyof typeof TYPE_TO_ID) : DEFAULT_DEVICE_TYPE;
-    return DISABLED_DEVICE_TYPES.has(candidate) ? DEFAULT_DEVICE_TYPE : candidate;
+      q && TYPE_TO_ID[q as keyof typeof TYPE_TO_ID]
+        ? (q as keyof typeof TYPE_TO_ID)
+        : DEFAULT_DEVICE_TYPE;
+    return DISABLED_DEVICE_TYPES.has(candidate)
+      ? DEFAULT_DEVICE_TYPE
+      : candidate;
   }, [location.search]);
 
   // Read deviceId for IoT Detail View
@@ -92,16 +93,22 @@ export default function Content({ }: Props) {
 
   // If current URL points to a zero-count type and there exists any available type, redirect to the first available
   const selectedId = useMemo(() => TYPE_TO_ID[urlType], [urlType]);
-  const availableTypes = (Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>).filter(
+  const availableTypes = (
+    Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>
+  ).filter(
     (k) =>
       !DISABLED_DEVICE_TYPES.has(k) &&
-      (k === "iot" || k === "caregiver" || k === "digitaltwin" || getCountForType(inventoryCounts as any, k as any) > 0)
+      (k === "iot" ||
+        k === "caregiver" ||
+        k === "digitaltwin" ||
+        getCountForType(inventoryCounts as any, k as any) > 0),
   );
   const selectedCount = getCountForType(inventoryCounts as any, urlType as any);
 
   if (typeof window !== "undefined") {
     const isDisabledType = DISABLED_DEVICE_TYPES.has(urlType);
-    const isExternal = urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
+    const isExternal =
+      urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
     const isZero = !isExternal && selectedCount <= 0;
     if ((isDisabledType || isZero) && availableTypes.length > 0) {
       const nextType = availableTypes[0];
@@ -110,61 +117,32 @@ export default function Content({ }: Props) {
       params.delete("deviceId"); // Clear detail on type switch
       if (siteCode) {
         navigate(
-          { pathname: absSite("/devices", siteCode), search: `?${params.toString()}` },
-          { replace: true }
+          {
+            pathname: absSite("/devices", siteCode),
+            search: `?${params.toString()}`,
+          },
+          { replace: true },
         );
       } else {
         navigate(
           { pathname: abs("/devices"), search: `?${params.toString()}` },
-          { replace: true }
+          { replace: true },
         );
       }
     }
   }
 
-  // เปลี่ยนการ์ด → อัปเดต URL (เปลี่ยนเฉพาะ search เพื่อลดการกระพริบ)
-  const handleChange = (ids: string[]) => {
-    const nextId = ids[0];
-
-    // Intercept Caregiver click
-    if (nextId === "caregiver-1") {
-      window.open("http://45.136.253.176:3000/", "_blank");
-      return;
-    }
-    // Intercept Digital Twin click
-    if (nextId === "digitaltwin-1") {
-      window.open("https://bpstech.online/login", "_blank");
-      return;
-    }
-
-    const nextType = nextId ? ID_TO_TYPE[nextId] : undefined;
-    if (!nextType || nextType === urlType) return;
-    if (DISABLED_DEVICE_TYPES.has(nextType as keyof typeof TYPE_TO_ID)) return;
-
-    // ใช้ search แทนการประกอบสตริงเอง เผื่ออนาคตมีพารามอื่น
-    const params = new URLSearchParams(location.search);
-    params.set("type", nextType);
-    if (siteCode) {
-      navigate(
-        { pathname: absSite("/devices", siteCode), search: `?${params.toString()}` },
-        { replace: false }
-      );
-    } else {
-      navigate(
-        { pathname: abs("/devices"), search: `?${params.toString()}` },
-        { replace: false }
-      );
-    }
-  };
-
   const effectiveSiteCode =
-    siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : undefined);
+    siteCode ??
+    (selectedSite && selectedSite !== "all" ? selectedSite : undefined);
   const currentBillingType = BILLING_TYPE_BY_URL[urlType] ?? null;
   const [billingGuardOpen, setBillingGuardOpen] = useState(false);
   const [siteDeviceGuardOpen, setSiteDeviceGuardOpen] = useState(false);
   const [billingDisabledOpen, setBillingDisabledOpen] = useState(false);
   const [billingAllowed, setBillingAllowed] = useState(false);
-  const [billingAccess, setBillingAccess] = useState<SiteBillingAccess | null>(null);
+  const [billingAccess, setBillingAccess] = useState<SiteBillingAccess | null>(
+    null,
+  );
   const [billingAccessLoading, setBillingAccessLoading] = useState(false);
 
   useEffect(() => {
@@ -243,8 +221,14 @@ export default function Content({ }: Props) {
   const isDeviceInventoryLoading = siteSwitchLoading;
   useEffect(() => {
     // If we are viewing IoT or Caregiver, do NOT block even if internal inventory is empty
-    const isExternal = urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
-    if (hasSpecificSite && !inventoryLoading && totalDeviceCount <= 0 && !isExternal) {
+    const isExternal =
+      urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
+    if (
+      hasSpecificSite &&
+      !inventoryLoading &&
+      totalDeviceCount <= 0 &&
+      !isExternal
+    ) {
       setSiteDeviceGuardOpen(true);
     } else {
       setSiteDeviceGuardOpen(false);
@@ -261,28 +245,31 @@ export default function Content({ }: Props) {
 
   return (
     <>
-      <nav className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-6">
-        <div className="flex flex-col gap-1 select-none">
-          <h1 className="text-2xl font-semibold">{tDevices("nav.title")}</h1>
-        </div>
-
-        <div className="gap-2 flex flex-wrap items-center">
-          <MiniFiltersBar page="devices" />
+      <nav className="">
+        <div className="flex flex-row items-center w-full justify-between">
+          <div className="w-full flex max-w-xl gap-3">
+            <MiniFiltersBar
+              page="devices"
+              variant="hero"
+              className="min-w-0 flex-1"
+            />
+            <LanguagePillSwitcher name="devices-lng" />
+          </div>
           {showBillingButton && (
             <button
               type="button"
               onClick={handleBillingClick}
               disabled={billingButtonDisabled}
               className={[
-                "inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-3 text-sm text-[#414651] font-inter font-bold",
+                "inline-flex h-11 shrink-0 items-center justify-center rounded-[18px] border border-[#CDEFFF] bg-white px-4 text-sm font-semibold text-[#2F3E56] shadow-[0_12px_30px_rgba(57,184,238,0.12)] xl:min-w-[176px]",
                 billingButtonDisabled
-                  ? "opacity-60 cursor-not-allowed"
-                  : "hover:cursor-pointer focus:bg-gray-50",
+                  ? "cursor-not-allowed opacity-60"
+                  : "hover:cursor-pointer hover:bg-slate-50",
               ].join(" ")}
             >
-              <span className="truncate flex items-center gap-2">
+              <span className="flex items-center gap-2 truncate">
                 <img src={exportImage} alt="" />
-                <span className="hidden sm:inline">
+                <span>
                   {tSidebar("menu.billing", { defaultValue: "Billing" })}
                 </span>
               </span>
@@ -291,63 +278,10 @@ export default function Content({ }: Props) {
         </div>
       </nav>
 
-      {/* กลุ่มการ์ด: single select */}
-      
-      <StatCardGroup
-        selectionMode="single"
-        activeIds={
-          selectedId &&
-            !DISABLED_DEVICE_TYPES.has(urlType) &&
-            (urlType === "iot" || urlType === "caregiver" || selectedCount > 0)
-            ? [selectedId]
-            : []
-        }
-        onChange={handleChange}
-        className="mt-5"
-      >
-        <div className="relative">
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
-            {DEVICE_CARDS.map((c) => {
-              const type = ID_TO_TYPE[c.id] as keyof typeof TYPE_TO_ID | undefined;
-              // Force count 1 for external types so they serve as "Active" in UI
-              let countVal = 0;
-              if (type === "iot" || type === "caregiver" || type === "digitaltwin") {
-                countVal = 1;
-              } else if (type) {
-                countVal = getCountForType(inventoryCounts as any, type as any);
-              }
-              const typeDisabled = type ? DISABLED_DEVICE_TYPES.has(type) : false;
-              const isExternal = type === "iot" || type === "caregiver" || type === "digitaltwin";
-              const disabled =
-                isDeviceInventoryLoading ||
-                typeDisabled ||
-                !type ||
-                (!isExternal && countVal <= 0);
-              return (
-                <li key={c.id}>
-                  <StatCard
-                    id={c.id}
-                    variant="boxWithSwitch"
-                    img={c.img}
-                    activeImg={c.activeImg}
-                    label={tDevices(c.label)}
-                    val={countVal}
-                    disabled={disabled}
-                  />
-                </li>
-              );
-            })}
-          </ul>
-          
-        </div>
-      </StatCardGroup>
-
       {/* Panel/Table ตาม selectedId (คอมโพเนนต์คงตัว ไม่รี-mount จาก key/state) */}
       {selectedId === "cctv-1" ? (
-        <div className="mt-6 rounded-xl bg-white p-8 text-center text-gray-500 border border-dashed border-gray-300">
-          {tDevices("cctvDisabled", {
-            defaultValue: "CCTV view is temporarily unavailable.",
-          })}
+        <div className="mt-6">
+          <CCTVPanel siteCode={siteCode} />
         </div>
       ) : selectedId === "intercom-1" ? (
         <div className="flex flex-col gap-3">
@@ -355,9 +289,8 @@ export default function Content({ }: Props) {
           <CCTVTable />
         </div>
       ) : selectedId === "water-1" ? (
-        <div className="flex flex-col gap-3">
+        <div className="mt-6">
           <WaterMeterPanel siteCode={siteCode} />
-          <CCTVTable />
         </div>
       ) : selectedId === "electric-1" ? (
         <div className="mt-6">
@@ -367,7 +300,6 @@ export default function Content({ }: Props) {
       ) : selectedId === "air-1" ? (
         <div className="mt-6">
           <AirPanel siteCode={siteCode} />
-          <CCTVTable />
         </div>
       ) : selectedId === "iot-1" ? (
         <div className="mt-6">
@@ -377,7 +309,10 @@ export default function Content({ }: Props) {
               onBack={() => {
                 const params = new URLSearchParams(location.search);
                 params.delete("deviceId");
-                navigate({ search: `?${params.toString()}` }, { replace: false });
+                navigate(
+                  { search: `?${params.toString()}` },
+                  { replace: false },
+                );
               }}
             />
           ) : (
@@ -426,7 +361,9 @@ export default function Content({ }: Props) {
           <div className="rounded-2xl border border-cyan-200 bg-white px-6 py-5 shadow-xl flex items-center gap-3 text-cyan-700">
             <i className="material-icons text-2xl animate-spin">autorenew</i>
             <span className="text-sm font-semibold">
-              {tDevices("loadingDevices", { defaultValue: "Loading devices..." })}
+              {tDevices("loadingDevices", {
+                defaultValue: "Loading devices...",
+              })}
             </span>
           </div>
         </div>
@@ -434,4 +371,3 @@ export default function Content({ }: Props) {
     </>
   );
 }
-

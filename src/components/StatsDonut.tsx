@@ -148,7 +148,7 @@ const StatsDonut: React.FC<Props> = ({
       colors: softEdges ? [separatorColor] : undefined,
       // บางเวอร์ชันของ Apex ไม่รองรับ rounding สำหรับ pie โดยตรง
       // แต่การมี stroke + สีพื้นหลังจะช่วยให้รอยต่อดูซอฟต์ขึ้น
-      lineCap: "round" as any,
+      lineCap: "round",
     },
     plotOptions: {
       pie: {
@@ -225,7 +225,7 @@ const StatsDonut: React.FC<Props> = ({
   );
 
   return (
-    <div className="flex w-[150px] flex-col items-center">
+    <div className="flex w-full max-w-[240px] flex-col items-center">
       {title && (
         <h3 className="mb-3 font-inter text-[21px] whitespace-nowrap text-gray-800">
           {title}

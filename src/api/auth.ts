@@ -1,7 +1,6 @@
 // src/api/auth.ts
-import { api } from "./axios";
-
-
+import { api, unwrapApiData } from "./axios";
+import { normalizeMeResponse } from "./user";
 
 export async function register(input: {
   firstName: string;
@@ -12,7 +11,7 @@ export async function register(input: {
   // /api/auth/register ต้องการ firstName, lastName, email, password
   // (ตาม service) → คืน id/email ถ้าสำเร็จ
   const { data } = await api.post("/auth/register", input);
-  return data;
+  return unwrapApiData(data);
 }
 
 export async function login(
@@ -21,7 +20,11 @@ export async function login(
   remember?: boolean
 ) {
   const { data } = await api.post("/auth/login", { email, password, remember });
-  return data.user;
+  const payload = unwrapApiData(data);
+  if (payload && typeof payload === "object" && "user" in payload) {
+    return normalizeMeResponse((payload as Record<string, unknown>).user);
+  }
+  return payload;
 }
 
 export async function logout() {
@@ -39,7 +42,7 @@ export async function verifyEmail(token: string) {
 export function checkEmailExists(email: string) {
   return api
     .post("/auth/check-email", { email })
-    .then((res) => res.data as { ok: boolean; exists: boolean });
+    .then((res) => unwrapApiData(res.data) as { ok: boolean; exists: boolean });
 }
 
 export async function requestPasswordReset(email: string) {

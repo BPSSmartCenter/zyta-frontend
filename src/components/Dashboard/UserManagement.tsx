@@ -1,127 +1,125 @@
-// src/components/Dashboard/UserManagement.tsx
 import StatsDonut from "../StatsDonut";
-import DonutLegend from "../DonutLegend";
 import {
-  regionSeries,
-  regionLabels,
   regionColors,
-  roleSeries,
-  roleLabels,
+  regionLabels,
+  regionSeries,
   roleColors,
+  roleLabels,
+  roleSeries,
 } from "../Dashboard/dashboard.constants";
 import { useTranslation } from "react-i18next";
 
-/**
- * Desktop (>= lg):
- *   - วาง 2 บล็อก "ข้างกัน" (legend ใต้โดนัท — คง UI เดิม)
- * Tablet/Mobile (< lg):
- *   - หล่นเป็นคอลัมน์ (flex-col)
- *   - ภายในแต่ละบล็อก: โดนัทเล็กลง และ legend อยู่ "ขวา" ของโดนัท
- */
-function DonutBlock({
-  scope, // "region" | "role" ใช้ชี้ตำแหน่งคีย์แปล
-  title,
-  series,
+function DistributionLegend({
   labels,
+  series,
   colors,
 }: {
-  scope: "region" | "role";
-  title: string;
-  series: number[];
   labels: string[];
+  series: number[];
   colors: string[];
 }) {
-  const { t } = useTranslation(["dashboard"]);
-
-  // แปลชื่อบล็อก + ป้าย total (fallback เป็นค่าเดิม)
-  const titleI18n = t(`userMgmt.${scope}.title`, { defaultValue: title });
-  const totalI18n = t("userMgmt.total", { defaultValue: "total" });
-
-  // แปล labels แบบ index-based: userMgmt.region.labels.0, .1, ...
-  const labelsI18n = labels.map((label, i) =>
-    t(`userMgmt.${scope}.labels.${i}`, { defaultValue: label })
-  );
+  const total = series.reduce((sum, value) => sum + value, 0);
 
   return (
-    <div className="w-full">
-      <div className="hidden lg:block">
-        <div className="flex items-center gap-4">
-          <div className="shrink-0">
-            <StatsDonut
-              title={titleI18n}
-              series={series}
-              labels={labelsI18n}
-              colors={colors}
-              height={160}
-              donutSize="45%"
-              separatorWidth={0}
-              showLegend={false}
-              center={{
-                mode: "sum",
-                label: totalI18n,
-                showDataLabelsAround: true,
-                offsets: {
-                  labelOffsetX: -14,
-                  labelOffsetY: 10,
-                  valueOffsetY: -6,
-                  valueOffsetX: 15,
-                },
-              }}
-            />
+    <div className="grid grid-cols-1 gap-2.5">
+      {labels.map((label, index) => {
+        const value = Number(series[index] ?? 0);
+        const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+
+        return (
+          <div
+            key={`${label}-${index}`}
+            className="flex items-center justify-between gap-3 rounded-[16px] border border-slate-200/80 bg-white px-3.5 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className="h-3 w-3 shrink-0 rounded-full"
+                style={{ backgroundColor: colors[index] }}
+              />
+              <span className="truncate text-sm font-medium text-slate-700">
+                {label}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 text-right">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                {percent}%
+              </span>
+              <span className="min-w-[24px] text-sm font-semibold text-slate-950">
+                {value}
+              </span>
+            </div>
           </div>
-          <div className="grow **:text-[12px]">
-            <DonutLegend
-              items={labelsI18n.map((label, i) => ({
-                label,
-                color: colors[i],
-              }))}
-              className=""
-              itemClassName="lg-1445:whitespace-nowrap lg-1445:w-[140px] min-w-[100px]"
-              labelClassName=""
-            />
-          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DonutSection({
+  title,
+  labels,
+  series,
+  colors,
+}: {
+  title: string;
+  labels: string[];
+  series: number[];
+  colors: string[];
+}) {
+  const total = series.reduce((sum, value) => sum + value, 0);
+
+  return (
+    <section className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfe_100%)] p-5 shadow-[0_18px_36px_rgba(15,23,42,0.05)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-[0.74rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Distribution
+          </p>
+          <h3 className="mt-2 text-[1.2rem] font-semibold text-slate-950">
+            {title}
+          </h3>
+        </div>
+
+        <div className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
+          Total {total}
         </div>
       </div>
 
-      {/* Tablet/Mobile: หล่นเป็นคอลัมน์ + legend อยู่ "ขวา" + donut เล็กลง */}
-      <div className="lg:hidden">
-        <div className="flex items-center gap-4">
-          <div className="shrink-0">
+      <div className="mt-4 flex flex-col items-center gap-4">
+        <div className="flex w-full justify-center">
+          <div className="rounded-full border border-slate-100 bg-white/90 p-3 shadow-[0_16px_32px_rgba(15,23,42,0.06)]">
             <StatsDonut
-              title={titleI18n}
+              title=""
               series={series}
-              labels={labelsI18n}
+              labels={labels}
               colors={colors}
-              height={140}
-              donutSize="45%"
-              separatorWidth={0}
+              height={232}
+              donutSize="68%"
+              separatorWidth={4}
+              separatorColor="#FFFFFF"
               showLegend={false}
               center={{
                 mode: "sum",
-                label: "",
-                showDataLabelsAround: true,
+                showDataLabelsAround: false,
+                display: "value",
                 offsets: {
-                  labelOffsetX: -10,
-                  valueOffsetY: 0,
                   valueOffsetX: 0,
+                  valueOffsetY: 0,
+                },
+                valueStyle: {
+                  fontSize: 34,
+                  fontWeight: 700,
+                  color: "#0F172A",
                 },
               }}
             />
           </div>
-          <div className="grow **:text-[12px]">
-            <DonutLegend
-              items={labelsI18n.map((label, i) => ({
-                label,
-                color: colors[i],
-              }))}
-              className=""
-              itemClassName="lg-1399:whitespace-nowrap lg-1389:w-[140px] min-w-[100px]"
-              labelClassName=""
-            />
-          </div>
         </div>
+
+        <DistributionLegend labels={labels} series={series} colors={colors} />
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -152,36 +150,35 @@ export default function UserManagement(props: UserManagementProps = {}) {
   const roleLabelsData = roleLabelsProp ?? roleLabels;
   const roleColorsData = roleColorsProp ?? roleColors;
 
+  const translatedRegionLabels = regionLabelsData.map((label, i) =>
+    t(`userMgmt.region.labels.${i}`, { defaultValue: label })
+  );
+  const translatedRoleLabels = roleLabelsData.map((label, i) =>
+    t(`userMgmt.role.labels.${i}`, { defaultValue: label })
+  );
+
   return (
-    <form className="flex flex-col justify-center py-0  gap-4">
-      <h1 className="text-[22px] font-semibold">
+    <section className="flex flex-col gap-5">
+      <p className="text-[0.76rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {t("userMgmt.title", { defaultValue: "USER MANAGEMENT" })}
-      </h1>
+      </p>
 
-      {/* Desktop: วางซ้อนกันเหมือนเดิม (component เดิมใช้ flex-col อยู่แล้ว) */}
-      <div className="flex gap-1 flex-col lg:flex-col justify-center">
-        <div className="w-full lg:w-1/2">
-          <DonutBlock
-            scope="region"
-            title={t("userMgmt.region.title", { defaultValue: "จำนวนไซต์" })}
-            series={regionSeriesData}
-            labels={regionLabelsData}
-            colors={regionColorsData}
-          />
-        </div>
-
-        <div className="w-full lg:w-1/2">
-          <DonutBlock
-            scope="role"
-            title={t("userMgmt.role.title", {
-              defaultValue: "จำนวน user ที่ใช้งาน",
-            })}
-            series={roleSeriesData}
-            labels={roleLabelsData}
-            colors={roleColorsData}
-          />
-        </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <DonutSection
+          title={t("userMgmt.region.title", { defaultValue: "Total Sites" })}
+          labels={translatedRegionLabels}
+          series={regionSeriesData}
+          colors={regionColorsData}
+        />
+        <DonutSection
+          title={t("userMgmt.role.title", {
+            defaultValue: "Active users",
+          })}
+          labels={translatedRoleLabels}
+          series={roleSeriesData}
+          colors={roleColorsData}
+        />
       </div>
-    </form>
+    </section>
   );
 }

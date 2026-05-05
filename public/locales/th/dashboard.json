@@ -68,6 +68,54 @@
     "zyta": "Red Box",
     "iot": "IoT"
   },
+  "utilityOverview": {
+    "title": "ภาพรวมยูทิลิตี้",
+    "subtitle": "ภาพรวมล่าสุด • น้ำ • ไฟฟ้า • อากาศ",
+    "live": "สด",
+    "emptyBadge": "ยังไม่มีข้อมูล",
+    "emptyTitle": "ยังไม่มีข้อมูลยูทิลิตี้จากระบบ",
+    "emptyDescription": "ส่วนนี้จะแสดงเมื่อระบบมีข้อมูลยูทิลิตี้แบบเรียลไทม์",
+    "updatedMinutesAgo_one": "{{count}} นาทีที่แล้ว",
+    "updatedMinutesAgo_other": "{{count}} นาทีที่แล้ว",
+    "alertCount_one": "{{count}} การแจ้งเตือน",
+    "alertCount_other": "{{count}} การแจ้งเตือน",
+    "open": "เปิดดู",
+    "metrics": {
+      "domestic": "ใช้ทั่วไป",
+      "drinking": "น้ำดื่ม",
+      "flow": "อัตราการไหล",
+      "ph": "ค่า pH",
+      "voltage": "แรงดัน",
+      "current": "กระแส",
+      "frequency": "ความถี่",
+      "month": "เดือนนี้",
+      "pm10": "PM 10",
+      "tvoc": "TVOC",
+      "temp": "อุณหภูมิ",
+      "humidity": "ความชื้น"
+    },
+    "cards": {
+      "water": {
+        "title": "มิเตอร์น้ำ",
+        "eyebrow": "ยอดใช้วันนี้",
+        "trend": "{{value}} เทียบเมื่อวาน",
+        "footer": "{{primary}} • {{secondary}}"
+      },
+      "electric": {
+        "title": "มิเตอร์ไฟฟ้า",
+        "eyebrow": "การใช้พลังงานวันนี้",
+        "trend": "{{value}} จุดพีคเวลา 19:00",
+        "footer": "{{primary}} • {{secondary}}"
+      },
+      "air": {
+        "title": "เซ็นเซอร์อากาศ",
+        "eyebrow": "PM 2.5 • ดี",
+        "trend": "{{value}} • 24 ชม.",
+        "footer": "{{primary}} • {{secondary}}",
+        "badge": "ปกติ"
+      }
+    }
+  },
   "userMgmt": {
     "title": "การจัดการผู้ใช้",
     "total": "รวม",

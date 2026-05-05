@@ -20,6 +20,7 @@ type Props = {
   buttonLabel: string;
   selectedEvents: string[]; // ["all"] หรือรายการ event ที่เลือก
   toggleEvent: (value: string) => void; // สลับเลือก event
+  items?: ReadonlyArray<Noti>;
 };
 
 function useLocaleFromI18n(i18nLang: string | undefined) {
@@ -201,7 +202,10 @@ function parseNotiDate(noti: Noti): Date | null {
   return parsed;
 }
 
-function buildSnapshotSeries(items: Noti[], shiftLabels: string[]): SnapshotSeriesMap {
+function buildSnapshotSeries(
+  items: ReadonlyArray<Noti>,
+  shiftLabels: string[]
+): SnapshotSeriesMap {
   const shiftCount = SHIFT_DEFINITIONS.length;
   const dailyCounts = Array.from({ length: shiftCount }, () =>
     Array(PERIOD_LENGTHS.daily).fill(0)
@@ -270,11 +274,13 @@ export default function Chart({
   buttonLabel,
   selectedEvents,
   toggleEvent,
+  items,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const locale = useLocaleFromI18n(i18n.language);
   const { t: tDash } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
+  const sourceItems = items ?? liveNotis;
 
   // Align event multi-select label with MapPanel behavior
   const multiEventLabel = React.useMemo(() => {
@@ -301,8 +307,8 @@ export default function Chart({
     [tDash]
   );
   const snapshotSeries = React.useMemo(
-    () => buildSnapshotSeries(liveNotis, shiftLabels),
-    [liveNotis, shiftLabels]
+    () => buildSnapshotSeries(sourceItems, shiftLabels),
+    [shiftLabels, sourceItems]
   );
 
   // เปลี่ยนช่วงเวลา (Daily ใช้ข้อมูลเดียวกับ Weekly)
@@ -410,7 +416,7 @@ export default function Chart({
         position: "bottom",
         horizontalAlign: "center",
         fontSize: "12px",
-        markers: { radius: 6, width: 10, height: 10 } as any,
+        markers: { size: 10, shape: "circle" },
         itemMargin: { vertical: 6 },
         offsetY: 8,
       },
@@ -432,10 +438,10 @@ export default function Chart({
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   React.useEffect(() => {
     const el = containerRef.current;
-    if (!el || !(window as any).ResizeObserver) return;
+    if (!el || typeof window.ResizeObserver === "undefined") return;
 
     let raf = 0;
-    const ro = new (window as any).ResizeObserver(() => {
+    const ro = new window.ResizeObserver(() => {
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() =>
         window.dispatchEvent(new Event("resize"))
@@ -445,9 +451,7 @@ export default function Chart({
     ro.observe(el);
     return () => {
       if (raf) cancelAnimationFrame(raf);
-      try {
-        ro.unobserve(el);
-      } catch { }
+      ro.unobserve(el);
       ro.disconnect();
     };
   }, []);
@@ -465,169 +469,240 @@ export default function Chart({
   const getEventLabel = (val: string, fallback: string) =>
     tDash(`events.${val}`, { defaultValue: fallback });
 
-  return (
-    <div className="px-6 flex w-full rounded-md flex-col gap-3 bg-white">
-      <form className="flex flex-col lg:flex-row lg:items-start lg:justify-between p-6 gap-6">
-        {/* =================== Left: header + chart =================== */}
-        <div className="flex flex-col flex-1 min-w-0">
-          {/* Header + filter */}
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-1">
-              <h1 className="text-gray-400 text-[18px] lg:text-[20px]">
-                {tDash("chart.statisticsTitle", { defaultValue: "Statistics" })}
-              </h1>
+  const totalSnapshots = React.useMemo(
+    () =>
+      series.reduce(
+        (sum, item) =>
+          sum +
+          item.data.reduce((inner, value) => inner + Number(value || 0), 0),
+        0
+      ),
+    [series]
+  );
 
-              <div className="flex items-center flex-wrap gap-2">
-                <h1 className="text-[20px] lg:text-[25px] font-bold">
+  const peakPoint = React.useMemo(() => {
+    let max = 0;
+    let categoryIndex = 0;
+    let seriesIndex = 0;
+
+    series.forEach((item, sIdx) => {
+      item.data.forEach((value, cIdx) => {
+        const numericValue = Number(value || 0);
+        if (numericValue > max) {
+          max = numericValue;
+          categoryIndex = cIdx;
+          seriesIndex = sIdx;
+        }
+      });
+    });
+
+    return {
+      value: max,
+      category: categories[categoryIndex] ?? "-",
+      shift: shiftLabels[seriesIndex] ?? "-",
+    };
+  }, [categories, series, shiftLabels]);
+
+  const mostActiveShift = React.useMemo(() => {
+    const totals = series.map((item) =>
+      item.data.reduce((sum, value) => sum + Number(value || 0), 0)
+    );
+    const max = Math.max(...totals, 0);
+    const index = totals.findIndex((value) => value === max);
+    return {
+      label: index >= 0 ? shiftLabels[index] : "-",
+      value: max,
+    };
+  }, [series, shiftLabels]);
+
+  const legendItems = React.useMemo(
+    () => [
+      { label: shiftLabels[0], color: "#4A3AFF" },
+      { label: shiftLabels[1], color: "#39B8EE" },
+      { label: shiftLabels[2], color: "#D3F7FF" },
+    ],
+    [shiftLabels]
+  );
+
+  return (
+    <section className="w-full rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfe_100%)] p-5 shadow-[0_18px_38px_rgba(15,23,42,0.05)] lg:p-7">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.78rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              {tDash("chart.statisticsTitle", { defaultValue: "Statistics" })}
+            </p>
+
+            <div className="mt-2 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-[1.9rem] font-semibold leading-tight text-slate-950">
                   {tDash("chart.totalSummary", {
                     defaultValue: "Total summary of snapshot",
                   })}
-                </h1>
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Overview by shift and reporting period
+                </p>
+              </div>
 
-                {/* Multi-select dropdown */}
-                <Dropdown
-                  options={EVENT_OPTIONS}
-                  value="__multi__"
-                  onChange={() => { }}
-                >
-                  {({ open, getButtonProps, getMenuProps }) => (
-                    <div className="relative inline-block ml-3">
-                      <button
-                        {...getButtonProps({
-                          type: "button",
-                          className:
-                            "inline-flex h-10 min-w-[140px] items-center justify-around rounded-md border border-gray-300 px-2 text-sm hover:cursor-pointer focus:bg-gray-50",
-                        })}
-                        onMouseDown={(e) => e.preventDefault()}
-                      >
-                        <span className="truncate">{labelForButton}</span>
-                        <i className="material-icons leading-none">
-                          {open ? "arrow_drop_up" : "arrow_drop_down"}
-                        </i>
-                      </button>
+              <Dropdown
+                options={EVENT_OPTIONS}
+                value="__multi__"
+                onChange={() => {}}
+              >
+                {({ open, getButtonProps, getMenuProps }) => (
+                  <div className="relative inline-block">
+                    <button
+                      {...getButtonProps({
+                        type: "button",
+                        className:
+                          "inline-flex h-11 min-w-[180px] items-center justify-between gap-3 rounded-[16px] border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-slate-50",
+                      })}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <span className="truncate">{labelForButton}</span>
+                      <i className="material-icons text-slate-500 leading-none">
+                        {open ? "arrow_drop_up" : "arrow_drop_down"}
+                      </i>
+                    </button>
 
-                      <div
-                        {...getMenuProps({
-                          className: [
-                            "absolute left-0 top-full mt-2 min-w-[160px] rounded-md",
-                            "border border-gray-300 bg-white p-2 shadow-md",
-                            "max-h-80 overflow-y-auto z-50",
-                            "transition-all duration-150",
-                            open
-                              ? "opacity-100 translate-y-0 pointer-events-auto"
-                              : "opacity-0 -translate-y-1 pointer-events-none",
-                          ].join(" "),
-                        })}
-                        onMouseDown={(e) => e.preventDefault()}
-                      >
-                        {EVENT_OPTIONS.map((opt: any) => {
-                          const checked = selectedEvents.includes("all")
-                            ? opt.value === "all"
-                            : selectedEvents.includes(opt.value);
-                          return (
-                            <label
-                              key={opt.value}
-                              className={[
-                                "flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-gray-50 hover:cursor-pointer whitespace-nowrap",
-                                checked ? "bg-gray-50" : "",
-                              ].join(" ")}
-                            >
-                              <input
-                                type="checkbox"
-                                className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
-                                checked={checked}
-                                onChange={() => toggleEvent(opt.value)}
-                                onMouseDown={(e) => e.preventDefault()}
-                              />
-                              <span className="text-gray-800">
-                                {getEventLabel(opt.value, opt.label)}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
+                    <div
+                      {...getMenuProps({
+                        className: [
+                          "absolute left-0 top-full z-50 mt-2 min-w-[220px] max-h-80 overflow-y-auto rounded-[18px]",
+                          "border border-slate-200 bg-white p-2 shadow-[0_20px_48px_rgba(15,23,42,0.12)]",
+                          "transition-all duration-150",
+                          open
+                            ? "pointer-events-auto translate-y-0 opacity-100"
+                            : "pointer-events-none -translate-y-1 opacity-0",
+                        ].join(" "),
+                      })}
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      {EVENT_OPTIONS.map((opt: { label: string; value: string }) => {
+                        const checked = selectedEvents.includes("all")
+                          ? opt.value === "all"
+                          : selectedEvents.includes(opt.value);
+                        return (
+                          <label
+                            key={opt.value}
+                            className={[
+                              "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-sm text-slate-700 hover:cursor-pointer hover:bg-slate-50",
+                              checked ? "bg-slate-50" : "",
+                            ].join(" ")}
+                          >
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 !ring-0 !ring-offset-0 hover:cursor-pointer"
+                              checked={checked}
+                              onChange={() => toggleEvent(opt.value)}
+                              onMouseDown={(e) => e.preventDefault()}
+                            />
+                            <span>{getEventLabel(opt.value, opt.label)}</span>
+                          </label>
+                        );
+                      })}
                     </div>
-                  )}
-                </Dropdown>
-              </div>
+                  </div>
+                )}
+              </Dropdown>
             </div>
+          </div>
 
-            {/* Daily / Weekly / Monthly */}
-            <div className="flex justify-center items-center lg:w-[350px] lg:mr-10">
-              <div className="bg-[#F8F8FF] rounded-2xl">
-                <div className="p-2 lg:p-4 gap-2 lg:gap-4 inline-flex rounded-lg ">
-                  <button
-                    type="button"
-                    aria-pressed={period === "daily"}
-                    onClick={() => setPeriod("daily")}
-                    className={btnClass(period === "daily")}
-                  >
-                    {tDash("chart.daily", { defaultValue: "Daily" })}
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={period === "weekly"}
-                    onClick={() => setPeriod("weekly")}
-                    className={btnClass(period === "weekly")}
-                  >
-                    {tDash("chart.weekly", { defaultValue: "Weekly" })}
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={period === "monthly"}
-                    onClick={() => setPeriod("monthly")}
-                    className={btnClass(period === "monthly")}
-                  >
-                    {tDash("chart.monthly", { defaultValue: "Monthly" })}
-                  </button>
+          <div className="inline-flex rounded-[20px] border border-slate-200/80 bg-slate-50 p-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+            <button
+              type="button"
+              aria-pressed={period === "daily"}
+              onClick={() => setPeriod("daily")}
+              className={btnClass(period === "daily")}
+            >
+              {tDash("chart.daily", { defaultValue: "Daily" })}
+            </button>
+            <button
+              type="button"
+              aria-pressed={period === "weekly"}
+              onClick={() => setPeriod("weekly")}
+              className={btnClass(period === "weekly")}
+            >
+              {tDash("chart.weekly", { defaultValue: "Weekly" })}
+            </button>
+            <button
+              type="button"
+              aria-pressed={period === "monthly"}
+              onClick={() => setPeriod("monthly")}
+              className={btnClass(period === "monthly")}
+            >
+              {tDash("chart.monthly", { defaultValue: "Monthly" })}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="rounded-[20px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Total Snapshots
+            </p>
+            <div className="mt-3 text-[1.8rem] font-semibold leading-none text-slate-950">
+              {totalSnapshots}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">{labelForButton}</p>
+          </div>
+
+          <div className="rounded-[20px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Peak Interval
+            </p>
+            <div className="mt-3 text-[1.4rem] font-semibold leading-tight text-slate-950">
+              {peakPoint.category}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {peakPoint.shift} • {peakPoint.value}
+            </p>
+          </div>
+
+          <div className="rounded-[20px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Most Active Shift
+            </p>
+            <div className="mt-3 text-[1.4rem] font-semibold leading-tight text-slate-950">
+              {mostActiveShift.label}
+            </div>
+            <p className="mt-2 text-sm text-slate-500">
+              {mostActiveShift.value} events
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-[24px] border border-slate-200/80 bg-white px-4 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)] lg:px-5 lg:py-5">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {legendItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700"
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.label}</span>
                 </div>
-              </div>
+              ))}
+            </div>
+
+            <div ref={containerRef}>
+              <ReactApexChart
+                key={`${period}-${categories.length}-${i18n.language}`}
+                type="bar"
+                series={series}
+                options={options}
+                height={period === "monthly" ? 460 : 420}
+              />
             </div>
           </div>
-
-          {/* Chart */}
-          <div ref={containerRef} className="mt-3">
-            <ReactApexChart
-              key={`${period}-${categories.length}-${i18n.language}`} // รีเฟรชเมื่อเปลี่ยนภาษา/period
-              type="bar"
-              series={series}
-              options={options}
-              height={period === "monthly" ? 520 : 480}
-            />
-          </div>
         </div>
-
-        {/* Custom legend (Desktop เท่านั้น) */}
-        <div className="hidden lg:flex flex-col justify-center items-center flex-none w-[220px] h-[600px]">
-          <ul className="flex flex-col gap-8">
-            <li className="flex gap-2 items-center">
-              <div className="rounded-full bg-[#4A3AFF] w-[20px] h-[20px]" />
-              <span className="min-w-[60px]">
-                {tDash("chart.legend.shift1", {
-                  defaultValue: "08:00 - 16:00",
-                })}
-              </span>
-            </li>
-            <li className="flex gap-2 items-center">
-              <div className="rounded-full bg-[#39B8EE] w-[20px] h-[20px]" />
-              <span>
-                {tDash("chart.legend.shift2", {
-                  defaultValue: "16:00 - 24:00",
-                })}
-              </span>
-            </li>
-            <li className="flex gap-2 items-center">
-              <div className="rounded-full bg-[#D3F7FF] w-[20px] h-[20px]" />
-              <span>
-                {tDash("chart.legend.shift3", {
-                  defaultValue: "24:00 - 08:00",
-                })}
-              </span>
-            </li>
-          </ul>
-        </div>
-      </form>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -639,6 +714,11 @@ export type WaterStackedProps = {
   series?: AxisSeries;
   height?: number | string;
   title?: string;
+  showLegend?: boolean;
+  stackType?: "normal" | "100%";
+  colors?: string[];
+  yLabelFormatter?: (value: number) => string;
+  tooltipFormatter?: (value: number) => string;
 };
 
 export function WaterStackedChart({
@@ -646,6 +726,11 @@ export function WaterStackedChart({
   series,
   height = 260,
   title = "ปริมาณน้ำ",
+  showLegend = false,
+  stackType = "normal",
+  colors,
+  yLabelFormatter,
+  tooltipFormatter,
 }: WaterStackedProps) {
   const cats = categories ?? [
     "Jan",
@@ -694,15 +779,32 @@ export function WaterStackedChart({
     chart: {
       type: "bar",
       stacked: true,
+      stackType,
       toolbar: { show: false },
       animations: { enabled: true },
     },
-    title: {
-      text: title,
-      align: "left",
-      style: { fontSize: "14px", fontWeight: 600, color: "#374151" },
-    },
-    colors: ["#22A9E0", "#6FD7FF", "#CDEFFF"],
+    title: title
+      ? {
+          text: title,
+          align: "left",
+          style: { fontSize: "14px", fontWeight: 600, color: "#374151" },
+        }
+      : undefined,
+    colors:
+      colors && colors.length
+        ? colors
+        : [
+            "#22A9E0",
+            "#6FD7FF",
+            "#CDEFFF",
+            "#F59E0B",
+            "#F97316",
+            "#10B981",
+            "#8B5CF6",
+            "#EF4444",
+            "#14B8A6",
+            "#A3E635",
+          ],
     plotOptions: {
       bar: { horizontal: false, columnWidth: "45%", borderRadius: 8 },
     },
@@ -716,12 +818,15 @@ export function WaterStackedChart({
     },
     yaxis: {
       min: 0,
-      max: maxY,
-      tickAmount: ticks,
+      max: stackType === "100%" ? 100 : maxY,
+      tickAmount: stackType === "100%" ? 5 : ticks,
       decimalsInFloat: 0,
       floating: false,
       forceNiceScale: false,
-      labels: { style: { fontSize: "12px", colors: "#94A3B8" } },
+      labels: {
+        style: { fontSize: "12px", colors: "#94A3B8" },
+        formatter: yLabelFormatter,
+      },
     },
     grid: {
       borderColor: "rgba(0,0,0,0.06)",
@@ -730,8 +835,21 @@ export function WaterStackedChart({
       xaxis: { lines: { show: false } },
       padding: { left: 10, right: 10, bottom: 0, top: 0 },
     },
-    legend: { show: false },
-    tooltip: { y: { formatter: (val: number) => val.toLocaleString() } },
+    legend: {
+      show: showLegend,
+      position: "top",
+      horizontalAlign: "right",
+      fontSize: "12px",
+      labels: { colors: "#94A3B8" },
+    },
+    tooltip: {
+      y: {
+        formatter:
+          tooltipFormatter ??
+          ((val: number) =>
+            stackType === "100%" ? `${Math.round(val)}%` : val.toLocaleString()),
+      },
+    },
     responsive: [
       {
         breakpoint: 1024,
@@ -773,36 +891,8 @@ export function WaterAreaStackedChart({
   yTitle = "ปริมาณน้ำ",
   xTitle = "Month",
 }: WaterAreaStackedProps) {
-  const cats = categories ?? [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
-
-  // mock ใกล้เคียงภาพ: เส้นเข้มล่างสุด ไล่โทนอ่อนไปด้านบน
-  const data: AxisSeries = series ?? [
-    {
-      name: "Series 1",
-      data: [60, 90, 120, 140, 250, 300, 260, 340, 360, 320, 380, 460],
-    },
-    {
-      name: "Series 2",
-      data: [360, 380, 420, 430, 450, 470, 440, 500, 520, 510, 530, 560],
-    },
-    {
-      name: "Series 3",
-      data: [540, 560, 590, 600, 650, 700, 660, 740, 780, 760, 800, 840],
-    },
-  ];
+  const cats = categories ?? [];
+  const data: AxisSeries = series ?? [];
 
   // คิด max แบบ "ไม่ลอย" (ฐาน 0 ตลอด)
   const stackedMax = (() => {
@@ -810,11 +900,11 @@ export function WaterAreaStackedChart({
     data.forEach((s) =>
       s.data.forEach((v, i) => (sums[i] += typeof v === "number" ? v : 0))
     );
-    return Math.max(...sums);
+    return sums.length ? Math.max(...sums) : 0;
   })();
   const stepCandidates = [100, 200];
   const pickStep = stepCandidates.find((st) => stackedMax / st <= 6) || 200;
-  const maxY = Math.ceil(stackedMax / pickStep) * pickStep;
+  const maxY = Math.max(pickStep, Math.ceil(stackedMax / pickStep) * pickStep);
   const ticks = Math.min(6, Math.max(3, Math.round(maxY / pickStep)));
 
   const options: ApexOptions = {
@@ -904,7 +994,7 @@ export function WaterAreaStackedChart({
 }
 
 /* ============================ NEW (Electric) ============================ */
-/** Basic Line Chart สำหรับ Electric (2 เส้น, โทนฟ้า/เขียว, smooth, grid จาง) */
+/** Basic Area Chart สำหรับ Electric (2 เส้น, gradient, smooth, grid จาง) */
 export type ElectricLineBasicProps = {
   categories?: string[];
   series?: AxisSeries;
@@ -947,15 +1037,24 @@ export function ElectricLineBasicChart({
 
   const options: ApexOptions = {
     chart: {
-      type: "line",
+      type: "area",
       toolbar: { show: false },
       animations: { enabled: true },
       fontFamily: "Inter, ui-sans-serif, system-ui",
     },
-    colors: ["#2E90FA", "#16A34A"], // ฟ้า / เขียว
+    colors: ["#F59E0B", "#38BDF8"],
     stroke: { curve: "smooth", width: 3 },
     markers: { size: 0 },
     dataLabels: { enabled: false },
+    fill: {
+      type: "gradient",
+      gradient: {
+        shadeIntensity: 1,
+        opacityFrom: 0.24,
+        opacityTo: 0.03,
+        stops: [0, 85, 100],
+      },
+    },
     xaxis: {
       categories: cats,
       axisTicks: { show: false },
@@ -987,7 +1086,7 @@ export function ElectricLineBasicChart({
 
   return (
     <ReactApexChart
-      type="line"
+      type="area"
       height={height}
       options={options}
       series={data}

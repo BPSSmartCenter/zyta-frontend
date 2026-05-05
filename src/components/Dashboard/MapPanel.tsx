@@ -1,14 +1,6 @@
-import Dropdown from "../Dropdown";
 import MapView from "../Map/Map";
-import {
-  EVENT_OPTIONS,
-  SEVERITY_OPTIONS,
-  LOCATION_OPTIONS,
-} from "../Dashboard/dashboard.constants";
 import type { Noti, Severity } from "../../data/Dashboard/notis";
 import { useEffect, useRef, useMemo, useCallback, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { me } from "../../data/Dashboard/auth";
 import { useNotisFeed } from "../../context/NotisContext";
 import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
@@ -56,6 +48,7 @@ type Props = {
 
   overrideNotis?: Noti[];
   selectedSiteCode?: string;
+  role?: "admin" | "manager" | "officer" | "user" | null;
   accessibleSites?: Array<{
     id?: string;
     code?: string;
@@ -70,18 +63,18 @@ type Props = {
 
 export default function MapPanel({
   selectedEvents,
-  buttonLabel,
-  toggleEvent,
+  buttonLabel: _buttonLabel,
+  toggleEvent: _toggleEvent,
   site,
-  setSite,
+  setSite: _setSite,
   province,
   setProvince,
   overrideNotis,
   selectedSiteCode,
+  role,
   accessibleSites,
 }: Props) {
   console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
-  const { t } = useTranslation(["dashboard"]);
   const { items: liveNotis } = useNotisFeed();
   const {
     setSelectedSite,
@@ -104,24 +97,7 @@ export default function MapPanel({
   const handleZoomOutToCountry = useCallback(() => {
     setSelectedSite("all");
   }, [setSelectedSite]);
-  // Compute i18n label for multi-select events (inside component)
-  const multiEventLabel = useMemo(() => {
-    if (selectedEvents.includes("all")) {
-      return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
-    }
-    const count = selectedEvents.length;
-    if (count > 1) {
-      return t("map.selectedCount", { count, defaultValue: `เลือก ${count}` });
-    }
-    if (count === 1) {
-      const single = selectedEvents[0];
-      const opt = EVENT_OPTIONS.find((o) => o.value === single);
-      return opt ? t(`events.${opt.value}`, { defaultValue: opt.label }) : single;
-    }
-    return t("map.allEvents", { defaultValue: "เหตุการณ์ทั้งหมด" });
-  }, [selectedEvents, t]);
-  const labelForButton = multiEventLabel || buttonLabel;
-  const userRole: "admin" | "manager" | "officer" | "user" = (me()?.role as any) || "admin";
+  const userRole: "admin" | "manager" | "officer" | "user" = role ?? "user";
   const [pinStatusBySite, setPinStatusBySite] = useState<Record<string, SitePinStatus>>({});
   const pinStatusRequestIdRef = useRef(0);
 
@@ -251,18 +227,6 @@ export default function MapPanel({
   /* ---------- auto set province for non-admin (ไม่แตะ UI) ---------- */
   // ยกเลิก auto-focus province ตาม role; ให้ผู้ใช้เลือกจังหวัดเองจาก dropdown เท่านั้น
   // ดังนั้นเมื่อกลับไป "ทั้งหมด" ให้คงเป็นระดับประเทศ (province === "all") จนกว่าผู้ใช้จะเลือกจังหวัดเอง
-
-  /* ---------- i18n helpers ---------- */
-  const getEventLabel = (val: string, fallback: string) =>
-    t(`events.${val}`, { defaultValue: fallback });
-
-  const getSeverityLabel = (val: string, fallback: string) => {
-    if (val === "all") return t("map.anySeverity", { defaultValue: fallback });
-    return t(`map.severity.${val}`, { defaultValue: fallback });
-  };
-
-  const onSelectProvince = (val: string) => setProvince(val);
-
 
   /* ---------- sitePoints (พิกัดไซต์ถาวรสำหรับปักหมุด) ---------- */
   const sitePoints = useMemo(() => {
@@ -485,16 +449,16 @@ export default function MapPanel({
   /* ---------- render (UI เดิม) ---------- */
   return (
     <div
-      className="flex flex-col justify-center py-2 px-0 md:px-3 gap-3"
+      className="flex flex-col justify-center"
       ref={wrapperRef}
     >
-      <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
+      {/* <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
         {t("map.title", { defaultValue: "แผนที่" })}
-      </h1>
+      </h1> */}
 
       <div className="flex items-center flex-wrap gap-5">
         {/* All Event Map (หลายตัวเลือก) */}
-        <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
+        {/* <Dropdown options={EVENT_OPTIONS} value="__multi__" onChange={() => {}}>
           {({ open, getButtonProps, getMenuProps }) => (
             <div className="relative inline-block">
               <button
@@ -553,10 +517,10 @@ export default function MapPanel({
               </div>
             </div>
           )}
-        </Dropdown>
+        </Dropdown> */}
 
         {/* Any Severity */}
-        <Dropdown options={SEVERITY_OPTIONS} value={site} onChange={setSite}>
+        {/* <Dropdown options={SEVERITY_OPTIONS} value={site} onChange={setSite}>
           {({
             open,
             selected,
@@ -617,10 +581,10 @@ export default function MapPanel({
               </div>
             </>
           )}
-        </Dropdown>
+        </Dropdown> */}
 
         {/* Location Dropdown → แสดงเฉพาะ admin */}
-        {userRole === "admin" && selectedSiteCode === "all" && (
+        {/* {userRole === "admin" && selectedSiteCode === "all" && (
           <Dropdown
             options={LOCATION_OPTIONS}
             value={province}
@@ -681,12 +645,12 @@ export default function MapPanel({
               </>
             )}
           </Dropdown>
-        )}
+        )} */}
 
       </div>
 
       {/* แผนที่ */}
-      <div className="mt-3">
+      <div className="">
         <MapView
           notis={notisForMap}
           showPins={true}

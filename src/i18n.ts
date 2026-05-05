@@ -15,6 +15,7 @@ i18n
       "dashboard",
       "signin",
       "signup",
+      "sidebar",
       "devices",
       "alert",
       "billing",

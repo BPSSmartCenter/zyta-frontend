@@ -1,23 +1,21 @@
-import StatCard, { StatCardGroup } from "../StatCard";
-import { exportImage } from "../../assets";
-import { useTranslation } from "react-i18next";
-import { useStatSelection, setSelectedStat } from "../../hook/useStatSelection";
-import CameraTile from "../CameraTile";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import DashboardTopBar from "../Dashboard/DashboardTopBar";
+import DetectionSummaryBar from "../Dashboard/DetectionSummaryBar";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useUserPath } from "../../routes/useUserPath";
-import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import { useNotisFeed } from "../../context/NotisContext";
+import { useFilters } from "../../context/FiltersContext";
+import { setSelectedStat } from "../../hook/useStatSelection";
+import { FACE_RECOGNIZE_PATH } from "../../utils/faceRecRoutes";
 import {
   matchesSite,
-  toDateKey,
-  resolveDefaultNotiImage,
   resolveAlertEventKey,
+  resolveDefaultNotiImage,
+  toDateKey,
 } from "../../utils/notis";
-import { useFilters } from "../../context/FiltersContext";
 
-/* ---------- types ---------- */
 type EventKey =
   | "motion"
   | "fall"
@@ -26,6 +24,9 @@ type EventKey =
   | "sleep"
   | "face"
   | "other";
+
+type PrimaryEvent = Exclude<EventKey, "other">;
+
 type StatItem = {
   key: string;
   label: string;
@@ -33,49 +34,95 @@ type StatItem = {
   img: string;
   activeImg: string;
 };
-type CameraItem = { ringColor: string; imgSrc: string; alt?: string; isFallback?: boolean };
-type Props = { statItems?: StatItem[]; cameraItems?: CameraItem[] };
 
-/* ---------- helpers ---------- */
-const getPic = (n: any): { src?: string; isFallback: boolean } => {
-  const fromScreenshot =
-    typeof n?.screenshot === "string" && n.screenshot.trim().length
-      ? n.screenshot
-      : undefined;
-  const fromImg =
-    typeof n?.img === "string" && n.img.trim().length ? n.img : undefined;
-  const src = fromScreenshot ?? fromImg;
+type Props = { statItems?: StatItem[] };
 
-  if (src) {
-    return {
-      src,
-      isFallback: false,
-    };
+const ALERT_META: Record<
+  PrimaryEvent,
+  {
+    title: string;
+    subtitle: string;
+    avgResponse: string;
+    activeCardClassName: string;
+    activeIconWrapClassName: string;
+    heroBorderClassName: string;
+    emphasisClassName: string;
   }
-
-  const fallback = resolveDefaultNotiImage(n);
-  return { src: fallback, isFallback: Boolean(fallback) };
+> = {
+  fire: {
+    title: "Fire detected",
+    subtitle: "Thermal & smoke anomalies",
+    avgResponse: "4m",
+    activeCardClassName:
+      "border-[#FF285B] bg-[#FF285B] text-white shadow-[0_22px_42px_rgba(255,40,91,0.22)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#FFC2CF]",
+    emphasisClassName: "text-[#FF285B]",
+  },
+  motion: {
+    title: "Motion detected",
+    subtitle: "Unexpected movement and patrol triggers",
+    avgResponse: "6m",
+    activeCardClassName:
+      "border-[#14B8E5] bg-[#14B8E5] text-white shadow-[0_22px_42px_rgba(20,184,229,0.22)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#B9F0FF]",
+    emphasisClassName: "text-[#14B8E5]",
+  },
+  offline: {
+    title: "Cameras offline",
+    subtitle: "Connectivity and device availability incidents",
+    avgResponse: "9m",
+    activeCardClassName:
+      "border-[#64748B] bg-[#64748B] text-white shadow-[0_22px_42px_rgba(100,116,139,0.2)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#D8E0EA]",
+    emphasisClassName: "text-[#475569]",
+  },
+  fall: {
+    title: "Fall detected",
+    subtitle: "Human fall incidents requiring quick follow-up",
+    avgResponse: "5m",
+    activeCardClassName:
+      "border-[#F59E0B] bg-[#F59E0B] text-white shadow-[0_22px_42px_rgba(245,158,11,0.22)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#FDE1A7]",
+    emphasisClassName: "text-[#F59E0B]",
+  },
+  sleep: {
+    title: "Sleep detected",
+    subtitle: "Prolonged inactivity or sleeping posture alerts",
+    avgResponse: "7m",
+    activeCardClassName:
+      "border-[#8B5CF6] bg-[#8B5CF6] text-white shadow-[0_22px_42px_rgba(139,92,246,0.2)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#DDD1FF]",
+    emphasisClassName: "text-[#7C3AED]",
+  },
+  face: {
+    title: "Face/Plate Recognize",
+    subtitle: "Identity, access, and plate recognition activity",
+    avgResponse: "3m",
+    activeCardClassName:
+      "border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_22px_42px_rgba(79,70,229,0.22)]",
+    activeIconWrapClassName: "bg-white/16",
+    heroBorderClassName: "border-[#CFCBFF]",
+    emphasisClassName: "text-[#4F46E5]",
+  },
 };
 
-const ringClass = (n: Noti) => {
-  const t = (n.type || "").toLowerCase();
-  if (t === "alert")
-    return "ring-[#FB3F3F] animate-[bps-ring-blink_1s_linear_infinite]";
-  if (t === "warning")
-    return "ring-[#FE9927] animate-[bps-ring-blink_1s_linear_infinite]";
-  return "ring-[#AFEAFF]";
-};
+function parseForcedEvent(value?: string | null): PrimaryEvent {
+  const normalized = String(value ?? "fire").toLowerCase();
+  const event = normalized === "plate" ? "face" : normalized;
+  return ["motion", "fall", "fire", "offline", "sleep", "face"].includes(event)
+    ? (event as PrimaryEvent)
+    : "fire";
+}
 
-const toEventKey = (n: Noti): EventKey => {
-  const detected = resolveAlertEventKey(n);
-  if (!detected) return "other";
-  if (detected === "plate") return "face";
-  return detected as EventKey;
-};
-
-const normalizeStatKey = (k: string): EventKey => {
-  const raw = (k || "").toLowerCase();
+function normalizeStatKey(value: string): EventKey {
+  const raw = (value || "").toLowerCase();
   const collapsed = raw.replace(/[\s/_()\-|]+/g, "");
+
   if (raw.includes("motion")) return "motion";
   if (raw.includes("fall")) return "fall";
   if (raw.includes("fire")) return "fire";
@@ -85,31 +132,61 @@ const normalizeStatKey = (k: string): EventKey => {
     /ออฟ.?ไลน์/.test(raw) ||
     collapsed.includes("จำนวนกล้องออฟไลน์ออนไลน์") ||
     collapsed.includes("กล้องออฟไลน์")
-  )
+  ) {
     return "offline";
+  }
   if (raw.includes("sleep") || raw.includes("หลับ")) return "sleep";
   return "other";
-};
+}
 
-const parseEventFromUrl = (s?: string | null): EventKey => {
-  const v = String(s ?? "motion").toLowerCase();
-  const normalized = v === "plate" ? "face" : v;
-  const allowed = ["motion", "fall", "fire", "offline", "sleep", "face"] as const;
-  return allowed.includes(normalized as any)
-    ? (normalized as EventKey)
-    : "motion";
-};
+function notiToEventKey(noti: Noti): EventKey {
+  const detected = resolveAlertEventKey(noti);
+  if (!detected) return "other";
+  if (detected === "plate") return "face";
+  return detected as EventKey;
+}
 
-export default function Content({ statItems }: Props) {
+function getHeroImage(noti?: Noti): string | undefined {
+  if (!noti) return undefined;
+
+  const direct =
+    typeof noti.screenshot === "string" && noti.screenshot.trim().length
+      ? noti.screenshot
+      : typeof noti.img === "string" && noti.img.trim().length
+        ? noti.img
+        : undefined;
+
+  return direct ?? resolveDefaultNotiImage(noti) ?? undefined;
+}
+
+function getSiteIdentity(noti: Noti): string {
+  return String(
+    noti.siteCode ?? noti.siteName ?? noti.siteId ?? noti.site ?? ""
+  ).trim();
+}
+
+function resolveEventLabel(
+  item: StatItem,
+  eventKey: EventKey,
+  t: (key: string, options?: Record<string, unknown>) => string
+) {
+  if (eventKey === "offline") {
+    return t("stats.offline", { defaultValue: "Cameras offline" });
+  }
+
+  return t(`stats.${eventKey}`, { defaultValue: item.label });
+}
+
+export default function Content({ statItems = [] }: Props) {
   const { t: tAlert } = useTranslation("alert");
   const { t } = useTranslation("dashboard");
-  const { selected } = useStatSelection();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const params = useParams();
   const { absSite } = useUserPath();
   const { items: liveNotis } = useNotisFeed();
   const { date: globalDate, selectedSite: selectedSiteFilter } = useFilters();
+
   const selectedDateKey = React.useMemo(() => toDateKey(globalDate), [globalDate]);
   const routeSite = params.siteCode ? String(params.siteCode) : null;
   const contextSite =
@@ -117,21 +194,28 @@ export default function Content({ statItems }: Props) {
       ? selectedSiteFilter
       : null;
   const effectiveSite = routeSite ?? contextSite;
-  // รวม notis จริง
-  const allEvents = React.useMemo<Noti[]>(() => {
-    let list: Noti[] = Array.isArray(liveNotis) ? liveNotis : [];
-    if (effectiveSite) {
-      list = list.filter((n) => matchesSite(n, effectiveSite));
-    }
-    if (selectedDateKey) {
-      list = list.filter((n) => toDateKey(n.date) === selectedDateKey);
-    }
-    return list;
-  }, [effectiveSite, selectedDateKey, liveNotis]);
+  const activeEvent = parseForcedEvent(searchParams.get("event"));
 
-  // นับยอดการ์ดจาก notis จริง (คีย์กลาง)
+  React.useEffect(() => {
+    setSelectedStat(activeEvent);
+  }, [activeEvent]);
+
+  const scopedEvents = React.useMemo<Noti[]>(() => {
+    let next: Noti[] = Array.isArray(liveNotis) ? liveNotis : [];
+
+    if (effectiveSite) {
+      next = next.filter((item) => matchesSite(item, effectiveSite));
+    }
+
+    if (selectedDateKey) {
+      next = next.filter((item) => toDateKey(item.date) === selectedDateKey);
+    }
+
+    return next;
+  }, [effectiveSite, liveNotis, selectedDateKey]);
+
   const counts = React.useMemo<Record<EventKey, number>>(() => {
-    const c: Record<EventKey, number> = {
+    const next: Record<EventKey, number> = {
       motion: 0,
       fall: 0,
       fire: 0,
@@ -140,146 +224,220 @@ export default function Content({ statItems }: Props) {
       face: 0,
       other: 0,
     };
-    for (const n of allEvents) {
-      const key = toEventKey(n);
-      c[key] = (c[key] ?? 0) + 1;
-    }
-    return c;
-  }, [allEvents]);
 
-  // ใช้คีย์กลางเป็น id การ์ด
-  const items = React.useMemo(
+    for (const item of scopedEvents) {
+      const key = notiToEventKey(item);
+      next[key] = (next[key] ?? 0) + 1;
+    }
+
+    return next;
+  }, [scopedEvents]);
+
+  const cards = React.useMemo(
     () =>
-      (statItems ?? []).map((it) => {
-        const idNorm = normalizeStatKey(it.key || it.label);
+      statItems.map((item) => {
+        const normalizedKey = normalizeStatKey(item.key || item.label);
         return {
-          ...it,
-          val: counts[idNorm] ?? 0,
-          key: idNorm,
-          labelClassName:
-            idNorm === "face" ? "text-[10px] whitespace-nowrap" : undefined,
+          ...item,
+          key: normalizedKey,
+          val: counts[normalizedKey] ?? 0,
+          displayLabel: resolveEventLabel(item, normalizedKey, t),
         };
       }),
-    [statItems, counts]
+    [counts, statItems, t]
   );
 
-  // event ปัจจุบันจาก URL + ให้ URL เป็น fallback สำหรับ activeIds
-  const eventKey = parseEventFromUrl(searchParams.get("event"));
-  const activeId = React.useMemo(
-    () => selected ?? eventKey,
-    [selected, eventKey]
+  const listForEvent = React.useMemo(
+    () =>
+      scopedEvents
+        .filter((item) => notiToEventKey(item) === activeEvent)
+        .sort(
+          (a, b) =>
+            new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
+        ),
+    [activeEvent, scopedEvents]
   );
 
-  // sync global selection กับ URL
-  React.useEffect(() => {
-    setSelectedStat(eventKey);
-  }, [eventKey]);
+  const activeCard =
+    cards.find((item) => item.key === activeEvent) ??
+    cards.find((item) => item.key !== "other") ??
+    cards[0];
 
-  // notis ของหมวดที่เลือก (เรียงใหม่->เก่า)
-  const listForEvent = React.useMemo(() => {
-    return allEvents
-      .filter((n) => toEventKey(n) === eventKey)
-      .sort(
-        (a, b) =>
-          new Date((b as any).date).getTime() -
-          new Date((a as any).date).getTime()
-      );
-  }, [allEvents, eventKey]);
+  const activeMeta = ALERT_META[activeEvent];
+  const activeImage = getHeroImage(listForEvent[0]);
+  const activeSitesCount = new Set(
+    listForEvent.map((item) => getSiteIdentity(item)).filter(Boolean)
+  ).size;
+  const unresolvedCount = listForEvent.filter((item) => {
+    const type = String(item.type ?? "").toLowerCase();
+    return type === "alert" || type === "warning" || type === "offline";
+  }).length;
 
-  // 3 รูปล่าสุด (ถ้ามี)
-  const tiles = React.useMemo<CameraItem[]>(() => {
-    return listForEvent
-      .map((n) => {
-        const pic = getPic(n);
-        if (!pic.src) return null;
-        return { ringColor: ringClass(n), imgSrc: pic.src, isFallback: pic.isFallback };
-      })
-      .filter(Boolean)
-      .slice(0, 3) as CameraItem[];
-  }, [listForEvent]);
+  const handleCardSelect = (nextKey: EventKey) => {
+    if (nextKey === "other") return;
+    setSelectedStat(nextKey);
 
-  // เปลี่ยนหมวด / ยกเลิกเลือก
-  const onStatChange = (ids: string[]) => {
-    const next = (ids[0] ?? "") as EventKey;
-    if (!next) {
-      setSelectedStat(null);
-      navigate(absSite("/dashboard"));
+    if (nextKey === "face") {
+      navigate(absSite(FACE_RECOGNIZE_PATH, effectiveSite ?? undefined));
       return;
     }
-    setSelectedStat(next);
-    if (next === "face") {
-      navigate(absSite("/facerec"));
-      return;
-    }
-    navigate(absSite(`/alert?event=${next}`));
+
+    navigate(absSite(`/alert?event=${nextKey}`, effectiveSite ?? undefined));
   };
 
+  const heroStats = [
+    {
+      label: tAlert("summary.today", { defaultValue: "Today" }),
+      value: String(activeCard?.val ?? 0),
+      valueClassName: activeMeta.emphasisClassName,
+    },
+    {
+      label: tAlert("summary.unresolved", { defaultValue: "Unresolved" }),
+      value: String(unresolvedCount),
+      valueClassName: "text-slate-950",
+    },
+    {
+      label: tAlert("summary.sitesAffected", {
+        defaultValue: "Sites affected",
+      }),
+      value: String(activeSitesCount),
+      valueClassName: "text-slate-950",
+    },
+    {
+      label: tAlert("summary.avgResponse", {
+        defaultValue: "Avg response",
+      }),
+      value: activeMeta.avgResponse,
+      valueClassName: "text-slate-950",
+    },
+  ];
+
   return (
-    <>
-      <style>{`@keyframes bps-ring-blink{0%,60%{opacity:1;}80%{opacity:.15;}100%{opacity:1;}}`}</style>
-
-      {/* Top bar */}
-      <nav className="flex justify-between mt-10">
-        <h1 className="text-2xl font-semibold">{tAlert("totalAlertsToday")}</h1>
-        <div className="gap-3 flex items-center">
-          <MiniFiltersBar page="alert" />
-          <button className="inline-flex h-10 w-10 md:w-[105px] items-center justify-center rounded-md border border-gray-300 px-3 text-sm font-inter font-bold">
-            <span className="truncate flex items-center gap-2">
-              <img src={exportImage} alt="" />
-              <span className="hidden md:inline">{t("navbar.import")}</span>
-            </span>
-          </button>
-          <button className="inline-flex h-10 w-10 md:w-[88px] items-center justify-center rounded-md px-3 bg-cyan text-white text-sm font-inter font-bold">
-            <span className="flex w-full justify-center items-center gap-2">
-              <i className="material-icons w-[24px]">add_2</i>
-              <p className="hidden md:block">{t("navbar.add")}</p>
-            </span>
-          </button>
-        </div>
-      </nav>
-
-      {/* Stat cards */}
-      <div className="mt-6">
-        <StatCardGroup
-          selectionMode="single"
-          activeIds={[activeId]} // <<< ใช้ URL เป็น fallback ป้องกันหลุด selection
-          onChange={onStatChange}
-          className="grid grid-cols-2 gap-2 px-6 lg-1024:flex lg-1024:flex-wrap"
-        >
-          {items.map((it) => (
-            <StatCard
-              key={it.key}
-              id={it.key} // id เป็นคีย์กลาง (motion/fall/fire/offline/sleep)
-              label={t(`stats.${it.key}`, { defaultValue: it.label })}
-              val={it.val}
-              labelClassName={it.labelClassName}
-              img={it.img}
-              activeImg={it.activeImg}
-              inactiveBg="bg-white"
-              activeBg="bg-cyan-500"
-              className="w-full lg-1024:flex-1"
-            />
-          ))}
-        </StatCardGroup>
-
-        {/* Camera tiles */}
-        {tiles.length > 0 && (
-          <div className="flex flex-3 justify-around flex-col items-center mt-6 md:flex-row gap-14 px-6">
-            {tiles.map((c, i) => (
-              <CameraTile
-                key={i}
-                ringColor={c.ringColor}
-                imgSrc={c.imgSrc}
-                isFallbackImg={c.isFallback}
-                alt={`event-${i + 1}`}
-                className="flex-1 max-w-[346px]"
-              />
-            ))}
-          </div>
-        )}
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+        <DashboardTopBar />
+        <DetectionSummaryBar
+          statItems={statItems}
+          events={scopedEvents}
+          selectedSiteCode={effectiveSite ?? undefined}
+          variant="inline"
+        />
       </div>
-    </>
+
+      <div className="space-y-1 px-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8AA0C5]">
+          {tAlert("section.detection", { defaultValue: "Detection" })}
+        </p>
+        <h1 className="text-[32px] font-semibold tracking-[-0.03em] text-slate-950">
+          {tAlert("totalAlertsToday", {
+            defaultValue: "Total Alerts (Today)",
+          })}
+        </h1>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+        {cards.map((item) => {
+          const isActive = item.key === activeEvent;
+          const cardMeta =
+            item.key !== "other" ? ALERT_META[item.key as PrimaryEvent] : ALERT_META.fire;
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleCardSelect(item.key)}
+              className={[
+                "group flex min-h-[108px] items-center gap-4 rounded-[22px] border p-4 text-left shadow-[0_18px_38px_rgba(15,23,42,0.08)] transition",
+                isActive
+                  ? cardMeta.activeCardClassName
+                  : "border-[#E8EEF7] bg-white text-slate-900 hover:-translate-y-0.5 hover:border-[#D2E7F5]",
+              ].join(" ")}
+              aria-pressed={isActive}
+            >
+              <span
+                className={[
+                  "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
+                  isActive
+                    ? cardMeta.activeIconWrapClassName
+                    : "bg-[#F7FAFF] group-hover:bg-[#EFF8FF]",
+                ].join(" ")}
+              >
+                <img
+                  src={isActive ? item.activeImg : item.img}
+                  alt=""
+                  className="h-5 w-5 object-contain"
+                />
+              </span>
+
+              <span className="min-w-0">
+                <span className="block text-[34px] font-semibold leading-none tracking-[-0.03em]">
+                  {item.val}
+                </span>
+                <span
+                  className={[
+                    "mt-2 block text-sm font-medium leading-snug",
+                    isActive ? "text-white/92" : "text-[#5B6B7F]",
+                  ].join(" ")}
+                >
+                  {item.displayLabel}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <section
+        className={[
+          "rounded-[30px] border bg-white p-6 shadow-[0_22px_48px_rgba(15,23,42,0.08)]",
+          activeMeta.heroBorderClassName,
+        ].join(" ")}
+      >
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+          <div className="h-[160px] w-full max-w-[160px] overflow-hidden rounded-[20px] bg-[#F1F5F9]">
+            {activeImage ? (
+              <img
+                src={activeImage}
+                alt={activeMeta.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-[#F8FBFE] text-xs font-semibold uppercase tracking-[0.2em] text-[#94A3B8]">
+                No image
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8AA0C5]">
+              {tAlert("summary.activeType", { defaultValue: "Active Type" })}
+            </p>
+            <h2 className="mt-2 text-[36px] font-semibold tracking-[-0.03em] text-slate-950">
+              {activeMeta.title}
+            </h2>
+            <p className="mt-2 text-base text-[#5B6B7F]">{activeMeta.subtitle}</p>
+
+            <div className="mt-6 grid grid-cols-2 gap-5 md:grid-cols-4">
+              {heroStats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="border-l border-[#E7EEF8] pl-4 first:border-l-0 first:pl-0"
+                >
+                  <p className="text-sm text-[#8AA0C5]">{stat.label}</p>
+                  <p
+                    className={[
+                      "mt-1 text-[18px] font-semibold tracking-[-0.02em]",
+                      stat.valueClassName,
+                    ].join(" ")}
+                  >
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
-
-

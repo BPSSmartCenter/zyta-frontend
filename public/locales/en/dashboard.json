@@ -68,6 +68,54 @@
     "zyta": "Red Box",
     "iot": "IoT"
   },
+  "utilityOverview": {
+    "title": "Utility Overview",
+    "subtitle": "Live snapshot • Water • Electric • Air",
+    "live": "Live",
+    "emptyBadge": "No data",
+    "emptyTitle": "No live utility data",
+    "emptyDescription": "This section will appear when utility metrics are available from the system.",
+    "updatedMinutesAgo_one": "{{count}} min ago",
+    "updatedMinutesAgo_other": "{{count}} min ago",
+    "alertCount_one": "{{count}} alert",
+    "alertCount_other": "{{count}} alerts",
+    "open": "Open",
+    "metrics": {
+      "domestic": "Domestic",
+      "drinking": "Drinking",
+      "flow": "Flow",
+      "ph": "pH",
+      "voltage": "Voltage",
+      "current": "Current",
+      "frequency": "Frequency",
+      "month": "Month",
+      "pm10": "PM 10",
+      "tvoc": "TVOC",
+      "temp": "Temp",
+      "humidity": "Humidity"
+    },
+    "cards": {
+      "water": {
+        "title": "Water Meter",
+        "eyebrow": "Total today",
+        "trend": "{{value}} vs yesterday",
+        "footer": "{{primary}} • {{secondary}}"
+      },
+      "electric": {
+        "title": "Electric Meter",
+        "eyebrow": "Today's consumption",
+        "trend": "{{value}} peak at 19:00",
+        "footer": "{{primary}} • {{secondary}}"
+      },
+      "air": {
+        "title": "Air Sensor",
+        "eyebrow": "PM 2.5 • Good",
+        "trend": "{{value}} • 24h",
+        "footer": "{{primary}} • {{secondary}}",
+        "badge": "Healthy"
+      }
+    }
+  },
   "userMgmt": {
     "title": "USER MANAGEMENT",
     "total": "total",

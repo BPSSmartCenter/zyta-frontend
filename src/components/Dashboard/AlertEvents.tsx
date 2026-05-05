@@ -4,22 +4,22 @@ import EventPanelState from "./EventPanelState";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import type { Noti } from "../../data/Dashboard/notis";
-import React from "react";
 import { useUserPath } from "../../routes/useUserPath";
 import { useFilters } from "../../context/FiltersContext";
 import {
   resolveAlertEventKey,
   type AlertEventKey,
-  buildNotiKeywordBag,
   isFaceRecNoti,
   resolveElectricDeviceSn,
 } from "../../utils/notis";
+import { resolveFaceRecPath } from "../../utils/faceRecRoutes";
 
 type Props = {
   search: string;
   setSearch: (v: string) => void;
   items: Noti[];
   loading?: boolean;
+  fillAvailableHeight?: boolean;
 };
 
 export default function AlertEvents({
@@ -27,6 +27,7 @@ export default function AlertEvents({
   setSearch,
   items,
   loading = false,
+  fillAvailableHeight = false,
 }: Props) {
   const { t, i18n } = useTranslation(["dashboard"]);
   const navigate = useNavigate();
@@ -72,40 +73,30 @@ export default function AlertEvents({
     navigate(abs(`/alert?event=${ev}`));
   };
 
-  // เรียงใหม่→เก่า (คงพฤติกรรมเดิม)
-  const list = React.useMemo(() => {
-    const q = (search || "").toLowerCase().trim();
-
-    // เรียงใหม่→เก่าเหมือนเดิม
-    const sorted = [...items].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
-
-    if (!q) return sorted;
-
-    // ใช้ bag() + site + date ให้ค้นหาทั้ง alert + wellbeing ได้
-    return sorted.filter((n: any) => {
-      const hay = [buildNotiKeywordBag(n), n?.site, n?.title, n?.type, n?.date]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return hay.includes(q);
-    });
-  }, [items, search, i18n.language]);
+  const list = items;
 
   return (
-    <form className="flex flex-col justify-center py-2 px-3 gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <form
+      className={[
+        "flex flex-col gap-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        fillAvailableHeight ? "h-full min-h-0" : "justify-center",
+      ].join(" ")}
+    >
 
       <SearchInput
         value={search}
         placeholder={t("search.placeholder")}
         onChange={setSearch}
-        className="font-poppins"
+        className="shrink-0 font-poppins"
         disableMenu
       />
 
-      <div className="h-[350px] lg:h-[558px] overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        className={[
+          "overflow-y-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          fillAvailableHeight ? "min-h-0 flex-1" : "h-[350px] lg:h-[558px]",
+        ].join(" ")}
+      >
         {list.length === 0 ? (
           <EventPanelState
             loading={loading}
@@ -144,8 +135,7 @@ export default function AlertEvents({
 
               const handleClick = (n: any, eventKey: AlertEventKey | null) => {
                 if (isFaceRecNoti(n)) {
-                  // default เปิดแท็บตาม kind ได้ถ้าอยาก (faceScan/licensePlates)
-                  navigate(abs("/facerec"), { state: { noti: n } });
+                  navigate(abs(resolveFaceRecPath(n)), { state: { noti: n } });
                   return;
                 }
                 if (eventKey) navigateToEvent(eventKey, n);
@@ -160,7 +150,7 @@ export default function AlertEvents({
                   onKeyDown={(e) => {
                     if (!isNavigable) return;
                     if (e.key === "Enter" || e.key === " ") {
-                      navigateToEvent(eventKey, n);
+                      handleClick(n, eventKey);
                     }
                   }}
                   className={`${

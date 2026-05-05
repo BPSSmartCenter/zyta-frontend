@@ -7,11 +7,19 @@
     "sidebarLabel": "แถบข้าง",
     "brandAlt": "แบรนด์"
   },
+  "section": {
+    "workspace": "พื้นที่ทำงาน",
+    "detection": "การตรวจจับ",
+    "access": "การเข้าถึง",
+    "admin": "ผู้ดูแลระบบ",
+    "system": "ระบบ"
+  },
   "menu": {
     "home": "หน้าแรก",
     "energy_calc": "การคำนวณค่าไฟ",
     "notification": "การแจ้งเตือน",
     "facerec": "การจดจำใบหน้า",
+    "license_plates": "ป้ายทะเบียนรถ",
     "devices": "อุปกรณ์",
     "devices_cctv": "กล้องวงจรปิด",
     "devices_intercom": "Red box",

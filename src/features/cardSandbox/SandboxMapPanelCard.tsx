@@ -3,7 +3,7 @@ import MapPanel from "../../components/Dashboard/MapPanel";
 import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
 import { listNotis } from "../../api/notis";
-import { notis as mockNotis, type Noti } from "../../data/Dashboard/notis";
+import type { Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
 import {
@@ -265,9 +265,7 @@ export default function SandboxMapPanelCard({ cardId }: Props) {
         ? remoteNotis
         : Array.isArray(liveNotis) && liveNotis.length
         ? liveNotis
-        : ((mockNotis as Noti[]) ?? []).map((noti) =>
-            decorateNotiForDisplay(noti)
-          );
+        : [];
     const siteScoped =
       !selectedSite || selectedSite === "all"
         ? scopedSiteCodes

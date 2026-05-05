@@ -7,11 +7,19 @@
     "sidebarLabel": "Sidebar",
     "brandAlt": "Brand"
   },
+  "section": {
+    "workspace": "Workspace",
+    "detection": "Detection",
+    "access": "Access",
+    "admin": "Admin",
+    "system": "System"
+  },
   "menu": {
     "home": "Home",
     "energy_calc": "Electric Cost",
     "notification": "Notification",
-    "facerec": "Face Regconize",
+    "facerec": "Face Recognize",
+    "license_plates": "License Plates",
     "devices": "Devices",
     "devices_cctv": "CCTV",
     "devices_intercom": "Red box",

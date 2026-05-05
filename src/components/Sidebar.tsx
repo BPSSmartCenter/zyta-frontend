@@ -8,7 +8,6 @@ import {
   useDeviceInventory,
   type DeviceTypeKey,
 } from "../context/DeviceInventoryContext";
-import { logout as mockLogout } from "../data/Dashboard/auth";
 import { authActions, selectAuthUser } from "../features/auth";
 import {
   clearAllStoredSites,
@@ -18,6 +17,10 @@ import { selectSidebarOpen, sidebarActions } from "../features/sidebar";
 import { useUserPath } from "../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 import { buildBrandingLogoSrc } from "../utils/branding";
+import {
+  FACE_RECOGNIZE_PATH,
+  LICENSE_PLATES_PATH,
+} from "../utils/faceRecRoutes";
 import Modal from "./Modal";
 import { GlassHoverSidebar, type GlassHoverSidebarItem } from "./ui";
 
@@ -134,11 +137,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     } catch {
       /* ignore logout API failures */
     }
-    try {
-      mockLogout();
-    } catch {
-      /* ignore mock logout failures */
-    }
     dispatch(authActions.clearAuthUser());
     dispatch(siteSelectionActions.resetSiteSelection());
     try {
@@ -165,7 +163,8 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     alert: pathScoped.startsWith("/alert"),
     alertEvent: (key: string) =>
       pathScoped.startsWith("/alert") && url.get("event") === key,
-    facerec: pathScoped.startsWith("/facerec"),
+    facerec: pathScoped.startsWith(FACE_RECOGNIZE_PATH),
+    licensePlates: pathScoped.startsWith(LICENSE_PLATES_PATH),
     devices: pathScoped.startsWith("/devices"),
     devicesType: (key: string) =>
       pathScoped.startsWith("/devices") && url.get("type") === key,
@@ -177,30 +176,35 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     {
       id: "alert-fire",
       label: t("menu.alerts_fire", { defaultValue: "ตรวจพบไฟไหม้" }),
+      icon: "local_fire_department",
       active: active.alertEvent("fire"),
       onSelect: () => go("/alert?event=fire"),
     },
     {
       id: "alert-motion",
       label: t("menu.alerts_motion", { defaultValue: "ตรวจพบการเคลื่อนไหว" }),
+      icon: "directions_run",
       active: active.alertEvent("motion"),
       onSelect: () => go("/alert?event=motion"),
     },
     {
       id: "alert-offline",
       label: t("menu.alerts_offline", { defaultValue: "จำนวนกล้อง" }),
+      icon: "videocam_off",
       active: active.alertEvent("offline"),
       onSelect: () => go("/alert?event=offline"),
     },
     {
       id: "alert-fall",
       label: t("menu.alerts_fall", { defaultValue: "ตรวจพบการล้ม" }),
+      icon: "personal_injury",
       active: active.alertEvent("fall"),
       onSelect: () => go("/alert?event=fall"),
     },
     {
       id: "alert-sleep",
       label: t("menu.alerts_sleep", { defaultValue: "ตรวจพบนอนหลับ" }),
+      icon: "bed",
       active: active.alertEvent("sleep"),
       onSelect: () => go("/alert?event=sleep"),
     },
@@ -211,32 +215,42 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       {
         key: "cctv",
         label: t("menu.devices_cctv", { defaultValue: "CCTV" }),
+        icon: "videocam",
       },
       {
         key: "watermeter",
         label: t("menu.devices_watermeter", { defaultValue: "Water Meter" }),
+        icon: "water_drop",
       },
       {
         key: "electricmeter",
         label: t("menu.devices_electricmeter", {
           defaultValue: "Electric Meter",
         }),
+        icon: "bolt",
       },
       {
         key: "airsensor",
         label: t("menu.devices_airsensor", { defaultValue: "Air Sensor" }),
+        icon: "air",
       },
-      { key: "iot", label: t("menu.devices_iot", { defaultValue: "IoT" }) },
+      {
+        key: "iot",
+        label: t("menu.devices_iot", { defaultValue: "IoT" }),
+        icon: "sensors",
+      },
       {
         key: "caregiver",
         label: t("menu.devices_caregiver", { defaultValue: "Caregiver" }),
+        icon: "medical_services",
       },
       {
         key: "digitaltwin",
         label: t("menu.devices_digitaltwin", { defaultValue: "Digital Twin" }),
+        icon: "view_in_ar",
       },
-    ] satisfies Array<{ key: SidebarDeviceKey; label: string }>
-  ).map(({ key, label }) => {
+    ] satisfies Array<{ key: SidebarDeviceKey; label: string; icon: string }>
+  ).map(({ key, label, icon }) => {
     const isExternal =
       key === "iot" || key === "caregiver" || key === "digitaltwin";
     const zero =
@@ -247,6 +261,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     return {
       id: `device-${key}`,
       label,
+      icon,
       active: active.devicesType(key),
       disabled,
       onSelect: disabled
@@ -267,16 +282,28 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     };
   });
 
+  const role = String(account?.role || "").toLowerCase();
+  const isAdmin = role === "admin";
+
   const navItems: GlassHoverSidebarItem[] = [
     {
-      id: "sandbox",
-      label: t("menu.sandbox", { defaultValue: "Sandbox" }),
-      icon: "dashboard_customize",
-      active: active.sandbox,
-      onSelect: () => {
-        go("/sandbox/card-board");
-      },
+      id: "section-workspace",
+      label: t("section.workspace", { defaultValue: "Workspace" }),
+      section: true,
     },
+    ...(isAdmin
+      ? [
+          {
+            id: "sandbox",
+            label: t("menu.sandbox", { defaultValue: "Sandbox" }),
+            icon: "dashboard_customize",
+            active: active.sandbox,
+            onSelect: () => {
+              go("/sandbox/card-board");
+            },
+          } satisfies GlassHoverSidebarItem,
+        ]
+      : []),
     {
       id: "home",
       label: t("menu.home", { defaultValue: "หน้าแรก" }),
@@ -285,30 +312,51 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       onSelect: () => go("/dashboard"),
     },
     {
-      id: "notification",
-      label: t("menu.notification", { defaultValue: "การแจ้งเตือน" }),
-      icon: "notifications",
-      active: active.alert,
-      children: alertItems,
+      id: "section-detection",
+      label: t("section.detection", { defaultValue: "Detection" }),
+      section: true,
+    },
+    ...alertItems,
+    {
+      id: "section-access",
+      label: t("section.access", { defaultValue: "Access" }),
+      section: true,
     },
     {
       id: "facerec",
       label: t("menu.facerec", { defaultValue: "การจดจำใบหน้า" }),
       icon: "face",
       active: active.facerec,
-      onSelect: () => go("/facerec"),
+      onSelect: () => go(FACE_RECOGNIZE_PATH),
     },
     {
-      id: "devices",
-      label: t("menu.devices", { defaultValue: "อุปกรณ์" }),
-      icon: "devices",
-      active: active.devices,
-      children: deviceItems,
+      id: "license-plates",
+      label: t("menu.license_plates", { defaultValue: "ป้ายทะเบียนรถ" }),
+      icon: "directions_car",
+      active: active.licensePlates,
+      onSelect: () => go(LICENSE_PLATES_PATH),
     },
+    {
+      id: "section-devices",
+      label: t("menu.devices", { defaultValue: "อุปกรณ์" }),
+      section: true,
+    },
+    ...deviceItems,
   ];
 
-  const role = String(account?.role || "").toLowerCase();
-  if (role === "admin" || role === "manager") {
+  const canManageUsers = role === "admin" || role === "manager";
+  const canManageSites =
+    String(account?.email || "").toLowerCase() === MASTER_EMAIL;
+
+  if (canManageUsers || canManageSites) {
+    navItems.push({
+      id: "section-admin",
+      label: t("section.admin", { defaultValue: "Admin" }),
+      section: true,
+    });
+  }
+
+  if (canManageUsers) {
     navItems.push({
       id: "usermanage",
       label: t("menu.user_management", { defaultValue: "การจัดการผู้ใช้" }),
@@ -318,7 +366,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
     });
   }
 
-  if (String(account?.email || "").toLowerCase() === MASTER_EMAIL) {
+  if (canManageSites) {
     navItems.push({
       id: "sitemanage",
       label: t("menu.site_management", { defaultValue: "การจัดการไซต์" }),
@@ -329,6 +377,11 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   }
 
   const footerItems: GlassHoverSidebarItem[] = [
+    {
+      id: "section-system",
+      label: t("section.system", { defaultValue: "System" }),
+      section: true,
+    },
     {
       id: "support",
       label: t("footer.support", { defaultValue: "Support" }),
@@ -409,7 +462,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       />
 
       <div
-        className={["min-h-160 bg-white transition-all duration-300", contentClassName].join(
+        className={["min-h-160 bg-white transition-all duration-300 lg:pl-[76px]", contentClassName].join(
           " "
         )}
       >

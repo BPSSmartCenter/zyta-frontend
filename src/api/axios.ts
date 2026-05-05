@@ -10,6 +10,20 @@ const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
 export const API_BASE_URL = (configuredApiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
 
+export function unwrapApiData<T = unknown>(payload: unknown): T {
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    const looksLikeEnvelope =
+      "success" in record || "meta" in record || "error" in record;
+
+    if (looksLikeEnvelope && "data" in record) {
+      return record.data as T;
+    }
+  }
+
+  return payload as T;
+}
+
 /**
  * Extended config flags:
  * - `_silent401`   : ถ้า true → interceptor จะไม่ redirect/log เมื่อเจอ 401

@@ -1,10 +1,23 @@
-// src/context/NotisContext.tsx
 import React from "react";
 import type { Noti } from "../data/Dashboard/notis";
-import { listNotis } from "../api/notis";
-import { notis as mockNotis } from "../data/Dashboard/notis";
-import { decorateNotiForDisplay, sortByNewest } from "../utils/notis";
-import { useFilters } from "./FiltersContext";
+import CriticalAlertModal from "../components/CriticalAlertModal";
+import { selectDateFilterValue } from "../features/dateFilter";
+import {
+  fetchNotisFeed,
+  selectNotisFeedError,
+  selectNotisFeedItems,
+  selectNotisFeedLoading,
+} from "../features/notisFeed";
+import {
+  selectAccessibleSites,
+  selectHasHydrated,
+  selectSelectedGroup,
+  selectSelectedSite,
+  selectSelectedUtility,
+  selectSiteCatalogStatus,
+} from "../features/siteSelection";
+import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { notiSeverity } from "../utils/notis";
 
 type NotisContextValue = {
   items: Noti[];
@@ -13,152 +26,291 @@ type NotisContextValue = {
   refresh: () => Promise<void>;
 };
 
-const defaultValue: NotisContextValue = {
-  items: [],
-  loading: true,
-  refresh: async () => {},
-};
+const ACKED_CRITICAL_ALERTS_KEY = "bps:acked-critical-alerts";
 
-const NotisContext = React.createContext<NotisContextValue>(defaultValue);
+function buildCriticalAlertKey(item: Noti): string {
+  const occurredAt = item.occurredAt ?? item.createdAt ?? item.date ?? "";
+  return [
+    item.id ?? "",
+    item.titleKey ?? item.title ?? "",
+    item.siteCode ?? item.siteId ?? item.siteName ?? item.site ?? "",
+    item.deviceId ?? "",
+    occurredAt,
+  ]
+    .map((value) => String(value).trim())
+    .join("|");
+}
 
-const prepareNotis = (list: Noti[]): Noti[] =>
-  sortByNewest(list.map((item) => decorateNotiForDisplay(item)));
-
-const pickFallback = (current: Noti[]): Noti[] => {
-  if (Array.isArray(current) && current.length) return current;
-  if (Array.isArray(mockNotis) && mockNotis.length) {
-    return prepareNotis(mockNotis as Noti[]);
+function readAckedCriticalAlertKeys(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(ACKED_CRITICAL_ALERTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed
+          .map((value) => String(value || "").trim())
+          .filter((value) => value.length > 0)
+      : [];
+  } catch {
+    return [];
   }
-  return [];
-};
+}
 
-const toIsoRangeForDate = (date: { y: number; m: number; d: number }) => {
-  // DatePicker is local-calendar based, so build local day boundaries.
-  const from = new Date(date.y, date.m - 1, date.d, 0, 0, 0, 0);
-  const to = new Date(date.y, date.m - 1, date.d, 23, 59, 59, 999);
-  return { from: from.toISOString(), to: to.toISOString() };
-};
+function writeAckedCriticalAlertKeys(keys: Iterable<string>) {
+  if (typeof window === "undefined") return;
+  try {
+    const deduped = Array.from(new Set(keys))
+      .map((value) => String(value || "").trim())
+      .filter((value) => value.length > 0)
+      .slice(-50);
+    window.sessionStorage.setItem(
+      ACKED_CRITICAL_ALERTS_KEY,
+      JSON.stringify(deduped)
+    );
+  } catch {
+    // ignore storage failures
+  }
+}
 
-export function NotisProvider({ children }: { children: React.ReactNode }) {
-  const { date, selectedSite, selectedUtility, selectedGroupSite, siteOptions } = useFilters();
-  const [items, setItems] = React.useState<Noti[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string>();
-
-  // Build set of allowed site codes from siteOptions (excludes "all" sentinel)
-  // ใช้เป็น defensive client-side guard เมื่อ selectedSite === "all"
-  const allowedSiteCodes = React.useMemo<Set<string>>(() => {
-    const codes = new Set<string>();
-    for (const opt of siteOptions) {
-      const code = String(opt.value || "").trim();
-      if (!code || code.toLowerCase() === "all") continue;
-      codes.add(code);
-    }
-    return codes;
-  }, [siteOptions]);
-
-  // Build set of site codes that match the current utility/group scope
-  const scopedSiteCodes = React.useMemo<Set<string> | null>(() => {
-    const isAll = !selectedSite || selectedSite === "all";
-    if (!isAll) return null; // single site — no client filter needed
-
-    // เมื่อ "all": เสมอกรองด้วย allowedSiteCodes เพื่อป้องกัน data leak
-    // จากนั้น narrow ลงอีกถ้ามี utility/group filter
-    const hasGroupFilter = !!(selectedUtility?.id || selectedGroupSite?.id);
-
-    const codes = new Set<string>();
-    for (const opt of siteOptions) {
-      const code = String(opt.value || "").trim();
-      if (!code || code.toLowerCase() === "all") continue;
-      if (hasGroupFilter) {
-        if (selectedUtility?.id && (opt as any).utilityId !== selectedUtility.id) continue;
-        if (selectedGroupSite?.id) {
-          const gId = (opt as any).groupId;
-          const gLabel = (opt as any).groupLabel;
-          if (gId !== selectedGroupSite.id && gLabel !== selectedGroupSite.label) continue;
-        }
-      }
-      codes.add(code);
-    }
-    return codes;
-  }, [selectedSite, selectedUtility, selectedGroupSite, siteOptions]);
-
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const range = toIsoRangeForDate(date);
-      const fetched = await listNotis({
-        from: range.from,
-        to: range.to,
-        siteCode: selectedSite && selectedSite !== "all" ? selectedSite : undefined,
-        limit: 500,
-      });
-      // Client-side filter:
-      // - ถ้า scopedSiteCodes มีค่า (selectedSite=all หรือมี utility/group filter) ใช้ filter นั้น
-      // - ถ้า selectedSite=all และ allowedSiteCodes ไม่ว่าง ให้กรองตาม allowedSiteCodes เสมอ
-      const isAll = !selectedSite || selectedSite === "all";
-      const activeFilter = scopedSiteCodes ?? (isAll && allowedSiteCodes.size > 0 ? allowedSiteCodes : null);
-      const filtered = activeFilter
-        ? fetched.filter((n) => {
-            const code = (n as any).siteCode ?? (n as any).site_code ?? "";
-            return activeFilter.has(String(code).trim());
-          })
-        : fetched;
-      setItems(prepareNotis(filtered));
-      setError(undefined);
-    } catch (err) {
-      console.error("Failed to load notis", err);
-      setError("FETCH_FAILED");
-      setItems((prev) => pickFallback(prev));
-    } finally {
-      setLoading(false);
-    }
-  }, [date, selectedSite, scopedSiteCodes, allowedSiteCodes]);
+function CriticalAlertBridge() {
+  const items = useAppSelector(selectNotisFeedItems);
+  const [activeAlert, setActiveAlert] = React.useState<Noti | null>(null);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [soundPending, setSoundPending] = React.useState(false);
+  const ackedKeysRef = React.useRef<Set<string>>(new Set());
+  const audioContextRef = React.useRef<AudioContext | null>(null);
 
   React.useEffect(() => {
+    ackedKeysRef.current = new Set(readAckedCriticalAlertKeys());
+  }, []);
+
+  const playAlarm = React.useCallback(async (): Promise<boolean> => {
+    if (typeof window === "undefined") return false;
+
+    const AudioCtor =
+      window.AudioContext ||
+      (
+        window as Window &
+          typeof globalThis & {
+            webkitAudioContext?: typeof AudioContext;
+          }
+      ).webkitAudioContext;
+
+    if (!AudioCtor) return false;
+
+    try {
+      const ctx = audioContextRef.current ?? new AudioCtor();
+      audioContextRef.current = ctx;
+
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+
+      const pattern = [0, 0.22, 0.44];
+      const duration = 0.14;
+      const now = ctx.currentTime;
+
+      pattern.forEach((offset, index) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = "square";
+        oscillator.frequency.setValueAtTime(index % 2 === 0 ? 880 : 740, now + offset);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          now + offset + duration
+        );
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(now + offset);
+        oscillator.stop(now + offset + duration);
+      });
+
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const criticalItems = items.filter((item) => notiSeverity(item) === "critical");
+    if (criticalItems.length === 0) {
+      setIsOpen(false);
+      setActiveAlert(null);
+      setSoundPending(false);
+      return;
+    }
+
+    const nextAlert = criticalItems.find(
+      (item) => !ackedKeysRef.current.has(buildCriticalAlertKey(item))
+    );
+
+    if (!nextAlert) return;
+
+    const nextKey = buildCriticalAlertKey(nextAlert);
+    const currentKey = activeAlert ? buildCriticalAlertKey(activeAlert) : null;
+    if (currentKey === nextKey && isOpen) return;
+
+    setActiveAlert(nextAlert);
+    setIsOpen(true);
+  }, [activeAlert, isOpen, items]);
+
+  React.useEffect(() => {
+    if (!isOpen || !activeAlert) return;
+    let cancelled = false;
+    void playAlarm().then((played) => {
+      if (cancelled) return;
+      setSoundPending(!played);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAlert, isOpen, playAlarm]);
+
+  React.useEffect(() => {
+    if (!isOpen || !soundPending) return;
+
+    const retry = () => {
+      void playAlarm().then((played) => {
+        if (played) {
+          setSoundPending(false);
+        }
+      });
+    };
+
+    window.addEventListener("pointerdown", retry, { once: true });
+    window.addEventListener("keydown", retry, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", retry);
+      window.removeEventListener("keydown", retry);
+    };
+  }, [isOpen, playAlarm, soundPending]);
+
+  React.useEffect(() => {
+    return () => {
+      void audioContextRef.current?.close().catch(() => undefined);
+      audioContextRef.current = null;
+    };
+  }, []);
+
+  const handleClose = React.useCallback(() => {
+    if (activeAlert) {
+      const key = buildCriticalAlertKey(activeAlert);
+      ackedKeysRef.current.add(key);
+      writeAckedCriticalAlertKeys(ackedKeysRef.current);
+    }
+    setIsOpen(false);
+    setSoundPending(false);
+  }, [activeAlert]);
+
+  return (
+    <CriticalAlertModal
+      open={isOpen}
+      alert={activeAlert}
+      soundPending={soundPending}
+      onClose={handleClose}
+    />
+  );
+}
+
+function NotisFeedPollingBridge() {
+  const dispatch = useAppDispatch();
+  const date = useAppSelector(selectDateFilterValue);
+  const selectedSite = useAppSelector(selectSelectedSite);
+  const selectedGroupSite = useAppSelector(selectSelectedGroup);
+  const selectedUtility = useAppSelector(selectSelectedUtility);
+  const accessibleSites = useAppSelector(selectAccessibleSites);
+  const catalogStatus = useAppSelector(selectSiteCatalogStatus);
+  const hasHydrated = useAppSelector(selectHasHydrated);
+
+  const ready = catalogStatus === "ready" && hasHydrated;
+  const queryKey = React.useMemo(
+    () =>
+      JSON.stringify({
+        date,
+        selectedSite,
+        selectedGroupSiteId: selectedGroupSite?.id ?? null,
+        selectedGroupSiteLabel: selectedGroupSite?.label ?? null,
+        selectedUtilityId: selectedUtility?.id ?? null,
+        accessibleSites: accessibleSites.map((site) => ({
+          value: site.value,
+          groupId: site.groupId ?? null,
+          groupLabel: site.groupLabel ?? null,
+          utilityId: site.utilityId ?? null,
+        })),
+      }),
+    [accessibleSites, date, selectedGroupSite, selectedSite, selectedUtility]
+  );
+
+  React.useEffect(() => {
+    if (!ready) return;
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const run = async () => {
       if (cancelled) return;
-      await load();
+      await dispatch(fetchNotisFeed());
       if (cancelled) return;
       timer = setTimeout(run, 5_000);
     };
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [load]);
+  }, [dispatch, queryKey, ready]);
 
   React.useEffect(() => {
-    const handleVisibility = () => {
+    if (!ready) return;
+
+    const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        load();
+        void dispatch(fetchNotisFeed());
       }
     };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [load]);
 
-  const value = React.useMemo(
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [dispatch, queryKey, ready]);
+
+  return null;
+}
+
+export function NotisProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <NotisFeedPollingBridge />
+      <CriticalAlertBridge />
+      {children}
+    </>
+  );
+}
+
+export function useNotisFeed(): NotisContextValue {
+  const dispatch = useAppDispatch();
+  const items = useAppSelector(selectNotisFeedItems);
+  const loading = useAppSelector(selectNotisFeedLoading);
+  const error = useAppSelector(selectNotisFeedError) ?? undefined;
+
+  const refresh = React.useCallback(async () => {
+    await dispatch(fetchNotisFeed());
+  }, [dispatch]);
+
+  return React.useMemo(
     () => ({
       items,
       loading,
       error,
-      refresh: load,
+      refresh,
     }),
-    [items, loading, error, load]
+    [error, items, loading, refresh]
   );
-
-  return <NotisContext.Provider value={value}>{children}</NotisContext.Provider>;
-}
-
-export function useNotisFeed() {
-  return React.useContext(NotisContext);
 }

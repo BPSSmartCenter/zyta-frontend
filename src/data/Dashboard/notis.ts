@@ -1,31 +1,29 @@
-// src/data/dashboard.ts
 import {
-  fireNoti,
-  deviceNoti,
-  fallingNoti,
-  sleepingNoti,
-  // faceImage,
-  plateImage,
   alertImage,
-  insuranceImage,
-  fireCamera,
-  sleepCamera,
+  deviceNoti,
   fallCamera,
+  fallingNoti,
+  fireCamera,
+  fireNoti,
+  insuranceImage,
   offlineDeviceCamera,
+  plateImage,
+  sleepCamera,
+  sleepingNoti,
 } from "../../assets/index";
 
 export {
+  alertImage,
+  deviceNoti,
   fallCamera,
   fallingNoti,
-  offlineDeviceCamera,
-  sleepCamera,
   fireCamera,
-  insuranceImage,
-  alertImage,
-  plateImage,
-  sleepingNoti,
-  deviceNoti,
   fireNoti,
+  insuranceImage,
+  offlineDeviceCamera,
+  plateImage,
+  sleepCamera,
+  sleepingNoti,
 };
 
 export type NotiType = "alert" | "warning" | "info" | "normal" | "offline" | "success";
@@ -34,7 +32,7 @@ export type Severity = "low" | "medium" | "critical";
 
 export type Noti = {
   id?: string;
-  type: NotiType; // ← ห้ามเป็น string กว้างๆ
+  type: NotiType;
   img?: string;
   titleKey?: string;
   title: string;
@@ -45,346 +43,15 @@ export type Noti = {
   coords?: { lat: number; lng: number };
   lat?: number;
   lng?: number;
-  date: string; // ISO string หรือ YYYY-MM-DD
+  date: string;
   occurredAt?: string;
   createdAt?: string;
-  severity?: Severity; // optional ได้
+  severity?: Severity;
   deviceId?: string;
   deviceModel?: string;
   meta?: Record<string, unknown> | null;
   screenshot?: string;
 };
-
-/* =============================
-   Notifications
-   ============================= */
-export const notis: Noti[] = [
-  // {
-  //   type: "warning",
-  //   img: motionNoti,
-  //   titleKey: "notis.motionDetected",
-  //   title: "ตรวจพบการเคลื่อนไหว",
-  //   site: "อาคารบรมนาถศรีนครินทร์",
-  //   coords: { lat: 13.7563, lng: 100.5018 }, // Bangkok
-  //   date: "2025-02-11",
-  //   severity: "medium",
-  //   screenshot: motionCamera,
-  // },
-];
-
-export const wellBeingNotis: Noti[] = [
-  // {
-  //   type: "alert",
-  //   img: sleepingNoti,
-  //   titleKey: "notis.sleepingLong",
-  //   title: "ตรวจพบคนหลับนานกว่าปกติ",
-  //   site: "Site A",
-  //   coords: { lat: 13.748953806991215, lng: 100.58319744232878 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: sleepCamera,
-  // },
-  // {
-  //   type: "alert",
-  //   img: fallingNoti,
-  //   titleKey: "notis.fallDetected",
-  //   title: "ตรวจพบคนล้ม",
-  //   site: "Site B",
-  //   coords: { lat: 14.026430582691166, lng: 99.97489303169598 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: fallCamera,
-  // },
-  // {
-  //   type: "alert",
-  //   img: sleepingNoti,
-  //   titleKey: "notis.sleepingLong",
-  //   title: "ตรวจพบคนหลับนานกว่าปกติ",
-  //   site: "Site C",
-  //   coords: { lat: 13.7278956, lng: 100.52412349999997 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: sleepCamera,
-  // },
-  // {
-  //   type: "alert",
-  //   img: sleepingNoti,
-  //   titleKey: "notis.sleepingLong",
-  //   title: "ตรวจพบคนหลับนานกว่าปกติ",
-  //   site: "Site A",
-  //   coords: { lat: 13.748953806991215, lng: 100.58319744232878 },
-  //   date: "2025-09-19",
-  //   severity: "critical",
-  //   screenshot: sleepCamera,
-  // },
-];
-
-export const recognizeNotis = [
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site A",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site C",
-  //   date: "2025-01-08",
-  // },
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site B",
-  //   date: "2025-01-12",
-  // },
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site D",
-  //   date: "2025-01-15",
-  // },
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site E",
-  //   date: "2025-02-02",
-  // },
-  // {
-  //   type: "normal",
-  //   img: faceImage,
-  //   titleKey: "notis.faceDetected",
-  //   title: "ตรวจพบใบหน้า",
-  //   detail: "",
-  //   site: "Site G",
-  //   date: "2025-02-10",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "1กข-8412",
-  //   site: "Site B",
-  //   date: "2025-01-07",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "7พร-1023",
-  //   site: "Site C",
-  //   date: "2025-01-09",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "กง-4521",
-  //   site: "Site F",
-  //   date: "2025-01-18",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "4ขฉ-9905",
-  //   site: "Site A",
-  //   date: "2025-01-22",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "2ทบ-3714",
-  //   site: "Site D",
-  //   date: "2025-02-04",
-  // },
-  // {
-  //   type: "normal",
-  //   img: plateImage,
-  //   titleKey: "notis.plateDetected",
-  //   title: "ตรวจพบเลขทะเบียนรถยนต์",
-  //   detail: "7พค-2288",
-  //   site: "Site E",
-  //   date: "2025-02-12",
-  // },
-] as const;
-
-export const ZYTA_NOTIS = [
-  // {
-  //   type: "alert",
-  //   titleKey: "zytaNotis.sos",
-  //   img: alertImage,
-  //   title: "SOS",
-  //   site: "โรงพยาบาลกรุงเทพ",
-  //   date: "2025-09-19",
-  // },
-  // {
-  //   type: "alert",
-  //   titleKey: "zytaNotis.sos",
-  //   img: alertImage,
-  //   title: "SOS",
-  //   site: "Site A",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site A",
-  //   date: "2025-09-19",
-  // },
-  // {
-  //   type: "alert",
-  //   titleKey: "zytaNotis.sos",
-  //   img: alertImage,
-  //   title: "SOS",
-  //   site: "Site B",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site B",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "alert",
-  //   titleKey: "zytaNotis.sos",
-  //   img: alertImage,
-  //   title: "SOS",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-  // {
-  //   type: "success",
-  //   titleKey: "zytaNotis.assistant",
-  //   img: insuranceImage,
-  //   title: "Assistant",
-  //   site: "Site C",
-  //   date: "2025-01-06",
-  // },
-];
-
-/* =============================
-   Site Options
-   ============================= */
-export const allSites = [
-  { label: "All Sites", value: "all" },
-  { label: "Site A", value: "a" },
-  { label: "Site B", value: "b" },
-  { label: "Site C", value: "c" },
-  { label: "Site D", value: "d" },
-  { label: "Site E", value: "e" },
-  { label: "Site F", value: "f" },
-  { label: "Site G", value: "g" },
-  { label: "Site H", value: "h" },
-  { label: "Site I", value: "i" },
-  { label: "Site J", value: "j" },
-  { label: "Site K", value: "k" },
-  { label: "Site L", value: "l" },
-  { label: "Site M", value: "m" },
-  { label: "Site N", value: "n" },
-  { label: "Site O", value: "o" },
-  { label: "Site P", value: "p" },
-  { label: "Site Q", value: "q" },
-  { label: "Site R", value: "r" },
-  { label: "Site S", value: "s" },
-  { label: "Site T", value: "t" },
-  { label: "Site U", value: "u" },
-  { label: "Site V", value: "v" },
-  { label: "Site W", value: "w" },
-  { label: "Site X", value: "x" },
-  { label: "Site Y", value: "y" },
-  { label: "Site Z", value: "z" },
-];
 
 export const TH_PROVINCES = [
   "กรุงเทพมหานคร",
