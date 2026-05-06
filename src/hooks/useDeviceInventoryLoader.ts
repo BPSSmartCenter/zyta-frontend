@@ -95,10 +95,10 @@ async function fetchSiteDetailsFor(site: SiteSummary): Promise<SiteDetails | nul
     }
   }
 
-  console.debug("[useDeviceInventoryLoader] site details fetch failed", {
-    codeTried: site.code,
-    idTried: site.id,
-  });
+  // console.debug("[useDeviceInventoryLoader] site details fetch failed", {
+  //   codeTried: site.code,
+  //   idTried: site.id,
+  // });
   return null;
 }
 
@@ -220,7 +220,7 @@ export function useDeviceInventoryLoader({
         sitesCacheRef.current = normalized;
         return normalized;
       } catch (e) {
-        console.debug("[useDeviceInventoryLoader] listSites failed", e);
+        // console.debug("[useDeviceInventoryLoader] listSites failed", e);
         return [];
       }
     };
@@ -281,9 +281,9 @@ export function useDeviceInventoryLoader({
         let fetchedRealData = false;
 
         try {
-          console.log("[useDeviceInventoryLoader] Fetching IoT devices...");
+          // console.log("[useDeviceInventoryLoader] Fetching IoT devices...");
           const iotDevices = await getIoTDevices();
-          console.log("[useDeviceInventoryLoader] Fetched IoT devices:", iotDevices?.length);
+          // console.log("[useDeviceInventoryLoader] Fetched IoT devices:", iotDevices?.length);
           if (Array.isArray(iotDevices)) {
             const devices = iotDevices as IotDevice[];
             // Count "IoT" devices exactly (inclusive check)
@@ -409,7 +409,7 @@ export function useDeviceInventoryLoader({
           zyta: Number(prev?.zyta ?? 0),
         }));
       } catch (error) {
-        console.debug("[useDeviceInventoryLoader] sync failed", error);
+        // console.debug("[useDeviceInventoryLoader] sync failed", error);
         if (!cancelled) {
           // keep previous state
           setCountsState((prev) => prev);

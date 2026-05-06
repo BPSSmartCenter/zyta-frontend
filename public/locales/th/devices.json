@@ -55,7 +55,6 @@
     "waterMeter": {
       "selectTime": "เลือกเวลา",
       "to": "ถึง",
-      "ofMl": "ทั้งหมด {{max}} มล.",
       "domesticWater": "น้ำอุปโภค",
       "drinkingWater": "น้ำบริโภค",
       "ph": "ค่า pH",
@@ -66,6 +65,9 @@
       "waterToday": "ปริมาณน้ำวันนี้",
       "monthUsage": "การใช้น้ำเดือนนี้",
       "literUnit": "ลิตร",
+      "litersToday": "{{unit}} วันนี้",
+      "monthlyConsumptionSubtitle": "น้ำอุปโภค vs น้ำบริโภค · {{unit}}",
+      "waterVolumeTrendSubtitle": "ค่าเฉลี่ยย้อนหลัง 12 เดือน · {{unit}}",
       "drinkingToday": "ปริมาณน้ำบริโภควันนี้",
       "drinkingMonth": "ปริมาณน้ำบริโภคเดือนนี้",
       "drinkingYear": "ปริมาณน้ำบริโภคปีนี้",

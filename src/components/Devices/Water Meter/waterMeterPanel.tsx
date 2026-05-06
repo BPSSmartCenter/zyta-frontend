@@ -458,8 +458,12 @@ function WaterHeroCard({
         >
           <div className="grid h-[92px] w-[92px] place-items-center rounded-full bg-white">
             <div className="text-center leading-tight">
-              <div className="text-[18px] font-semibold text-slate-900">{value}</div>
-              <div className="mt-1 text-[12px] text-slate-400">{subValue}</div>
+              <div className="text-[28px] font-semibold leading-none text-slate-900">
+                {value}
+              </div>
+              <div className="mt-1 text-[16px] font-medium text-slate-400">
+                {subValue}
+              </div>
             </div>
           </div>
         </div>
@@ -476,28 +480,8 @@ function WaterHeroCard({
               <div className="text-[22px] font-semibold leading-tight text-slate-900">
                 {title}
               </div>
+              <div className="mt-3 text-sm text-[#8AA0C5]">{syncText}</div>
             </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[14px] font-medium text-slate-500">
-                Utilization
-              </span>
-              <span className="text-[16px] font-semibold" style={{ color: progressColor }}>
-                {safeProgress.toFixed(0)}%
-              </span>
-            </div>
-            <div className="mt-2 h-3 overflow-hidden rounded-full bg-[#E7F3FB]">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${safeProgress}%`,
-                  background: `linear-gradient(90deg, ${progressColor} 0%, ${progressColor} 100%)`,
-                }}
-              />
-            </div>
-            <div className="mt-3 text-sm text-[#8AA0C5]">{syncText}</div>
           </div>
         </div>
       </div>
@@ -581,11 +565,19 @@ function TodayTotalCard({
   domestic,
   drinking,
   radialItems,
+  unitLabel,
+  totalUnitLabel,
+  domesticLabel,
+  drinkingLabel,
 }: {
   total: number;
   domestic: number;
   drinking: number;
   radialItems: Array<{ label: string; value: string }>;
+  unitLabel: string;
+  totalUnitLabel: string;
+  domesticLabel: string;
+  drinkingLabel: string;
 }) {
   return (
     <UtilitySurface className="h-full">
@@ -610,7 +602,7 @@ function TodayTotalCard({
                 <div className="text-[40px] font-semibold text-slate-900">
                   {formatWithComma(total)}
                 </div>
-                <div className="mt-1 text-[15px] text-[#8AA0C5]">liters today</div>
+                <div className="mt-1 text-[15px] text-[#8AA0C5]">{totalUnitLabel}</div>
               </div>
             </div>
           </div>
@@ -618,15 +610,15 @@ function TodayTotalCard({
 
         <div className="mt-6 grid w-full grid-cols-2 gap-6 text-center">
           <div>
-            <div className="text-[13px] font-medium text-[#8AA0C5]">Domestic</div>
+            <div className="text-[13px] font-medium text-[#8AA0C5]">{domesticLabel}</div>
             <div className="mt-1 text-[18px] font-semibold text-[#0284C7]">
-              {formatWithComma(domestic)} L
+              {formatWithComma(domestic)} {unitLabel}
             </div>
           </div>
           <div>
-            <div className="text-[13px] font-medium text-[#8AA0C5]">Drinking</div>
+            <div className="text-[13px] font-medium text-[#8AA0C5]">{drinkingLabel}</div>
             <div className="mt-1 text-[18px] font-semibold text-[#0EA5E9]">
-              {formatWithComma(drinking)} L
+              {formatWithComma(drinking)} {unitLabel}
             </div>
           </div>
         </div>
@@ -652,9 +644,11 @@ function TodayTotalCard({
 function MonthlyConsumptionChart({
   categories,
   series,
+  unitLabel,
 }: {
   categories: string[];
   series: WaterSeries[];
+  unitLabel: string;
 }) {
   const maxValue = Math.max(
     1,
@@ -712,11 +706,11 @@ function MonthlyConsumptionChart({
         shared: true,
         intersect: false,
         y: {
-          formatter: (value: number) => `${formatWithComma(value)} L`,
+          formatter: (value: number) => `${formatWithComma(value)} ${unitLabel}`,
         },
       },
     }),
-    [categories, maxValue, series.length]
+    [categories, maxValue, series.length, unitLabel]
   );
 
   return <ReactApexChart type="bar" height={320} options={options} series={series} />;
@@ -725,9 +719,11 @@ function MonthlyConsumptionChart({
 function WaterTrendChart({
   categories,
   values,
+  unitLabel,
 }: {
   categories: string[];
   values: number[];
+  unitLabel: string;
 }) {
   const maxValue = Math.max(1, ...values.map((value) => Number(value || 0)));
   const options = useMemo<ApexOptions>(
@@ -779,11 +775,11 @@ function WaterTrendChart({
       legend: { show: false },
       tooltip: {
         y: {
-          formatter: (value: number) => `${formatWithComma(value)} L`,
+          formatter: (value: number) => `${formatWithComma(value)} ${unitLabel}`,
         },
       },
     }),
-    [categories, maxValue]
+    [categories, maxValue, unitLabel]
   );
 
   return (
@@ -1057,30 +1053,39 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   const domesticLevel = Number(domesticSection.consumptionLiters ?? 0);
   const drinkingLevel = Number(drinkingSection.consumptionLiters ?? 0);
   const totalToday = domesticLevel + drinkingLevel;
-
-  const domesticMaxText =
-    domesticSection.maxLabel ??
-    (t("devices.waterMeter.ofMl", {
-      max: formatWithComma(domesticLevel),
-      defaultValue: `of ${formatWithComma(domesticLevel)} ml`,
-    }) as string);
-  const drinkingMaxText =
-    drinkingSection.maxLabel ??
-    (t("devices.waterMeter.ofMl", {
-      max: formatWithComma(drinkingLevel),
-      defaultValue: `of ${formatWithComma(drinkingLevel)} ml`,
-    }) as string);
+  const literUnit = t("devices.waterMeter.literUnit", {
+    defaultValue: "L",
+  }) as string;
+  const domesticWaterLabel = t("devices.waterMeter.domesticWater", {
+    defaultValue: "Domestic Water",
+  }) as string;
+  const drinkingWaterLabel = t("devices.waterMeter.drinkingWater", {
+    defaultValue: "Drinking Water",
+  }) as string;
+  const litersTodayLabel = t("devices.waterMeter.litersToday", {
+    unit: literUnit,
+    defaultValue: `${literUnit} today`,
+  }) as string;
+  const monthlyConsumptionSubtitle = t(
+    "devices.waterMeter.monthlyConsumptionSubtitle",
+    {
+      unit: literUnit,
+      defaultValue: `Domestic vs Drinking · ${literUnit}`,
+    }
+  ) as string;
+  const waterVolumeTrendSubtitle = t("devices.waterMeter.waterVolumeTrendSubtitle", {
+    unit: literUnit,
+    defaultValue: `12-month moving average · ${literUnit}`,
+  }) as string;
 
   const syncText = formatLastSync(snapshot?.timestamp ?? null, locale);
 
   const heroCards = [
     {
       key: "domestic",
-      title: t("devices.waterMeter.domesticWater", {
-        defaultValue: "Domestic Water",
-      }),
+      title: domesticWaterLabel,
       value: formatWithComma(domesticLevel),
-      subValue: domesticMaxText,
+      subValue: literUnit,
       progress:
         domesticLevel > 0
           ? Math.min(
@@ -1095,11 +1100,9 @@ export default function WaterMeterPanel({ siteCode }: Props) {
     },
     {
       key: "drinking",
-      title: t("devices.waterMeter.drinkingWater", {
-        defaultValue: "Drinking Water",
-      }),
+      title: drinkingWaterLabel,
       value: formatWithComma(drinkingLevel),
-      subValue: drinkingMaxText,
+      subValue: literUnit,
       progress:
         drinkingLevel > 0
           ? Math.min(
@@ -1119,54 +1122,42 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       label: t("devices.waterMeter.drinkingToday", {
         defaultValue: "Drinking water today",
       }),
-      value: `${formatWithComma(drinkingTotals.today)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(drinkingTotals.today)} ${literUnit}`,
       icon: waterDrop,
     },
     {
       label: t("devices.waterMeter.drinkingMonth", {
         defaultValue: "Drinking water this month",
       }),
-      value: `${formatWithComma(drinkingTotals.month)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(drinkingTotals.month)} ${literUnit}`,
       icon: waterDrop,
     },
     {
       label: t("devices.waterMeter.drinkingYear", {
         defaultValue: "Drinking water this year",
       }),
-      value: `${formatWithComma(drinkingTotals.year)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(drinkingTotals.year)} ${literUnit}`,
       icon: waterDrop,
     },
     {
       label: t("devices.waterMeter.domesticToday", {
         defaultValue: "Domestic water today",
       }),
-      value: `${formatWithComma(domesticTotals.today)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(domesticTotals.today)} ${literUnit}`,
       icon: waterDrop,
     },
     {
       label: t("devices.waterMeter.domesticMonth", {
         defaultValue: "Domestic water this month",
       }),
-      value: `${formatWithComma(domesticTotals.month)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(domesticTotals.month)} ${literUnit}`,
       icon: waterDrop,
     },
     {
       label: t("devices.waterMeter.domesticYear", {
         defaultValue: "Domestic water this year",
       }),
-      value: `${formatWithComma(domesticTotals.year)} ${t("devices.waterMeter.literUnit", {
-        defaultValue: "L",
-      })}`,
+      value: `${formatWithComma(domesticTotals.year)} ${literUnit}`,
       icon: waterDrop,
     },
   ];
@@ -1298,7 +1289,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   ) {
     radialItems.unshift({
       label: "Snapshot total",
-      value: `${formatWithComma(snapshotTotalValue)} L`,
+      value: `${formatWithComma(snapshotTotalValue)} ${literUnit}`,
     });
   }
 
@@ -1361,11 +1352,12 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         <UtilitySurface>
           <UtilitySectionTitle
             title="Monthly consumption"
-            subtitle="Domestic vs Drinking · liters"
+            subtitle={monthlyConsumptionSubtitle}
           />
           <MonthlyConsumptionChart
             categories={monthlyCategories}
             series={monthlySeries}
+            unitLabel={literUnit}
           />
         </UtilitySurface>
 
@@ -1374,13 +1366,17 @@ export default function WaterMeterPanel({ siteCode }: Props) {
           domestic={domesticLevel}
           drinking={drinkingLevel}
           radialItems={radialItems}
+          unitLabel={literUnit}
+          totalUnitLabel={litersTodayLabel}
+          domesticLabel={domesticWaterLabel}
+          drinkingLabel={drinkingWaterLabel}
         />
       </div>
 
       <UtilitySurface>
         <UtilitySectionTitle
           title="Water volume trend"
-          subtitle="12-month moving average · L"
+          subtitle={waterVolumeTrendSubtitle}
           right={
             <div className="inline-flex overflow-hidden rounded-[16px] border border-slate-200 bg-white">
               {(["30d", "90d", "1y"] as const).map((range) => (
@@ -1403,7 +1399,11 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         />
 
         {trendCategories.length && trendValues.some((value) => value !== 0) ? (
-          <WaterTrendChart categories={trendCategories} values={trendValues} />
+          <WaterTrendChart
+            categories={trendCategories}
+            values={trendValues}
+            unitLabel={literUnit}
+          />
         ) : (
           <div className="grid h-[340px] place-items-center rounded-[18px] border border-slate-200 bg-slate-50 text-sm text-slate-400">
             <div className="text-center">

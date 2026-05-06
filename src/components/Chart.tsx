@@ -525,7 +525,7 @@ export default function Chart({
   );
 
   return (
-    <section className="w-full rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfe_100%)] p-5 shadow-[0_18px_38px_rgba(15,23,42,0.05)] lg:p-7">
+    <section className="w-full rounded-[10px] border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfe_100%)] p-5 shadow-[0_18px_38px_rgba(15,23,42,0.05)] lg:p-7">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0 flex-1">

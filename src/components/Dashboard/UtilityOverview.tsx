@@ -125,6 +125,19 @@ function toFiniteNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function formatOverviewUpdateTime(value: string | null, locale: string) {
+  if (!value) return "-";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(parsed));
+}
+
 function extractElectricOverview(payload: unknown) {
   const data =
     payload && typeof payload === "object" && "data" in payload
@@ -181,11 +194,18 @@ function UtilityCard({
   electricOverview: ElectricOverviewState;
   onOpenElectric: () => void;
 }) {
-  const { t } = useTranslation("dashboard");
+  const { t, i18n } = useTranslation("dashboard");
   const theme = CARD_THEME[cardKey];
   const isElectric = cardKey === "electric";
   const hasLiveElectric = isElectric && electricOverview.hasData;
   const loadingElectric = isElectric && electricOverview.loading;
+  const locale = i18n.language?.toLowerCase().startsWith("th")
+    ? "th-TH"
+    : "en-US";
+  const formattedLastUpdateTime = formatOverviewUpdateTime(
+    electricOverview.lastUpdateTime,
+    locale
+  );
 
   return (
     <article
@@ -311,7 +331,7 @@ function UtilityCard({
                     })}
                   </p>
                   <p className="mt-1 truncate text-[0.95rem] font-semibold text-white">
-                    {electricOverview.lastUpdateTime || "-"}
+                    {formattedLastUpdateTime}
                   </p>
                   <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/20">
                     <div className="h-full w-[62%] rounded-full bg-white/80" />

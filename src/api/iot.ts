@@ -23,16 +23,16 @@ export async function getIoTDevices(): Promise<IoTDevice[]> {
             timeout: 5000,
             baseURL: ""
         });
-        console.log("[IoT API] Raw response:", data);
+        // console.log("[IoT API] Raw response:", data);
         // Ensure we return an array
         if (Array.isArray(data)) {
-            console.log("[IoT API] Returning array (length):", data.length);
+            // console.log("[IoT API] Returning array (length):", data.length);
             return data;
         } else if (data && Array.isArray(data.data)) {
-            console.log("[IoT API] Returning data.data (length):", data.data.length);
+            // console.log("[IoT API] Returning data.data (length):", data.data.length);
             return data.data;
         }
-        console.warn("IoT API returned unexpected format:", data);
+        // console.warn("IoT API returned unexpected format:", data);
         return [];
     } catch (error) {
         console.warn("Failed to fetch IoT devices:", error);

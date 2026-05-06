@@ -449,7 +449,7 @@ export default function ContentLayout(props: Props) {
           </DashboardSurface>
         </div>
 
-        <div className="overflow-hidden rounded-[10px] border border-white/80 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        <div className="overflow-hidden rounded-[10px]">
           <SnapshotChartSection
             buttonLabel={buttonLabel}
             selectedEvents={selectedEvents}

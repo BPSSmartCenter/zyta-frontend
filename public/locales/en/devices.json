@@ -55,7 +55,6 @@
     "waterMeter": {
       "selectTime": "Select time",
       "to": "TO",
-      "ofMl": "of {{max}} ml",
       "domesticWater": "Domestic water",
       "drinkingWater": "Drinking water",
       "ph": "pH",
@@ -66,6 +65,9 @@
       "waterToday": "Today's water",
       "monthUsage": "Water usage this month",
       "literUnit": "L",
+      "litersToday": "{{unit}} today",
+      "monthlyConsumptionSubtitle": "Domestic vs Drinking · {{unit}}",
+      "waterVolumeTrendSubtitle": "12-month moving average · {{unit}}",
       "drinkingToday": "Drinking water today",
       "drinkingMonth": "Drinking water this month",
       "drinkingYear": "Drinking water this year",

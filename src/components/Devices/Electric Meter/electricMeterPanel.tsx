@@ -362,9 +362,31 @@ const OVERVIEW_CONTRIBUTION_COLORS = [
   "#FF7A1A",
 ];
 
+const toShape = (value: unknown, depth = 0): unknown => {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (Array.isArray(value)) {
+    return {
+      type: "array",
+      length: value.length,
+      sample: value.length ? toShape(value[0], depth + 1) : "empty",
+    };
+  }
+  if (typeof value !== "object") return typeof value;
+  if (depth >= 4) return "object";
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.reduce<Record<string, unknown>>((acc, [key, item]) => {
+    acc[key] = toShape(item, depth + 1);
+    return acc;
+  }, {});
+};
+
 const logElectricApiPayload = (label: string, payload: unknown) => {
-  if (typeof console === "undefined") return;
-  console.log(`[ElectricMeterPanel] ${label}`, payload);
+  if (!import.meta.env.DEV || typeof console === "undefined") return;
+  console.groupCollapsed(`[ElectricMeterPanel API shape] ${label}`);
+  console.log(toShape(payload));
+  console.groupEnd();
 };
 
 const summarizeTelemetryPayload = (payload: any): NormalizedTelemetrySummary => {
@@ -444,6 +466,63 @@ const summarizeTelemetryPayload = (payload: any): NormalizedTelemetrySummary => 
       typeof temperature === "number" && Number.isFinite(temperature)
         ? Math.round(temperature)
         : null,
+  };
+};
+
+const averagePositive = (
+  summaries: NormalizedTelemetrySummary[],
+  picker: (summary: NormalizedTelemetrySummary) => number | null
+) => {
+  const values = summaries
+    .map((summary) => picker(summary))
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value > 0
+    );
+  if (!values.length) return 0;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+};
+
+const sumSummaryField = (
+  summaries: NormalizedTelemetrySummary[],
+  picker: (summary: NormalizedTelemetrySummary) => number
+) =>
+  Math.round(
+    summaries.reduce((sum, summary) => {
+      const value = Number(picker(summary));
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0)
+  );
+
+const aggregateTelemetrySummaries = (
+  summaries: NormalizedTelemetrySummary[]
+): NormalizedTelemetrySummary => {
+  const temperatures = summaries
+    .map((summary) => summary.temperatureC)
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value > 0
+    );
+
+  return {
+    voltageAvg: averagePositive(summaries, (summary) => summary.voltageAvg),
+    currentAvg: averagePositive(summaries, (summary) => summary.currentAvg),
+    frequencyAvg: averagePositive(summaries, (summary) => summary.frequencyAvg),
+    usageKwh: sumSummaryField(summaries, (summary) => summary.usageKwh),
+    accumulatedKwh: sumSummaryField(summaries, (summary) => summary.accumulatedKwh),
+    productionTodayKwh: sumSummaryField(
+      summaries,
+      (summary) => summary.productionTodayKwh
+    ),
+    productionMonthKwh: sumSummaryField(
+      summaries,
+      (summary) => summary.productionMonthKwh
+    ),
+    temperatureC: temperatures.length
+      ? Math.round(
+          temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length
+        )
+      : null,
   };
 };
 
@@ -644,6 +723,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       try {
         const settled = await runWithConcurrency(siteTargets, 4, async (siteIdOrCode) => {
           const res = await getElectricDevices(siteIdOrCode);
+          logElectricApiPayload("getElectricDevices", {
+            siteIdOrCode,
+            response: res,
+          });
           const items: any[] = Array.isArray((res as any)?.items)
             ? (res as any).items
             : Array.isArray((res as any)?.data?.items)
@@ -734,6 +817,16 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         DEFAULT_INVERTER_SN;
   const selectedDeviceSiteForApi = selectedDevice?.siteIdOrCode || siteForApi;
   const deviceCategory = "INVERTER";
+  const overviewDeviceOptionsKey = React.useMemo(
+    () =>
+      deviceOptions
+        .map(
+          (device) =>
+            `${device.siteIdOrCode || siteForApi}:${device.category}:${device.sn}`
+        )
+        .join("|"),
+    [deviceOptions, siteForApi]
+  );
   const deviceDropdownOptions = React.useMemo(
     () => {
       const overviewLabel = t("devices.electric.deviceSelector.overview", {
@@ -901,6 +994,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         }));
 
       const daysToFetch = 8; // today + previous 7 days
+      if (isOverviewSelected && !isAllSitesSelected && !deviceOptions.length) {
+        if (!active) return;
+        setDailySeries([]);
+        return;
+      }
       const todayStart = startOfDay(new Date());
       const rangeStart = new Date(todayStart);
       rangeStart.setDate(rangeStart.getDate() - (daysToFetch - 1));
@@ -911,8 +1009,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         isAllSitesSelected && isOverviewSelected
           ? `group:${siteTargetsKey}`
           : selectedDeviceSiteForApi;
-      const cacheKey = `db:telemetry-window:${cacheSiteKey}:${deviceSN}:${rangeStartKey}:${rangeEndKey}`;
-      const stickyKey = `db:telemetry-window:sticky:${cacheSiteKey}:${deviceSN}`;
+      const cacheDeviceKey =
+        isOverviewSelected && !isAllSitesSelected
+          ? `overview:${overviewDeviceOptionsKey || "pending"}`
+          : deviceSN;
+      const cacheKey = `db:telemetry-window:${cacheSiteKey}:${cacheDeviceKey}:${rangeStartKey}:${rangeEndKey}`;
+      const stickyKey = `db:telemetry-window:sticky:${cacheSiteKey}:${cacheDeviceKey}`;
       const cached = readSessionJson<{
         fetchedAt: number;
         entries: Array<{
@@ -962,7 +1064,69 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const endTime = formatDateTimeForApi(rangeEnd);
         let points: DailyTelemetryPoint[] = [];
         let aggregatedEntries: DailySeries[] | null = null;
-        if (isAllSitesSelected && isOverviewSelected) {
+        if (isOverviewSelected && !isAllSitesSelected) {
+          const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
+            const res = await fetchEquipmentTelemetry({
+              siteIdOrCode: device.siteIdOrCode || siteForApi,
+              sn: device.sn,
+              startTime,
+              endTime,
+              category: device.category,
+            });
+            const list: any[] = (res?.data as any)?.telemetries ?? [];
+            return normalizeTelemetries(list);
+          });
+
+          const perDevicePoints = settled
+            .filter(
+              (result): result is PromiseFulfilledResult<DailyTelemetryPoint[]> =>
+                result.status === "fulfilled"
+            )
+            .map((result) => result.value);
+
+          aggregatedEntries = [];
+          for (let i = 0; i < daysToFetch; i++) {
+            const dayStart = new Date(todayStart);
+            dayStart.setDate(dayStart.getDate() - i);
+            const dayEnd = endOfDay(dayStart);
+            const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
+
+            const summedHalfHourSeries = HALF_HOUR_SLOTS.map(() => 0);
+            let totalWhSum = 0;
+
+            for (const devicePoints of perDevicePoints) {
+              const dayPoints = devicePoints.filter(
+                (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
+              );
+              const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
+              for (let j = 0; j < summedHalfHourSeries.length; j++) {
+                summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
+              }
+
+              const totalWh =
+                dayPoints.length > 1
+                  ? Math.max(
+                      0,
+                      dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
+                    )
+                  : 0;
+              totalWhSum += totalWh;
+            }
+
+            const totalKwh = summedHalfHourSeries.length
+              ? summedHalfHourSeries[summedHalfHourSeries.length - 1]
+              : 0;
+
+            aggregatedEntries.push({
+              key: dayKey,
+              date: dayStart,
+              isToday: i === 0,
+              totalWh: totalWhSum,
+              totalKwh,
+              halfHourSeries: summedHalfHourSeries,
+            });
+          }
+        } else if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           if (!targets.length) {
             aggregatedEntries = [];
@@ -1173,8 +1337,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   }, [
     deviceSN,
     deviceCategory,
+    deviceOptions,
     isAllSitesSelected,
     isOverviewSelected,
+    overviewDeviceOptionsKey,
+    siteForApi,
     siteTargetsKey,
     selectedDeviceSiteForApi,
   ]);
@@ -1279,7 +1446,48 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           range,
         });
         let res: any = null;
-        if (isAllSitesSelected && isOverviewSelected) {
+        if (isOverviewSelected && !isAllSitesSelected) {
+          if (!deviceOptions.length) {
+            setMetrics({
+              voltage: 0,
+              current: 0,
+              frequency: 0,
+              consumptionKwh: 0,
+              lifetimeKwh: 0,
+              monthKwh: 0,
+            });
+            setTemperatureC(null);
+            return;
+          }
+          const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
+            const response = await fetchEquipmentTelemetry({
+              siteIdOrCode: device.siteIdOrCode || siteForApi,
+              sn: device.sn,
+              startTime: range.from,
+              endTime: range.to,
+              category: device.category,
+            });
+            const payload = (response as any)?.data ?? {};
+            return summarizeTelemetryPayload(payload);
+          });
+          const summaries = settled
+            .filter(
+              (item): item is PromiseFulfilledResult<NormalizedTelemetrySummary> =>
+                item.status === "fulfilled"
+            )
+            .map((item) => item.value);
+          res = {
+            data: {
+              summary: aggregateTelemetrySummaries(summaries),
+              telemetries: [],
+            },
+          };
+          logElectricApiPayload("fetchEquipmentTelemetry(single-site overview aggregated)", {
+            deviceCount: deviceOptions.length,
+            summaries,
+            response: res,
+          });
+        } else if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
             fetchEquipmentTelemetry({
@@ -1423,8 +1631,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     computeRange,
     deviceSN,
     deviceCategory,
+    deviceOptions,
     isOverviewSelected,
     isAllSitesSelected,
+    overviewDeviceOptionsKey,
+    siteForApi,
     siteTargetsKey,
     selectedDeviceSiteForApi,
   ]);
@@ -1548,7 +1759,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const overviewInverterAggregate = React.useMemo(() => {
     return overviewInverterSummaries.reduce(
       (acc, item) => {
-        acc.todayKwh += Number(item.summary.productionTodayKwh || 0);
+        const seriesTodayKwh = item.halfHourSeries.length
+          ? Number(item.halfHourSeries[item.halfHourSeries.length - 1] || 0)
+          : 0;
+        acc.todayKwh += Number(
+          item.summary.productionTodayKwh || seriesTodayKwh || item.summary.usageKwh || 0
+        );
         acc.monthKwh += Number(item.summary.productionMonthKwh || 0);
         acc.lifetimeKwh += Number(item.summary.accumulatedKwh || 0);
         return acc;
