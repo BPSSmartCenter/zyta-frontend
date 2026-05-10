@@ -14,7 +14,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { brandImage, meaLogo, peaLogo } from "../../assets";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
-import type { MeterDashboard } from "../../api/meter";
+import type { MeterDashboard } from "../../features/electric";
 import {
   downloadBillExcel,
   downloadPreviewBillExcel,
@@ -25,7 +25,7 @@ import {
   generateBillExcel as generateBillExcelApi,
   type BillDetailPayload,
   type BillingReadingsPayload,
-} from "../../api/billing";
+} from "../../features/billing";
 import { saveBlobAsFile } from "../../utils/download";
 import { buildBrandingLogoSrc } from "../../utils/branding";
 type BillingMode = "monthly" | "daily";

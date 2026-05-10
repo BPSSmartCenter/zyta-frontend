@@ -5,7 +5,7 @@ import { useFilters } from "../../../context/FiltersContext";
 import {
   getElectricOverview,
   getElectricDevices,
-} from "../../../api/electric";
+} from "../../../features/electric";
 import {
   UtilityHeroCard,
   UtilityMetricTile,
@@ -213,7 +213,7 @@ const to24FromLabel = (label?: string) => {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
 
-import { fetchEquipmentTelemetry } from "../../../api/equipment";
+import { fetchEquipmentTelemetry } from "../../../features/electric";
 
 type DailySeries = {
   key: string;

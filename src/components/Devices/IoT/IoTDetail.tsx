@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 
-import { getIoTDevices, type IoTDevice } from "../../../api/iot";
+import { getIoTDevices, type IoTDevice } from "../../../features/devices";
 import { LineChart } from "../../Chart";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";

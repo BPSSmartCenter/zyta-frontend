@@ -2,7 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import Dropdown from "../Dropdown";
 import type { AdminRow } from "./user.constant";
-import { listSites } from "../../api/sites";
+import { listSites } from "../../features/sites";
 
 type Props = {
   actorRole?: "admin" | "manager" | "officer" | "user";

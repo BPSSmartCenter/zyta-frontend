@@ -2,7 +2,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { DateValue } from "../components/DateInput";
-import { getSiteDetails } from "../api/sites";
+import { getSiteDetails } from "../features/sites";
 import {
   dateFilterActions,
   selectDateFilterTouched,

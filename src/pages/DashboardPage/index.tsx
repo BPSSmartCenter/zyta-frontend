@@ -1,7 +1,7 @@
 // src/pages/DashboardPage/index.tsx
 import React from "react";
 import ContentLayout from "../../components/Dashboard/ContentLayout";
-import { listSites } from "../../api/sites";
+import { listSites } from "../../features/sites";
 import { useFilters } from "../../context/FiltersContext";
 import DetectionSummaryBar from "../../components/Dashboard/DetectionSummaryBar";
 import DashboardTopBar from "../../components/Dashboard/DashboardTopBar";

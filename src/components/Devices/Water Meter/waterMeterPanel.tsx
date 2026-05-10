@@ -11,7 +11,7 @@ import phWaterDrop from "../../../assets/phWaterDrop.png";
 import waterIcon from "../../../assets/Water.png";
 import TDSIcon from "../../../assets/TDS.png";
 import waterDrop from "../../../assets/waterDrop.png";
-import { getWaterDevices, type WaterDeviceRecord } from "../../../api/water";
+import { getWaterDevices, type WaterDeviceRecord } from "../../../features/devices";
 import { useFilters } from "../../../context/FiltersContext";
 import { useNotisFeed } from "../../../context/NotisContext";
 import type { Noti } from "../../../data/Dashboard/notis";

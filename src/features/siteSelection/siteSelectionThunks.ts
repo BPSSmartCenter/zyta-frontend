@@ -1,19 +1,11 @@
 // src/features/siteSelection/siteSelectionThunks.ts
-//
-// Async thunks for loading site catalog and hydrating initial selection.
-// Logic ย้ายมาจาก FiltersContext (listSites + listSiteGroups + apiMe)
-// เพื่อให้ Redux เป็น single source of truth
-
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { me as apiMe } from "../../api/user";
-import { listSites } from "../../api/sites";
-import { listSiteGroups } from "../../api/siteGroups";
+import { ApiError, request, requestList } from "../../lib/http";
+import { normalizeMeResponse, type MeResponse } from "../users/usersTypes";
+import type { SiteGroup } from "../siteGroups/siteGroupsThunks";
+import type { ListSitesResponse } from "../sites/sitesTypes";
 import type { SiteOption } from "./siteSelectionTypes";
 import { readStoredSite, writeStoredSite } from "./siteSelectionStorage";
-
-// ─────────────────────────────────────────────────────────
-// Helpers (pure)
-// ─────────────────────────────────────────────────────────
 
 type ApiRecord = Record<string, unknown>;
 
@@ -43,24 +35,6 @@ function arrayFromResponse(value: unknown): unknown[] {
   return [];
 }
 
-function getHttpStatus(error: unknown): number | undefined {
-  if (!isRecord(error)) return undefined;
-  const response = asRecord(error.response);
-  const status = response?.status;
-  return typeof status === "number" ? status : undefined;
-}
-
-function getErrorCode(error: unknown): string | undefined {
-  if (!isRecord(error)) return undefined;
-  return typeof error.code === "string" ? error.code : undefined;
-}
-
-function getErrorMessage(error: unknown): string | undefined {
-  if (!isRecord(error)) return undefined;
-  return typeof error.message === "string" ? error.message : undefined;
-}
-
-/** Normalize raw site object จาก API → SiteOption */
 export function normalizeSiteToOption(site: unknown): SiteOption | null {
   if (!isRecord(site)) return null;
   const rawLabel = site.name ?? site.code ?? site.id ?? "";
@@ -70,7 +44,6 @@ export function normalizeSiteToOption(site: unknown): SiteOption | null {
     asRecord(site.site_groups) ??
     asRecord(site.siteGroup) ??
     asRecord(site.group);
-  // Direct utility on the site takes priority; fallback to group's utility
   const utilityFromApi =
     asRecord(site.utility) ??
     asRecord(groupFromApi?.utility) ??
@@ -100,7 +73,6 @@ export function normalizeSiteToOption(site: unknown): SiteOption | null {
   };
 }
 
-/** Dedup options by value (case-insensitive) */
 function dedupOptions(options: SiteOption[]): SiteOption[] {
   const seen = new Set<string>();
   const list: SiteOption[] = [];
@@ -113,10 +85,6 @@ function dedupOptions(options: SiteOption[]): SiteOption[] {
   return list;
 }
 
-// ─────────────────────────────────────────────────────────
-// Thunk: loadSiteCatalog
-// ─────────────────────────────────────────────────────────
-
 export type LoadSiteCatalogResult = {
   isAdmin: boolean;
   sites: SiteOption[];
@@ -128,24 +96,14 @@ export type LoadSiteCatalogError = {
   message: string;
 };
 
-/**
- * โหลด catalog ไซต์ที่ user เข้าถึงได้
- *
- * Logic:
- * - admin role → ดึงทั้งหมดจาก listSites() (global catalog)
- * - non-admin + มี user.sites → ใช้ user.sites + enrich metadata จาก catalog ถ้าเข้าถึงได้
- * - non-admin + ไม่มี user.sites → คืน [] (ไม่มีสิทธิ์)
- *
- * ไม่ throw สำหรับ "user ไม่มีสิทธิ์" — คืน { sites: [] } แทน
- * Reject เฉพาะ network/auth error
- */
 export const loadSiteCatalog = createAsyncThunk<
   LoadSiteCatalogResult,
   void,
   { rejectValue: LoadSiteCatalogError }
 >("siteSelection/loadCatalog", async (_, { rejectWithValue }) => {
   try {
-    const currentUser = await apiMe();
+    const meRaw = await request<unknown>("/users/me");
+    const currentUser: MeResponse = normalizeMeResponse(meRaw);
     const uid = currentUser?.id ?? null;
     const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
 
@@ -155,12 +113,11 @@ export const loadSiteCatalog = createAsyncThunk<
           .filter((opt): opt is SiteOption => Boolean(opt))
       : [];
 
-    // พยายามดึง site groups (เพื่อ enrich groupLabel ในกรณี assigned ไม่ได้ populate ครบ)
     let groupsById = new Map<string, string>();
     try {
-      const groups = await listSiteGroups();
+      const groups = await requestList<SiteGroup>("/site-groups");
       groupsById = new Map(
-        (Array.isArray(groups) ? groups : [])
+        groups
           .map((group): [string, string] => [
             String(group?.id || "").trim(),
             String(group?.name || "").trim(),
@@ -171,10 +128,9 @@ export const loadSiteCatalog = createAsyncThunk<
       groupsById = new Map();
     }
 
-    // ดึง catalog จาก /sites — ใช้สำหรับ admin (แทน assigned) หรือ non-admin (enrich)
     let catalogOptions: SiteOption[] = [];
     try {
-      const sitesResp: unknown = await listSites();
+      const sitesResp = await request<ListSitesResponse>("/sites");
       const items = arrayFromResponse(sitesResp);
       catalogOptions = items
         .map((site) => normalizeSiteToOption(site))
@@ -193,7 +149,6 @@ export const loadSiteCatalog = createAsyncThunk<
     if (isAdmin) {
       baseOptions = catalogOptions;
     } else if (assignedOptions.length > 0) {
-      // enrich metadata จาก catalog แต่ไม่เพิ่มไซต์นอก scope
       const catalogByValue = new Map(
         catalogOptions.map((opt) => [opt.value.toLowerCase(), opt] as const)
       );
@@ -208,8 +163,6 @@ export const loadSiteCatalog = createAsyncThunk<
           utilityLabel: opt.utilityLabel ?? catalog.utilityLabel ?? null,
         };
       });
-    } else {
-      baseOptions = [];
     }
 
     return {
@@ -217,64 +170,39 @@ export const loadSiteCatalog = createAsyncThunk<
       sites: dedupOptions(baseOptions),
       uid,
     };
-  } catch (error: unknown) {
-    const status = getHttpStatus(error);
-    if (status === 401 || status === 403) {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 401 || error.status === 403) {
+        return rejectWithValue({
+          code: "UNAUTHORIZED",
+          message: "Not authenticated",
+        });
+      }
+      if (error.status === undefined) {
+        return rejectWithValue({ code: "NETWORK", message: "Network error" });
+      }
       return rejectWithValue({
-        code: "UNAUTHORIZED",
-        message: "Not authenticated",
-      });
-    }
-    if (getErrorCode(error) === "ERR_NETWORK" || !status) {
-      return rejectWithValue({
-        code: "NETWORK",
-        message: "Network error",
+        code: "UNKNOWN",
+        message: error.message || "Failed to load sites",
       });
     }
     return rejectWithValue({
       code: "UNKNOWN",
-      message: getErrorMessage(error) ?? "Failed to load sites",
+      message: "Failed to load sites",
     });
   }
 });
 
-// ─────────────────────────────────────────────────────────
-// Thunk: hydrateSelection
-// ─────────────────────────────────────────────────────────
-
 export type HydrateSelectionInput = {
-  /** uid ปัจจุบันจาก URL หรือ auth — ใช้เป็น key สำหรับ sessionStorage */
   uid: string;
-  /** ถ้า URL มี :siteCode ให้ส่งมา (จะ priority สูงสุด) */
   urlSiteCode?: string | null;
 };
 
 export type HydrateSelectionResult =
-  | {
-      kind: "resolved";
-      /** ค่าที่เลือก ("all" หรือ site code) */
-      value: string;
-      /** source ที่มาของค่า (สำหรับ debug/analytics) */
-      source: "url" | "storage" | "auto-single";
-    }
-  | {
-      kind: "needs-picker";
-      /** เปิด modal แบบ forced (ผู้ใช้มีหลายไซต์ ต้องเลือก) */
-    }
-  | {
-      kind: "no-access";
-      /** ไม่มีไซต์ให้เลือกเลย (non-admin, no assigned sites) */
-    };
+  | { kind: "resolved"; value: string; source: "url" | "storage" | "auto-single" }
+  | { kind: "needs-picker" }
+  | { kind: "no-access" };
 
-/**
- * Resolve initial selection หลัง catalog โหลดเสร็จ
- *
- * Priority:
- *   1. URL `:siteCode` (ถ้า user มีสิทธิ์)
- *   2. sessionStorage (ถ้ายัง valid + site ยังอยู่ใน catalog)
- *   3. auto-select ถ้ามีไซต์เดียว
- *   4. else → needs-picker
- */
 export const hydrateSelection = createAsyncThunk<
   HydrateSelectionResult,
   HydrateSelectionInput,
@@ -288,20 +216,16 @@ export const hydrateSelection = createAsyncThunk<
 
   const validValues = new Set<string>(["all", ...sites.map((s) => s.value.toLowerCase())]);
 
-  // 1) URL
   if (urlSiteCode) {
     const norm = urlSiteCode.trim().toLowerCase();
     if (validValues.has(norm)) {
-      // หา casing ต้นฉบับ
       const match = sites.find((s) => s.value.toLowerCase() === norm);
       const value = match ? match.value : urlSiteCode.trim();
       writeStoredSite(uid, value);
       return { kind: "resolved", value, source: "url" };
     }
-    // URL มี siteCode แต่ไม่มีสิทธิ์ — ไม่ auto-resolve, ตกลงสู่ขั้นตอนถัดไป
   }
 
-  // 2) sessionStorage
   const stored = readStoredSite(uid);
   if (stored) {
     const norm = stored.toLowerCase();
@@ -312,13 +236,11 @@ export const hydrateSelection = createAsyncThunk<
     }
   }
 
-  // 3) auto-select ถ้ามีไซต์เดียว
   if (sites.length === 1) {
     const only = sites[0].value;
     writeStoredSite(uid, only);
     return { kind: "resolved", value: only, source: "auto-single" };
   }
 
-  // 4) ต้อง force picker
   return { kind: "needs-picker" };
 });

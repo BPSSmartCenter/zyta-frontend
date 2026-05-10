@@ -16,9 +16,9 @@ import BillingHistoryTable from "../../components/ElectricMeterDashboard/Billing
 import Modal from "../../components/Modal";
 import { useUserPath } from "../../routes/useUserPath";
 import type { MeterOption } from "../../types/meter";
-import { getElectricDevices } from "../../api/electric";
-import { getMeterDashboard, getSiteMetersDashboard, type MeterDashboard } from "../../api/meter";
-import { downloadBillPdf } from "../../api/billing";
+import { getElectricDevices } from "../../features/electric";
+import { getMeterDashboard, getSiteMetersDashboard, type MeterDashboard } from "../../features/electric";
+import { downloadBillPdf } from "../../features/billing";
 import { saveBlobAsFile } from "../../utils/download";
 
 const OVERVIEW_METER_ID = "overview";

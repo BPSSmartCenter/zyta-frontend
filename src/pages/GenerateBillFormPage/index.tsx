@@ -12,14 +12,14 @@ import {
 } from "../../context/DeviceInventoryContext";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import { useUserPath } from "../../routes/useUserPath";
-import { listSiteDevices } from "../../api/devices";
-import { getSiteDetails } from "../../api/sites";
+import { listSiteDevices } from "../../features/devices";
+import { getSiteDetails } from "../../features/sites";
 import {
   getMeterDashboard,
   getSiteMetersDashboard,
   type MeterDashboard,
-} from "../../api/meter";
-import { getBillingReadingsData, getSiteBillingReadingsData } from "../../api/billing";
+} from "../../features/electric";
+import { getBillingReadingsData, getSiteBillingReadingsData } from "../../features/billing";
 import Dropdown from "../../components/Dropdown";
 import DatePicker, { type DateValue } from "../../components/DateInput";
 import { buildBrandingLogoSrc } from "../../utils/branding";
@@ -575,11 +575,12 @@ const GenerateBillForm: React.FC = () => {
           setSiteInfo(null);
         }
 
+        const devicesAny = devicesResp as any;
         const devicePayload =
-          devicesResp?.items ??
-          devicesResp?.data?.items ??
-          devicesResp?.data ??
-          devicesResp ??
+          devicesAny?.items ??
+          devicesAny?.data?.items ??
+          devicesAny?.data ??
+          devicesAny ??
           [];
           const actualMeters = (devicePayload as any[])
             .filter((item) => item?.id ?? item?.model)

@@ -10,8 +10,8 @@ import {
   roleColors,
   roleLabels,
 } from "../../components/Dashboard/dashboard.constants";
-import { listSites } from "../../api/sites";
-import { getUserStats } from "../../api/user";
+import { listSites } from "../sites";
+import { getUserStats } from "../users";
 import { selectAuthUser } from "../auth";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";

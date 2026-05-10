@@ -9,7 +9,7 @@ import {
   roleLabels,
   roleColors,
 } from "./dashboard.constants";
-import { getUserStats } from "../../api/user";
+import { getUserStats } from "../../features/users";
 import DeviceCount from "./DeviceCount";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import FaceRecognize from "./FaceRecognize";

@@ -7,7 +7,7 @@ import ContentCreate from "../../components/SiteManagement/Content_Create";
 import ContentEdit from "../../components/SiteManagement/Content_Edit";
 import ContentDetail from "../../components/SiteManagement/Content_Detail";
 import { ToastProvider, useToast } from "../../hook/toastProvider";
-import { listSites, registerSite, updateSite, deleteSite } from "../../api/sites";
+import { listSites, registerSite, updateSite, deleteSite } from "../../features/sites";
 import { PROVINCE_CODE_TO_TH } from "../../data/Dashboard/data";
 import type { SiteRow } from "../../components/SiteManagement/site.constant";
 import Modal from "../../components/Modal";
@@ -26,7 +26,7 @@ function SiteManagementGuarded() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../../api/user")).me();
+        const me = await (await import("../../features/users")).me();
         setAllowed(String(me.role).toLowerCase() === "admin");
       } catch {
         setAllowed(false);

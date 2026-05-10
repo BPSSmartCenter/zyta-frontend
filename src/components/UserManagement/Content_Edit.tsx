@@ -4,8 +4,8 @@ import Dropdown from "../Dropdown";
 import Modal from "../Modal";
 import { useToast } from "../../hook/toastProvider";
 import type { AdminRow } from "./user.constant";
-import { listSites } from "../../api/sites";
-import { getUser } from "../../api/adminUsers";
+import { listSites } from "../../features/sites";
+import { getUser } from "../../features/users";
 import { buildBrandingLogoSrc } from "../../utils/branding";
 
 type Props = {

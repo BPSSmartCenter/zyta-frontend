@@ -1,8 +1,8 @@
 import React from "react";
 import MapPanel from "../../components/Dashboard/MapPanel";
-import { listSites } from "../../api/sites";
+import { listSites } from "../../features/sites";
 import { selectAuthUser } from "../auth";
-import { listNotis } from "../../api/notis";
+import { listNotifications as listNotis } from "../notifications";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";

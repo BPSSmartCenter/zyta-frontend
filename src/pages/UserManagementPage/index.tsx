@@ -16,7 +16,7 @@ import {
   assignUserSites as apiAssignUserSites,
   type AdminUserDto,
   type UserSearchDto,
-} from "../../api/adminUsers";
+} from "../../features/users";
 import { ADMIN_ROWS, type AdminRow } from "../../components/UserManagement/user.constant";
 
 export default function UserManagement() {
@@ -34,7 +34,7 @@ function UserManagementGuarded() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../../api/user")).me();
+        const me = await (await import("../../features/users")).me();
         const role = String(me.role).toLowerCase();
         setAllowed(role === "admin" || role === "manager");
       } catch {
@@ -164,7 +164,7 @@ function UserManagementInner() {
   React.useEffect(() => {
     (async () => {
       try {
-        const me = await (await import("../../api/user")).me();
+        const me = await (await import("../../features/users")).me();
         setActorRole((String(me?.role || "user").toLowerCase() as any) || "user");
         const siteIds = Array.isArray(me?.sites)
           ? me.sites.map((s: any) => s?.id).filter(Boolean)

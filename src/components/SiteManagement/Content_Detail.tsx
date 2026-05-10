@@ -1,8 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
-import { getSiteDetails, updateSiteBillingAccess } from "../../api/sites";
-import { getElectricDevices, registerElectricDevice } from "../../api/electric";
+import { getSiteDetails, updateSiteBillingAccess } from "../../features/sites";
+import { getElectricDevices, registerElectricDevice } from "../../features/electric";
 import {
   registerAirSensorDevice,
   registerCctvDevice,
@@ -11,7 +11,7 @@ import {
   deleteSiteDevice,
   updateSiteDevice,
   type DeviceTypeKey,
-} from "../../api/devices";
+} from "../../features/devices";
 import { useToast } from "../../hook/toastProvider";
 import type { BillingType, SiteBillingAccess } from "../../types/billing";
 import { buildBrandingLogoSrc } from "../../utils/branding";

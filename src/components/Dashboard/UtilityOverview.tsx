@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { getElectricOverview } from "../../api/electric";
+import { getElectricOverview } from "../../features/electric";
 import {
   selectAccessibleSites,
   selectSelectedGroup,

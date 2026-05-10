@@ -5,7 +5,7 @@ import { useNotisFeed } from "../../context/NotisContext";
 import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
 import type { SitePoint, SitePinStatus } from "../Map/MapTypes";
-import { getSiteDetails } from "../../api/sites";
+import { getSiteDetails } from "../../features/sites";
 
 /* ---------- helpers ---------- */
 const toEventKey = (n: Noti): string => {

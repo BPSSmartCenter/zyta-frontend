@@ -3,8 +3,8 @@ import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import { useTranslation } from "react-i18next";
 import SearchInput from "../../SearchInput";
-import { getIoTDevices, type IoTDevice } from "../../../api/iot";
-import { api, unwrapApiData } from "../../../api/axios";
+import { getIoTDevices, type IoTDevice } from "../../../features/devices";
+import { request } from "../../../lib/http";
 import { useFilters } from "../../../context/FiltersContext";
 import {
   UtilitySectionTitle,
@@ -581,12 +581,11 @@ export default function AirPanel({ siteCode }: Props) {
     let cancelled = false;
 
     const fetchWeather = async (coords: typeof BANGKOK_COORDS) => {
-      // V1: backend wraps Open-Meteo (cache + privacy). Response is the upstream
-      // payload unchanged, but wrapped in { ok, data }.
-      const response = await api.get("/weather/forecast", {
+      // V1: backend wraps Open-Meteo (cache + privacy). The http wrapper
+      // already unwraps the v1 envelope, so `data` here is the upstream payload.
+      const data = await request<Record<string, any>>("/weather/forecast", {
         params: { lat: coords.lat, lng: coords.lon },
       });
-      const data = unwrapApiData<Record<string, any>>(response.data);
       const current =
         data?.current ??
         (data?.current_weather

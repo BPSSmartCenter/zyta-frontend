@@ -5,7 +5,7 @@ import {
   updateUtility,
   deleteUtility,
   type Utility,
-} from "../api/utilities";
+} from "../features/utilities";
 
 export function useUtilities() {
   const [utilities, setUtilities] = React.useState<Utility[]>([]);

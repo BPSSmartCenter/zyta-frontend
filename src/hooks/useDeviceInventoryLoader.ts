@@ -1,6 +1,6 @@
 import React from "react";
-import { getSiteDetails, listSites } from "../api/sites";
-import { getIoTDevices } from "../api/iot";
+import { getSiteDetails, listSites } from "../features/sites";
+import { getIoTDevices } from "../features/devices";
 import { useDeviceInventory } from "../context/DeviceInventoryContext";
 import { useFilters } from "../context/FiltersContext";
 import type { SiteOption } from "../components/Shared/SiteDropdownGrouped";

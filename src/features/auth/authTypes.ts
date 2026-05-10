@@ -1,4 +1,4 @@
-import type { MeResponse } from "../../api/user";
+import type { MeResponse } from "../users/usersTypes";
 
 export type RequestStatus = "idle" | "pending" | "succeeded" | "failed";
 

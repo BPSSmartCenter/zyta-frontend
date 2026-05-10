@@ -1,7 +1,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { SiteRow } from "./site.constant";
-import { lookupThaiAddress } from "../../api/thaiAddress";
+import { lookupThaiAddress } from "../../features/thaiAddress";
 import { useSiteGroups } from "../../hooks/useSiteGroups";
 import { useUtilities } from "../../hooks/useUtilities";
 import Dropdown from "../Dropdown";

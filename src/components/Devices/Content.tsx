@@ -20,7 +20,7 @@ import {
   getCountForType,
 } from "../../context/DeviceInventoryContext";
 import Modal from "../Modal";
-import { getSiteBillingAccess } from "../../api/sites";
+import { getSiteBillingAccess } from "../../features/sites";
 import type { BillingType, SiteBillingAccess } from "../../types/billing";
 
 type Props = {};

@@ -1,5 +1,5 @@
 import React from "react";
-import { createSiteGroup, listSiteGroups, type SiteGroup } from "../api/siteGroups";
+import { createSiteGroup, listSiteGroups, type SiteGroup } from "../features/siteGroups";
 
 export function useSiteGroups() {
   const [groups, setGroups] = React.useState<SiteGroup[]>([]);

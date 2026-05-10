@@ -1,6 +1,6 @@
 ﻿// src/context/FaceRecContext.tsx
 import React from "react";
-import { listFaceRecEvents, faceRecStreamUrl, type FaceRecWebhookPayload, type PlateWebhookPayload } from "../api/facerec";
+import { listFaceRecEvents, faceRecStreamUrl, type FaceRecWebhookPayload, type PlateWebhookPayload } from "../features/facerec";
 import type { Noti } from "../data/Dashboard/notis";
 import { useNotisFeed } from "./NotisContext";
 import { sortByNewest } from "../utils/notis";

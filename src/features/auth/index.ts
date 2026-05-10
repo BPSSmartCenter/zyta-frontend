@@ -8,7 +8,18 @@ export {
   registerAccount,
   resendVerificationEmail,
   resetPassword,
+  verifyEmail,
 } from "./authThunks";
+export {
+  registerAccountApi,
+  loginApi,
+  logoutApi,
+  resendVerificationApi,
+  verifyEmailApi,
+  checkEmailExistsApi,
+  requestPasswordResetApi,
+  resetPasswordApi,
+} from "./authApi";
 export {
   selectAuthBootError,
   selectAuthBootStatus,

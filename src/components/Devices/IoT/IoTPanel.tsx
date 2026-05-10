@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { getIoTDevices, type IoTDevice } from "../../../api/iot";
+import { getIoTDevices, type IoTDevice } from "../../../features/devices";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function IoTPanel() {

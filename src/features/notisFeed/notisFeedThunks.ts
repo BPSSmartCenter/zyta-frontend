@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { listNotis } from "../../api/notis";
+import { listNotifications } from "../notifications";
 import type { Noti } from "../../data/Dashboard/notis";
 import type { RootState } from "../../store/store";
 import { decorateNotiForDisplay, sortByNewest } from "../../utils/notis";
@@ -128,7 +128,7 @@ export const fetchNotisFeed = createAsyncThunk<
 
   try {
     const range = toIsoRangeForDate(date);
-    const fetched = await listNotis({
+    const fetched = await listNotifications({
       from: range.from,
       to: range.to,
       siteCode:

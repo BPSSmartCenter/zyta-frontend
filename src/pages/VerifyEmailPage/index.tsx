@@ -1,9 +1,9 @@
 // src/pages/VerifyEmailPage/index.tsx
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { verifyEmail } from "../../api/auth";
-import { isAxiosError } from "axios";
 import { useTranslation } from "react-i18next";
+import { verifyEmailApi } from "../../features/auth";
+import { ApiError } from "../../lib/http";
 
 export default function VerifyEmail() {
   const { t } = useTranslation("verify");
@@ -14,25 +14,18 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     (async () => {
+      if (!token) {
+        setStatus("bad");
+        return;
+      }
       try {
-        if (!token) {
-          setStatus("bad");
-          return;
-        }
-        const { data } = await verifyEmail(token);
-        // ��� backend �ͺ 200 ������ ok:true ���� ok:true,already:true  �����Ҽ�ҹ
-        if (data?.ok) {
+        await verifyEmailApi(token);
+        setStatus("ok");
+      } catch (e) {
+        // Backend returns 409 / already-verified for tokens that already verified — treat as success.
+        if (e instanceof ApiError && e.status === 409) {
           setStatus("ok");
           return;
-        }
-        setStatus("bad");
-      } catch (e) {
-        if (isAxiosError(e)) {
-          // �ѹ�ó� backend �ͺ 409/200-already  �����Ҽ�ҹ
-          if (e.response?.status === 409) {
-            setStatus("ok");
-            return;
-          }
         }
         setStatus("bad");
       }
@@ -41,7 +34,6 @@ export default function VerifyEmail() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-br from-white to-[#F6FBFF] relative overflow-hidden">
-      {/* decorative blurred orbs */}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-cyan/20 blur-3xl"
@@ -55,11 +47,10 @@ export default function VerifyEmail() {
           status === "ok"
             ? "ring-2 ring-lime-200"
             : status === "bad"
-            ? "ring-2 ring-rose-200"
-            : "ring-1 ring-cyan/20"
+              ? "ring-2 ring-rose-200"
+              : "ring-1 ring-cyan/20"
         }`}
       >
-        {/* top accent bar */}
         <div
           aria-hidden
           className="absolute inset-x-0 -top-px h-1 bg-gradient-to-r from-cyan via-blue to-cyan rounded-t-3xl"
@@ -75,7 +66,7 @@ export default function VerifyEmail() {
             </h1>
             <button
               className="bg-cyan text-white px-6 py-2.5 rounded-lg cursor-pointer mt-10 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-transform duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan/40"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/login")}
             >
               {t("login")}
             </button>
@@ -89,7 +80,7 @@ export default function VerifyEmail() {
             <p className="mb-4 text-gray-600">{t("go_signin")}</p>
             <button
               className="bg-cyan text-white px-6 py-2.5 rounded-lg cursor-pointer shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-transform duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan/40"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/login")}
             >
               {t("login")}
             </button>
