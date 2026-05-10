@@ -128,6 +128,7 @@ api.interceptors.response.use(
       if (status === 401 && !isAuthEndpoint && !silent401) {
         const publicPaths = [
           "/",
+          "/login",
           "/register",
           "/verify-email",
           "/forgot",
@@ -137,12 +138,12 @@ api.interceptors.response.use(
           typeof window !== "undefined" &&
           publicPaths.includes(window.location?.pathname || "");
         if (atPublic) {
-          // Avoid redirect loops on public routes (e.g., root login)
+          // Avoid redirect loops on public routes (e.g., landing/login)
           return Promise.reject(err);
         }
         // for protected APIs only: bounce to login
         if (typeof window !== "undefined") {
-          window.location.href = "/";
+          window.location.href = "/login";
         }
         return Promise.reject(err);
       }

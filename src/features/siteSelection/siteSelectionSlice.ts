@@ -16,7 +16,8 @@ import {
   loadSiteCatalog,
   type LoadSiteCatalogError,
 } from "./siteSelectionThunks";
-import { writeStoredSite } from "./siteSelectionStorage";
+import { clearAllStoredSites, writeStoredSite } from "./siteSelectionStorage";
+import { logoutUser } from "../auth/authThunks";
 
 type SiteSelectionState = {
   // Catalog
@@ -156,6 +157,18 @@ const slice = createSlice({
           state.isPickerOpen = false;
           state.pickerReason = null;
         }
+      })
+
+      // Logout — drop persisted selection + reset slice. Storage cleanup is a
+      // side effect; the immer-friendly state reset comes from returning fresh
+      // initialState.
+      .addCase(logoutUser.fulfilled, () => {
+        try {
+          clearAllStoredSites();
+        } catch {
+          // ignore storage errors — slice reset still proceeds
+        }
+        return { ...initialState };
       });
   },
 });

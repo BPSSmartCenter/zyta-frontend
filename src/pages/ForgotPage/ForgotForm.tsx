@@ -97,7 +97,7 @@ export default function ForgotForm({
             </span>
           </button>
           <Link
-            to="/"
+            to="/login"
             className="text-center text-sm font-semibold text-[#0877A8] underline-offset-4 transition hover:text-[#0063BF] hover:underline sm:text-base"
           >
             {t("reset.login_link")}

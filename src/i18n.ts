@@ -21,6 +21,7 @@ i18n
       "billing",
       "userManagement",
       "siteManagement",
+      "landing",
     ],
     defaultNS: "common",
     debug: false,

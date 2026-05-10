@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import {
   Dashboard,
+  Landing,
   Register,
   Login,
   TotalAlert,
@@ -44,13 +45,7 @@ import { selectAuthUser, selectIsAuthBooting } from "./features/auth";
 import type { AuthUser } from "./features/auth";
 
 function dashboardPathFor(user: AuthUser | null) {
-  return user?.id ? `/u/${encodeURIComponent(user.id)}/dashboard` : "/";
-}
-
-function cardSandboxPathFor(user: AuthUser | null) {
-  if (!user?.id) return "/";
-  if (user.role !== "admin") return dashboardPathFor(user);
-  return `/u/${encodeURIComponent(user.id)}/sandbox/card-board`;
+  return user?.id ? "/dashboard" : "/";
 }
 
 function AppBootLoading() {
@@ -92,16 +87,12 @@ function App() {
       <LanguageSwitcher />
       <Routes>
         {/* public — ไม่ mount authed providers */}
-        <Route path="/" element={<RootLoginOrDashboard />} />
+        <Route path="/" element={<RootLandingOrDashboard />} />
+        <Route path="/login" element={<RootLoginOrDashboard />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot" element={<Forgot />} />
         <Route path="/reset" element={<Reset />} />
-        <Route path="/sandbox/card-board" element={<LegacyCardSandboxRedirect />} />
-
-        {/* legacy path */}
-        <Route path="/dashboard" element={<LegacyDashboardRedirect />} />
-
         {/* protected — mount providers หลังผ่าน RequireAuth แล้ว */}
         <Route
           element={
@@ -113,52 +104,50 @@ function App() {
           }
         >
           <Route element={<AppLayout />}>
-            <Route path="/u/:uid">
-              <Route element={<RequireAdmin />}>
-                <Route path="sandbox/card-board" element={<CardSandbox />} />
-              </Route>
+            <Route element={<RequireAdmin />}>
+              <Route path="/sandbox/card-board" element={<CardSandbox />} />
+            </Route>
 
-              {/* data routes — require a selected site (or "all") */}
-              <Route element={<RequireSiteSelected />}>
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="electric" element={<BillingOverview />} />
-                <Route path="electric/meter" element={<ElectricMeter />} />
-                <Route
-                  path="electric/generate-bill"
-                  element={<GenerateBillForm />}
-                />
-                <Route
-                  path="electric/generate-bill/preview"
-                  element={<BillPdfPreview />}
-                />
-                <Route path="alert" element={<TotalAlert />} />
-                <Route path="facerec" element={<FaceRecognize />} />
-                <Route path="license-plates" element={<LicensePlates />} />
-                <Route path="devices" element={<Devices />} />
-              </Route>
+            {/* data routes — require a selected site (or "all") */}
+            <Route element={<RequireSiteSelected />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/electric" element={<BillingOverview />} />
+              <Route path="/electric/meter" element={<ElectricMeter />} />
+              <Route
+                path="/electric/generate-bill"
+                element={<GenerateBillForm />}
+              />
+              <Route
+                path="/electric/generate-bill/preview"
+                element={<BillPdfPreview />}
+              />
+              <Route path="/alert" element={<TotalAlert />} />
+              <Route path="/facerec" element={<FaceRecognize />} />
+              <Route path="/license-plates" element={<LicensePlates />} />
+              <Route path="/devices" element={<Devices />} />
+            </Route>
 
-              {/* admin routes — ไม่ต้องบังคับเลือกไซต์ */}
-              <Route path="usermanage" element={<UserManagement />} />
-              <Route path="sitemanage" element={<SiteManagement />} />
+            {/* admin routes — ไม่ต้องบังคับเลือกไซต์ */}
+            <Route path="/usermanage" element={<UserManagement />} />
+            <Route path="/sitemanage" element={<SiteManagement />} />
 
-              {/* site-scoped routes — URL ระบุ site แล้ว ไม่ต้องผ่าน picker guard */}
-              <Route path="site/:siteCode">
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="electric" element={<BillingOverview />} />
-                <Route path="electric/meter" element={<ElectricMeter />} />
-                <Route
-                  path="electric/generate-bill"
-                  element={<GenerateBillForm />}
-                />
-                <Route
-                  path="electric/generate-bill/preview"
-                  element={<BillPdfPreview />}
-                />
-                <Route path="alert" element={<TotalAlert />} />
-                <Route path="devices" element={<Devices />} />
-                <Route path="facerec" element={<FaceRecognize />} />
-                <Route path="license-plates" element={<LicensePlates />} />
-              </Route>
+            {/* site-scoped routes — URL ระบุ site แล้ว ไม่ต้องผ่าน picker guard */}
+            <Route path="/site/:siteCode">
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="electric" element={<BillingOverview />} />
+              <Route path="electric/meter" element={<ElectricMeter />} />
+              <Route
+                path="electric/generate-bill"
+                element={<GenerateBillForm />}
+              />
+              <Route
+                path="electric/generate-bill/preview"
+                element={<BillPdfPreview />}
+              />
+              <Route path="alert" element={<TotalAlert />} />
+              <Route path="devices" element={<Devices />} />
+              <Route path="facerec" element={<FaceRecognize />} />
+              <Route path="license-plates" element={<LicensePlates />} />
             </Route>
           </Route>
         </Route>
@@ -171,28 +160,19 @@ function App() {
 }
 
 /**
- * Legacy `/dashboard` path → redirect ไปยัง `/u/:uid/dashboard`
- * อ่าน user จาก Redux (ซึ่งถูก bootstrap แล้วจาก main.tsx) ไม่ต้อง fetch ซ้ำ
+ * หน้า root "/" : ถ้า login แล้ว → redirect ไป dashboard, ถ้ายัง → แสดง Landing
  */
-function LegacyDashboardRedirect() {
+function RootLandingOrDashboard() {
   const booting = useAppSelector(selectIsAuthBooting);
   const user = useAppSelector(selectAuthUser);
 
   if (booting) return <AppBootLoading />;
+  if (!user?.id) return <Landing />;
   return <Navigate to={dashboardPathFor(user)} replace />;
 }
 
-function LegacyCardSandboxRedirect() {
-  const booting = useAppSelector(selectIsAuthBooting);
-  const user = useAppSelector(selectAuthUser);
-
-  if (booting) return <AppBootLoading />;
-  return <Navigate to={cardSandboxPathFor(user)} replace />;
-}
-
 /**
- * หน้า root "/" : ถ้า login แล้ว → redirect ไป dashboard, ถ้ายัง → แสดง Login
- * อ่าน user จาก Redux (bootstrap ใน main.tsx) — ไม่ fetch /users/me ซ้ำ
+ * หน้า /login : ถ้า login แล้ว → redirect ไป dashboard, ถ้ายัง → แสดง Login form
  */
 function RootLoginOrDashboard() {
   const booting = useAppSelector(selectIsAuthBooting);

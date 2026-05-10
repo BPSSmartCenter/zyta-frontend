@@ -18,7 +18,8 @@ import UtilityOverview from "./UtilityOverview";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
-import { me as apiMe } from "../../api/user";
+import { useAppSelector } from "../../store/hooks";
+import { selectAuthUser } from "../../features/auth";
 import SnapshotChartSection from "../Chart";
 import Switch from "../Switch";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -152,7 +153,9 @@ export default function ContentLayout(props: Props) {
   } = props;
 
   const navigate = useNavigate();
-  const [isMaster, setIsMaster] = React.useState(false);
+  const authUser = useAppSelector(selectAuthUser);
+  const isMaster =
+    String(authUser?.email || "").toLowerCase() === MASTER_EMAIL;
   const [alertRailMode, setAlertRailMode] =
     React.useState<AlertRailMode>("alert-events");
   const alertAsideRef = React.useRef<HTMLElement | null>(null);
@@ -162,16 +165,6 @@ export default function ContentLayout(props: Props) {
   );
   const [alertViewportHeight, setAlertViewportHeight] =
     React.useState<number | null>(null);
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const me = await apiMe();
-        setIsMaster(String(me?.email || "").toLowerCase() === MASTER_EMAIL);
-      } catch {
-        setIsMaster(false);
-      }
-    })();
-  }, []);
   React.useEffect(() => {
     const node = mapSurfaceRef.current;
     if (!node) return;

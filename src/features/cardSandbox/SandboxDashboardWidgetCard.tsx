@@ -11,7 +11,8 @@ import {
   roleLabels,
 } from "../../components/Dashboard/dashboard.constants";
 import { listSites } from "../../api/sites";
-import { getUserStats, me as apiMe } from "../../api/user";
+import { getUserStats } from "../../api/user";
+import { selectAuthUser } from "../auth";
 import { useFilters } from "../../context/FiltersContext";
 import { useNotisFeed } from "../../context/NotisContext";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -168,16 +169,17 @@ function matchesSiteSummary(site: SandboxSite, codes: Set<string>) {
 }
 
 function useSandboxAccessibleSites() {
-  const [role, setRole] = React.useState<DashboardRole | null>(null);
+  const authUser = useAppSelector(selectAuthUser);
+  const role: DashboardRole | null = authUser
+    ? normalizeRole(authUser.role)
+    : null;
   const [accessibleSites, setAccessibleSites] = React.useState<SandboxSite[]>([]);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const currentUser = await apiMe();
-        const nextRole = normalizeRole(currentUser?.role);
-        const assignedSites = normalizeSiteList(currentUser?.sites);
+        const assignedSites = normalizeSiteList(authUser?.sites);
         let catalogSites: SandboxSite[] = [];
         try {
           catalogSites = normalizeSiteList(await listSites());
@@ -186,26 +188,20 @@ function useSandboxAccessibleSites() {
         }
 
         const nextSites =
-          nextRole === "admin"
+          role === "admin"
             ? catalogSites
             : assignedSites.length
             ? mergeSiteMetadata(assignedSites, catalogSites)
             : [];
-        if (!cancelled) {
-          setRole(nextRole);
-          setAccessibleSites(nextSites);
-        }
+        if (!cancelled) setAccessibleSites(nextSites);
       } catch {
-        if (!cancelled) {
-          setRole("user");
-          setAccessibleSites([]);
-        }
+        if (!cancelled) setAccessibleSites([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUser?.sites, role]);
 
   return { accessibleSites, role };
 }

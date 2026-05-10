@@ -4,6 +4,7 @@ export {
   bootstrapAuth,
   forgotPassword,
   loginWithCredentials,
+  logoutUser,
   registerAccount,
   resendVerificationEmail,
   resetPassword,

@@ -1,7 +1,7 @@
 import React from "react";
 import MapPanel from "../../components/Dashboard/MapPanel";
-import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
+import { selectAuthUser } from "../auth";
 import { listNotis } from "../../api/notis";
 import type { Noti } from "../../data/Dashboard/notis";
 import { useFilters } from "../../context/FiltersContext";
@@ -153,13 +153,14 @@ export default function SandboxMapPanelCard({ cardId }: Props) {
   const severity = filterGroup?.severity ?? "all";
   const province = filterGroup?.province ?? "all";
 
+  const authUser = useAppSelector(selectAuthUser);
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const currentUser = await apiMe();
-        const role = String(currentUser?.role || "").toLowerCase();
-        const assignedSites = normalizeSiteList(currentUser?.sites);
+        const role = String(authUser?.role || "").toLowerCase();
+        const assignedSites = normalizeSiteList(authUser?.sites);
         let catalogSites: SandboxSite[] = [];
         try {
           catalogSites = normalizeSiteList(await listSites());
@@ -181,7 +182,7 @@ export default function SandboxMapPanelCard({ cardId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authUser?.role, authUser?.sites]);
 
   const selectedDateKey = React.useMemo(
     () => toDateKey(selectedDate),

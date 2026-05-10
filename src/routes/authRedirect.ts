@@ -10,11 +10,14 @@ export type LoginRedirectState = {
 
 const AUTH_ENTRY_PATHS = new Set([
   "/",
+  "/login",
   "/register",
   "/forgot",
   "/reset",
   "/verify-email",
 ]);
+
+const FALLBACK_PATH = "/dashboard";
 
 function isSafeInternalPath(path: string) {
   return path.startsWith("/") && !path.startsWith("//");
@@ -53,21 +56,15 @@ export function getReturnToFromState(state: unknown) {
   return typeof returnTo === "string" ? returnTo : undefined;
 }
 
-export function buildPostLoginPath(userId: string | number, returnTo?: string) {
-  const encodedUserId = encodeURIComponent(String(userId));
-  const fallbackPath = `/u/${encodedUserId}/dashboard`;
-  if (!returnTo) return fallbackPath;
+export function buildPostLoginPath(_userId: string | number, returnTo?: string) {
+  if (!returnTo) return FALLBACK_PATH;
 
   const url = parseInternalPath(returnTo);
-  if (!url) return fallbackPath;
+  if (!url) return FALLBACK_PATH;
 
-  if (AUTH_ENTRY_PATHS.has(url.pathname) || url.pathname === "/dashboard") {
-    return fallbackPath;
+  if (AUTH_ENTRY_PATHS.has(url.pathname)) {
+    return FALLBACK_PATH;
   }
 
-  const userScopedMatch = url.pathname.match(/^\/u\/[^/]+(?<path>\/.*)?$/);
-  if (!userScopedMatch) return fallbackPath;
-
-  const userScopedPath = userScopedMatch.groups?.path || "/dashboard";
-  return `/u/${encodedUserId}${userScopedPath}${url.search}${url.hash}`;
+  return `${url.pathname}${url.search}${url.hash}`;
 }

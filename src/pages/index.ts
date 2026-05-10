@@ -15,9 +15,11 @@ import BillingOverview from "./BillingOverviewPage";
 import GenerateBillForm from "./GenerateBillFormPage";
 import BillPdfPreview from "./BillPdfPreviewPage";
 import CardSandbox from "./CardSandboxPage";
+import Landing from "./LandingPage";
 
 export {
   Dashboard,
+  Landing,
   Login,
   Register,
   TotalAlert,

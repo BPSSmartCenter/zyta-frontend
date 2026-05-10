@@ -364,7 +364,7 @@ export default function RegisterForm({
         <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-slate-600 sm:text-base">
           <span className="shrink-0">{t("footer.have_account")}</span>
           <Link
-            to="/"
+            to="/login"
             className="font-bold text-[#0877A8] underline-offset-4 transition hover:text-[#0063BF] hover:underline"
           >
             {t("actions.signin")}

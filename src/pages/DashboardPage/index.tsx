@@ -1,13 +1,13 @@
 // src/pages/DashboardPage/index.tsx
 import React from "react";
 import ContentLayout from "../../components/Dashboard/ContentLayout";
-import { me as apiMe } from "../../api/user";
 import { listSites } from "../../api/sites";
 import { useFilters } from "../../context/FiltersContext";
 import DetectionSummaryBar from "../../components/Dashboard/DetectionSummaryBar";
 import DashboardTopBar from "../../components/Dashboard/DashboardTopBar";
 import { statItems } from "../../components/Dashboard/dashboard.constants";
 import { useAppSelector } from "../../store/hooks";
+import { selectAuthUser } from "../../features/auth";
 import {
   selectDashboardAlertEventItems,
   selectDashboardFaceRecognizeItems,
@@ -86,6 +86,7 @@ function normalizeSiteList(value: unknown): DashboardSiteSummary[] {
 
 export default function Dashboard() {
   const { selectedSite } = useFilters();
+  const authUser = useAppSelector(selectAuthUser);
   const liveRawNotis = useAppSelector(selectDashboardRawNotis);
   const liveAlertEvents = useAppSelector(selectDashboardAlertEventItems);
   const liveWellBeingEvents = useAppSelector(selectDashboardWellBeingItems);
@@ -100,29 +101,37 @@ export default function Dashboard() {
   const zytaItems = liveZytaItems;
   const notisLoading = liveNotisLoading;
 
-  // Role + sites for ContentLayout behavior similar to original
-  const [role, setRole] = React.useState<DashboardRole | null>(null);
+  // Role comes straight from Redux (bootstrapAuth already populated authSlice).
+  const role: DashboardRole | null = authUser
+    ? normalizeRole(authUser.role)
+    : null;
+
+  // Accessible sites: prefer the list bootstrapAuth captured. Fall back to
+  // /sites only when the user object doesn't carry assigned sites (rare; e.g.
+  // first login of a manager whose assignment hasn't propagated yet).
   const [accessibleSites, setAccessibleSites] = React.useState<
     DashboardSiteSummary[]
-  >([]);
+  >(() => normalizeSiteList(authUser?.sites));
+
   React.useEffect(() => {
+    const fromAuth = normalizeSiteList(authUser?.sites);
+    if (fromAuth.length > 0) {
+      setAccessibleSites(fromAuth);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
-        const me = await apiMe();
-        setRole(normalizeRole(me?.role));
-        const meSites = normalizeSiteList(me?.sites);
-        if (meSites.length > 0) {
-          setAccessibleSites(meSites);
-          return;
-        }
         const resp: unknown = await listSites();
-        setAccessibleSites(normalizeSiteList(resp));
+        if (!cancelled) setAccessibleSites(normalizeSiteList(resp));
       } catch {
-        setRole((r) => r ?? "user");
-        setAccessibleSites([]);
+        if (!cancelled) setAccessibleSites([]);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.sites]);
 
   // View state for ContentLayout
   const [searchEvent, setSearchEvent] = React.useState("");

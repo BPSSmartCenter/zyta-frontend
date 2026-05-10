@@ -14,11 +14,11 @@ import {
 import { useAppDispatch, useAppSelector } from "../store/hooks";
 
 function isDashboardRoute(pathname: string) {
-  return /^\/u\/[^/]+(?:\/site\/[^/]+)?\/dashboard\/?$/.test(pathname);
+  return /^(?:\/site\/[^/]+)?\/dashboard\/?$/.test(pathname);
 }
 
 function isDevicesRoute(pathname: string) {
-  return /^\/u\/[^/]+(?:\/site\/[^/]+)?\/devices\/?$/.test(pathname);
+  return /^(?:\/site\/[^/]+)?\/devices\/?$/.test(pathname);
 }
 
 export default function LanguageSwitcher() {
@@ -29,9 +29,7 @@ export default function LanguageSwitcher() {
   const hasHydrated = useAppSelector(selectHasHydrated);
   const filterDate = useAppSelector(selectDateFilterValue);
   const [pendingLng, setPendingLng] = React.useState<"th" | "en" | null>(null);
-  const isSandboxRoute =
-    location.pathname.startsWith("/sandbox/") ||
-    /^\/u\/[^/]+\/sandbox\//.test(location.pathname);
+  const isSandboxRoute = location.pathname.startsWith("/sandbox/");
   const canUseDashboardFilters = isDashboardRoute(location.pathname) && hasHydrated;
   const canSwitchSite = canUseDashboardFilters && sites.length > 1;
 
@@ -65,10 +63,11 @@ export default function LanguageSwitcher() {
   }, []);
 
   const btnClass = (lng: "th" | "en") =>
-    `px-3 py-1 text-sm cursor-pointer select-none transition-colors
-     hover:bg-gray-600 hover:text-white ${
-       isActive(lng) ? "bg-gray-900 text-white" : "bg-white text-gray-700"
-     }`;
+    `relative z-10 inline-flex min-w-[44px] items-center justify-center rounded-full px-3 py-1 text-xs font-semibold cursor-pointer select-none transition-colors duration-200 focus-visible:outline-none ${
+      isActive(lng)
+        ? "text-white"
+        : "text-slate-600 hover:text-slate-900"
+    }`;
   const openSitePicker = () => {
     dispatch(siteSelectionActions.openPicker({ reason: "manual" }));
   };
@@ -125,8 +124,16 @@ export default function LanguageSwitcher() {
       <fieldset
         aria-label="Language switcher"
         aria-busy={pendingLng ? "true" : "false"}
-        className="inline-flex rounded-lg border border-gray-200 overflow-hidden shadow bg-white"
+        className="relative inline-flex items-center rounded-full border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/70"
       >
+        {/* sliding active pill */}
+        <span
+          aria-hidden="true"
+          className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-cyan-500 shadow-sm transition-transform duration-200 ease-out ${
+            isActive("th") ? "translate-x-0" : "translate-x-[calc(100%+4px)]"
+          }`}
+        />
+
         {/* TH */}
         <input
           id="lng-th"

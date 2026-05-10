@@ -1,0 +1,73 @@
+{
+  "nav": {
+    "products": "Products",
+    "about": "About",
+    "contact": "Contact",
+    "login": "Sign in",
+    "register": "Sign up"
+  },
+  "hero": {
+    "eyebrow": "BPS Command Center",
+    "title": "Smart energy and\nsafety command center",
+    "subtitle": "Connect solar, electric meters, water, air, and CCTV across every site you operate — live monitoring, instant alerts, end-to-end billing in one place.",
+    "ctaPrimary": "Get started",
+    "ctaSecondary": "Explore products"
+  },
+  "products": {
+    "title": "Our products",
+    "subtitle": "Every utility, one platform",
+    "items": {
+      "solar": {
+        "title": "Solar Monitoring",
+        "desc": "Auto-sync with SolarEdge and SolisCloud — peak/off-peak overview, per-inverter telemetry, alerts when an inverter goes offline."
+      },
+      "electric": {
+        "title": "Electric Meter & Billing",
+        "desc": "Automated meter reads with PDF/Excel bill generation aligned to PEA/MEA tariffs, including on-peak/off-peak and FT adjustments."
+      },
+      "water": {
+        "title": "Water Meter",
+        "desc": "Per-site water usage dashboard with daily, monthly, and quarterly readings."
+      },
+      "air": {
+        "title": "Air Quality",
+        "desc": "PM2.5, PM10, CO2, and TVOC, paired with outdoor temperature and humidity from Open-Meteo."
+      },
+      "facerec": {
+        "title": "Face & License Plate",
+        "desc": "Detect faces and plates from on-site cameras with a live SSE event stream."
+      },
+      "alert": {
+        "title": "Centralized Alerts",
+        "desc": "All device events in one feed, filterable by severity and site — never miss a critical event."
+      }
+    }
+  },
+  "about": {
+    "title": "About BPS",
+    "lead": "Built for organizations operating many sites across the country.",
+    "body": "BPS Command Center unifies data from multi-vendor IoT devices — inverters, meters, water, air, and CCTV — into a single, simple console. With user and site management plus PDPA-aware billing built in.",
+    "stats": {
+      "sites": "Active sites",
+      "devices": "Connected devices",
+      "uptime": "Uptime"
+    }
+  },
+  "contact": {
+    "title": "Contact us",
+    "subtitle": "Talk to us about a demo or pilot.",
+    "emailLabel": "Email",
+    "phoneLabel": "Phone",
+    "addressLabel": "Address",
+    "address": "BPS Tech Co., Ltd. — Thailand",
+    "ctaEmail": "Email us"
+  },
+  "footer": {
+    "tagline": "Smart energy & safety management",
+    "rights": "© {{year}} BPS Tech. All rights reserved.",
+    "links": {
+      "privacy": "Privacy policy",
+      "terms": "Terms of service"
+    }
+  }
+}

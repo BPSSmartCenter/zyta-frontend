@@ -3,6 +3,7 @@ import { isAxiosError } from "axios";
 import {
   checkEmailExists,
   login as apiLogin,
+  logout as apiLogout,
   register as apiRegister,
   requestPasswordReset,
   resendVerification,
@@ -206,3 +207,23 @@ export const resendVerificationEmail = createAsyncThunk<
     return rejectWithValue(rejectFromError(error));
   }
 });
+
+/**
+ * Logout — clears server cookie + local auth state.
+ *
+ * The thunk only owns the API call; per-slice cleanup is wired through
+ * `logoutUser.fulfilled` in extraReducers (authSlice resets user, siteSelection
+ * resets selected site, etc). Network failures are swallowed — local state is
+ * cleared either way so the user can re-authenticate.
+ */
+export const logoutUser = createAsyncThunk<void, void>(
+  "auth/logout",
+  async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // Best-effort: even if the cookie clear request fails, we still want to
+      // drop local auth state so the UI doesn't act as if the user is signed in.
+    }
+  }
+);

@@ -143,10 +143,10 @@ export default function Header({ statItems, cameraItems, events, selectedSiteCod
   const { absSite, base } = useUserPath();
   const { items: liveNotis } = useNotisFeed();
 
-  // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard (แก้เฉพาะ logicตาม base /u/:uid)
+  // ⬇️ ล้าง selection เมื่ออยู่ที่ /dashboard
   React.useEffect(() => {
-    const pathNoBase = location.pathname.startsWith(base)
-      ? location.pathname.slice(base.length) || "/"
+    const pathNoBase = base
+      ? location.pathname.replace(new RegExp(`^${base}`), "") || "/"
       : location.pathname;
     if (pathNoBase === "/dashboard") {
       setSelectedStat(null);

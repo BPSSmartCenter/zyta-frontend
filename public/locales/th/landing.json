@@ -1,0 +1,73 @@
+{
+  "nav": {
+    "products": "ผลิตภัณฑ์",
+    "about": "เกี่ยวกับเรา",
+    "contact": "ติดต่อ",
+    "login": "เข้าสู่ระบบ",
+    "register": "สมัครสมาชิก"
+  },
+  "hero": {
+    "eyebrow": "BPS Command Center",
+    "title": "ศูนย์ควบคุมพลังงาน\nและความปลอดภัยอัจฉริยะ",
+    "subtitle": "เชื่อมต่อโซลาร์ มิเตอร์ไฟฟ้า น้ำ อากาศ และระบบกล้องในทุกไซต์ของคุณไว้ในแพลตฟอร์มเดียว — ตรวจสอบสด, แจ้งเตือนทันที, ออกบิลครบจบ",
+    "ctaPrimary": "เริ่มใช้งาน",
+    "ctaSecondary": "ดูผลิตภัณฑ์"
+  },
+  "products": {
+    "title": "ผลิตภัณฑ์ของเรา",
+    "subtitle": "ครอบคลุมทุก utility ในไซต์เดียว",
+    "items": {
+      "solar": {
+        "title": "Solar Monitoring",
+        "desc": "เชื่อมต่อ SolarEdge / SolisCloud อัตโนมัติ — ภาพรวม peak/off-peak, telemetry รายเครื่อง, alert เมื่อ inverter offline"
+      },
+      "electric": {
+        "title": "Electric Meter & Billing",
+        "desc": "อ่านค่ามิเตอร์อัตโนมัติ ออกบิล PDF/Excel ตามอัตราการไฟฟ้า รองรับ on-peak/off-peak และส่วนลด FT"
+      },
+      "water": {
+        "title": "Water Meter",
+        "desc": "ตรวจวัดการใช้น้ำรายไซต์ พร้อม dashboard และค่ามิเตอร์รายช่วงเวลา"
+      },
+      "air": {
+        "title": "Air Quality",
+        "desc": "PM2.5 / PM10 / CO2 / TVOC + อุณหภูมิและความชื้นภายนอกจาก Open-Meteo"
+      },
+      "facerec": {
+        "title": "Face & License Plate",
+        "desc": "ตรวจจับใบหน้าและทะเบียนรถจากกล้องภายในไซต์ พร้อม event stream แบบเรียลไทม์"
+      },
+      "alert": {
+        "title": "Centralized Alerts",
+        "desc": "รวมเหตุการณ์จากทุกอุปกรณ์ คัดกรองตาม severity และ site — ไม่พลาดเหตุสำคัญ"
+      }
+    }
+  },
+  "about": {
+    "title": "เกี่ยวกับ BPS",
+    "lead": "เราออกแบบระบบสำหรับองค์กรที่ดูแลหลายไซต์ทั่วประเทศ",
+    "body": "BPS Command Center รวมข้อมูลจากอุปกรณ์ IoT หลายแบรนด์เข้าด้วยกัน ตั้งแต่อินเวอร์เตอร์ มิเตอร์ น้ำ อากาศ ไปจนถึงกล้อง CCTV — แสดงในหน้าเดียวที่เข้าใจง่าย พร้อมระบบจัดการ user, site และการออกบิลที่รองรับ PDPA",
+    "stats": {
+      "sites": "ไซต์ที่ใช้งาน",
+      "devices": "อุปกรณ์ที่เชื่อมต่อ",
+      "uptime": "Uptime"
+    }
+  },
+  "contact": {
+    "title": "ติดต่อเรา",
+    "subtitle": "พร้อมให้คำปรึกษาและสาธิตระบบ",
+    "emailLabel": "อีเมล",
+    "phoneLabel": "โทรศัพท์",
+    "addressLabel": "ที่อยู่",
+    "address": "บริษัท BPS Tech จำกัด ประเทศไทย",
+    "ctaEmail": "ส่งอีเมลถึงเรา"
+  },
+  "footer": {
+    "tagline": "Smart energy & safety management",
+    "rights": "© {{year}} BPS Tech. สงวนลิขสิทธิ์",
+    "links": {
+      "privacy": "นโยบายความเป็นส่วนตัว",
+      "terms": "เงื่อนไขการใช้งาน"
+    }
+  }
+}

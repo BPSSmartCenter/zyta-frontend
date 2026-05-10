@@ -34,7 +34,7 @@ export default function RequireAuth({ children }: RequireAuthProps = {}) {
 
   useEffect(() => {
     if (!booting && !user) {
-      navigate("/", {
+      navigate("/login", {
         replace: true,
         state: createLoginRedirectState(location),
       });

@@ -72,8 +72,8 @@ export default function BootstrapSitesGate({ children }: Props) {
   const isPickerOpen = useAppSelector(selectIsSitePickerOpen);
   const pickerReason = useAppSelector(selectSitePickerReason);
 
-  // Sync URL site code → Redux (เช่น navigate เข้า /u/:uid/site/:siteCode/*)
-  const siteCodeMatch = useMatch("/u/:uid/site/:siteCode/*");
+  // Sync URL site code → Redux (เช่น navigate เข้า /site/:siteCode/*)
+  const siteCodeMatch = useMatch("/site/:siteCode/*");
   const urlSiteCode = siteCodeMatch?.params?.siteCode ?? null;
 
   // 1) Load catalog ครั้งเดียวเมื่อมี user

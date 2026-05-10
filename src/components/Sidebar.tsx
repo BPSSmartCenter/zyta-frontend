@@ -1,18 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
-import { logout as apiLogout } from "../api/auth";
 import { brandImage, userIcon } from "../assets/index";
 import {
   getCountForType,
   useDeviceInventory,
   type DeviceTypeKey,
 } from "../context/DeviceInventoryContext";
-import { authActions, selectAuthUser } from "../features/auth";
-import {
-  clearAllStoredSites,
-  siteSelectionActions,
-} from "../features/siteSelection";
+import { logoutUser, selectAuthUser } from "../features/auth";
 import { selectSidebarOpen, sidebarActions } from "../features/sidebar";
 import { useUserPath } from "../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
@@ -132,18 +127,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   };
 
   const handleConfirmLogout = async () => {
-    try {
-      await apiLogout();
-    } catch {
-      /* ignore logout API failures */
-    }
-    dispatch(authActions.clearAuthUser());
-    dispatch(siteSelectionActions.resetSiteSelection());
-    try {
-      clearAllStoredSites();
-    } catch {
-      /* ignore storage errors */
-    }
+    await dispatch(logoutUser());
     closeSidebar();
     setLogoutOpen(false);
     navigate("/", { replace: true });

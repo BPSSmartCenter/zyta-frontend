@@ -53,14 +53,13 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
   const isForced = reason === "forced";
 
   const syncScopedDashboardPath = (value: string) => {
-    const match = location.pathname.match(/^(\/u\/[^/]+)\/site\/[^/]+(\/.*)?$/);
+    const match = location.pathname.match(/^\/site\/[^/]+(\/.*)?$/);
     if (!match) return;
-    const basePath = match[1];
-    const suffix = match[2] || "/dashboard";
+    const suffix = match[1] || "/dashboard";
     const pathname =
       value === "all"
-        ? `${basePath}${suffix}`
-        : `${basePath}/site/${encodeURIComponent(value)}${suffix}`;
+        ? suffix
+        : `/site/${encodeURIComponent(value)}${suffix}`;
     if (pathname !== location.pathname) {
       navigate({ pathname, search: location.search }, { replace: true });
     }

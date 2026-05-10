@@ -10,6 +10,7 @@ import {
   bootstrapAuth,
   forgotPassword,
   loginWithCredentials,
+  logoutUser,
   registerAccount,
   resendVerificationEmail,
   resetPassword,
@@ -215,7 +216,10 @@ const authSlice = createSlice({
       })
       .addCase(resendVerificationEmail.rejected, (state) => {
         state.resendStatus = "failed";
-      });
+      })
+      // Logout — reset auth-owned state. Other slices may listen to this same
+      // action in their own extraReducers to clear their state.
+      .addCase(logoutUser.fulfilled, () => initialState);
   },
 });
 

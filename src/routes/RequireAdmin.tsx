@@ -7,10 +7,7 @@ export default function RequireAdmin() {
 
   if (!user) return null;
   if (user.role !== "admin") {
-    const dashboardPath = user.id
-      ? `/u/${encodeURIComponent(user.id)}/dashboard`
-      : "/";
-    return <Navigate to={dashboardPath} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <Outlet />;
