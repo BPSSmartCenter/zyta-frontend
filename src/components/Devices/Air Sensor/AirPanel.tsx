@@ -4,6 +4,7 @@ import type { ApexOptions } from "apexcharts";
 import { useTranslation } from "react-i18next";
 import SearchInput from "../../SearchInput";
 import { getIoTDevices, type IoTDevice } from "../../../api/iot";
+import { api, unwrapApiData } from "../../../api/axios";
 import { useFilters } from "../../../context/FiltersContext";
 import {
   UtilitySectionTitle,
@@ -580,16 +581,12 @@ export default function AirPanel({ siteCode }: Props) {
     let cancelled = false;
 
     const fetchWeather = async (coords: typeof BANGKOK_COORDS) => {
-      const params = new URLSearchParams({
-        latitude: String(coords.lat),
-        longitude: String(coords.lon),
-        current: "temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code",
-        timezone: "Asia/Bangkok",
+      // V1: backend wraps Open-Meteo (cache + privacy). Response is the upstream
+      // payload unchanged, but wrapped in { ok, data }.
+      const response = await api.get("/weather/forecast", {
+        params: { lat: coords.lat, lng: coords.lon },
       });
-      const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?${params.toString()}`
-      );
-      const data = await response.json();
+      const data = unwrapApiData<Record<string, any>>(response.data);
       const current =
         data?.current ??
         (data?.current_weather

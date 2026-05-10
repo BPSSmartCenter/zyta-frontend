@@ -22,19 +22,12 @@ export async function listSites(): Promise<ListSitesResponse> {
 }
 
 export async function getSiteInventory(siteId: string) {
-  // Primary route (plural)
-  try {
-    const { data } = await api.get(`/sites/${encodeURIComponent(siteId)}/inventory`);
-    return data;
-  } catch {
-    // Fallback to singular route if backend uses /site/:id/inventory
-    const { data } = await api.get(`/site/${encodeURIComponent(siteId)}/inventory`);
-    return data;
-  }
+  const { data } = await api.get(`/sites/${encodeURIComponent(siteId)}/inventory`);
+  return data;
 }
 
 export async function getSiteDetails(siteIdOrCode: string) {
-  const { data } = await api.get(`/site/${encodeURIComponent(siteIdOrCode)}/details`);
+  const { data } = await api.get(`/sites/${encodeURIComponent(siteIdOrCode)}/details`);
   return data;
 }
 
@@ -96,7 +89,7 @@ export async function registerSite(input: RegisterSiteInput) {
     payload.solisStationId = input.solisStationId.trim();
   }
 
-  const { data } = await api.post("/site/register", payload);
+  const { data } = await api.post("/sites:register", payload);
   return data;
 }
 
@@ -187,18 +180,18 @@ function normalizeSitePayload(input: UpdateSiteInput) {
 
 export async function updateSite(siteId: string, input: UpdateSiteInput) {
   const payload = normalizeSitePayload(input);
-  const { data } = await api.put(`/site/${encodeURIComponent(siteId)}`, payload);
+  const { data } = await api.put(`/sites/${encodeURIComponent(siteId)}`, payload);
   return data;
 }
 
 export async function deleteSite(siteId: string) {
-  const { data } = await api.delete(`/site/${encodeURIComponent(siteId)}`);
+  const { data } = await api.delete(`/sites/${encodeURIComponent(siteId)}`);
   return data;
 }
 
 export async function getSiteBillingAccess(siteIdOrCode: string): Promise<SiteBillingAccess> {
   const { data } = await api.get<{ ok: boolean; data: SiteBillingAccess }>(
-    `/site/${encodeURIComponent(siteIdOrCode)}/billing-access`
+    `/sites/${encodeURIComponent(siteIdOrCode)}/billing-access`
   );
   return data.data;
 }
@@ -208,7 +201,7 @@ export async function updateSiteBillingAccess(
   payload: Partial<SiteBillingAccess>
 ): Promise<SiteBillingAccess> {
   const { data } = await api.patch<{ ok: boolean; data: SiteBillingAccess }>(
-    `/site/${encodeURIComponent(siteIdOrCode)}/billing-access`,
+    `/sites/${encodeURIComponent(siteIdOrCode)}/billing-access`,
     payload
   );
   return data.data;

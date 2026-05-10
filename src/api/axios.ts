@@ -5,7 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 
-const DEFAULT_API_BASE_URL = import.meta.env.DEV ? "/api" : "https://zyta.net/api";
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? "/api/v1" : "https://zyta.net/api/v1";
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 
 export const API_BASE_URL = (configuredApiBaseUrl || DEFAULT_API_BASE_URL).replace(/\/+$/, "");

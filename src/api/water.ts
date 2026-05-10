@@ -18,7 +18,7 @@ export type WaterDevicesResponse =
 
 export async function getWaterDevices(siteIdOrCode: string) {
   const { data } = await api.get(
-    `/site/${encodeURIComponent(siteIdOrCode)}/water/devices`
+    `/sites/${encodeURIComponent(siteIdOrCode)}/water/devices`
   );
   return data as WaterDevicesResponse;
 }

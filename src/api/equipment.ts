@@ -17,7 +17,7 @@ export async function fetchEquipmentTelemetry(params: {
   q.set("startTime", params.startTime);
   q.set("endTime", params.endTime);
   if (params.category) q.set("category", params.category);
-  const url = `/site/${encodeURIComponent(params.siteIdOrCode)}/electric/equipment/${encodeURIComponent(params.sn)}/data?${q.toString()}`;
+  const url = `/sites/${encodeURIComponent(params.siteIdOrCode)}/electric/equipment/${encodeURIComponent(params.sn)}/data?${q.toString()}`;
   const { data } = await api.get<EquipmentFetchResp>(url);
   return data;
 }

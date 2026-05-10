@@ -37,5 +37,9 @@ export async function listFaceRecEvents(): Promise<{ items: any[]; plateItems?: 
 }
 
 export function faceRecStreamUrl(): string {
-  return `${API_BASE_URL}/facerec/stream`;
+  // SSE stream is NOT migrated to /api/v1 yet (backend Sprint 6 MIG-09 pending —
+  // nginx proxy buffering tweaks needed). Pin to legacy /api regardless of
+  // VITE_API_BASE_URL so the rest of the app can flip to /api/v1 safely.
+  const legacyBase = API_BASE_URL.replace(/\/v1\/?$/, "");
+  return `${legacyBase}/facerec/stream`;
 }

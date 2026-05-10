@@ -1,6 +1,11 @@
 import { API_BASE_URL, api } from "./axios";
 
-const IOT_API_URL = `${API_BASE_URL}/devices`;
+// IoT realtime list (`GET /devices?t=`) is NOT listed in the v1 reference —
+// only `/devices/{id}/dashboard` and `/devices/{id}/billing-readings` are.
+// Pin this to legacy /api regardless of VITE_API_BASE_URL until backend confirms
+// a v1 equivalent (or until this consumer is replaced).
+const LEGACY_API_BASE = API_BASE_URL.replace(/\/v1\/?$/, "");
+const IOT_API_URL = `${LEGACY_API_BASE}/devices`;
 export interface IoTDevice {
     id?: string | number;
     deviceId?: string;

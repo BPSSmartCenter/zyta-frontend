@@ -99,7 +99,7 @@ const toNoti = (n: ApiNoti): Noti => {
 };
 
 export async function listNotis(params?: ListNotisParams): Promise<Noti[]> {
-  const response = await api.get("/notis", {
+  const response = await api.get("/notifications", {
     params: {
       limit: params?.limit ?? 200,
       siteCode: params?.siteCode,
