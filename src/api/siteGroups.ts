@@ -9,7 +9,7 @@ export type SiteGroup = {
 };
 
 export async function listSiteGroups(): Promise<SiteGroup[]> {
-  const { data } = await api.get("/sites/site-groups");
+  const { data } = await api.get("/site-groups");
   const payload = unwrapApiData(data) as { items?: SiteGroup[] } | SiteGroup[];
   return Array.isArray(payload)
     ? payload
@@ -26,6 +26,6 @@ export async function createSiteGroup(input: {
   const payload: Record<string, unknown> = { name: input.name };
   if (input.code) payload.code = input.code;
   if (input.utilityId) payload.utilityId = input.utilityId;
-  const { data } = await api.post("/sites/site-groups", payload);
+  const { data } = await api.post("/site-groups", payload);
   return data;
 }

@@ -14,42 +14,43 @@ export type ManualDeviceRegisterInput = {
 
 type ManualDevicePayload = Omit<ManualDeviceRegisterInput, "siteId">;
 
-async function postManualRegister(
+async function postUnifiedRegister(
   siteId: string,
-  endpoint: "cctv" | "water" | "air",
+  type: "cctv" | "water" | "air",
   payload: ManualDevicePayload
 ) {
-  const url = `/site/${encodeURIComponent(siteId)}/${endpoint}/devices/register`;
-  const { data } = await api.post(url, payload);
+  // V1 unified register: POST /sites/{id}/devices body { type, deviceKey, ... }
+  const url = `/sites/${encodeURIComponent(siteId)}/devices`;
+  const { data } = await api.post(url, { type, ...payload });
   return data;
 }
 
 export function registerCctvDevice(input: ManualDeviceRegisterInput) {
   const { siteId, ...payload } = input;
-  return postManualRegister(siteId, "cctv", payload);
+  return postUnifiedRegister(siteId, "cctv", payload);
 }
 
 export function registerWaterMeterDevice(input: ManualDeviceRegisterInput) {
   const { siteId, ...payload } = input;
-  return postManualRegister(siteId, "water", payload);
+  return postUnifiedRegister(siteId, "water", payload);
 }
 
 export function registerAirSensorDevice(input: ManualDeviceRegisterInput) {
   const { siteId, ...payload } = input;
-  return postManualRegister(siteId, "air", payload);
+  return postUnifiedRegister(siteId, "air", payload);
 }
 
 export async function listSiteDevices(siteIdOrCode: string, type?: DeviceTypeKey | "all") {
   const params = new URLSearchParams();
   if (type && type !== "all") params.set("type", type);
   const query = params.toString();
-  const url = `/site/${encodeURIComponent(siteIdOrCode)}/devices${query ? `?${query}` : ""}`;
+  const url = `/sites/${encodeURIComponent(siteIdOrCode)}/devices${query ? `?${query}` : ""}`;
   const { data } = await api.get(url);
   return data;
 }
 
 export async function deleteSiteDevice(siteIdOrCode: string, deviceId: string) {
-  const url = `/site/${encodeURIComponent(siteIdOrCode)}/devices/${encodeURIComponent(deviceId)}`;
+  const url = `/sites/${encodeURIComponent(siteIdOrCode)}/devices/${encodeURIComponent(deviceId)}`;
   const { data } = await api.delete(url);
   return data;
 }
@@ -67,7 +68,7 @@ export async function updateSiteDevice(
     buildingTag?: string | null;
   }
 ) {
-  const url = `/site/${encodeURIComponent(siteIdOrCode)}/devices/${encodeURIComponent(deviceId)}`;
+  const url = `/sites/${encodeURIComponent(siteIdOrCode)}/devices/${encodeURIComponent(deviceId)}`;
   const { data } = await api.put(url, {
     name: payload.name,
     status: payload.status,

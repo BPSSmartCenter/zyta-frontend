@@ -101,7 +101,7 @@ export async function getSiteMetersDashboard(
   if (params?.startDate) query.set("startDate", params.startDate);
   if (params?.endDate) query.set("endDate", params.endDate);
   if (params?.tag) query.set("tag", params.tag);
-  const url = `/site/${encodeURIComponent(siteId)}/meters/dashboard${
+  const url = `/sites/${encodeURIComponent(siteId)}/meters/dashboard${
     query.size ? `?${query.toString()}` : ""
   }`;
   const { data } = await api.get<{ ok: boolean; data: MeterDashboard }>(url);

@@ -18,7 +18,7 @@ export type AirDevicesResponse =
 
 export async function getAirDevices(siteIdOrCode: string) {
   const { data } = await api.get(
-    `/site/${encodeURIComponent(siteIdOrCode)}/air/devices`
+    `/sites/${encodeURIComponent(siteIdOrCode)}/air/devices`
   );
   return data as AirDevicesResponse;
 }

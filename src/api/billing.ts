@@ -49,7 +49,7 @@ export type BillingOverviewPayload = {
 };
 
 export async function getBillingOverview(siteId: string) {
-  const url = `/site/${encodeURIComponent(siteId)}/billing/overview`;
+  const url = `/billing/sites/${encodeURIComponent(siteId)}/dashboard`;
   const { data } = await api.get<{ ok: boolean; data: BillingOverviewPayload }>(url);
   return data.data;
 }
@@ -104,9 +104,9 @@ export type BillDetailPayload = {
 };
 
 export async function createBill(siteId: string, payload: CreateBillPayload) {
-  const url = `/site/${encodeURIComponent(siteId)}/billing/bills`;
-  const { data } = await api.post<{ ok: boolean; bill: { billId: string } }>(url, payload);
-  return data.bill;
+  const url = `/billing/sites/${encodeURIComponent(siteId)}/bills`;
+  const { data } = await api.post<{ ok: boolean; data: { billId: string } }>(url, payload);
+  return data.data;
 }
 
 export async function getBillDetailApi(billId: string) {
@@ -172,7 +172,7 @@ export async function downloadPreviewBillExcel(
   payload: PreviewBillExcelPayload
 ) {
   const response = await api.post(
-    `/site/${encodeURIComponent(siteId)}/billing/preview/excel`,
+    `/billing/sites/${encodeURIComponent(siteId)}/bills:preview-excel`,
     payload,
     { responseType: "blob" }
   );
@@ -195,7 +195,7 @@ type BillExcelPayload = {
 
 export async function generateBillExcel(billId: string, payload?: BillExcelPayload) {
   const { data } = await api.post(
-    `/billing/bills/${encodeURIComponent(billId)}/excel/generate`,
+    `/billing/bills/${encodeURIComponent(billId)}/excel:generate`,
     payload ?? {}
   );
   return data;
@@ -267,7 +267,7 @@ export async function getSiteBillingReadingsData(
   }
   if (params.tag) query.set("tag", String(params.tag));
   const { data } = await api.get<{ ok: boolean; data: BillingReadingsPayload }>(
-    `/site/${encodeURIComponent(siteId)}/billing-readings?${query.toString()}`
+    `/sites/${encodeURIComponent(siteId)}/billing-readings?${query.toString()}`
   );
   return data.data;
 }
