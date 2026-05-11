@@ -5,7 +5,9 @@
       "Bash(Select-Object Name)",
       "Bash(git switch *)",
       "Bash(npx tsc *)",
-      "Bash(echo \"===EXIT: $?===\")"
+      "Bash(echo \"===EXIT: $?===\")",
+      "Read(//var/www/api/**)",
+      "Read(//etc/nginx/sites-enabled/**)"
     ]
   }
 }
