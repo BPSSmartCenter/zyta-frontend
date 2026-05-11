@@ -9,7 +9,7 @@ import {
   roleLabels,
   roleColors,
 } from "./dashboard.constants";
-import { getUserStats } from "../../features/users";
+// getUserStats removed — global userStats now comes from /me (selectAuthUserStats)
 import DeviceCount from "./DeviceCount";
 import { useDeviceInventoryLoader } from "../../hooks/useDeviceInventoryLoader";
 import FaceRecognize from "./FaceRecognize";
@@ -19,7 +19,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { useAppSelector } from "../../store/hooks";
-import { selectAuthUser } from "../../features/auth";
+import { selectAuthUser, selectAuthUserStats } from "../../features/auth";
 import SnapshotChartSection from "../Chart";
 import Switch from "../Switch";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -264,97 +264,19 @@ export default function ContentLayout(props: Props) {
   const deviceCounts = liveDeviceCounts;
   const deviceTotals = liveDeviceTotals;
 
-  // Fetch role stats (จำนวน user ที่ใช้งาน) for the selected site
-  // กรณีเลือกไซต์เฉพาะ: ใช้ officer/user จากไซต์นั้น + admin จาก global (เห็นได้ทุกไซต์)
-  const [roleSeriesFromApi, setRoleSeriesFromApi] = React.useState<
-    number[] | null
-  >(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const raw = (props.selectedSiteCode ?? "").toString().trim();
-        const isAll = !raw || raw === "all";
-        const role = String(props.role || "").toLowerCase();
-        const hasAnySite = Array.isArray(props.accessibleSites) && props.accessibleSites.length > 0;
-
-        // Wait for sites to load before deciding; avoid showing 0 on first paint
-        if (props.accessibleSites == null) return;
-
-        // If non-admin and no accessible sites, don't fetch; show zeros
-        if (role !== "admin" && !hasAnySite) {
-          if (!cancelled) setRoleSeriesFromApi([0, 0, 0]);
-          return;
-        }
-
-        if (isAll) {
-          if (role === "admin") {
-            // Admin: use global stats directly (all sites)
-            const global = await getUserStats();
-            const series = [
-              global.byRole.officer ?? 0,
-              global.byRole.user ?? 0,
-              global.byRole.admin ?? 0,
-            ];
-            if (!cancelled) setRoleSeriesFromApi(series);
-            return;
-          }
-          // Non-admin: aggregate across accessible sites
-          const codes = (props.accessibleSites || [])
-            .map((s: any) => String(s.code || "").trim())
-            .filter(Boolean);
-          if (codes.length === 0) {
-            if (!cancelled) setRoleSeriesFromApi([0, 0, 0]);
-            return;
-          }
-          const results = await Promise.all(
-            codes.map(async (c) => {
-              try {
-                return await getUserStats(c);
-              } catch {
-                return { byRole: { admin: 0, officer: 0, user: 0 } } as any;
-              }
-            })
-          );
-          const sum = results.reduce(
-            (acc, r: any) => ({
-              admin: acc.admin + (r?.byRole?.admin ?? 0),
-              officer: acc.officer + (r?.byRole?.officer ?? 0),
-              user: acc.user + (r?.byRole?.user ?? 0),
-            }),
-            { admin: 0, officer: 0, user: 0 }
-          );
-          if (!cancelled)
-            setRoleSeriesFromApi([sum.officer, sum.user, sum.admin]);
-          return;
-        }
-
-        // Specific site: always use that site's stats for all roles
-        console.debug("[UserMgmt] fetch site /users/stats?site=", raw);
-        const site = await getUserStats(raw);
-        const series = [
-          site.byRole.officer ?? 0,
-          site.byRole.user ?? 0,
-          site.byRole.admin ?? 0,
-        ];
-        console.debug(
-          "[UserMgmt] composed series [officer,user,admin] =",
-          series
-        );
-        if (!cancelled) setRoleSeriesFromApi(series);
-      } catch (e) {
-        console.debug("[UserMgmt] fetch stats failed", e);
-        if (!cancelled) setRoleSeriesFromApi(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    props.selectedSiteCode,
-    props.role,
-    JSON.stringify(props.accessibleSites),
-  ]);
+  // Role stats — read from /me's userStats (single source of truth).
+  // The global aggregate is what backend authorizes the user to see, so no
+  // per-site fetch needed. Specific-site view uses the same global breakdown
+  // (intentional simplification — per-site role breakdown removed).
+  const userStats = useAppSelector(selectAuthUserStats);
+  const roleSeriesFromApi: number[] | null = React.useMemo(() => {
+    if (!userStats) return null;
+    return [
+      userStats.byRole.officer ?? 0,
+      userStats.byRole.user ?? 0,
+      userStats.byRole.admin ?? 0,
+    ];
+  }, [userStats]);
 
   const specialAlertCount =
     filteredFaceRecognizeItems.length +

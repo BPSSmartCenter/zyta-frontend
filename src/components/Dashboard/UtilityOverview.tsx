@@ -1,9 +1,8 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { getElectricOverview } from "../../features/electric";
+import { selectAuthSites } from "../../features/auth";
 import {
-  selectAccessibleSites,
   selectSelectedGroup,
   selectSelectedUtility,
 } from "../../features/siteSelection";
@@ -115,16 +114,6 @@ function UtilityOverviewIcon({ kind }: { kind: CardKey }) {
   );
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string" && value.trim()
-      ? Number(value)
-      : NaN;
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function formatOverviewUpdateTime(value: string | null, locale: string) {
   if (!value) return "-";
   const parsed = Date.parse(value);
@@ -136,24 +125,6 @@ function formatOverviewUpdateTime(value: string | null, locale: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(parsed));
-}
-
-function extractElectricOverview(payload: unknown) {
-  const data =
-    payload && typeof payload === "object" && "data" in payload
-      ? (payload as { data?: unknown }).data
-      : payload;
-  const record =
-    data && typeof data === "object" ? (data as Record<string, unknown>) : {};
-
-  return {
-    todayKwh: toFiniteNumber(record.today_kwh),
-    monthKwh: toFiniteNumber(record.month_kwh),
-    lastUpdateTime:
-      typeof record.lastUpdateTime === "string" && record.lastUpdateTime.trim()
-        ? record.lastUpdateTime.trim()
-        : null,
-  };
 }
 
 function Sparkline() {
@@ -469,7 +440,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
   const { t } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { absSite, abs } = useUserPath();
-  const accessibleSites = useAppSelector(selectAccessibleSites);
+  const authSites = useAppSelector(selectAuthSites);
   const selectedGroup = useAppSelector(selectSelectedGroup);
   const selectedUtility = useAppSelector(selectSelectedUtility);
   const [electricOverview, setElectricOverview] = React.useState<ElectricOverviewState>({
@@ -480,39 +451,41 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     lastUpdateTime: null,
   });
 
-  const scopedSiteCodes = React.useMemo(() => {
-    try {
-      const visibleSites = accessibleSites.filter((site) => {
-        if (
-          selectedUtility &&
-          String(site.utilityId ?? "") !== String(selectedUtility.id)
-        ) {
-          return false;
-        }
-        if (
-          selectedGroup &&
-          String(site.groupId ?? "") !== String(selectedGroup.id) &&
-          String(site.groupLabel ?? "") !== String(selectedGroup.label)
-        ) {
-          return false;
-        }
-        return true;
-      });
-      return visibleSites
-        .map((site) => String(site.value ?? "").trim())
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }, [accessibleSites, selectedGroup, selectedUtility]);
-
   React.useEffect(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
-    let cancelled = false;
-    const normalizedSiteCodes =
-      !siteCode || siteCode.toLowerCase() === "all" ? scopedSiteCodes : [siteCode];
+    const isAll = !siteCode || siteCode.toLowerCase() === "all";
 
-    if (normalizedSiteCodes.length === 0) {
+    // Scope target sites directly from /me-derived auth slice. We deliberately
+    // don't go through siteSelection.accessibleSites because that depends on
+    // loadSiteCatalog finishing first — if that thunk is still pending or
+    // failed, the dashboard would render with zero data even though /me
+    // already has everything we need.
+    let targetSites = authSites;
+    if (!isAll) {
+      const norm = siteCode.toLowerCase();
+      targetSites = authSites.filter(
+        (s) =>
+          s.code.toLowerCase() === norm ||
+          String(s.id).toLowerCase() === norm
+      );
+    } else {
+      if (selectedUtility) {
+        targetSites = targetSites.filter(
+          (s) => String(s.utility_id ?? "") === String(selectedUtility.id)
+        );
+      }
+      if (selectedGroup) {
+        targetSites = targetSites.filter(
+          (s) => String(s.site_group_id ?? "") === String(selectedGroup.id)
+        );
+      }
+    }
+
+    const overviews = targetSites
+      .map((s) => s.electricOverview)
+      .filter((o): o is NonNullable<typeof o> => o !== null);
+
+    if (overviews.length === 0) {
       setElectricOverview({
         loading: false,
         hasData: false,
@@ -523,59 +496,22 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       return;
     }
 
-    setElectricOverview((prev) => ({ ...prev, loading: true }));
+    const totalToday = overviews.reduce((sum, o) => sum + (o.today_kwh ?? 0), 0);
+    const totalMonth = overviews.reduce((sum, o) => sum + (o.month_kwh ?? 0), 0);
+    const lastUpdateTime =
+      overviews.find((o) => o.lastUpdateTime)?.lastUpdateTime ?? null;
 
-    (async () => {
-      try {
-        const responses = await Promise.allSettled(
-          normalizedSiteCodes.map((code) => getElectricOverview(code))
-        );
-
-        const snapshots = responses
-          .filter(
-            (entry): entry is PromiseFulfilledResult<unknown> =>
-              entry.status === "fulfilled"
-          )
-          .map((entry) => extractElectricOverview(entry.value));
-
-        const totalToday = snapshots.reduce(
-          (sum, item) => sum + (item.todayKwh ?? 0),
-          0
-        );
-        const totalMonth = snapshots.reduce(
-          (sum, item) => sum + (item.monthKwh ?? 0),
-          0
-        );
-        const lastUpdateTime =
-          snapshots.find((item) => item.lastUpdateTime)?.lastUpdateTime ?? null;
-        const hasData = snapshots.some(
-          (item) => item.todayKwh !== null || item.monthKwh !== null
-        );
-
-        if (cancelled) return;
-        setElectricOverview({
-          loading: false,
-          hasData,
-          todayKwh: hasData ? Math.round(totalToday) : null,
-          monthKwh: hasData ? Math.round(totalMonth) : null,
-          lastUpdateTime,
-        });
-      } catch {
-        if (cancelled) return;
-        setElectricOverview({
-          loading: false,
-          hasData: false,
-          todayKwh: null,
-          monthKwh: null,
-          lastUpdateTime: null,
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [scopedSiteCodes, selectedSiteCode]);
+    // hasData = "the user has electricOverview entries for in-scope sites".
+    // Zero kWh is still valid data (e.g., at night / inverter idle) — render
+    // 0 rather than the empty placeholder.
+    setElectricOverview({
+      loading: false,
+      hasData: true,
+      todayKwh: Math.round(totalToday),
+      monthKwh: Math.round(totalMonth),
+      lastUpdateTime,
+    });
+  }, [selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
   const handleOpenElectric = React.useCallback(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();

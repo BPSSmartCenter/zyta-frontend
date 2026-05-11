@@ -219,7 +219,13 @@ const authSlice = createSlice({
       })
       // Logout — reset auth-owned state. Other slices may listen to this same
       // action in their own extraReducers to clear their state.
-      .addCase(logoutUser.fulfilled, () => initialState);
+      // Keep bootStatus "ready" (not "idle") so RootLandingOrDashboard renders
+      // <Landing /> immediately instead of getting stuck on the splash screen
+      // — the session probe has effectively already happened (negatively).
+      .addCase(logoutUser.fulfilled, () => ({
+        ...initialState,
+        bootStatus: "ready" as const,
+      }));
   },
 });
 

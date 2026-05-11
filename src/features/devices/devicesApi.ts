@@ -88,15 +88,14 @@ export async function getAirDevices(siteIdOrCode: string): Promise<AirDevicesRes
   );
 }
 
-/** IoT realtime list — pinned to legacy /api (not in v1 reference yet). */
+/**
+ * IoT realtime list — endpoint removed. Backend has no `/devices` (or v1
+ * equivalent) for the IoT realtime list, so we no-op rather than make a
+ * request that always 404s. Callers (AirPanel, IoTPanel, IoTDetail,
+ * useDeviceInventoryLoader) get an empty array and render an empty state.
+ *
+ * If/when backend ships a real endpoint, replace the body with the real fetch.
+ */
 export async function getIoTDevices(): Promise<IoTDevice[]> {
-  const data = await request<unknown>(`/devices?t=${Date.now()}`, {
-    legacy: true,
-  });
-  if (Array.isArray(data)) return data as IoTDevice[];
-  if (data && typeof data === "object") {
-    const inner = (data as { data?: unknown }).data;
-    if (Array.isArray(inner)) return inner as IoTDevice[];
-  }
   return [];
 }

@@ -6,6 +6,39 @@ const selectAuth = (state: RootState) => state.auth;
 
 export const selectAuthUser = (state: RootState) => state.auth.user;
 
+// ---- /me-derived selectors (data flows in via bootstrapAuth/login thunks) ----
+
+/** Sites the current user can access — full data (counters, electricOverview, billing, ...). */
+export const selectAuthSites = (state: RootState) =>
+  state.auth.user?.sites ?? [];
+
+/** Site groups the user has visibility into. */
+export const selectAuthSiteGroups = (state: RootState) =>
+  state.auth.user?.siteGroups ?? [];
+
+/** Utilities (PEA/MEA/etc) the user has visibility into. */
+export const selectAuthUtilities = (state: RootState) =>
+  state.auth.user?.utilities ?? [];
+
+/** Global user stats: total + per-role counts. */
+export const selectAuthUserStats = (state: RootState) =>
+  state.auth.user?.userStats ?? null;
+
+/** Lookup a site by id from /me; returns undefined if user can't access it. */
+export const selectAuthSiteById = (id: string | null | undefined) =>
+  (state: RootState) => {
+    if (!id) return undefined;
+    return state.auth.user?.sites.find((s) => s.id === id);
+  };
+
+/** Lookup a site by code (or "all") from /me. */
+export const selectAuthSiteByCode = (code: string | null | undefined) =>
+  (state: RootState) => {
+    if (!code) return undefined;
+    const norm = code.toLowerCase();
+    return state.auth.user?.sites.find((s) => s.code.toLowerCase() === norm);
+  };
+
 /** true เมื่อมี user object (เคย login สำเร็จและ session ยังใช้ได้) */
 export const selectIsAuthenticated = (state: RootState) =>
   state.auth.user !== null;

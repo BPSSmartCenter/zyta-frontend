@@ -1,9 +1,7 @@
 // src/features/siteSelection/siteSelectionThunks.ts
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { ApiError, request, requestList } from "../../lib/http";
+import { ApiError, request } from "../../lib/http";
 import { normalizeMeResponse, type MeResponse } from "../users/usersTypes";
-import type { SiteGroup } from "../siteGroups/siteGroupsThunks";
-import type { ListSitesResponse } from "../sites/sitesTypes";
 import type { SiteOption } from "./siteSelectionTypes";
 import { readStoredSite, writeStoredSite } from "./siteSelectionStorage";
 
@@ -11,10 +9,6 @@ type ApiRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is ApiRecord {
   return typeof value === "object" && value !== null;
-}
-
-function asRecord(value: unknown): ApiRecord | null {
-  return isRecord(value) ? value : null;
 }
 
 function asText(value: unknown): string {
@@ -26,28 +20,47 @@ function asNullableText(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
-function arrayFromResponse(value: unknown): unknown[] {
-  if (Array.isArray(value)) return value;
-  if (isRecord(value) && Array.isArray(value.items)) return value.items;
-  const data = isRecord(value) ? value.data : undefined;
-  if (Array.isArray(data)) return data;
-  if (isRecord(data) && Array.isArray(data.items)) return data.items;
-  return [];
+/**
+ * Map a /me site (full data) → picker SiteOption.
+ * Group/utility labels are looked up from the /me payload's siteGroups +
+ * utilities tables — no extra fetch needed.
+ */
+function meSiteToOption(
+  site: MeResponse["sites"][number],
+  groupsById: Map<string, string>,
+  utilitiesById: Map<string, string>
+): SiteOption | null {
+  const value = asText(site.code) || asText(site.id) || asText(site.name);
+  if (!value) return null;
+  const label = asText(site.name) || value;
+  const groupId = site.site_group_id ?? null;
+  const utilityId = site.utility_id ?? null;
+  return {
+    label,
+    value,
+    groupId,
+    groupLabel: groupId ? (groupsById.get(groupId) ?? null) : null,
+    utilityId,
+    utilityLabel: utilityId ? (utilitiesById.get(utilityId) ?? null) : null,
+  };
 }
 
+/** Legacy normalizer — still used by callers that get raw site objects from
+ * other endpoints (e.g. cardSandbox /sites fetch). Kept exported. */
 export function normalizeSiteToOption(site: unknown): SiteOption | null {
   if (!isRecord(site)) return null;
   const rawLabel = site.name ?? site.code ?? site.id ?? "";
   const rawValue = site.code ?? site.id ?? site.name ?? "";
   const groupFromApi =
-    asRecord(site.site_group) ??
-    asRecord(site.site_groups) ??
-    asRecord(site.siteGroup) ??
-    asRecord(site.group);
+    (isRecord(site.site_group) && site.site_group) ||
+    (isRecord(site.site_groups) && site.site_groups) ||
+    (isRecord(site.siteGroup) && site.siteGroup) ||
+    (isRecord(site.group) && site.group) ||
+    null;
   const utilityFromApi =
-    asRecord(site.utility) ??
-    asRecord(groupFromApi?.utility) ??
-    asRecord(groupFromApi?.utilities);
+    (isRecord(site.utility) && site.utility) ||
+    (groupFromApi && isRecord(groupFromApi.utility) && groupFromApi.utility) ||
+    null;
   const utilityId =
     asNullableText(utilityFromApi?.id) ??
     asNullableText(site.utility_id) ??
@@ -96,79 +109,45 @@ export type LoadSiteCatalogError = {
   message: string;
 };
 
+/**
+ * Build the site picker catalog from a single /users/me probe.
+ *
+ * The consolidated /me payload now includes sites, siteGroups, and utilities
+ * — so we no longer call /sites or /site-groups here. Group/utility labels
+ * come from the embedded lookup tables in the same response.
+ */
 export const loadSiteCatalog = createAsyncThunk<
   LoadSiteCatalogResult,
   void,
   { rejectValue: LoadSiteCatalogError }
 >("siteSelection/loadCatalog", async (_, { rejectWithValue }) => {
   try {
-    const meRaw = await request<unknown>("/users/me");
-    const currentUser: MeResponse = normalizeMeResponse(meRaw);
-    const uid = currentUser?.id ?? null;
-    const isAdmin = String(currentUser?.role || "").toLowerCase() === "admin";
+    // silent401: don't let http.ts bounce to /login if session is expired —
+    // the thunk handles 401 itself (rejectWithValue UNAUTHORIZED), and
+    // BootstrapSitesGate decides how to react. A bounce here would reload
+    // the page mid-thunk and wipe Redux state, making it look like a reset.
+    const meRaw = await request<unknown>("/users/me", { silent401: true });
+    const me: MeResponse = normalizeMeResponse(meRaw);
 
-    const assignedOptions: SiteOption[] = Array.isArray(currentUser?.sites)
-      ? currentUser.sites
-          .map((site) => normalizeSiteToOption(site))
-          .filter((opt): opt is SiteOption => Boolean(opt))
-      : [];
+    const groupsById = new Map<string, string>(
+      me.siteGroups
+        .filter((g) => g.id && g.name)
+        .map((g) => [g.id, g.name] as const)
+    );
+    const utilitiesById = new Map<string, string>(
+      me.utilities
+        .filter((u) => u.id && u.name)
+        .map((u) => [u.id, u.name] as const)
+    );
 
-    let groupsById = new Map<string, string>();
-    try {
-      const groups = await requestList<SiteGroup>("/site-groups");
-      groupsById = new Map(
-        groups
-          .map((group): [string, string] => [
-            String(group?.id || "").trim(),
-            String(group?.name || "").trim(),
-          ])
-          .filter(([id, name]) => id.length > 0 && name.length > 0)
-      );
-    } catch {
-      groupsById = new Map();
-    }
-
-    let catalogOptions: SiteOption[] = [];
-    try {
-      const sitesResp = await request<ListSitesResponse>("/sites");
-      const items = arrayFromResponse(sitesResp);
-      catalogOptions = items
-        .map((site) => normalizeSiteToOption(site))
-        .map((opt: SiteOption | null) => {
-          if (!opt) return null;
-          if (opt.groupLabel || !opt.groupId) return opt;
-          const name = groupsById.get(String(opt.groupId).trim());
-          return name ? { ...opt, groupLabel: name } : opt;
-        })
-        .filter((opt: SiteOption | null): opt is SiteOption => Boolean(opt));
-    } catch {
-      catalogOptions = [];
-    }
-
-    let baseOptions: SiteOption[] = [];
-    if (isAdmin) {
-      baseOptions = catalogOptions;
-    } else if (assignedOptions.length > 0) {
-      const catalogByValue = new Map(
-        catalogOptions.map((opt) => [opt.value.toLowerCase(), opt] as const)
-      );
-      baseOptions = assignedOptions.map((opt) => {
-        const catalog = catalogByValue.get(opt.value.toLowerCase());
-        if (!catalog) return opt;
-        return {
-          ...opt,
-          groupLabel: opt.groupLabel ?? catalog.groupLabel ?? null,
-          groupId: opt.groupId ?? catalog.groupId ?? null,
-          utilityId: opt.utilityId ?? catalog.utilityId ?? null,
-          utilityLabel: opt.utilityLabel ?? catalog.utilityLabel ?? null,
-        };
-      });
-    }
+    const options = me.sites
+      .map((s) => meSiteToOption(s, groupsById, utilitiesById))
+      .filter((opt): opt is SiteOption => opt !== null);
 
     return {
-      isAdmin,
-      sites: dedupOptions(baseOptions),
-      uid,
+      isAdmin: me.role === "admin",
+      sites: dedupOptions(options),
+      uid: me.id || null,
     };
   } catch (error) {
     if (error instanceof ApiError) {

@@ -3,26 +3,20 @@ import { createSlice } from "@reduxjs/toolkit";
 import { logoutUser } from "../auth/authThunks";
 import {
   fetchAirDevices,
-  fetchIoTDevices,
   fetchSiteDevices,
   fetchWaterDevices,
-  type IoTDevice,
 } from "./devicesThunks";
 
 type DevicesState = {
   siteDevices: Record<string, unknown>;
   waterDevices: Record<string, unknown>;
   airDevices: Record<string, unknown>;
-  iotList: IoTDevice[];
-  iotStatus: "idle" | "pending" | "succeeded" | "failed";
 };
 
 const initialState: DevicesState = {
   siteDevices: {},
   waterDevices: {},
   airDevices: {},
-  iotList: [],
-  iotStatus: "idle",
 };
 
 const devicesSlice = createSlice({
@@ -40,16 +34,6 @@ const devicesSlice = createSlice({
       })
       .addCase(fetchAirDevices.fulfilled, (state, action) => {
         state.airDevices[action.payload.siteId] = action.payload.data;
-      })
-      .addCase(fetchIoTDevices.pending, (state) => {
-        state.iotStatus = "pending";
-      })
-      .addCase(fetchIoTDevices.fulfilled, (state, action) => {
-        state.iotStatus = "succeeded";
-        state.iotList = action.payload;
-      })
-      .addCase(fetchIoTDevices.rejected, (state) => {
-        state.iotStatus = "failed";
       })
       .addCase(logoutUser.fulfilled, () => initialState);
   },

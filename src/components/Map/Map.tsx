@@ -107,7 +107,7 @@ export default function Map({
   onPinClick,
   lockZoomOut,
 }: Props) {
-  console.log("🗺️ [Map] COMPONENT RENDER", { sitePoints: sitePoints?.length, focusSiteCenter });
+  // console.log("🗺️ [Map] COMPONENT RENDER", { sitePoints: sitePoints?.length, focusSiteCenter });
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<unknown>(null);
   const initializedRef = useRef(false);

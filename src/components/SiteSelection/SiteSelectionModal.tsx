@@ -9,7 +9,7 @@
 // Visual theme อ้างอิง AuthPageShell + SiteDropdownGrouped
 //   primary dark: #123A42, accent: #3AB8EE, action: #0063bf
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -23,8 +23,8 @@ import {
   siteSelectionActions,
 } from "../../features/siteSelection";
 import { selectAuthUser } from "../../features/auth";
-import SiteSelectionList from "./SiteSelectionList";
-import { buildHierarchyTree, filterHierarchy } from "./siteTree";
+import SiteCardGrid from "./SiteCardGrid";
+import { buildHierarchyTree } from "./siteTree";
 
 type Props = {
   /**
@@ -47,7 +47,6 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
   const selectedUtility = useAppSelector(selectSelectedUtility);
   const user = useAppSelector(selectAuthUser);
 
-  const [query, setQuery] = useState("");
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
   const isForced = reason === "forced";
@@ -87,54 +86,25 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [isOpen, isForced, dispatch]);
 
-  // Clear query ตอนเปิดใหม่
-  useEffect(() => {
-    if (isOpen) setQuery("");
-  }, [isOpen]);
-
   const allSitesLabel = t("navbar.allSites", { defaultValue: "All Sites" });
 
   const tree = useMemo(() => buildHierarchyTree(sites), [sites]);
-  const filteredTree = useMemo(() => filterHierarchy(tree, query), [tree, query]);
 
-  const filteredCount = useMemo(() => {
-    const u = filteredTree.utilities.reduce(
-      (sum, ut) =>
-        sum +
-        ut.ungroupedSites.length +
-        ut.groups.reduce((s, g) => s + g.sites.length, 0),
-      0
-    );
-    const og = filteredTree.orphanGroups.reduce((sum, g) => sum + g.sites.length, 0);
-    const ug = filteredTree.ungrouped.length;
-    return u + og + ug;
-  }, [filteredTree]);
-
+  // Single-click commit: any selection auto-closes the modal (selectSite
+  // closes via the slice's selectSite reducer). No separate submit step.
   const handleSelect = (value: string) => {
-    dispatch(
-      isForced
-        ? siteSelectionActions.selectSite(value)
-        : siteSelectionActions.selectSiteWithoutClosingPicker(value)
-    );
+    dispatch(siteSelectionActions.selectSite(value));
     if (!isForced) syncScopedDashboardPath(value);
   };
 
   const handleSelectGroup = (group: { id: string; label: string }) => {
-    dispatch(
-      isForced
-        ? siteSelectionActions.selectSite("all")
-        : siteSelectionActions.selectSiteWithoutClosingPicker("all")
-    );
+    dispatch(siteSelectionActions.selectSite("all"));
     dispatch(siteSelectionActions.selectGroup(group));
     if (!isForced) syncScopedDashboardPath("all");
   };
 
   const handleSelectUtility = (utility: { id: string; label: string }) => {
-    dispatch(
-      isForced
-        ? siteSelectionActions.selectSite("all")
-        : siteSelectionActions.selectSiteWithoutClosingPicker("all")
-    );
+    dispatch(siteSelectionActions.selectSite("all"));
     dispatch(siteSelectionActions.selectUtility(utility));
     if (!isForced) syncScopedDashboardPath("all");
   };
@@ -169,7 +139,7 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative z-10 flex max-h-[calc(100dvh-3rem)] w-full max-w-lg flex-col overflow-hidden rounded-[8px] border border-white/70 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.35)] transition-all ${
+        className={`relative z-10 flex max-h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.35)] transition-all ${
           isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
         }`}
       >
@@ -207,76 +177,33 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
           )}
         </div>
 
-        {/* Search */}
-        <div className="px-6 pt-4">
-          <div className="relative">
-            <span className="material-icons-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-slate-400">
-              search
-            </span>
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("siteSelection.searchPlaceholder", {
-                defaultValue: "ค้นหาไซต์, Utility, กลุ่ม…",
-              })}
-              className="h-11 w-full rounded-[8px] border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#3AB8EE] focus:ring-4 focus:ring-[#3AB8EE]/15"
-              autoFocus
-            />
-          </div>
-        </div>
-
-        {/* Body */}
+        {/* Body — scrolls when there are many sites */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {sites.length === 0 ? (
             <EmptyState />
           ) : (
-            <>
-              {/* All Sites card — แสดงเสมอถ้ามี >1 ไซต์ */}
-              {sites.length > 1 && query.trim() === "" && (
-                <AllSitesCard
-                  label={allSitesLabel}
-                  count={sites.length}
-                  active={isAllSitesActive}
-                  onClick={() => handleSelect("all")}
-                />
-              )}
-
-              {/* Tree */}
-              {filteredCount === 0 && query.trim() !== "" ? (
-                <div className="py-10 text-center text-sm text-slate-400">
-                  {t("siteSelection.noMatch", {
-                    defaultValue: "ไม่พบไซต์ที่ตรงกับคำค้นหา",
-                  })}
-                </div>
-              ) : (
-                <SiteSelectionList
-                  tree={filteredTree}
-                  selectedValue={selected}
-                  selectedGroup={selectedGroup}
-                  onSelectGroup={handleSelectGroup}
-                  selectedUtility={selectedUtility}
-                  onSelectUtility={handleSelectUtility}
-                  onSelect={handleSelect}
-                  autoExpand={query.trim() !== ""}
-                />
-              )}
-            </>
+            <SiteCardGrid
+              tree={tree}
+              selectedValue={selected}
+              selectedGroup={selectedGroup}
+              onSelectGroup={handleSelectGroup}
+              selectedUtility={selectedUtility}
+              onSelectUtility={handleSelectUtility}
+              onSelect={handleSelect}
+              allSites={
+                sites.length > 1
+                  ? {
+                      label: allSitesLabel,
+                      count: sites.length,
+                      active: isAllSitesActive,
+                      onSelect: () => handleSelect("all"),
+                    }
+                  : undefined
+              }
+            />
           )}
         </div>
 
-        {/* Footer (manual only) */}
-        {!isForced && (
-          <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-3">
-            <button
-              type="button"
-              onClick={() => dispatch(siteSelectionActions.closePicker())}
-              className="h-10 rounded-md px-4 text-sm font-medium text-slate-600 hover:bg-slate-100"
-            >
-              {t("siteSelection.done", { defaultValue: "เสร็จสิ้น" })}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -285,49 +212,6 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
 // ─────────────────────────────────────────────────────────
 // Subcomponents
 // ─────────────────────────────────────────────────────────
-
-function AllSitesCard({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`mb-3 flex w-full items-center gap-3 rounded-[8px] border p-4 text-left transition ${
-        active
-          ? "border-[#3AB8EE] bg-[#3AB8EE]/10"
-          : "border-slate-200 bg-white hover:border-[#3AB8EE]/50 hover:bg-[#3AB8EE]/5"
-      }`}
-    >
-      <span
-        className={`grid h-10 w-10 place-items-center rounded-full ${
-          active ? "bg-[#3AB8EE] text-white" : "bg-slate-100 text-slate-600"
-        }`}
-      >
-        <span className="material-icons-outlined text-[22px]">public</span>
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-slate-900">{label}</div>
-        <div className="text-xs text-slate-500">
-          ดูข้อมูลรวมจากทุกไซต์ ({count} ไซต์)
-        </div>
-      </div>
-      {active && (
-        <span className="material-icons-outlined text-[22px] text-[#3AB8EE]">
-          check_circle
-        </span>
-      )}
-    </button>
-  );
-}
 
 function EmptyState() {
   return (

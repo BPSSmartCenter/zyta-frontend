@@ -27,7 +27,7 @@ export default function LanguagePillSwitcher({
     <fieldset
       aria-label="Language switcher"
       aria-busy={pendingLng ? "true" : "false"}
-      className="inline-flex h-11 items-center rounded-[18px] border border-[#CDEFFF] bg-white p-1 shadow-[0_12px_30px_rgba(57,184,238,0.12)]"
+      className="inline-flex h-11 items-center rounded-[18px] border border-[#CDEFFF] bg-white p-1 shadow-[0_12px_30px_rgba(57,184,238,0.12)] gap-1"
     >
       <input
         id={`${name}-th`}

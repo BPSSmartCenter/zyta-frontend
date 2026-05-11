@@ -6,7 +6,6 @@ export {
   registerManualDevice,
   fetchWaterDevices,
   fetchAirDevices,
-  fetchIoTDevices,
   type AirDeviceRecord,
   type DeviceTypeKey,
   type IoTDevice,

@@ -74,7 +74,7 @@ export default function MapPanel({
   role,
   accessibleSites,
 }: Props) {
-  console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
+  // console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
   const { items: liveNotis } = useNotisFeed();
   const {
     setSelectedSite,

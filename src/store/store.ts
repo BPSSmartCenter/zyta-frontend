@@ -35,6 +35,11 @@ export const store = configureStore({
     users: usersReducer,
     utilities: utilitiesReducer,
   },
+  // Name the instance so it's easy to pick in the Redux DevTools instance
+  // dropdown when multiple tabs/apps are connected. Disabled in production.
+  devTools: import.meta.env.DEV
+    ? { name: "BPScommand", trace: true }
+    : false,
 });
 
 let previousCardSandboxState = store.getState().cardSandbox;

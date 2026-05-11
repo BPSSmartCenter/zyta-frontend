@@ -2,7 +2,7 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
 import type { DateValue } from "../components/DateInput";
-import { getSiteDetails } from "../features/sites";
+import { selectAuthSites } from "../features/auth";
 import {
   dateFilterActions,
   selectDateFilterTouched,
@@ -56,17 +56,6 @@ const FiltersContext = React.createContext<FiltersState | undefined>(undefined);
 const BPS_UTILITY_ID = "__bps";
 const BPS_UTILITY_LABEL = "BPS";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function resolveBillingSite(payload: unknown): Record<string, unknown> {
-  if (!isRecord(payload)) return {};
-  const data = isRecord(payload.data) ? payload.data : payload;
-  if (!isRecord(data)) return {};
-  return isRecord(data.site) ? data.site : data;
-}
-
 function withFallbackGroup(option: SiteOption): SiteOption {
   if (option.groupId || option.groupLabel) {
     return option;
@@ -98,6 +87,7 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
   const selectedUtility = useAppSelector(selectSelectedUtility);
   const isPickerOpen = useAppSelector(selectIsSitePickerOpen);
   const pickerReason = useAppSelector(selectSitePickerReason);
+  const authSites = useAppSelector(selectAuthSites);
 
   const [searchSite, setSearchSite] = React.useState("");
   const [billingGuard, setBillingGuard] =
@@ -106,9 +96,6 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       loading: false,
       allowElectricBilling: null,
     });
-  const billingPermissionCacheRef = React.useRef<Map<string, boolean>>(
-    new Map()
-  );
 
   const allSitesOption = React.useMemo<SiteOption>(
     () => ({
@@ -137,51 +124,18 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const cached = billingPermissionCacheRef.current.get(code);
-    if (typeof cached === "boolean") {
-      setBillingGuard({
-        siteCode: code,
-        loading: false,
-        allowElectricBilling: cached,
-      });
-      return;
-    }
-
-    let cancelled = false;
+    // Read billing.allowElectricBilling from /me-derived auth slice; no fetch.
+    const norm = code.toLowerCase();
+    const site = authSites.find(
+      (s) =>
+        s.code.toLowerCase() === norm || String(s.id).toLowerCase() === norm
+    );
     setBillingGuard({
       siteCode: code,
-      loading: true,
-      allowElectricBilling: null,
+      loading: false,
+      allowElectricBilling: site ? site.billing.allowElectricBilling : false,
     });
-
-    getSiteDetails(code)
-      .then((resp: unknown) => {
-        if (cancelled) return;
-        const site = resolveBillingSite(resp);
-        const allowed = Boolean(
-          site.allowElectricBilling ?? site.allow_electric_billing
-        );
-        billingPermissionCacheRef.current.set(code, allowed);
-        setBillingGuard({
-          siteCode: code,
-          loading: false,
-          allowElectricBilling: allowed,
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        billingPermissionCacheRef.current.set(code, false);
-        setBillingGuard({
-          siteCode: code,
-          loading: false,
-          allowElectricBilling: false,
-        });
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedSite]);
+  }, [selectedSite, authSites]);
 
   const setDate = React.useCallback(
     (v: DateValue) => {
