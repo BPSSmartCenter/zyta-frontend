@@ -6,10 +6,12 @@ import {
   flushCardSandboxState,
   saveCardSandboxState,
 } from "../features/cardSandbox/cardSandboxStorage";
+import { catalogReducer } from "../features/catalog";
 import { dateFilterReducer } from "../features/dateFilter";
 import { detectionSummaryReducer } from "../features/detectionSummary";
 import { devicesReducer } from "../features/devices";
 import { electricReducer } from "../features/electric";
+import { notificationsReducer } from "../features/notifications";
 import { notisFeedReducer } from "../features/notisFeed";
 import { sidebarReducer } from "../features/sidebar";
 import { sitesReducer } from "../features/sites";
@@ -23,10 +25,12 @@ export const store = configureStore({
     auth: authReducer,
     billing: billingReducer,
     cardSandbox: cardSandboxReducer,
+    catalog: catalogReducer,
     dateFilter: dateFilterReducer,
     detectionSummary: detectionSummaryReducer,
     devices: devicesReducer,
     electric: electricReducer,
+    notifications: notificationsReducer,
     notisFeed: notisFeedReducer,
     sidebar: sidebarReducer,
     sites: sitesReducer,

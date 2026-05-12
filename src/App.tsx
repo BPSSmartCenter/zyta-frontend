@@ -26,7 +26,6 @@ import {
   BillPdfPreview,
   CardSandbox,
 } from "./pages";
-import LanguageSwitcher from "./components/LanguageSwitcher";
 import "./App.css";
 import ScrollUnlocker from "./hook/ScrollUnlocker";
 import ScrollToTop from "./hook/useScrollToTop";
@@ -43,6 +42,8 @@ import { SiteSelectionModal } from "./components/SiteSelection";
 import { useAppSelector } from "./store/hooks";
 import { selectAuthUser, selectIsAuthBooting } from "./features/auth";
 import type { AuthUser } from "./features/auth";
+import { NotificationStreamGate } from "./features/notifications";
+import { CatalogBootstrapGate } from "./features/catalog/CatalogBootstrapGate";
 
 function dashboardPathFor(user: AuthUser | null) {
   return user?.id ? "/dashboard" : "/";
@@ -64,6 +65,8 @@ function AppBootLoading() {
 function AuthedProviders({ children }: { children: React.ReactNode }) {
   return (
     <BootstrapSitesGate>
+      <CatalogBootstrapGate />
+      <NotificationStreamGate />
       <DeviceInventoryProvider>
         <FaceRecProvider>
           <FiltersProvider>
@@ -84,7 +87,6 @@ function App() {
     <BrowserRouter>
       <ScrollToTop smooth={true} />
       <ScrollUnlocker />
-      <LanguageSwitcher />
       <Routes>
         {/* public — ไม่ mount authed providers */}
         <Route path="/" element={<RootLandingOrDashboard />} />

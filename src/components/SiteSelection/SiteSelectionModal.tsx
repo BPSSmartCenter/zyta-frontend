@@ -139,7 +139,7 @@ export default function SiteSelectionModal({ alwaysMounted = false }: Props) {
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative z-10 flex max-h-[calc(100dvh-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.35)] transition-all ${
+        className={`relative z-10 flex max-h-[calc(100dvh-3rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.35)] transition-all ${
           isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
         }`}
       >

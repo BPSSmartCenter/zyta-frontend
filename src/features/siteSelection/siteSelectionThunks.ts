@@ -1,7 +1,7 @@
 // src/features/siteSelection/siteSelectionThunks.ts
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { ApiError, request } from "../../lib/http";
-import { normalizeMeResponse, type MeResponse } from "../users/usersTypes";
+import type { MeResponse, MeSite } from "../users/usersTypes";
+import type { RootState } from "../../store/store";
 import type { SiteOption } from "./siteSelectionTypes";
 import { readStoredSite, writeStoredSite } from "./siteSelectionStorage";
 
@@ -26,7 +26,7 @@ function asNullableText(value: unknown): string | null {
  * utilities tables — no extra fetch needed.
  */
 function meSiteToOption(
-  site: MeResponse["sites"][number],
+  site: MeSite,
   groupsById: Map<string, string>,
   utilitiesById: Map<string, string>
 ): SiteOption | null {
@@ -42,6 +42,27 @@ function meSiteToOption(
     groupLabel: groupId ? (groupsById.get(groupId) ?? null) : null,
     utilityId,
     utilityLabel: utilityId ? (utilitiesById.get(utilityId) ?? null) : null,
+  };
+}
+
+function buildCatalogFromMe(me: MeResponse): LoadSiteCatalogResult {
+  const groupsById = new Map<string, string>(
+    me.siteGroups
+      .filter((g) => g.id && g.name)
+      .map((g) => [g.id, g.name] as const)
+  );
+  const utilitiesById = new Map<string, string>(
+    me.utilities
+      .filter((u) => u.id && u.name)
+      .map((u) => [u.id, u.name] as const)
+  );
+  const options = me.sites
+    .map((s) => meSiteToOption(s, groupsById, utilitiesById))
+    .filter((opt): opt is SiteOption => opt !== null);
+  return {
+    isAdmin: me.role === "admin",
+    sites: dedupOptions(options),
+    uid: me.id || null,
   };
 }
 
@@ -116,60 +137,31 @@ export type LoadSiteCatalogError = {
  * — so we no longer call /sites or /site-groups here. Group/utility labels
  * come from the embedded lookup tables in the same response.
  */
+/**
+ * Build picker catalog from auth state (no network).
+ *
+ * The bootstrap probe (`bootstrapAuth` thunk dispatched in main.tsx) already
+ * fetches `/users/me` once on app start and stores the full consolidated
+ * payload in `state.auth.user`. This thunk just re-shapes that data into
+ * `SiteOption[]` for the picker — no second /me request.
+ *
+ * If auth.user is missing (race condition or bootstrap failed),
+ * BootstrapSitesGate will not have mounted this dispatch in the first place
+ * (it guards on `user?.id`), but we still reject with UNAUTHORIZED defensively.
+ */
 export const loadSiteCatalog = createAsyncThunk<
   LoadSiteCatalogResult,
   void,
-  { rejectValue: LoadSiteCatalogError }
->("siteSelection/loadCatalog", async (_, { rejectWithValue }) => {
-  try {
-    // silent401: don't let http.ts bounce to /login if session is expired —
-    // the thunk handles 401 itself (rejectWithValue UNAUTHORIZED), and
-    // BootstrapSitesGate decides how to react. A bounce here would reload
-    // the page mid-thunk and wipe Redux state, making it look like a reset.
-    const meRaw = await request<unknown>("/users/me", { silent401: true });
-    const me: MeResponse = normalizeMeResponse(meRaw);
-
-    const groupsById = new Map<string, string>(
-      me.siteGroups
-        .filter((g) => g.id && g.name)
-        .map((g) => [g.id, g.name] as const)
-    );
-    const utilitiesById = new Map<string, string>(
-      me.utilities
-        .filter((u) => u.id && u.name)
-        .map((u) => [u.id, u.name] as const)
-    );
-
-    const options = me.sites
-      .map((s) => meSiteToOption(s, groupsById, utilitiesById))
-      .filter((opt): opt is SiteOption => opt !== null);
-
-    return {
-      isAdmin: me.role === "admin",
-      sites: dedupOptions(options),
-      uid: me.id || null,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      if (error.status === 401 || error.status === 403) {
-        return rejectWithValue({
-          code: "UNAUTHORIZED",
-          message: "Not authenticated",
-        });
-      }
-      if (error.status === undefined) {
-        return rejectWithValue({ code: "NETWORK", message: "Network error" });
-      }
-      return rejectWithValue({
-        code: "UNKNOWN",
-        message: error.message || "Failed to load sites",
-      });
-    }
+  { state: RootState; rejectValue: LoadSiteCatalogError }
+>("siteSelection/loadCatalog", async (_, { getState, rejectWithValue }) => {
+  const me = getState().auth.user;
+  if (!me) {
     return rejectWithValue({
-      code: "UNKNOWN",
-      message: "Failed to load sites",
+      code: "UNAUTHORIZED",
+      message: "Not authenticated",
     });
   }
+  return buildCatalogFromMe(me as MeResponse);
 });
 
 export type HydrateSelectionInput = {

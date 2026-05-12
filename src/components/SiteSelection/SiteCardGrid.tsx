@@ -108,7 +108,7 @@ export default function SiteCardGrid({
   return (
     <div className="flex flex-col gap-6">
       {allSites && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <AllSitesCard
             label={allSites.label}
             count={allSites.count}
@@ -157,7 +157,7 @@ export default function SiteCardGrid({
                   : undefined
               }
             />
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {section.sites.map((site) => (
                 <SiteCard
                   key={site.value}

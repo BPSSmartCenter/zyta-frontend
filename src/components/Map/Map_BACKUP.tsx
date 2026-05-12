@@ -974,7 +974,7 @@ export default function Map({
         }
       } catch (err) {
         if (abortCountry.signal.aborted || cancelled) return;
-        console.error("[Map] cannot load thailand.geojson", err);
+        // console.error("[Map] cannot load thailand.geojson", err);
         setGeoError("country");
       }
     })();
@@ -1197,7 +1197,7 @@ export default function Map({
         } catch {}
       } catch (err) {
         if (abortProvinces.signal.aborted) return;
-        console.error("[Map] cannot load provinces.geojson", err);
+        // console.error("[Map] cannot load provinces.geojson", err);
         setGeoError("provinces");
       }
     })();

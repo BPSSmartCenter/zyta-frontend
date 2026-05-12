@@ -437,7 +437,6 @@ function UtilityCard({
 }
 
 export default function UtilityOverview({ selectedSiteCode }: Props) {
-  const { t } = useTranslation("dashboard");
   const navigate = useNavigate();
   const { absSite, abs } = useUserPath();
   const authSites = useAppSelector(selectAuthSites);
@@ -522,38 +521,9 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     navigate(abs("/electric/meter"));
   }, [abs, absSite, navigate, selectedSiteCode]);
 
-  const hasAnyLiveData = electricOverview.hasData;
-
   return (
     <section>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <h2 className="text-[1.6rem] font-semibold text-slate-950">
-            {t("utilityOverview.title", { defaultValue: "Utility Overview" })}
-          </h2>
-          <p className="mt-0.5 text-[0.95rem] font-medium text-slate-400">
-            {t("utilityOverview.subtitle", {
-              defaultValue: "Live snapshot • Water • Electric • Air",
-            })}
-          </p>
-        </div>
-
-        <div className="inline-flex items-center gap-2 self-start rounded-full bg-slate-50 px-3.5 py-1.5 text-xs font-semibold text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-          <span
-            className={[
-              "h-2 w-2 rounded-full",
-              hasAnyLiveData ? "bg-[#8CE0C4]" : "bg-slate-300",
-            ].join(" ")}
-          />
-          <span>
-            {hasAnyLiveData
-              ? t("utilityOverview.live", { defaultValue: "Live" })
-              : t("utilityOverview.emptyBadge", { defaultValue: "No data" })}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <UtilityCard
           cardKey="water"
           electricOverview={electricOverview}

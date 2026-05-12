@@ -299,6 +299,35 @@ export async function requestBlob(
   return response.blob();
 }
 
+export type RequestWithHeadersResult<T> = {
+  status: number;
+  /** Parsed body. `null` when the server returned 304 Not Modified. */
+  data: T | null;
+  /** Echo of response headers (lowercased keys via Headers API). */
+  headers: Headers;
+};
+
+/**
+ * Variant of `request` that exposes response status + headers, used by
+ * ETag-aware endpoints (e.g. the notification catalog) that need to read
+ * `ETag` / handle `304 Not Modified` themselves.
+ *
+ * On 304 → `data: null`, `status: 304`, caller keeps using its cached copy.
+ * On 2xx → `data` is the unwrapped envelope just like `request<T>`.
+ * On 4xx/5xx → throws `ApiError` like `request<T>`.
+ */
+export async function requestWithHeaders<T = unknown>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<RequestWithHeadersResult<T>> {
+  const response = await dispatchRequest(path, options);
+  if (response.status === 304) {
+    return { status: 304, data: null, headers: response.headers };
+  }
+  const data = await readEnvelope<T>(response);
+  return { status: response.status, data, headers: response.headers };
+}
+
 /** Helper for endpoints whose top-level shape is `{ ok, items }`. */
 export async function requestList<T = unknown>(
   path: string,

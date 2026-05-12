@@ -3,7 +3,9 @@ import type { CSSProperties } from "react";
 import type { Props, SitePoint, SitePinStatus } from "./MapTypes";
 
 declare global {
-  interface Window { longdo?: any; }
+  interface Window {
+    longdo?: any;
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -11,7 +13,11 @@ declare global {
 ───────────────────────────────────────────── */
 type LonLat = { lon: number; lat: number };
 type Geometry = { type: string; coordinates: unknown };
-type Feature = { type: "Feature"; properties?: Record<string, string>; geometry: Geometry };
+type Feature = {
+  type: "Feature";
+  properties?: Record<string, string>;
+  geometry: Geometry;
+};
 type FeatureCollection = { type: "FeatureCollection"; features: Feature[] };
 
 /* ─────────────────────────────────────────────
@@ -21,17 +27,25 @@ const DEFAULT_LONGDO_KEY = "014d3a8670f605c055dfadcbb59a35a2";
 let longdoScriptPromise: Promise<void> | null = null;
 
 const resolveLongdoKey = () =>
-  ((import.meta as { env?: Record<string, string> }).env?.VITE_LONGDO_MAP_KEY) || DEFAULT_LONGDO_KEY;
+  (import.meta as { env?: Record<string, string> }).env?.VITE_LONGDO_MAP_KEY ||
+  DEFAULT_LONGDO_KEY;
 
 const loadLongdoMap2D = async () => {
   if (typeof window === "undefined" || window.longdo) return;
-  if (longdoScriptPromise) { await longdoScriptPromise; return; }
+  if (longdoScriptPromise) {
+    await longdoScriptPromise;
+    return;
+  }
   const key = resolveLongdoKey();
   longdoScriptPromise = new Promise<void>((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-longdo="map2"]');
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-longdo="map2"]',
+    );
     if (existing) {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load Longdo")));
+      existing.addEventListener("error", () =>
+        reject(new Error("Failed to load Longdo")),
+      );
       return;
     }
     const script = document.createElement("script");
@@ -116,27 +130,37 @@ export default function Map({
   /* refs สำหรับ overlay tracking */
   const provinceOverlaysRef = useRef<unknown[]>([]);
   const allMarkerOverlaysRef = useRef<unknown[]>([]);
-  const siteByOverlayRef = useRef<globalThis.Map<unknown, SitePoint>>(new globalThis.Map());
+  const siteByOverlayRef = useRef<globalThis.Map<unknown, SitePoint>>(
+    new globalThis.Map(),
+  );
   // ติดตาม position + label ของทุก marker ที่ render (ใช้สำหรับ tooltip)
-  const renderedMarkerLabelsRef = useRef<{ lat: number; lng: number; name: string }[]>([]);
+  const renderedMarkerLabelsRef = useRef<
+    { lat: number; lng: number; name: string }[]
+  >([]);
 
   const [mapReady, setMapReady] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(MAP_MIN_ZOOM);
   const zoomLevelRef = useRef(MAP_MIN_ZOOM);
   const [pinTooltip, setPinTooltip] = useState<{
-    visible: boolean; text: string; left: number; top: number;
+    visible: boolean;
+    text: string;
+    left: number;
+    top: number;
   }>({ visible: false, text: "", left: 0, top: 0 });
 
   // ติดตาม mouse position สำหรับ tooltip
   const lastMousePosRef = useRef({ x: 0, y: 0 });
   useEffect(() => {
-    const track = (e: MouseEvent) => { lastMousePosRef.current = { x: e.clientX, y: e.clientY }; };
+    const track = (e: MouseEvent) => {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
     window.addEventListener("mousemove", track, true);
     return () => window.removeEventListener("mousemove", track, true);
   }, []);
 
   const allSitePoints = useMemo(
-    () => (Array.isArray(sitePoints) && sitePoints.length > 0 ? sitePoints : []),
+    () =>
+      Array.isArray(sitePoints) && sitePoints.length > 0 ? sitePoints : [],
     [sitePoints],
   );
   const allSitePointsRef = useRef<SitePoint[]>(allSitePoints);
@@ -147,9 +171,9 @@ export default function Map({
 
   /* ─── Electric status helpers ─── */
   const resolveStatus = (site: SitePoint): SitePinStatus | undefined =>
-    (site.code ? pinStatusRef.current?.[site.code] : undefined)
-    ?? (site.id ? pinStatusRef.current?.[site.id] : undefined)
-    ?? pinStatusRef.current?.[site.name];
+    (site.code ? pinStatusRef.current?.[site.code] : undefined) ??
+    (site.id ? pinStatusRef.current?.[site.id] : undefined) ??
+    pinStatusRef.current?.[site.name];
 
   const pinColor = (site: SitePoint): string => {
     const s = resolveStatus(site);
@@ -159,10 +183,16 @@ export default function Map({
 
   /* ─── Overlay cleanup ─── */
   const clearAllMarkers = () => {
-    const map = mapRef.current as { Overlays: { remove: (o: unknown) => void } } | null;
+    const map = mapRef.current as {
+      Overlays: { remove: (o: unknown) => void };
+    } | null;
     if (!map) return;
     for (const ov of allMarkerOverlaysRef.current) {
-      try { map.Overlays.remove(ov); } catch { /* noop */ }
+      try {
+        map.Overlays.remove(ov);
+      } catch {
+        /* noop */
+      }
     }
     renderedMarkerLabelsRef.current = [];
     allMarkerOverlaysRef.current = [];
@@ -170,17 +200,25 @@ export default function Map({
   };
 
   const clearProvinceOverlays = () => {
-    const map = mapRef.current as { Overlays: { remove: (o: unknown) => void } } | null;
+    const map = mapRef.current as {
+      Overlays: { remove: (o: unknown) => void };
+    } | null;
     if (!map) return;
     for (const ov of provinceOverlaysRef.current) {
-      try { map.Overlays.remove(ov); } catch { /* noop */ }
+      try {
+        map.Overlays.remove(ov);
+      } catch {
+        /* noop */
+      }
     }
     provinceOverlaysRef.current = [];
   };
 
   /* ─── Province border overlays (visual only, not clickable) ─── */
   const drawProvinceOverlays = () => {
-    const map = mapRef.current as { Overlays: { add: (o: unknown) => void } } | null;
+    const map = mapRef.current as {
+      Overlays: { add: (o: unknown) => void };
+    } | null;
     const longdo = window.longdo;
     if (!map || !longdo) return;
     clearProvinceOverlays();
@@ -224,13 +262,32 @@ export default function Map({
     const showTip = () => {
       const rect = mapContainerRef.current?.getBoundingClientRect();
       const pos = lastMousePosRef.current;
-      setPinTooltip({ visible: true, text: label, left: pos.x - (rect?.left ?? 0), top: pos.y - (rect?.top ?? 0) - 20 });
+      setPinTooltip({
+        visible: true,
+        text: label,
+        left: pos.x - (rect?.left ?? 0),
+        top: pos.y - (rect?.top ?? 0) - 20,
+      });
     };
-    try { longdo.Event.bind(evtOver, marker, showTip); } catch { /* noop */ }
-    try { longdo.Event.bind(evtOut, marker, () => setPinTooltip((p) => ({ ...p, visible: false }))); } catch { /* noop */ }
+    try {
+      longdo.Event.bind(evtOver, marker, showTip);
+    } catch {
+      /* noop */
+    }
+    try {
+      longdo.Event.bind(evtOut, marker, () =>
+        setPinTooltip((p) => ({ ...p, visible: false })),
+      );
+    } catch {
+      /* noop */
+    }
     allMarkerOverlaysRef.current.push(marker);
     siteByOverlayRef.current.set(marker, site);
-    renderedMarkerLabelsRef.current.push({ lat: site.lat, lng: site.lng, name: site.name });
+    renderedMarkerLabelsRef.current.push({
+      lat: site.lat,
+      lng: site.lng,
+      name: site.name,
+    });
     map.Overlays.add(marker);
   };
 
@@ -260,10 +317,25 @@ export default function Map({
     const showTip = () => {
       const rect = mapContainerRef.current?.getBoundingClientRect();
       const pos = lastMousePosRef.current;
-      setPinTooltip({ visible: true, text: label, left: pos.x - (rect?.left ?? 0), top: pos.y - (rect?.top ?? 0) - 20 });
+      setPinTooltip({
+        visible: true,
+        text: label,
+        left: pos.x - (rect?.left ?? 0),
+        top: pos.y - (rect?.top ?? 0) - 20,
+      });
     };
-    try { longdo.Event.bind(evtOver, marker, showTip); } catch { /* noop */ }
-    try { longdo.Event.bind(evtOut, marker, () => setPinTooltip((p) => ({ ...p, visible: false }))); } catch { /* noop */ }
+    try {
+      longdo.Event.bind(evtOver, marker, showTip);
+    } catch {
+      /* noop */
+    }
+    try {
+      longdo.Event.bind(evtOut, marker, () =>
+        setPinTooltip((p) => ({ ...p, visible: false })),
+      );
+    } catch {
+      /* noop */
+    }
     // คลิก group pin → zoom เข้าไปให้เห็น individual sites
     const fakeGroupSite: SitePoint = { name: groupName, lat, lng };
     allMarkerOverlaysRef.current.push(marker);
@@ -275,7 +347,11 @@ export default function Map({
   /* ─── Render site markers ─── */
   const renderMarkers = () => {
     clearAllMarkers();
-    const map = mapRef.current as { Overlays: { add: (o: unknown) => void }; zoom: (z?: number) => number; location: (l: { lon: number; lat: number }) => void } | null;
+    const map = mapRef.current as {
+      Overlays: { add: (o: unknown) => void };
+      zoom: (z?: number) => number;
+      location: (l: { lon: number; lat: number }) => void;
+    } | null;
     const longdo = window.longdo;
     if (!map || !longdo) return;
 
@@ -286,15 +362,9 @@ export default function Map({
     });
 
     const currentZoom = zoomLevelRef.current;
-    console.log("[Map] renderMarkers", {
-      siteCount: sites.length,
-      zoom: currentZoom,
-      groups: sites.map((s) => ({ name: s.name, groupSite: s.groupSite })),
-    });
-
     const longdoEvt = (window.longdo as any)?.EventName ?? {};
     const evtOver = longdoEvt.MouseOver ?? longdoEvt.mouseover ?? "mouseover";
-    const evtOut  = longdoEvt.MouseOut  ?? longdoEvt.mouseout  ?? "mouseout";
+    const evtOut = longdoEvt.MouseOut ?? longdoEvt.mouseout ?? "mouseout";
 
     if (currentZoom < GROUP_ZOOM_THRESHOLD) {
       // ─── Group mode: รวม site ที่มี groupSite เดียวกัน ───
@@ -336,10 +406,10 @@ export default function Map({
     let overlayClickHandler: ((overlay: unknown) => void) | null = null;
 
     (async () => {
-      console.log("🗺️ [Map] init useEffect START", { hasContainer: !!mapContainerRef.current });
+      // console.log("🗺️ [Map] init useEffect START", { hasContainer: !!mapContainerRef.current });
       if (!mapContainerRef.current) return;
       await loadLongdoMap2D();
-      console.log("🗺️ [Map] Longdo script loaded", { hasLongdo: !!window.longdo, cancelled });
+      // console.log("🗺️ [Map] Longdo script loaded", { hasLongdo: !!window.longdo, cancelled });
       if (cancelled || !mapContainerRef.current || !window.longdo) return;
 
       const longdo = window.longdo;
@@ -347,10 +417,10 @@ export default function Map({
       // สร้าง map ก่อน ไม่ต้องรอ provinces.geojson
       mapContainerRef.current.innerHTML = "";
 
-      console.log("🗺️ [Map] creating longdo.Map instance...");
+      // console.log("🗺️ [Map] creating longdo.Map instance...");
       const map = new longdo.Map({
         placeholder: mapContainerRef.current,
-        location: { lon: 101.0, lat: 13.0 },   // ศูนย์กลางประเทศไทย
+        location: { lon: 101.0, lat: 13.0 }, // ศูนย์กลางประเทศไทย
         zoom: MAP_MIN_ZOOM,
         ui: longdo.UiComponent?.None,
         language: longdo.Language?.THAI ?? "th",
@@ -361,7 +431,11 @@ export default function Map({
       });
 
       console.log("🗺️ [Map] longdo.Map created successfully");
-      try { map.Ui?.Crosshair?.visible?.(false); } catch { /* noop */ }
+      try {
+        map.Ui?.Crosshair?.visible?.(false);
+      } catch {
+        /* noop */
+      }
       mapRef.current = map;
       initializedRef.current = true;
 
@@ -370,11 +444,17 @@ export default function Map({
         const site = siteByOverlayRef.current.get(overlay);
         if (!site) return;
         // ถ้า zoom ต่ำกว่า threshold และ site ไม่มี code = group pin → zoom เข้า
-        if (zoomLevelRef.current < GROUP_ZOOM_THRESHOLD && !site.code && !site.id) {
+        if (
+          zoomLevelRef.current < GROUP_ZOOM_THRESHOLD &&
+          !site.code &&
+          !site.id
+        ) {
           try {
             (map as any).location({ lon: site.lng, lat: site.lat });
             (map as any).zoom(GROUP_ZOOM_THRESHOLD);
-          } catch { /* noop */ }
+          } catch {
+            /* noop */
+          }
         } else {
           onPinClick?.(site);
         }
@@ -382,8 +462,13 @@ export default function Map({
 
       /* Resolve Longdo event names — enum or string fallback */
       const EVT = (longdo as any).EventName ?? {};
-      const evtOverlayClick = EVT.OverlayClick ?? EVT.overlayClick ?? "overlayClick";
-      try { map.Event.bind(evtOverlayClick, overlayClickHandler); } catch (e) { console.warn("[Map] bind overlayClick failed", e); }
+      const evtOverlayClick =
+        EVT.OverlayClick ?? EVT.overlayClick ?? "overlayClick";
+      try {
+        map.Event.bind(evtOverlayClick, overlayClickHandler);
+      } catch (e) {
+        console.warn("[Map] bind overlayClick failed", e);
+      }
 
       // Bind zoom event เพื่อ re-render markers ตาม zoom level
       const evtZoom = EVT.Zoom ?? EVT.zoom ?? "zoom";
@@ -393,24 +478,27 @@ export default function Map({
           zoomLevelRef.current = z;
           setZoomLevel(z);
         });
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
 
-      console.log("🗺️ [Map] init complete, setting mapReady=true");
+      // console.log("🗺️ [Map] init complete, setting mapReady=true");
       setMapReady(true);
 
       // โหลด provinces.geojson แบบ background (ไม่บล็อก map)
       try {
-        const provincesGeo = await fetch("/data/provinces.geojson")
-          .then((r) => r.json()) as FeatureCollection;
+        const provincesGeo = (await fetch("/data/provinces.geojson").then((r) =>
+          r.json(),
+        )) as FeatureCollection;
         if (!cancelled) {
           provincesRef.current = provincesGeo.features ?? [];
           drawProvinceOverlays();
-          console.log("🗺️ [Map] provinces loaded", { count: provincesGeo?.features?.length });
+          // console.log("🗺️ [Map] provinces loaded", { count: provincesGeo?.features?.length });
         }
       } catch (e) {
-        console.warn("🗺️ [Map] provinces.geojson load failed", e);
+        // console.warn("🗺️ [Map] provinces.geojson load failed", e);
       }
-    })().catch((err) => console.error("[Map] init failed", err));
+    })()
 
     return () => {
       cancelled = true;
@@ -418,10 +506,25 @@ export default function Map({
         Event: { unbind: (e: string, h: unknown) => void };
       } | null;
       if (map) {
-        try { if (overlayClickHandler) map.Event.unbind("overlayClick", overlayClickHandler); } catch { /* */ }
-        try { if (overlayClickHandler) map.Event.unbind("OverlayClick", overlayClickHandler); } catch { /* */ }
+        try {
+          if (overlayClickHandler)
+            map.Event.unbind("overlayClick", overlayClickHandler);
+        } catch {
+          /* */
+        }
+        try {
+          if (overlayClickHandler)
+            map.Event.unbind("OverlayClick", overlayClickHandler);
+        } catch {
+          /* */
+        }
       }
-      try { clearAllMarkers(); clearProvinceOverlays(); } catch { /* noop */ }
+      try {
+        clearAllMarkers();
+        clearProvinceOverlays();
+      } catch {
+        /* noop */
+      }
       initializedRef.current = false;
       mapRef.current = null;
       setMapReady(false);
@@ -446,7 +549,9 @@ export default function Map({
     try {
       map.location({ lon: focusSiteCenter.lng, lat: focusSiteCenter.lat });
       map.zoom(14);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     const matched = allSitePoints.find(
       (s) => s.lat === focusSiteCenter.lat && s.lng === focusSiteCenter.lng,
     );
@@ -483,13 +588,18 @@ export default function Map({
     /** แปลง lat/lng → pixel position ใน map container
      *  ใช้ Longdo map.getPixel() ถ้ามี, ไม่งั้น fallback ด้วย mercator
      */
-    const latLngToPixel = (lat: number, lng: number): { x: number; y: number } | null => {
+    const latLngToPixel = (
+      lat: number,
+      lng: number,
+    ): { x: number; y: number } | null => {
       const map = mapRef.current as any;
       if (!map) return null;
       try {
         // Longdo API: map.location({ lon, lat }) คืน pixel? — ไม่มี direct method
         // ใช้ map.bound() + container size แปลงเอง
-        const bound = map.bound?.() as { minLon: number; maxLon: number; minLat: number; maxLat: number } | undefined;
+        const bound = map.bound?.() as
+          | { minLon: number; maxLon: number; minLat: number; maxLat: number }
+          | undefined;
         if (!bound) return null;
         const rect = root.getBoundingClientRect();
         const W = rect.width;
@@ -522,13 +632,23 @@ export default function Map({
       }
 
       if (closest) {
-        setPinTooltip({ visible: true, text: closest.name, left: mx, top: my - 32 });
+        setPinTooltip({
+          visible: true,
+          text: closest.name,
+          left: mx,
+          top: my - 32,
+        });
       } else {
-        setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+        setPinTooltip((prev) =>
+          prev.visible ? { ...prev, visible: false } : prev,
+        );
       }
     };
 
-    const handleLeave = () => setPinTooltip((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+    const handleLeave = () =>
+      setPinTooltip((prev) =>
+        prev.visible ? { ...prev, visible: false } : prev,
+      );
 
     root.addEventListener("mousemove", handleMove);
     root.addEventListener("mouseleave", handleLeave);
@@ -593,9 +713,20 @@ export default function Map({
           title="Zoom in"
           style={zoomBtnStyle}
           onClick={() => {
-            const map = mapRef.current as { zoom: (z?: number) => number } | null;
+            const map = mapRef.current as {
+              zoom: (z?: number) => number;
+            } | null;
             if (!map) return;
-            try { map.zoom(Math.min(Number(map.zoom?.() ?? MAP_MIN_ZOOM) + 1, MAP_MAX_ZOOM)); } catch { /* noop */ }
+            try {
+              map.zoom(
+                Math.min(
+                  Number(map.zoom?.() ?? MAP_MIN_ZOOM) + 1,
+                  MAP_MAX_ZOOM,
+                ),
+              );
+            } catch {
+              /* noop */
+            }
           }}
         >
           +
@@ -605,9 +736,20 @@ export default function Map({
           title="Zoom out"
           style={zoomBtnStyle}
           onClick={() => {
-            const map = mapRef.current as { zoom: (z?: number) => number } | null;
+            const map = mapRef.current as {
+              zoom: (z?: number) => number;
+            } | null;
             if (!map) return;
-            try { map.zoom(Math.max(Number(map.zoom?.() ?? MAP_MIN_ZOOM) - 1, MAP_MIN_ZOOM)); } catch { /* noop */ }
+            try {
+              map.zoom(
+                Math.max(
+                  Number(map.zoom?.() ?? MAP_MIN_ZOOM) - 1,
+                  MAP_MIN_ZOOM,
+                ),
+              );
+            } catch {
+              /* noop */
+            }
           }}
         >
           −
