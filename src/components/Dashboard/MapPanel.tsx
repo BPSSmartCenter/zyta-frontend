@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo, useCallback, useState } from "react";
 import { useNotisFeed } from "../../context/NotisContext";
 import { notiSeverity, resolveAlertEventKey } from "../../utils/notis";
 import { useFilters } from "../../context/FiltersContext";
+import type { SelectedGroupSite, SelectedUtility } from "../../context/FiltersContext";
 import type { SitePoint, SitePinStatus } from "../Map/MapTypes";
 import { getSiteDetails } from "../../features/sites";
 
@@ -61,6 +62,13 @@ type Props = {
   }>;
   fillHeight?: boolean;
   mapContainerClassName?: string;
+  /** ถ้าส่ง object มา (รวม null fields) จะใช้แทน scope จาก FiltersContext */
+  scopeOverride?: {
+    utility: SelectedUtility;
+    groupSite: SelectedGroupSite;
+  };
+  /** intercept pin click / zoom-out → all (sandbox writes ไป per-card group) */
+  onSelectSite?: (siteCode: string) => void;
 };
 
 export default function MapPanel({
@@ -77,30 +85,47 @@ export default function MapPanel({
   accessibleSites,
   fillHeight,
   mapContainerClassName,
+  scopeOverride,
+  onSelectSite,
 }: Props) {
   // console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
   const { items: liveNotis } = useNotisFeed();
   const {
     setSelectedSite,
     siteOptions,
-    selectedGroupSite,
-    selectedUtility,
+    selectedGroupSite: ctxSelectedGroupSite,
+    selectedUtility: ctxSelectedUtility,
   } = useFilters();
 
-  // When a pin is clicked on the map, update the global site selection (dropdown)
+  // ถ้ามี scopeOverride จาก parent (sandbox) ใช้แทน context
+  const selectedUtility = scopeOverride
+    ? scopeOverride.utility
+    : ctxSelectedUtility;
+  const selectedGroupSite = scopeOverride
+    ? scopeOverride.groupSite
+    : ctxSelectedGroupSite;
+
+  // When a pin is clicked on the map, update site selection (per-card or global)
   const handlePinClick = useCallback(
     (site: SitePoint) => {
-      if (site.code) {
+      if (!site.code) return;
+      if (onSelectSite) {
+        onSelectSite(site.code);
+      } else {
         setSelectedSite(site.code);
       }
     },
-    [setSelectedSite]
+    [onSelectSite, setSelectedSite]
   );
 
   // When map zooms out to country, reset site selection to "All Sites"
   const handleZoomOutToCountry = useCallback(() => {
-    setSelectedSite("all");
-  }, [setSelectedSite]);
+    if (onSelectSite) {
+      onSelectSite("all");
+    } else {
+      setSelectedSite("all");
+    }
+  }, [onSelectSite, setSelectedSite]);
   const userRole: "admin" | "manager" | "officer" | "user" = role ?? "user";
   const [pinStatusBySite, setPinStatusBySite] = useState<Record<string, SitePinStatus>>({});
   const pinStatusRequestIdRef = useRef(0);

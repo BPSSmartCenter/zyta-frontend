@@ -327,6 +327,19 @@ export default function SandboxMapPanelCard({ cardId }: Props) {
         selectedSiteCode={selectedSite || "all"}
         accessibleSites={accessibleSites}
         overrideNotis={mapNotis}
+        scopeOverride={{
+          utility: filterGroup?.selectedUtility ?? null,
+          groupSite: filterGroup?.selectedGroupSite ?? null,
+        }}
+        onSelectSite={(code) => {
+          if (!filterGroup) return;
+          dispatch(
+            cardSandboxActions.setFilterGroupSite({
+              id: filterGroup.id,
+              selectedSite: code,
+            })
+          );
+        }}
       />
     </div>
   );
