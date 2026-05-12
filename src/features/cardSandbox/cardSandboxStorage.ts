@@ -22,6 +22,9 @@ const CARD_KINDS = new Set<SandboxCardKind>([
   "devices",
   "users",
   "snapshot",
+  "electric_meter",
+  "water_meter",
+  "air_sensor",
 ]);
 const DEFAULT_FILTER_GROUP_ID = "group-blue";
 const FILTER_GROUP_DEFS = [

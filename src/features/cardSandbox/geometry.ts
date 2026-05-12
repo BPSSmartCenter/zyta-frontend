@@ -11,6 +11,8 @@ export const MIN_FILTER_CARD_WIDTH = 360;
 export const MIN_FILTER_CARD_HEIGHT = 228;
 export const MIN_ALERT_CARD_WIDTH = 360;
 export const MIN_ALERT_CARD_HEIGHT = 540;
+export const MIN_UTILITY_CARD_WIDTH = 720;
+export const MIN_UTILITY_CARD_HEIGHT = 520;
 
 export type CardResizeConstraints = {
   minWidth: number;
@@ -30,6 +32,16 @@ export function getCardResizeConstraints(
     return {
       minWidth: MIN_ALERT_CARD_WIDTH,
       minHeight: MIN_ALERT_CARD_HEIGHT,
+    };
+  }
+  if (
+    kind === "electric_meter" ||
+    kind === "water_meter" ||
+    kind === "air_sensor"
+  ) {
+    return {
+      minWidth: MIN_UTILITY_CARD_WIDTH,
+      minHeight: MIN_UTILITY_CARD_HEIGHT,
     };
   }
   return {

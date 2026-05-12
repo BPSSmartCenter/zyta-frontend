@@ -114,12 +114,16 @@ function buildGroupPinSvg(count: number): string {
 /* ─────────────────────────────────────────────
    Map Component
 ───────────────────────────────────────────── */
+const DEFAULT_MAP_CONTAINER_CLASS =
+  "relative z-0 h-[720px] w-full overflow-hidden rounded-lg bg-[#dff1ff] sm:h-[740px] md:h-[760px]";
+
 export default function Map({
   sitePoints,
   pinStatusBySite,
   focusSiteCenter,
   onPinClick,
   lockZoomOut,
+  containerClassName,
 }: Props) {
   // console.log("🗺️ [Map] COMPONENT RENDER", { sitePoints: sitePoints?.length, focusSiteCenter });
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -538,6 +542,37 @@ export default function Map({
     renderMarkersRef.current();
   }, [allSitePoints, pinStatusBySite, mapReady, zoomLevel]);
 
+  /* ─── Trigger Longdo redraw on container resize (sandbox stretch fix) ─── */
+  useEffect(() => {
+    if (!mapReady) return;
+    const root = mapContainerRef.current;
+    if (!root || typeof ResizeObserver === "undefined") return;
+
+    let frame = 0;
+    const trigger = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const map = mapRef.current as {
+          resize?: () => void;
+          render?: () => void;
+        } | null;
+        if (!map) return;
+        try {
+          map.resize?.();
+          map.render?.();
+        } catch {
+          /* noop */
+        }
+      });
+    };
+    const observer = new ResizeObserver(trigger);
+    observer.observe(root);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [mapReady]);
+
   /* ─── Focus เมื่อ site ถูกเลือกจาก dropdown ─── */
   useEffect(() => {
     if (!focusSiteCenter || !mapReady) return;
@@ -674,7 +709,7 @@ export default function Map({
   };
 
   return (
-    <div className="longdo-map-root relative">
+    <div className="longdo-map-root relative h-full">
       <style>{`
         .longdo-map-root .ldmap_center_mark,
         .longdo-map-root .ldmap-center-mark,
@@ -687,7 +722,7 @@ export default function Map({
       {/* Longdo map container */}
       <div
         ref={mapContainerRef}
-        className="relative z-0 h-[720px] w-full overflow-hidden rounded-lg bg-[#dff1ff] sm:h-[740px] md:h-[760px]"
+        className={containerClassName ?? DEFAULT_MAP_CONTAINER_CLASS}
       />
 
       {/* Hover tooltip */}

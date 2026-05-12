@@ -273,6 +273,10 @@ function createCard(
   const isStatsPanel = kind === "devices" || kind === "users";
   const isSnapshot = kind === "snapshot";
   const isFilters = kind === "filters";
+  const isUtility =
+    kind === "electric_meter" ||
+    kind === "water_meter" ||
+    kind === "air_sensor";
   const titleByKind: Record<SandboxCardKind, string> = {
     blank: `Card ${index + 1}`,
     filters: "Main Filters",
@@ -284,6 +288,9 @@ function createCard(
     devices: "Device Count",
     users: "User Management",
     snapshot: "Snapshot Chart",
+    electric_meter: "Electric Meter",
+    water_meter: "Water Meter",
+    air_sensor: "Air Sensor",
   };
   return {
     id: createId(),
@@ -304,6 +311,8 @@ function createCard(
       ? 560
       : isFilters
       ? 360
+      : isUtility
+      ? 1080
       : 520,
     height: isSnapshot
       ? 720
@@ -317,6 +326,8 @@ function createCard(
       ? 520
       : isFilters
       ? 250
+      : isUtility
+      ? 720
       : 300,
     color: CARD_COLORS[index % CARD_COLORS.length],
     zIndex: maxZ + 10,

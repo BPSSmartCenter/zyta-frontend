@@ -11,6 +11,7 @@ import {
   SandboxDashboardWidgetCard,
   SandboxFilterControlCard,
   SandboxMapPanelCard,
+  SandboxUtilityPanelCard,
   useCardBoardInteractions,
   useLayeredCards,
   useSandboxPan,
@@ -18,7 +19,7 @@ import {
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
 const SCREEN_WIDTH = 1920;
-const SCREEN_HEIGHT = 1080;
+const SCREEN_HEIGHT = 1200;
 const BOARD_COLS = 2;
 const BOARD_ROWS = 2;
 const BOARD_WIDTH = SCREEN_WIDTH * BOARD_COLS;
@@ -33,12 +34,23 @@ type SandboxWidgetKind = Extract<
   "zyta" | "facerec" | "devices" | "users" | "snapshot"
 >;
 
+type SandboxUtilityKind = Extract<
+  SandboxCard["kind"],
+  "electric_meter" | "water_meter" | "air_sensor"
+>;
+
 const dashboardWidgetKinds = new Set<SandboxCard["kind"]>([
   "zyta",
   "facerec",
   "devices",
   "users",
   "snapshot",
+]);
+
+const utilityPanelKinds = new Set<SandboxCard["kind"]>([
+  "electric_meter",
+  "water_meter",
+  "air_sensor",
 ]);
 
 function clampZoom(value: number) {
@@ -56,6 +68,10 @@ function shouldKeepCardWheel(target: EventTarget | null) {
 
 function isDashboardWidgetKind(kind: SandboxCard["kind"]): kind is SandboxWidgetKind {
   return dashboardWidgetKinds.has(kind);
+}
+
+function isUtilityPanelKind(kind: SandboxCard["kind"]): kind is SandboxUtilityKind {
+  return utilityPanelKinds.has(kind);
 }
 
 const resizeHandles: Array<{
@@ -185,7 +201,6 @@ export default function CardSandboxPage() {
                   backgroundSize: "24px 24px",
                 }}
               >
-                <ScreenGuides />
                 {renderOrder.map((card) => (
                   <SandboxLayerCard
                     key={card.id}
@@ -255,6 +270,21 @@ export default function CardSandboxPage() {
             onClick={() => addCard("snapshot")}
           />
           <ToolButton
+            icon="bolt"
+            label="Add electric meter card"
+            onClick={() => addCard("electric_meter")}
+          />
+          <ToolButton
+            icon="water_drop"
+            label="Add water meter card"
+            onClick={() => addCard("water_meter")}
+          />
+          <ToolButton
+            icon="air"
+            label="Add air sensor card"
+            onClick={() => addCard("air_sensor")}
+          />
+          <ToolButton
             icon="content_copy"
             label="Duplicate"
             onClick={duplicateSelected}
@@ -294,42 +324,6 @@ export default function CardSandboxPage() {
         </div>
       </div>
     </main>
-  );
-}
-
-function ScreenGuides() {
-  return (
-    <div className="pointer-events-none absolute inset-0 z-0">
-      {Array.from({ length: BOARD_ROWS }).map((_, row) =>
-        Array.from({ length: BOARD_COLS }).map((__, col) => {
-          const index = row * BOARD_COLS + col + 1;
-          return (
-            <div
-              key={`${row}-${col}`}
-              className="absolute border border-dashed border-sky-500/45"
-              style={{
-                left: col * SCREEN_WIDTH,
-                top: row * SCREEN_HEIGHT,
-                width: SCREEN_WIDTH,
-                height: SCREEN_HEIGHT,
-              }}
-            >
-              <span className="absolute left-4 top-4 rounded-md border border-sky-200 bg-white/85 px-2 py-1 text-xs font-semibold text-sky-700 shadow-sm">
-                Screen {index} · 1920x1080
-              </span>
-            </div>
-          );
-        })
-      )}
-      <div
-        className="absolute top-0 bottom-0 border-l-2 border-sky-600/55"
-        style={{ left: SCREEN_WIDTH }}
-      />
-      <div
-        className="absolute left-0 right-0 border-t-2 border-sky-600/55"
-        style={{ top: SCREEN_HEIGHT }}
-      />
-    </div>
   );
 }
 
@@ -500,7 +494,7 @@ function SandboxLayerCard({
       </div>
 
       <div
-        className={`h-[calc(100%-2.75rem)] rounded-b-lg ${
+        className={`h-[calc(100%-2.75rem)] rounded-b-lg p-4 ${
           card.kind === "filters" ? "overflow-visible" : "overflow-hidden"
         }`}
       >
@@ -509,10 +503,7 @@ function SandboxLayerCard({
             <SandboxFilterControlCard cardId={card.id} />
           </div>
         ) : card.kind === "map" ? (
-          <div
-            data-sandbox-card-scroll="true"
-            className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
+          <div className="h-full overflow-hidden bg-white">
             <SandboxMapPanelCard cardId={card.id} />
           </div>
         ) : card.kind === "alerts" || card.kind === "wellbeing" ? (
@@ -528,6 +519,13 @@ function SandboxLayerCard({
             className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
             <SandboxDashboardWidgetCard cardId={card.id} variant={card.kind} />
+          </div>
+        ) : isUtilityPanelKind(card.kind) ? (
+          <div
+            data-sandbox-card-scroll="true"
+            className="h-full overflow-auto bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <SandboxUtilityPanelCard cardId={card.id} variant={card.kind} />
           </div>
         ) : (
           <div className="h-full border border-dashed border-slate-300 bg-white/70" />

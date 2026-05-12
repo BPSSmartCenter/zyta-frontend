@@ -3,6 +3,7 @@ export { default as SandboxDashboardEventsCard } from "./SandboxDashboardEventsC
 export { default as SandboxDashboardWidgetCard } from "./SandboxDashboardWidgetCard";
 export { default as SandboxFilterControlCard } from "./SandboxFilterControlCard";
 export { default as SandboxMapPanelCard } from "./SandboxMapPanelCard";
+export { default as SandboxUtilityPanelCard } from "./SandboxUtilityPanelCard";
 export { useCardBoardInteractions } from "./useCardBoardInteractions";
 export { useLayeredCards } from "./useLayeredCards";
 export { useSandboxPan } from "./useSandboxPan";

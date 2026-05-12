@@ -44,4 +44,5 @@ export type Props = {
   allowCountryView?: boolean;
   lockZoomOut?: boolean;
   allowedSiteNames?: string[];
+  containerClassName?: string;
 };

@@ -59,6 +59,8 @@ type Props = {
     utility?: string;
     groupSite?: string;
   }>;
+  fillHeight?: boolean;
+  mapContainerClassName?: string;
 };
 
 export default function MapPanel({
@@ -73,6 +75,8 @@ export default function MapPanel({
   selectedSiteCode,
   role,
   accessibleSites,
+  fillHeight,
+  mapContainerClassName,
 }: Props) {
   // console.log("🗺️ [MapPanel] COMPONENT RENDER", { selectedSiteCode, accessibleSites: accessibleSites?.length });
   const { items: liveNotis } = useNotisFeed();
@@ -449,7 +453,11 @@ export default function MapPanel({
   /* ---------- render (UI เดิม) ---------- */
   return (
     <div
-      className="flex flex-col justify-center"
+      className={
+        fillHeight
+          ? "flex h-full flex-col"
+          : "flex flex-col justify-center"
+      }
       ref={wrapperRef}
     >
       {/* <h1 className="text-[22px] font-inter font-semibold text-[#1E1E1E]">
@@ -650,7 +658,7 @@ export default function MapPanel({
       </div>
 
       {/* แผนที่ */}
-      <div className="">
+      <div className={fillHeight ? "min-h-0 flex-1" : ""}>
         <MapView
           notis={notisForMap}
           showPins={true}
@@ -658,6 +666,7 @@ export default function MapPanel({
           severityFilter={toSeverity(site)}
           sitePoints={visibleSitePoints}
           pinStatusBySite={pinStatusBySite}
+          containerClassName={mapContainerClassName}
           // ถ้าเลือก site เฉพาะ → โฟกัสพิกัด site โดยตรง
           focusSiteCenter={
             selectedSiteCode && selectedSiteCode !== "all"

@@ -289,8 +289,10 @@ export default function SandboxMapPanelCard({ cardId }: Props) {
   );
 
   return (
-    <div className="min-h-full bg-white">
+    <div className="h-full bg-white">
       <MapPanel
+        fillHeight
+        mapContainerClassName="relative z-0 h-full w-full overflow-hidden rounded-lg bg-[#dff1ff]"
         selectedEvents={selectedEvents}
         buttonLabel={buttonLabel}
         toggleEvent={(value) =>

@@ -9,7 +9,10 @@ export type SandboxCardKind =
   | "facerec"
   | "devices"
   | "users"
-  | "snapshot";
+  | "snapshot"
+  | "electric_meter"
+  | "water_meter"
+  | "air_sensor";
 
 export type SandboxCardRect = {
   x: number;
