@@ -1,5 +1,4 @@
 import React from "react";
-import { brandImage } from "../../assets";
 import {
   cardSandboxActions,
   selectSandboxFilterGroupForCard,
@@ -27,7 +26,6 @@ const BOARD_HEIGHT = SCREEN_HEIGHT * BOARD_ROWS;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.75;
 const ZOOM_STEP = 0.1;
-const WHEEL_ZOOM_STEP = 0.08;
 
 type SandboxWidgetKind = Extract<
   SandboxCard["kind"],
@@ -55,15 +53,6 @@ const utilityPanelKinds = new Set<SandboxCard["kind"]>([
 
 function clampZoom(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))));
-}
-
-function shouldKeepCardWheel(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return Boolean(
-    target.closest("[data-sandbox-card-scroll]") ||
-      target.closest("input, textarea, select")
-  );
 }
 
 function isDashboardWidgetKind(kind: SandboxCard["kind"]): kind is SandboxWidgetKind {
@@ -127,35 +116,6 @@ export default function CardSandboxPage() {
   const resetZoom = React.useCallback(() => {
     setZoom(1);
   }, []);
-  const handleWheelZoom = React.useCallback((event: React.WheelEvent<HTMLElement>) => {
-    if (event.deltaY === 0 || shouldKeepCardWheel(event.target)) return;
-
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-
-    event.preventDefault();
-
-    const viewportRect = viewport.getBoundingClientRect();
-    const pointerX = event.clientX - viewportRect.left;
-    const pointerY = event.clientY - viewportRect.top;
-    const scrollX = viewport.scrollLeft + pointerX;
-    const scrollY = viewport.scrollTop + pointerY;
-    const direction = event.deltaY < 0 ? 1 : -1;
-
-    setZoom((currentZoom) => {
-      const nextZoom = clampZoom(currentZoom + direction * WHEEL_ZOOM_STEP);
-      if (nextZoom === currentZoom) return currentZoom;
-
-      const scaleRatio = nextZoom / currentZoom;
-
-      window.requestAnimationFrame(() => {
-        viewport.scrollLeft = scrollX * scaleRatio - pointerX;
-        viewport.scrollTop = scrollY * scaleRatio - pointerY;
-      });
-
-      return nextZoom;
-    });
-  }, []);
 
   const renderOrder = React.useMemo(
     () => [...cards].sort((a, b) => a.zIndex - b.zIndex),
@@ -164,19 +124,18 @@ export default function CardSandboxPage() {
 
   return (
     <main className="relative min-h-screen bg-[#eef2f7] text-slate-900">
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex justify-center bg-transparent px-4">
+      {/* <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex justify-center bg-transparent px-4">
         <img
           src={brandImage}
           alt="BPS"
           className="h-20 w-auto object-contain drop-shadow-[0_8px_22px_rgba(15,23,42,0.18)]"
         />
-      </header>
+      </header> */}
 
       <div className="grid h-screen grid-cols-[minmax(0,1fr)]">
         <section
           ref={viewportRef}
           onPointerDown={startPan}
-          onWheel={handleWheelZoom}
           className={`overflow-auto overscroll-contain bg-[#dfe6ef] ${
             isPanning ? "cursor-grabbing" : "cursor-grab"
           }`}
