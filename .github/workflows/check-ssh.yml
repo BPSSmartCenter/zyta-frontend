@@ -1,0 +1,105 @@
+name: Check SSH Connection
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Sanity-check secrets are present
+        run: |
+          missing=()
+          [ -z "${{ secrets.SSH_HOST }}" ]     && missing+=("SSH_HOST")
+          [ -z "${{ secrets.SSH_USER }}" ]     && missing+=("SSH_USER")
+          [ -z "${{ secrets.SSH_KEY }}" ]      && missing+=("SSH_KEY")
+          [ -z "${{ secrets.PROJECT_PATH }}" ] && missing+=("PROJECT_PATH")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing secrets in environment '${{ inputs.environment }}': ${missing[*]}"
+            echo "Add them at: Settings → Environments → ${{ inputs.environment }} → Environment secrets"
+            exit 1
+          fi
+          echo "All required secrets are set ✓"
+
+      - name: Validate SSH_KEY format
+        env:
+          KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          if ! printf '%s' "$KEY" | head -n1 | grep -q "BEGIN .* PRIVATE KEY"; then
+            echo "::error::SSH_KEY does not start with '-----BEGIN ... PRIVATE KEY-----'"
+            echo "Likely cause: pasted public key (.pub) instead of private key,"
+            echo "or pasted a fragment without the header/footer lines."
+            exit 1
+          fi
+          if ! printf '%s' "$KEY" | tail -n1 | grep -q "END .* PRIVATE KEY"; then
+            echo "::error::SSH_KEY does not end with '-----END ... PRIVATE KEY-----'"
+            echo "Likely cause: trailing newline or footer line was lost when pasting."
+            exit 1
+          fi
+          echo "SSH_KEY format looks valid ✓"
+
+      - name: SSH and run remote diagnostics
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: false
+          script: |
+            echo "=== Connection ==="
+            echo "Logged in as: $(whoami)@$(hostname)"
+            echo "Date:         $(date)"
+            echo
+
+            echo "=== Docker ==="
+            if command -v docker >/dev/null 2>&1; then
+              docker --version
+              if docker info >/dev/null 2>&1; then
+                echo "Docker daemon: reachable ✓"
+              else
+                echo "Docker daemon: NOT reachable — user may not be in 'docker' group"
+              fi
+            else
+              echo "docker: NOT installed"
+            fi
+            if docker compose version >/dev/null 2>&1; then
+              docker compose version
+            else
+              echo "docker compose plugin: NOT installed"
+            fi
+            echo
+
+            echo "=== Git ==="
+            if command -v git >/dev/null 2>&1; then
+              git --version
+            else
+              echo "git: NOT installed"
+            fi
+            echo
+
+            echo "=== Project path ==="
+            PROJECT_PATH="${{ secrets.PROJECT_PATH }}"
+            echo "PROJECT_PATH = $PROJECT_PATH"
+            if [ -d "$PROJECT_PATH" ]; then
+              echo "Directory exists ✓"
+              cd "$PROJECT_PATH"
+              if [ -d .git ]; then
+                echo "Git repo: $(git remote get-url origin 2>/dev/null || echo '(no origin)')"
+                echo "Branch:   $(git rev-parse --abbrev-ref HEAD)"
+                echo "HEAD:     $(git rev-parse --short HEAD)"
+              else
+                echo "Not a git repo — clone it first:"
+                echo "  git clone git@github.com:bps-developer/ZYTA-FE.git $PROJECT_PATH"
+              fi
+            else
+              echo "Directory does NOT exist — create it and clone the repo first"
+            fi
