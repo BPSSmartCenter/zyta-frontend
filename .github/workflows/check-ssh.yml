@@ -33,18 +33,24 @@ jobs:
         env:
           KEY: ${{ secrets.SSH_KEY }}
         run: |
-          if ! printf '%s' "$KEY" | head -n1 | grep -q "BEGIN .* PRIVATE KEY"; then
-            echo "::error::SSH_KEY does not start with '-----BEGIN ... PRIVATE KEY-----'"
-            echo "Likely cause: pasted public key (.pub) instead of private key,"
-            echo "or pasted a fragment without the header/footer lines."
+          # Tolerant of leading/trailing blank lines and CRLF
+          if ! printf '%s' "$KEY" | grep -q "BEGIN.*PRIVATE KEY"; then
+            echo "::error::SSH_KEY missing '-----BEGIN ... PRIVATE KEY-----' marker."
+            echo "Likely cause: pasted public key (.pub) instead of private key."
             exit 1
           fi
-          if ! printf '%s' "$KEY" | tail -n1 | grep -q "END .* PRIVATE KEY"; then
-            echo "::error::SSH_KEY does not end with '-----END ... PRIVATE KEY-----'"
-            echo "Likely cause: trailing newline or footer line was lost when pasting."
+          if ! printf '%s' "$KEY" | grep -q "END.*PRIVATE KEY"; then
+            echo "::error::SSH_KEY missing '-----END ... PRIVATE KEY-----' marker."
+            echo "Likely cause: trailing footer line was lost when pasting."
             exit 1
           fi
-          echo "SSH_KEY format looks valid ✓"
+          if printf '%s' "$KEY" | grep -q "^ssh-"; then
+            echo "::error::SSH_KEY appears to be a PUBLIC key (starts with 'ssh-')."
+            echo "Use the private key file (no .pub extension) instead."
+            exit 1
+          fi
+          line_count=$(printf '%s' "$KEY" | wc -l | tr -d ' ')
+          echo "SSH_KEY format looks valid ✓  (length: ${line_count} lines)"
 
       - name: SSH and run remote diagnostics
         uses: appleboy/ssh-action@v1.2.0
