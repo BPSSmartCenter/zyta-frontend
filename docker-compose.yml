@@ -19,7 +19,7 @@ services:
     # (build: ../ZYTA-BE) or reference an image built elsewhere.
     image: zyta-api:local
     env_file:
-      - ./api.env
+      - ./.env
     expose:
       - "3000"
     networks:

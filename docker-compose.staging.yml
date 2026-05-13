@@ -12,7 +12,7 @@ services:
         VITE_AUTH_GUARD_ENABLED: "true"
         VITE_REDIRECT_ON_401: "true"
     ports:
-      - "${FE_PORT:-80}:80"
+      - "${FE_PORT:-4001}:80"
 
   api:
     image: zyta-api:staging
