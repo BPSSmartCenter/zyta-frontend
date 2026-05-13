@@ -1,0 +1,53 @@
+name: Deploy
+
+on:
+  push:
+    branches: [development, production]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # GitHub Environments scope the secrets below per env.
+    # Create environments at: Settings → Environments → New environment
+    environment: >-
+      ${{ inputs.environment
+          || (github.ref_name == 'production' && 'production' || 'staging') }}
+
+    steps:
+      - name: Resolve compose overlay
+        id: vars
+        run: |
+          if [ "${{ github.ref_name }}" = "production" ] || [ "${{ inputs.environment }}" = "production" ]; then
+            echo "stage=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: SSH and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          envs: STAGE,REF
+          script: |
+            set -euo pipefail
+            export STAGE="${{ steps.vars.outputs.stage }}"
+            export REF="${{ github.ref_name }}"
+            cd "${{ secrets.PROJECT_PATH }}"
+            git fetch origin "$REF"
+            git reset --hard "origin/$REF"
+            docker compose \
+              -f docker-compose.yml \
+              -f "docker-compose.${STAGE}.yml" \
+              up -d --build
+            docker image prune -f

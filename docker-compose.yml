@@ -1,0 +1,30 @@
+# Base compose — shared structure used by all environments.
+# Always combine with an overlay:
+#   local:      docker compose -f docker-compose.yml -f docker-compose.local.yml      up -d --build
+#   staging:    docker compose -f docker-compose.yml -f docker-compose.staging.yml    up -d --build
+#   production: docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
+
+services:
+  fe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    networks:
+      - zyta
+
+  api:
+    # Replace once ZYTA-BE is set up — either build from its own checkout
+    # (build: ../ZYTA-BE) or reference an image built elsewhere.
+    image: zyta-api:local
+    env_file:
+      - ./api.env
+    expose:
+      - "3000"
+    networks:
+      - zyta
+
+networks:
+  zyta:
+    driver: bridge
