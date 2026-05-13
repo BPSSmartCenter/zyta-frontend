@@ -19,12 +19,12 @@ services:
         max-size: "10m"
         max-file: "5"
 
-  api:
-    image: zyta-api:production
-    container_name: zyta-api
-    restart: always
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
+  # api:
+  #   image: zyta-api:production
+  #   container_name: zyta-api
+  #   restart: always
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "5"

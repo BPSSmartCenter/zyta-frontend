@@ -9,21 +9,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    depends_on:
-      - api
     networks:
       - zyta
 
-  api:
-    # Replace once ZYTA-BE is set up — either build from its own checkout
-    # (build: ../ZYTA-BE) or reference an image built elsewhere.
-    image: zyta-api:local
-    env_file:
-      - ./.env
-    expose:
-      - "3000"
-    networks:
-      - zyta
+  # api: re-enable once ZYTA-BE image is available.
+  # api:
+  #   image: ghcr.io/bps-developer/zyta-api:latest
+  #   env_file:
+  #     - ./.env
+  #   expose:
+  #     - "3000"
+  #   networks:
+  #     - zyta
 
 networks:
   zyta:

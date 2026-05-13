@@ -14,7 +14,7 @@ services:
     ports:
       - "${FE_PORT:-4001}:80"
 
-  api:
-    image: zyta-api:staging
-    container_name: zyta-api-staging
-    restart: unless-stopped
+  # api:
+  #   image: zyta-api:staging
+  #   container_name: zyta-api-staging
+  #   restart: unless-stopped
