@@ -21,17 +21,19 @@ export type FetchNotificationsArg = {
 };
 
 /**
- * GET /api/v1/notifications?format=v2&since=&limit=
+ * GET /api/v1/notifications?format=v1&since=&limit=
  *
- * Always requests v2. Falls back to the legacy adapter if the server still
- * returns a legacy shape (during the migration window).
+ * Asks the backend for the canonical (v2-shape) DTO via `?format=v1`
+ * (BE's opt-in flag name — yes, the flag is "v1" even though the shape is
+ * canonical/v2). If the server falls back to the deprecated legacy row
+ * shape, the per-row dispatch below routes it through the legacy adapter.
  */
 export const fetchNotifications = createAsyncThunk<
   NotificationListResponse,
   FetchNotificationsArg | undefined,
   { state: RootState }
 >("notifications/fetch", async (arg, { getState }) => {
-  const params: Record<string, string> = { format: "v2" };
+  const params: Record<string, string> = { format: "v1" };
   if (arg?.since) params.since = arg.since;
   if (arg?.limit) params.limit = String(arg.limit);
 

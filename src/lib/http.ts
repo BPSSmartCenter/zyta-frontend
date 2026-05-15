@@ -188,7 +188,20 @@ async function readEnvelope<T>(response: Response): Promise<T> {
       });
     }
 
-    // Envelope unwrap: prefer data, then items, else the whole body.
+    // Envelope unwrap.
+    // - `{ ok, items, data: { ...cursors } }` → merge cursors with items so
+    //   callers see a single flat object. This is the shape returned by
+    //   list+cursor endpoints (e.g. /notifications).
+    // - `{ ok, data }`  → return data.
+    // - `{ ok, items }` → return the body so callers can read items.
+    // - else            → return the whole body.
+    const hasItems = "items" in body && Array.isArray(body.items);
+    const dataField = body.data;
+    const dataIsObject =
+      "data" in body && dataField !== null && typeof dataField === "object" && !Array.isArray(dataField);
+    if (hasItems && dataIsObject) {
+      return { ...(dataField as Record<string, unknown>), items: body.items } as T;
+    }
     if ("data" in body) return body.data as T;
     if ("items" in body) return body as unknown as T; // caller picks between items/data
     return body as T;
