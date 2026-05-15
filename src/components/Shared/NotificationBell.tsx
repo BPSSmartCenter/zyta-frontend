@@ -29,20 +29,6 @@ const SEVERITY_DOT: Record<Severity, string> = {
   low: "bg-sky-500",
 };
 
-function formatRelative(iso: string, t: (key: string, opts?: object) => string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (diffSec < 60) return t("navbar.bell.justNow", { defaultValue: "just now" });
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return t("navbar.bell.minutesAgo", { defaultValue: "{{n}}m ago", n: diffMin });
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return t("navbar.bell.hoursAgo", { defaultValue: "{{n}}h ago", n: diffHr });
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return t("navbar.bell.daysAgo", { defaultValue: "{{n}}d ago", n: diffDay });
-  return new Date(iso).toLocaleDateString();
-}
-
 function NotificationRow({
   item,
   onClick,
@@ -52,6 +38,33 @@ function NotificationRow({
 }) {
   const { t } = useTranslation("dashboard");
   const subtitle = item.site?.name ?? item.device?.model ?? "";
+
+  const then = new Date(item.occurredAt).getTime();
+  let relative = "";
+  if (!Number.isNaN(then)) {
+    const diffSec = Math.max(0, Math.floor((Date.now() - then) / 1000));
+    if (diffSec < 60) {
+      relative = t("navbar.bell.justNow", { defaultValue: "just now" });
+    } else if (diffSec < 3600) {
+      relative = t("navbar.bell.minutesAgo", {
+        defaultValue: "{{n}}m ago",
+        n: Math.floor(diffSec / 60),
+      });
+    } else if (diffSec < 86_400) {
+      relative = t("navbar.bell.hoursAgo", {
+        defaultValue: "{{n}}h ago",
+        n: Math.floor(diffSec / 3600),
+      });
+    } else if (diffSec < 604_800) {
+      relative = t("navbar.bell.daysAgo", {
+        defaultValue: "{{n}}d ago",
+        n: Math.floor(diffSec / 86_400),
+      });
+    } else {
+      relative = new Date(item.occurredAt).toLocaleDateString();
+    }
+  }
+
   return (
     <li>
       <button
@@ -75,9 +88,7 @@ function NotificationRow({
             <span className="block text-xs text-gray-500 truncate">{subtitle}</span>
           ) : null}
         </span>
-        <span className="text-xs text-gray-400 whitespace-nowrap">
-          {formatRelative(item.occurredAt, t)}
-        </span>
+        <span className="text-xs text-gray-400 whitespace-nowrap">{relative}</span>
       </button>
     </li>
   );
