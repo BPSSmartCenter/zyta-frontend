@@ -469,63 +469,6 @@ const summarizeTelemetryPayload = (payload: any): NormalizedTelemetrySummary => 
   };
 };
 
-const averagePositive = (
-  summaries: NormalizedTelemetrySummary[],
-  picker: (summary: NormalizedTelemetrySummary) => number | null
-) => {
-  const values = summaries
-    .map((summary) => picker(summary))
-    .filter(
-      (value): value is number =>
-        typeof value === "number" && Number.isFinite(value) && value > 0
-    );
-  if (!values.length) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-};
-
-const sumSummaryField = (
-  summaries: NormalizedTelemetrySummary[],
-  picker: (summary: NormalizedTelemetrySummary) => number
-) =>
-  Math.round(
-    summaries.reduce((sum, summary) => {
-      const value = Number(picker(summary));
-      return sum + (Number.isFinite(value) ? value : 0);
-    }, 0)
-  );
-
-const aggregateTelemetrySummaries = (
-  summaries: NormalizedTelemetrySummary[]
-): NormalizedTelemetrySummary => {
-  const temperatures = summaries
-    .map((summary) => summary.temperatureC)
-    .filter(
-      (value): value is number =>
-        typeof value === "number" && Number.isFinite(value) && value > 0
-    );
-
-  return {
-    voltageAvg: averagePositive(summaries, (summary) => summary.voltageAvg),
-    currentAvg: averagePositive(summaries, (summary) => summary.currentAvg),
-    frequencyAvg: averagePositive(summaries, (summary) => summary.frequencyAvg),
-    usageKwh: sumSummaryField(summaries, (summary) => summary.usageKwh),
-    accumulatedKwh: sumSummaryField(summaries, (summary) => summary.accumulatedKwh),
-    productionTodayKwh: sumSummaryField(
-      summaries,
-      (summary) => summary.productionTodayKwh
-    ),
-    productionMonthKwh: sumSummaryField(
-      summaries,
-      (summary) => summary.productionMonthKwh
-    ),
-    temperatureC: temperatures.length
-      ? Math.round(
-          temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length
-        )
-      : null,
-  };
-};
-
 export default function ElectricMeterPanel({ siteCode }: Props) {
   const { selectedSite, selectedGroupSite, selectedUtility, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
@@ -561,8 +504,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     };
   }, []);
 
-  const [fromTime] = useState<string>(defaultTimeRange.from);
-  const [toTime] = useState<string>(defaultTimeRange.to);
+  const [fromTime, setFromTime] = useState<string>(defaultTimeRange.from);
+  const [toTime, setToTime] = useState<string>(defaultTimeRange.to);
+  // Half-hour time options (00:00, 00:30, ... 23:30) for the range filter.
+  const timeSelectOptions = React.useMemo(
+    () => HALF_HOUR_SLOTS.map((slot) => formatTime(slot.hour, slot.minute)),
+    []
+  );
   const [selectedComparisonKey, setSelectedComparisonKey] = useState<string | null>(
     null
   );
@@ -1064,69 +1012,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const endTime = formatDateTimeForApi(rangeEnd);
         let points: DailyTelemetryPoint[] = [];
         let aggregatedEntries: DailySeries[] | null = null;
-        if (isOverviewSelected && !isAllSitesSelected) {
-          const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
-            const res = await fetchEquipmentTelemetry({
-              siteIdOrCode: device.siteIdOrCode || siteForApi,
-              sn: device.sn,
-              startTime,
-              endTime,
-              category: device.category,
-            });
-            const list: any[] = (res?.data as any)?.telemetries ?? [];
-            return normalizeTelemetries(list);
-          });
-
-          const perDevicePoints = settled
-            .filter(
-              (result): result is PromiseFulfilledResult<DailyTelemetryPoint[]> =>
-                result.status === "fulfilled"
-            )
-            .map((result) => result.value);
-
-          aggregatedEntries = [];
-          for (let i = 0; i < daysToFetch; i++) {
-            const dayStart = new Date(todayStart);
-            dayStart.setDate(dayStart.getDate() - i);
-            const dayEnd = endOfDay(dayStart);
-            const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
-
-            const summedHalfHourSeries = HALF_HOUR_SLOTS.map(() => 0);
-            let totalWhSum = 0;
-
-            for (const devicePoints of perDevicePoints) {
-              const dayPoints = devicePoints.filter(
-                (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
-              );
-              const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
-              for (let j = 0; j < summedHalfHourSeries.length; j++) {
-                summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
-              }
-
-              const totalWh =
-                dayPoints.length > 1
-                  ? Math.max(
-                      0,
-                      dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
-                    )
-                  : 0;
-              totalWhSum += totalWh;
-            }
-
-            const totalKwh = summedHalfHourSeries.length
-              ? summedHalfHourSeries[summedHalfHourSeries.length - 1]
-              : 0;
-
-            aggregatedEntries.push({
-              key: dayKey,
-              date: dayStart,
-              isToday: i === 0,
-              totalWh: totalWhSum,
-              totalKwh,
-              halfHourSeries: summedHalfHourSeries,
-            });
-          }
-        } else if (isAllSitesSelected && isOverviewSelected) {
+        // Single-site Overview falls through to the single aggregate call
+        // below (sn = __OVERVIEW__); only all-sites Overview fans out per site.
+        if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           if (!targets.length) {
             aggregatedEntries = [];
@@ -1434,6 +1322,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   }, [selectedComparison, t, todaySeriesData]);
 
   React.useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const range = computeRange();
@@ -1446,48 +1335,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           range,
         });
         let res: any = null;
-        if (isOverviewSelected && !isAllSitesSelected) {
-          if (!deviceOptions.length) {
-            setMetrics({
-              voltage: 0,
-              current: 0,
-              frequency: 0,
-              consumptionKwh: 0,
-              lifetimeKwh: 0,
-              monthKwh: 0,
-            });
-            setTemperatureC(null);
-            return;
-          }
-          const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
-            const response = await fetchEquipmentTelemetry({
-              siteIdOrCode: device.siteIdOrCode || siteForApi,
-              sn: device.sn,
-              startTime: range.from,
-              endTime: range.to,
-              category: device.category,
-            });
-            const payload = (response as any)?.data ?? {};
-            return summarizeTelemetryPayload(payload);
-          });
-          const summaries = settled
-            .filter(
-              (item): item is PromiseFulfilledResult<NormalizedTelemetrySummary> =>
-                item.status === "fulfilled"
-            )
-            .map((item) => item.value);
-          res = {
-            data: {
-              summary: aggregateTelemetrySummaries(summaries),
-              telemetries: [],
-            },
-          };
-          logElectricApiPayload("fetchEquipmentTelemetry(single-site overview aggregated)", {
-            deviceCount: deviceOptions.length,
-            summaries,
-            response: res,
-          });
-        } else if (isAllSitesSelected && isOverviewSelected) {
+        // Single-site Overview is served by one server-side aggregate call
+        // (sn = __OVERVIEW__ via the `else` branch). Only all-sites Overview
+        // needs to fan out per site. Per-inverter cards still come from the
+        // dedicated overview-summaries effect, so we no longer loop
+        // deviceOptions here (was the source of duplicate equipment requests).
+        if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
             fetchEquipmentTelemetry({
@@ -1589,6 +1442,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             response: res,
           });
         }
+        if (!active) return;
         const payload: any = (res as any)?.data ?? {};
         logElectricApiPayload("fetchEquipmentTelemetry(payload.data)", payload);
         const list: any[] = payload?.telemetries ?? [];
@@ -1627,14 +1481,15 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         // ignore
       }
     })();
+    return () => {
+      active = false;
+    };
   }, [
     computeRange,
     deviceSN,
     deviceCategory,
-    deviceOptions,
     isOverviewSelected,
     isAllSitesSelected,
-    overviewDeviceOptionsKey,
     siteForApi,
     siteTargetsKey,
     selectedDeviceSiteForApi,
@@ -2078,6 +1933,45 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                         })}
                   </p>
                 ) : null}
+              </div>
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-2 xl:items-end">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                {t("devices.electric.timeRange.label", {
+                  defaultValue: "Time range",
+                })}
+              </span>
+              <div className="flex items-center gap-2">
+                <select
+                  value={fromTime}
+                  onChange={(e) => setFromTime(e.target.value)}
+                  aria-label={t("devices.electric.timeRange.from", {
+                    defaultValue: "From",
+                  })}
+                  className="h-11 rounded-[14px] border border-slate-200 bg-white px-3 text-sm text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+                >
+                  {timeSelectOptions.map((opt) => (
+                    <option key={`from-${opt}`} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-sm text-slate-400">–</span>
+                <select
+                  value={toTime}
+                  onChange={(e) => setToTime(e.target.value)}
+                  aria-label={t("devices.electric.timeRange.to", {
+                    defaultValue: "To",
+                  })}
+                  className="h-11 rounded-[14px] border border-slate-200 bg-white px-3 text-sm text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+                >
+                  {timeSelectOptions.map((opt) => (
+                    <option key={`to-${opt}`} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
