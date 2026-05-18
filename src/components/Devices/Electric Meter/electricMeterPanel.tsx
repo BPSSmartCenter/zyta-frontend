@@ -550,6 +550,28 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewInverterSummaries, setOverviewInverterSummaries] = useState<
     OverviewInverterSummary[]
   >([]);
+  const inverterSectionRef = React.useRef<HTMLDivElement | null>(null);
+  const [inverterSectionInView, setInverterSectionInView] = useState(false);
+  React.useEffect(() => {
+    if (inverterSectionInView) return;
+    const target = inverterSectionRef.current;
+    if (!target) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInverterSectionInView(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInverterSectionInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "200px 0px" }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [inverterSectionInView]);
   const [deviceOptions, setDeviceOptions] = useState<ElectricDeviceOption[]>([]);
   const [deviceOptionsLoading, setDeviceOptionsLoading] = useState(false);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(
@@ -857,16 +879,37 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         setOverviewInverterSummaries([]);
         return;
       }
+      if (!inverterSectionInView) return;
+      const base =
+        typeof filtersDate === "object" && filtersDate
+          ? new Date(filtersDate.y, (filtersDate.m || 1) - 1, filtersDate.d || 1)
+          : new Date();
+      const dayStart = startOfDay(base);
+      const dayEnd = endOfDay(base);
+      const startTime = formatDateTimeForApi(dayStart);
+      const endTime = formatDateTimeForApi(dayEnd);
+      const dayKey = startTime.slice(0, 10);
+      const deviceFingerprint = deviceOptions
+        .map((d) => `${d.siteIdOrCode || siteForApi}|${d.sn}`)
+        .sort()
+        .join(",");
+      const cacheKey = `db:overview-inverters:${siteForApi}:${dayKey}:${deviceFingerprint}`;
+      const cached = readSessionJson<{
+        fetchedAt: number;
+        entries: OverviewInverterSummary[];
+      }>(cacheKey);
+      if (
+        cached &&
+        typeof cached.fetchedAt === "number" &&
+        Date.now() - cached.fetchedAt <= TELEMETRY_CACHE_TTL_MS &&
+        Array.isArray(cached.entries) &&
+        cached.entries.length === deviceOptions.length
+      ) {
+        setOverviewInverterSummaries(cached.entries);
+        return;
+      }
       try {
-        const base =
-          typeof filtersDate === "object" && filtersDate
-            ? new Date(filtersDate.y, (filtersDate.m || 1) - 1, filtersDate.d || 1)
-            : new Date();
-        const dayStart = startOfDay(base);
-        const dayEnd = endOfDay(base);
-        const startTime = formatDateTimeForApi(dayStart);
-        const endTime = formatDateTimeForApi(dayEnd);
-        const settled = await runWithConcurrency(deviceOptions, 4, async (device) => {
+        const settled = await runWithConcurrency(deviceOptions, 8, async (device) => {
           const res = await fetchEquipmentTelemetry({
             siteIdOrCode: device.siteIdOrCode || siteForApi,
             sn: device.sn,
@@ -901,6 +944,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             })
           );
         setOverviewInverterSummaries(normalized);
+        if (normalized.length) {
+          writeSessionJson(cacheKey, {
+            fetchedAt: Date.now(),
+            entries: normalized,
+          });
+        }
       } catch {
         if (!active) return;
         setOverviewInverterSummaries([]);
@@ -909,7 +958,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return () => {
       active = false;
     };
-  }, [deviceOptions, filtersDate, isOverviewSelected, siteForApi]);
+  }, [deviceOptions, filtersDate, isOverviewSelected, siteForApi, inverterSectionInView]);
 
   React.useEffect(() => {
     let active = true;
@@ -1985,7 +2034,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             title={t("devices.electric.cards.utilization", {
               defaultValue: "Utilization",
             })}
-            value={String(formatWithComma(sideCardTodayValue ?? 0))}
+            value={String(formatWithComma(metrics.consumptionKwh))}
             unit="kWh"
             progressValue={utilizationPercent}
             progressLabel={`${utilizationPercent}%`}
@@ -2103,6 +2152,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           </div>
         </UtilitySurface>
 
+        <div ref={inverterSectionRef}>
         <UtilitySurface>
           <UtilitySectionTitle
             title={
@@ -2261,6 +2311,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             />
           )}
         </UtilitySurface>
+        </div>
       </div>
     </>
   );

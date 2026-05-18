@@ -15,6 +15,8 @@ export {
   getElectricDevices,
   syncElectricInventory,
   getElectricOverview,
+  getElectricOverviewSummary,
+  getElectricOverviewForSites,
   updateElectricOverview,
   getElectricSeries,
   registerElectricDevice,
@@ -22,4 +24,5 @@ export {
   getMeterDashboard,
   getSiteMetersDashboard,
   type EquipmentFetchResp,
+  type ElectricOverviewSummary,
 } from "./electricApi";

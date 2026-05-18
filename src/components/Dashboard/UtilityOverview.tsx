@@ -2,6 +2,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { selectAuthSites } from "../../features/auth";
+import { getElectricOverviewForSites } from "../../features/electric";
 import {
   selectSelectedGroup,
   selectSelectedUtility,
@@ -480,11 +481,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       }
     }
 
-    const overviews = targetSites
-      .map((s) => s.electricOverview)
-      .filter((o): o is NonNullable<typeof o> => o !== null);
-
-    if (overviews.length === 0) {
+    if (targetSites.length === 0) {
       setElectricOverview({
         loading: false,
         hasData: false,
@@ -495,21 +492,64 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       return;
     }
 
-    const totalToday = overviews.reduce((sum, o) => sum + (o.today_kwh ?? 0), 0);
-    const totalMonth = overviews.reduce((sum, o) => sum + (o.month_kwh ?? 0), 0);
-    const lastUpdateTime =
-      overviews.find((o) => o.lastUpdateTime)?.lastUpdateTime ?? null;
+    const siteIds = targetSites.map((s) => String(s.id || s.code));
+    let cancelled = false;
+    setElectricOverview((prev) => ({ ...prev, loading: true }));
 
-    // hasData = "the user has electricOverview entries for in-scope sites".
-    // Zero kWh is still valid data (e.g., at night / inverter idle) — render
-    // 0 rather than the empty placeholder.
-    setElectricOverview({
-      loading: false,
-      hasData: true,
-      todayKwh: Math.round(totalToday),
-      monthKwh: Math.round(totalMonth),
-      lastUpdateTime,
-    });
+    (async () => {
+      try {
+        const results = await getElectricOverviewForSites(siteIds);
+        if (cancelled) return;
+        const usable = results.filter((r) => r.hasData);
+        if (usable.length === 0) {
+          setElectricOverview({
+            loading: false,
+            hasData: false,
+            todayKwh: null,
+            monthKwh: null,
+            lastUpdateTime: null,
+          });
+          return;
+        }
+        const totalToday = usable.reduce(
+          (sum, r) => sum + (r.todayKwh ?? 0),
+          0
+        );
+        const totalMonth = usable.reduce(
+          (sum, r) => sum + (r.monthKwh ?? 0),
+          0
+        );
+        const lastUpdateTime =
+          usable
+            .map((r) => r.lastUpdateTime)
+            .filter((v): v is string => Boolean(v))
+            .sort()
+            .pop() ?? null;
+
+        // hasData = at least one in-scope site responded with electric data.
+        // Zero kWh is still valid (e.g., at night / inverter idle).
+        setElectricOverview({
+          loading: false,
+          hasData: true,
+          todayKwh: Math.round(totalToday),
+          monthKwh: Math.round(totalMonth),
+          lastUpdateTime,
+        });
+      } catch {
+        if (cancelled) return;
+        setElectricOverview({
+          loading: false,
+          hasData: false,
+          todayKwh: null,
+          monthKwh: null,
+          lastUpdateTime: null,
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
   const handleOpenElectric = React.useCallback(() => {

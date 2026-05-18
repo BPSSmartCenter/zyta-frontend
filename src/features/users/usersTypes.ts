@@ -1,9 +1,9 @@
 // src/features/users/usersTypes.ts
 //
 // Type definitions and shape normalizer for the /users/me consolidated
-// response. Backend ships sites + counters + electricOverview + userStats
-// + siteGroups + utilities all in one /me payload, eliminating the previous
-// N+1 dashboard fetches.
+// response. Backend ships sites + counters + userStats + siteGroups +
+// utilities. Electric KPIs (electricOverview) are NOT in /me anymore — they
+// are loaded lazily via the electric overview endpoint when Dashboard mounts.
 
 export type UserRole = "admin" | "manager" | "officer" | "user";
 
@@ -45,29 +45,7 @@ export type MeSiteCounters = {
   devices_air: number;
   devices_electric_online: number;
   devices_electric_offline: number;
-  notis_total: number;
-  notis_alert: number;
-  notis_warning: number;
-  notis_info: number;
-  notis_normal: number;
   users_count: number;
-};
-
-export type MeSiteElectricOverview = {
-  lastUpdateTime: string | null;
-  now: {
-    unit: string;
-    pv_kw: number;
-    load_kw: number;
-    grid_kw: number;
-    storage_kw: number;
-  };
-  today_kwh: number;
-  month_kwh: number;
-  lastYear_kwh: number;
-  lifetime_kwh: number;
-  avg_year_day_kwh: number;
-  threshold_90_day_kwh: number;
 };
 
 export type MeSite = {
@@ -88,7 +66,6 @@ export type MeSite = {
   inverterApiType: "solaredge" | "soliscloud" | string | null;
   billing: MeSiteBilling;
   counters: MeSiteCounters;
-  electricOverview: MeSiteElectricOverview | null;
   // Allow extra unknown fields for forward-compat with future backend additions.
   [key: string]: unknown;
 };
@@ -284,33 +261,7 @@ function normalizeCounters(raw: unknown): MeSiteCounters {
     devices_air: asNumber(r.devices_air),
     devices_electric_online: asNumber(r.devices_electric_online),
     devices_electric_offline: asNumber(r.devices_electric_offline),
-    notis_total: asNumber(r.notis_total),
-    notis_alert: asNumber(r.notis_alert),
-    notis_warning: asNumber(r.notis_warning),
-    notis_info: asNumber(r.notis_info),
-    notis_normal: asNumber(r.notis_normal),
     users_count: asNumber(r.users_count),
-  };
-}
-
-function normalizeElectricOverview(raw: unknown): MeSiteElectricOverview | null {
-  if (!isRecord(raw)) return null;
-  const now = isRecord(raw.now) ? raw.now : {};
-  return {
-    lastUpdateTime: asNullableText(raw.lastUpdateTime),
-    now: {
-      unit: asText(now.unit) || "kW",
-      pv_kw: asNumber(now.pv_kw),
-      load_kw: asNumber(now.load_kw),
-      grid_kw: asNumber(now.grid_kw),
-      storage_kw: asNumber(now.storage_kw),
-    },
-    today_kwh: asNumber(raw.today_kwh),
-    month_kwh: asNumber(raw.month_kwh),
-    lastYear_kwh: asNumber(raw.lastYear_kwh),
-    lifetime_kwh: asNumber(raw.lifetime_kwh),
-    avg_year_day_kwh: asNumber(raw.avg_year_day_kwh),
-    threshold_90_day_kwh: asNumber(raw.threshold_90_day_kwh),
   };
 }
 
@@ -339,7 +290,6 @@ function normalizeSite(raw: unknown): MeSite | null {
     inverterApiType: asNullableText(raw.inverterApiType ?? raw.inverter_api_type),
     billing: normalizeBilling(raw.billing),
     counters: normalizeCounters(raw.counters),
-    electricOverview: normalizeElectricOverview(raw.electricOverview),
   };
 }
 
