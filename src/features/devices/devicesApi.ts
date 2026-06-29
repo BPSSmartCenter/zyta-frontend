@@ -88,14 +88,47 @@ export async function getAirDevices(siteIdOrCode: string): Promise<AirDevicesRes
   );
 }
 
-/**
- * IoT realtime list — endpoint removed. Backend has no `/devices` (or v1
- * equivalent) for the IoT realtime list, so we no-op rather than make a
- * request that always 404s. Callers (AirPanel, IoTPanel, IoTDetail,
- * useDeviceInventoryLoader) get an empty array and render an empty state.
- *
- * If/when backend ships a real endpoint, replace the body with the real fetch.
- */
 export async function getIoTDevices(): Promise<IoTDevice[]> {
-  return [];
+  const data = await request<unknown>("/devices", {
+    params: { t: Date.now() },
+  });
+
+  const rawDevices: Array<Record<string, unknown>> =
+    Array.isArray(data)
+      ? (data as Array<Record<string, unknown>>)
+      : data && typeof data === "object" && Array.isArray((data as { devices?: unknown }).devices)
+      ? ((data as { devices: Array<Record<string, unknown>> }).devices ?? [])
+      : [];
+
+  return rawDevices
+    .filter((row) => String(row.type ?? "").toLowerCase() === "iot")
+    .map((row) => {
+      const locationId = row.locationId == null ? "" : String(row.locationId).trim();
+      return {
+        ...row,
+        id: row.id == null ? undefined : String(row.id),
+        deviceId:
+          row.externalId == null
+            ? row.id == null
+              ? undefined
+              : String(row.id)
+            : String(row.externalId),
+        name:
+          row.name == null
+            ? row.externalId == null
+              ? ""
+              : String(row.externalId)
+            : String(row.name),
+        type: String(row.type ?? ""),
+        status: String(row.status ?? "Unknown"),
+        siteId: locationId || undefined,
+        siteCode: locationId || undefined,
+        siteName:
+          row.subLocation == null
+            ? row.locationName == null
+              ? undefined
+              : String(row.locationName)
+            : String(row.subLocation),
+      } as IoTDevice;
+    });
 }
