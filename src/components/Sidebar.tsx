@@ -1,11 +1,15 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { brandImage, userIcon } from "../assets/index";
 import {
+  getCountForType,
   type DeviceTypeKey,
+  useDeviceInventory,
 } from "../context/DeviceInventoryContext";
+import { useFilters } from "../context/FiltersContext";
 import { logoutUser, selectAuthUser } from "../features/auth";
+import { useDeviceInventoryLoader } from "../hooks/useDeviceInventoryLoader";
 import { selectSidebarOpen, sidebarActions } from "../features/sidebar";
 import { useUserPath } from "../routes/useUserPath";
 import { useAppDispatch, useAppSelector } from "../store/hooks";
@@ -28,6 +32,10 @@ type Props = {
   children?: ReactNode;
   contentClassName?: string;
 };
+
+function isInventoryDeviceKey(key: SidebarDeviceKey): key is DeviceTypeKey {
+  return key !== "digitaltwin";
+}
 
 function useIsDesktop1024() {
   const get = () =>
@@ -55,6 +63,30 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const authUser = useAppSelector(selectAuthUser);
   const sidebarOpen = useAppSelector(selectSidebarOpen);
   const { abs, base, absSite } = useUserPath();
+  const { counts: inventoryCounts, loading: inventoryLoading } =
+    useDeviceInventory();
+  const { selectedSite, siteOptions } = useFilters();
+
+  const accessibleSitesFromFilters = useMemo(
+    () =>
+      (siteOptions || [])
+        .map((opt) => ({
+          code: String(opt?.value || "").trim(),
+          name: String(opt?.label || "").trim(),
+        }))
+        .filter(
+          (site) => site.code.length > 0 && site.code.toLowerCase() !== "all",
+        ),
+    [siteOptions],
+  );
+
+  const scMatch = location.pathname.match(/\/site\/([^/]+)/);
+  const routeSiteCode = scMatch?.[1];
+
+  useDeviceInventoryLoader({
+    selectedSiteCode: routeSiteCode ?? selectedSite,
+    accessibleSites: accessibleSitesFromFilters,
+  });
 
   const [sidebarLogoSrc, setSidebarLogoSrc] = useState<string>(() => {
     try {
@@ -113,9 +145,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   };
 
   const goSiteOrGlobal = (path: string) => {
-    const scMatch = location.pathname.match(/\/site\/([^/]+)/);
-    const siteCode = scMatch?.[1];
-    navigate(siteCode ? absSite(path, siteCode) : abs(path));
+    navigate(routeSiteCode ? absSite(path, routeSiteCode) : abs(path));
     closeSidebar();
   };
 
@@ -228,7 +258,10 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       },
     ] satisfies Array<{ key: SidebarDeviceKey; label: string; icon: string }>
   ).map(({ key, label, icon }) => {
-    const disabled = DISABLED_DEVICE_TYPES.has(key);
+    const noDevicesInTopic =
+      isInventoryDeviceKey(key) && getCountForType(inventoryCounts, key) <= 0;
+    const disabled =
+      DISABLED_DEVICE_TYPES.has(key) || (!inventoryLoading && noDevicesInTopic);
 
     return {
       id: `device-${key}`,
