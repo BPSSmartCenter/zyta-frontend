@@ -372,8 +372,12 @@ function SiteCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const icon = pickIcon(site.label);
-  const accent = pickAccent(site.groupLabel ?? site.label);
+  const displayLabel =
+    typeof site.cardLabel === "string" && site.cardLabel.trim().length > 0
+      ? site.cardLabel.trim()
+      : site.label;
+  const icon = pickIcon(displayLabel);
+  const accent = pickAccent(site.groupLabel ?? displayLabel);
 
   return (
     <button
@@ -414,7 +418,7 @@ function SiteCard({
             selected ? "text-[#0063bf]" : "text-slate-900"
           }`}
         >
-          {site.label}
+          {displayLabel}
         </span>
       </div>
 

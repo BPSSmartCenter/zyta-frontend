@@ -33,10 +33,15 @@ function meSiteToOption(
   const value = asText(site.code) || asText(site.id) || asText(site.name);
   if (!value) return null;
   const label = asText(site.name) || value;
+  const cardLabel =
+    asNullableText((site as unknown as ApiRecord).sub_locations) ??
+    asNullableText(site.address_sub) ??
+    label;
   const groupId = site.site_group_id ?? null;
   const utilityId = site.utility_id ?? null;
   return {
     label,
+    cardLabel,
     value,
     groupId,
     groupLabel: groupId ? (groupsById.get(groupId) ?? null) : null,
@@ -88,10 +93,15 @@ export function normalizeSiteToOption(site: unknown): SiteOption | null {
     asNullableText(site.utilityId);
   const utilityLabel = asNullableText(utilityFromApi?.name);
   const label = asText(rawLabel);
+  const cardLabel =
+    asNullableText(site.sub_locations) ??
+    asNullableText(site.address_sub) ??
+    label;
   const value = asText(rawValue);
   if (!value) return null;
   return {
     label: label || value,
+    cardLabel,
     value,
     groupLabel:
       asNullableText(groupFromApi?.name) ??

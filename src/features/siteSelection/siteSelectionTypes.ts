@@ -6,6 +6,7 @@
 
 export type SiteOption = {
   label: string;
+  cardLabel?: string | null;
   value: string;
   i18nKey?: string;
   groupLabel?: string | null;
