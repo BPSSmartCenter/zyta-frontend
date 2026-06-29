@@ -43,6 +43,8 @@ export type MeSiteCounters = {
   devices_water: number;
   devices_electric: number;
   devices_air: number;
+  devices_iot: number;
+  devices_caregiver: number;
   devices_electric_online: number;
   devices_electric_offline: number;
   users_count: number;
@@ -259,6 +261,8 @@ function normalizeCounters(raw: unknown): MeSiteCounters {
     devices_water: asNumber(r.devices_water),
     devices_electric: asNumber(r.devices_electric),
     devices_air: asNumber(r.devices_air),
+    devices_iot: asNumber(r.devices_iot),
+    devices_caregiver: asNumber(r.devices_caregiver),
     devices_electric_online: asNumber(r.devices_electric_online),
     devices_electric_offline: asNumber(r.devices_electric_offline),
     users_count: asNumber(r.users_count),

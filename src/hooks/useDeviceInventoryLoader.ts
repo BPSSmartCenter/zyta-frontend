@@ -87,6 +87,8 @@ function addSiteToAggregate(acc: DeviceAggregate, site: MeSite): DeviceAggregate
     electricOnline: acc.electricOnline + c.devices_electric_online,
     electricOffline: acc.electricOffline + c.devices_electric_offline,
     air: acc.air + c.devices_air,
+    iot: acc.iot + c.devices_iot,
+    caregiver: acc.caregiver + c.devices_caregiver,
   };
 }
 
@@ -211,9 +213,9 @@ export function useDeviceInventoryLoader({
         electricOnline: aggregated.electricOnline,
         electricOffline: aggregated.electricOffline,
         airSensor: aggregated.air,
-        iot: 0,
+        iot: aggregated.iot,
         iotOffline: 0,
-        caregiver: 0,
+        caregiver: aggregated.caregiver,
         caregiverOffline: 0,
       };
 
