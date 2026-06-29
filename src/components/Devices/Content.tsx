@@ -17,7 +17,6 @@ import MiniFiltersBar from "../Shared/MiniFiltersBar";
 import LanguagePillSwitcher from "../LanguagePillSwitcher";
 import {
   useDeviceInventory,
-  getCountForType,
 } from "../../context/DeviceInventoryContext";
 import Modal from "../Modal";
 import { getSiteBillingAccess } from "../../features/sites";
@@ -96,21 +95,12 @@ export default function Content({}: Props) {
   const availableTypes = (
     Object.keys(TYPE_TO_ID) as Array<keyof typeof TYPE_TO_ID>
   ).filter(
-    (k) =>
-      !DISABLED_DEVICE_TYPES.has(k) &&
-      (k === "iot" ||
-        k === "caregiver" ||
-        k === "digitaltwin" ||
-        getCountForType(inventoryCounts as any, k as any) > 0),
+    (k) => !DISABLED_DEVICE_TYPES.has(k),
   );
-  const selectedCount = getCountForType(inventoryCounts as any, urlType as any);
 
   if (typeof window !== "undefined") {
     const isDisabledType = DISABLED_DEVICE_TYPES.has(urlType);
-    const isExternal =
-      urlType === "iot" || urlType === "caregiver" || urlType === "digitaltwin";
-    const isZero = !isExternal && selectedCount <= 0;
-    if ((isDisabledType || isZero) && availableTypes.length > 0) {
+    if (isDisabledType && availableTypes.length > 0) {
       const nextType = availableTypes[0];
       const params = new URLSearchParams(location.search);
       params.set("type", nextType);

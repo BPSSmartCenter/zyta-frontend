@@ -3,8 +3,6 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { brandImage, userIcon } from "../assets/index";
 import {
-  getCountForType,
-  useDeviceInventory,
   type DeviceTypeKey,
 } from "../context/DeviceInventoryContext";
 import { logoutUser, selectAuthUser } from "../features/auth";
@@ -19,7 +17,7 @@ import {
 import Modal from "./Modal";
 import { GlassHoverSidebar, type GlassHoverSidebarItem } from "./ui";
 
-const DISABLED_DEVICE_TYPES = new Set<SidebarDeviceKey>(["cctv"]);
+const DISABLED_DEVICE_TYPES = new Set<SidebarDeviceKey>();
 const MASTER_EMAIL = "smartechcenter@bpstechthai.com";
 const LOGO_CACHE_KEY = "bps_user_branding_logo";
 
@@ -48,10 +46,6 @@ function useIsDesktop1024() {
   return isDesktop;
 }
 
-function isInventoryDeviceKey(key: SidebarDeviceKey): key is DeviceTypeKey {
-  return key !== "digitaltwin";
-}
-
 export default function Sidebar({ children, contentClassName = "" }: Props) {
   const isDesktop = useIsDesktop1024();
   const { t } = useTranslation("sidebar");
@@ -61,7 +55,6 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   const authUser = useAppSelector(selectAuthUser);
   const sidebarOpen = useAppSelector(selectSidebarOpen);
   const { abs, base, absSite } = useUserPath();
-  const { counts: inventoryCounts } = useDeviceInventory();
 
   const [sidebarLogoSrc, setSidebarLogoSrc] = useState<string>(() => {
     try {
@@ -235,12 +228,7 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
       },
     ] satisfies Array<{ key: SidebarDeviceKey; label: string; icon: string }>
   ).map(({ key, label, icon }) => {
-    const isExternal =
-      key === "iot" || key === "caregiver" || key === "digitaltwin";
-    const zero =
-      isInventoryDeviceKey(key) &&
-      getCountForType(inventoryCounts, key) <= 0;
-    const disabled = (!isExternal && zero) || DISABLED_DEVICE_TYPES.has(key);
+    const disabled = DISABLED_DEVICE_TYPES.has(key);
 
     return {
       id: `device-${key}`,
