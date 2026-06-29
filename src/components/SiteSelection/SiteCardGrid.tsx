@@ -372,12 +372,20 @@ function SiteCard({
   selected: boolean;
   onClick: () => void;
 }) {
-  const displayLabel =
+  const displayLabelRaw =
     typeof site.cardLabel === "string" && site.cardLabel.trim().length > 0
       ? site.cardLabel.trim()
       : site.label;
-  const icon = pickIcon(displayLabel);
-  const accent = pickAccent(site.groupLabel ?? displayLabel);
+
+  const splitLabels = displayLabelRaw
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  const primaryLabel = splitLabels[0] ?? displayLabelRaw;
+  const remainingCount = Math.max(splitLabels.length - 1, 0);
+
+  const icon = pickIcon(primaryLabel);
+  const accent = pickAccent(site.groupLabel ?? primaryLabel);
 
   return (
     <button
@@ -418,8 +426,13 @@ function SiteCard({
             selected ? "text-[#0063bf]" : "text-slate-900"
           }`}
         >
-          {displayLabel}
+          {primaryLabel}
         </span>
+        {remainingCount > 0 && (
+          <span className="mt-0.5 text-[11px] font-medium text-slate-400">
+            +{remainingCount} sub-locations
+          </span>
+        )}
       </div>
 
       {/* Selected checkmark badge */}
