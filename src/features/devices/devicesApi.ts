@@ -16,6 +16,10 @@ export type WaterDevicesResponse =
 export type AirDevicesResponse =
   | { ok?: boolean; items?: AirDeviceRecord[] }
   | AirDeviceRecord[];
+type IoTQueryScope = {
+  siteId?: string | null;
+  siteGroupId?: string | null;
+};
 
 export async function listSiteDevices(
   siteIdOrCode: string,
@@ -88,10 +92,14 @@ export async function getAirDevices(siteIdOrCode: string): Promise<AirDevicesRes
   );
 }
 
-export async function getIoTDevices(): Promise<IoTDevice[]> {
-  const data = await request<unknown>("/devices", {
-    params: { t: Date.now() },
-  });
+export async function getIoTDevices(scope?: IoTQueryScope): Promise<IoTDevice[]> {
+  const params: Record<string, string | number> = { t: Date.now() };
+  const siteId = String(scope?.siteId || "").trim();
+  const siteGroupId = String(scope?.siteGroupId || "").trim();
+  if (siteId) params.siteId = siteId;
+  if (siteGroupId) params.siteGroupId = siteGroupId;
+
+  const data = await request<unknown>("/devices", { params });
 
   const rawDevices: Array<Record<string, unknown>> =
     Array.isArray(data)

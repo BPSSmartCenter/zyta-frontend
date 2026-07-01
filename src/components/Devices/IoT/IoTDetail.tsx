@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 
 import { getIoTDevices, type IoTDevice } from "../../../features/devices";
+import { useFilters } from "../../../context/FiltersContext";
 import { LineChart } from "../../Chart";
 import Dropdown from "../../Dropdown";
 import Thermostat from "../../Themorstats";
@@ -23,6 +24,7 @@ import voltageIcon from "../../../assets/Voltage.png";
 type Props = {
     deviceId: string;
     onBack: () => void;
+    siteCode?: string;
 };
 
 // UI Component: Blue Hero Card (Modified for click interaction)
@@ -140,7 +142,7 @@ const FIELD_CONFIG: Record<string, FieldMeta> = {
     alarm_volume: { label: "Alarm Vol", icon: bellIcon, forceSide: true },
 };
 
-export default function IoTDetail({ deviceId, onBack }: Props) {
+export default function IoTDetail({ deviceId, onBack, siteCode }: Props) {
     // const { t } = useTranslation("devices");
     const [device, setDevice] = useState<IoTDevice | null>(null);
     const [loading, setLoading] = useState(false);
@@ -165,14 +167,55 @@ export default function IoTDetail({ deviceId, onBack }: Props) {
 
     // Real-time Chart Data (Store all metrics)
     const [chartData, setChartData] = useState<any[]>([]);
+    const { selectedSite, selectedGroupSite, selectedUtility, siteOptions } = useFilters();
+
+    const scopedSiteCode = useMemo(() => {
+        const routeSite = String(siteCode || "").trim();
+        if (routeSite && routeSite.toLowerCase() !== "all") return routeSite;
+        const selected = String(selectedSite || "").trim();
+        if (selected && selected.toLowerCase() !== "all") return selected;
+        return "";
+    }, [siteCode, selectedSite]);
+
+    const queryScope = useMemo(() => {
+        const groupId = String(selectedGroupSite?.id || "").trim();
+        if (scopedSiteCode) return { siteId: scopedSiteCode, siteGroupId: null as string | null };
+        if (groupId) return { siteId: null as string | null, siteGroupId: groupId };
+        return { siteId: null as string | null, siteGroupId: null as string | null };
+    }, [scopedSiteCode, selectedGroupSite?.id]);
+
+    const allowedSiteIds = useMemo(() => {
+        if (scopedSiteCode) return new Set([scopedSiteCode]);
+        if (!selectedGroupSite?.id && !selectedUtility?.id) return null;
+
+        const ids = new Set<string>();
+        for (const option of siteOptions || []) {
+            const value = String(option?.value || "").trim();
+            if (!value || value.toLowerCase() === "all") continue;
+            if (selectedUtility?.id && option.utilityId !== selectedUtility.id) continue;
+            if (selectedGroupSite?.id) {
+                if (option.groupId !== selectedGroupSite.id && option.groupLabel !== selectedGroupSite.label) {
+                    continue;
+                }
+            }
+            ids.add(value);
+        }
+
+        return ids;
+    }, [scopedSiteCode, selectedGroupSite, selectedUtility, siteOptions]);
 
     useEffect(() => {
         const fetchDevice = async () => {
             // Only show global loading on first load
             if (!device) setLoading(true);
             try {
-                const all = await getIoTDevices();
-                const found = all.find(d => String(d.id) === deviceId || d.deviceId === deviceId);
+                const all = await getIoTDevices(queryScope);
+                const scoped = all.filter((d) => {
+                    if (!allowedSiteIds) return true;
+                    const deviceSiteId = String(d.siteId ?? d.siteCode ?? "").trim();
+                    return deviceSiteId.length > 0 && allowedSiteIds.has(deviceSiteId);
+                });
+                const found = scoped.find(d => String(d.id) === deviceId || d.deviceId === deviceId);
                 if (found) {
                     setDevice(found);
                 }
@@ -186,7 +229,7 @@ export default function IoTDetail({ deviceId, onBack }: Props) {
         fetchDevice();
         const interval = setInterval(fetchDevice, 3000); // Poll every 3 seconds
         return () => clearInterval(interval);
-    }, [deviceId]);
+    }, [deviceId, queryScope, allowedSiteIds]);
 
     const snapshot = device?.snapshot || (device?.value ? { value: device.value } : {});
 

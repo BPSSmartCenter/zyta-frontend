@@ -262,11 +262,6 @@ function SectionHeader({
   const active = groupActive || utilityActive;
   const clickable = onClickGroup ?? onClickUtility;
   const handleClick = onClickGroup ?? onClickUtility;
-  const helperText = onClickGroup
-    ? "เลือกทั้งกลุ่ม"
-    : onClickUtility
-      ? "เลือกทั้ง utility"
-      : null;
 
   return (
     <div className="flex items-center gap-2">
@@ -291,9 +286,6 @@ function SectionHeader({
           </span>
         )}
       </button>
-      {helperText && (
-        <span className="text-[11px] text-slate-400">{helperText}</span>
-      )}
     </div>
   );
 }

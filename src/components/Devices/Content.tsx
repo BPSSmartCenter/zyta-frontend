@@ -296,6 +296,7 @@ export default function Content({}: Props) {
           {deviceId ? (
             <IoTDetail
               deviceId={deviceId}
+              siteCode={effectiveSiteCode}
               onBack={() => {
                 const params = new URLSearchParams(location.search);
                 params.delete("deviceId");
@@ -306,7 +307,7 @@ export default function Content({}: Props) {
               }}
             />
           ) : (
-            <IoTPanel />
+            <IoTPanel siteCode={effectiveSiteCode} />
           )}
         </div>
       ) : (

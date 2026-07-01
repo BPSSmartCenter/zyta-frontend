@@ -260,8 +260,9 @@ export default function Sidebar({ children, contentClassName = "" }: Props) {
   ).map(({ key, label, icon }) => {
     const noDevicesInTopic =
       isInventoryDeviceKey(key) && getCountForType(inventoryCounts, key) <= 0;
+    const alwaysEnabled = key === "caregiver" || key === "digitaltwin";
     const disabled =
-      DISABLED_DEVICE_TYPES.has(key) || (!inventoryLoading && noDevicesInTopic);
+      DISABLED_DEVICE_TYPES.has(key) || (!alwaysEnabled && !inventoryLoading && noDevicesInTopic);
 
     return {
       id: `device-${key}`,
