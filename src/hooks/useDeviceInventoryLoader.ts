@@ -17,6 +17,8 @@ type DeviceCounts = Partial<{
   zyta: number;
   iot: number;
   iotOffline: number;
+  medical: number;
+  medicalOffline: number;
   caregiver: number;
   caregiverOffline: number;
 }>;
@@ -34,9 +36,13 @@ type DeviceAggregate = {
   air: number;
   iot: number;
   iotOffline: number;
+  medical: number;
+  medicalOffline: number;
   caregiver: number;
   caregiverOffline: number;
   zyta: number;
+  online: number;
+  offline: number;
 };
 
 type SiteSummary = {
@@ -69,14 +75,21 @@ function createEmptyAggregate(): DeviceAggregate {
     air: 0,
     iot: 0,
     iotOffline: 0,
+    medical: 0,
+    medicalOffline: 0,
     caregiver: 0,
     caregiverOffline: 0,
     zyta: 0,
+    online: 0,
+    offline: 0,
   };
 }
 
 function addSiteToAggregate(acc: DeviceAggregate, site: MeSite): DeviceAggregate {
   const c = site.counters;
+  const medicalCount = Number((c as any).devices_medical ?? c.devices_caregiver ?? 0);
+  const onlineCount = Number((c as any).devices_online ?? 0);
+  const offlineCount = Number((c as any).devices_offline ?? 0);
   return {
     ...acc,
     total: acc.total + c.devices_total,
@@ -88,7 +101,10 @@ function addSiteToAggregate(acc: DeviceAggregate, site: MeSite): DeviceAggregate
     electricOffline: acc.electricOffline + c.devices_electric_offline,
     air: acc.air + c.devices_air,
     iot: acc.iot + c.devices_iot,
+    medical: acc.medical + medicalCount,
     caregiver: acc.caregiver + c.devices_caregiver,
+    online: acc.online + onlineCount,
+    offline: acc.offline + offlineCount,
   };
 }
 
@@ -215,14 +231,21 @@ export function useDeviceInventoryLoader({
         airSensor: aggregated.air,
         iot: aggregated.iot,
         iotOffline: 0,
+        medical: aggregated.medical,
+        medicalOffline: 0,
         caregiver: aggregated.caregiver,
         caregiverOffline: 0,
       };
 
-      const electricOffline = aggregated.electricOffline;
+      const hasLifecycleTotals = aggregated.online > 0 || aggregated.offline > 0;
+      const fallbackOffline = aggregated.electricOffline;
       const nextTotals: DeviceTotals = {
-        online: Math.max(0, aggregated.total - electricOffline),
-        offline: electricOffline,
+        online: hasLifecycleTotals
+          ? Math.max(0, aggregated.online)
+          : Math.max(0, aggregated.total - fallbackOffline),
+        offline: hasLifecycleTotals
+          ? Math.max(0, aggregated.offline)
+          : fallbackOffline,
       };
 
       setCountsState(nextCounts);

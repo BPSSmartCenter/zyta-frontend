@@ -24,6 +24,8 @@ type DeviceCounts = {
   zyta: number;
   iot: number;
   iotOffline?: number;
+  medical: number;
+  medicalOffline?: number;
   caregiver: number;
   caregiverOffline?: number;
 };
@@ -199,8 +201,8 @@ export default function DeviceCount({
   });
   const labelAir = t("devices.air", { defaultValue: "Air" });
   const labelIot = t("devices.iot", { defaultValue: "IoT" });
-  const labelCaregiver = t("devices.caregiver", {
-    defaultValue: "Caregiver",
+  const labelMedical = t("devices.medical", {
+    defaultValue: "Medical",
   });
   const labelDigitalTwin = t("devices.digitalTwinCard", {
     defaultValue: "Digital Twin",
@@ -220,6 +222,8 @@ export default function DeviceCount({
     zyta: 0,
     iot: 0,
     iotOffline: 0,
+    medical: 0,
+    medicalOffline: 0,
     caregiver: 0,
     caregiverOffline: 0,
     ...(globalCounts || {}),
@@ -248,13 +252,12 @@ export default function DeviceCount({
       ),
       off: Number(mergedCounts.iotOffline || 0),
     },
-    caregiver: {
+    medical: {
       on: Math.max(
         0,
-        Number(mergedCounts.caregiver || 0) -
-          Number(mergedCounts.caregiverOffline || 0)
+        Number(mergedCounts.medical || 0) - Number(mergedCounts.medicalOffline || 0)
       ),
-      off: Number(mergedCounts.caregiverOffline || 0),
+      off: Number(mergedCounts.medicalOffline || 0),
     },
   } as const;
 
@@ -342,17 +345,16 @@ export default function DeviceCount({
       disabled: isZero(mergedCounts.iot),
     },
     {
-      key: "caregiver",
-      label: labelCaregiver,
-      count: Number(mergedCounts.caregiver || 0),
-      online: statusByType.caregiver.on,
-      offline: statusByType.caregiver.off,
+      key: "medical",
+      label: labelMedical,
+      count: Number(mergedCounts.medical || 0),
+      online: statusByType.medical.on,
+      offline: statusByType.medical.off,
       icon: nurseImage,
       iconAlt: "",
       iconWrapClassName: "bg-fuchsia-50 ring-fuchsia-100",
       accentClassName: "bg-fuchsia-50 text-fuchsia-700",
-      onClick: () => window.open("http://45.136.253.176:3000/", "_blank"),
-      disabled: isZero(mergedCounts.caregiver),
+      onClick: () => window.open("https://bpstech.online/login", "_blank"),
     },
     {
       key: "digitalTwin",

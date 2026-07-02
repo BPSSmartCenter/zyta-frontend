@@ -21,6 +21,8 @@ export type DeviceCounts = Partial<{
   zyta: number;
   iot: number;
   iotOffline: number;
+  medical: number;
+  medicalOffline: number;
   caregiver: number;
   caregiverOffline: number;
 }>;
@@ -80,4 +82,3 @@ export function getCountForType(map: DeviceCounts, type: DeviceTypeKey): number 
       return 0;
   }
 }
-

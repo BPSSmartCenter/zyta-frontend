@@ -38,12 +38,15 @@ export type MeSiteBilling = {
 
 export type MeSiteCounters = {
   devices_total: number;
+  devices_online: number;
+  devices_offline: number;
   devices_camera: number;
   devices_intercom: number;
   devices_water: number;
   devices_electric: number;
   devices_air: number;
   devices_iot: number;
+  devices_medical: number;
   devices_caregiver: number;
   devices_electric_online: number;
   devices_electric_offline: number;
@@ -256,12 +259,15 @@ function normalizeCounters(raw: unknown): MeSiteCounters {
   const r = isRecord(raw) ? raw : {};
   return {
     devices_total: asNumber(r.devices_total),
+    devices_online: asNumber(r.devices_online),
+    devices_offline: asNumber(r.devices_offline),
     devices_camera: asNumber(r.devices_camera),
     devices_intercom: asNumber(r.devices_intercom),
     devices_water: asNumber(r.devices_water),
     devices_electric: asNumber(r.devices_electric),
     devices_air: asNumber(r.devices_air),
     devices_iot: asNumber(r.devices_iot),
+    devices_medical: asNumber(r.devices_medical ?? r.devices_caregiver),
     devices_caregiver: asNumber(r.devices_caregiver),
     devices_electric_online: asNumber(r.devices_electric_online),
     devices_electric_offline: asNumber(r.devices_electric_offline),
