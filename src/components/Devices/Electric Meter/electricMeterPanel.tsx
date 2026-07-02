@@ -1884,6 +1884,14 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       ].filter((item): item is NonNullable<typeof item> => item !== null),
     [metricAvailability, metrics, t]
   );
+  const metricGridColsClass = React.useMemo(() => {
+    const count = metricTiles.length;
+    if (count >= 5) return "xl:grid-cols-5";
+    if (count === 4) return "xl:grid-cols-4";
+    if (count === 3) return "xl:grid-cols-3";
+    if (count === 2) return "xl:grid-cols-2";
+    return "xl:grid-cols-1";
+  }, [metricTiles.length]);
 
   const summaryTiles = React.useMemo(
     () =>
@@ -2160,7 +2168,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className={["grid grid-cols-1 gap-4 md:grid-cols-2", metricGridColsClass].join(" ")}>
           {metricTiles.map((tile) => (
             <UtilityMetricTile
               key={tile.key}
