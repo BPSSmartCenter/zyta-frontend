@@ -499,12 +499,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       to.setMinutes(to.getMinutes() - 30);
     }
     const from = new Date(now);
-    if (now.getHours() >= 9) {
-      from.setHours(9, 0, 0, 0);
-    } else {
-      // Before 09:00 use midnight->now to avoid querying future windows.
-      from.setHours(0, 0, 0, 0);
-    }
+    // Include full-day readings by default so early-meter snapshots are visible.
+    from.setHours(0, 0, 0, 0);
     const makeLabel = (d: Date) => formatTime(d.getHours(), d.getMinutes());
     return {
       from: makeLabel(from),
@@ -736,7 +732,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             }));
           });
         const filtered = normalized
-          .filter((opt) => opt.category === "INVERTER")
+          .filter((opt) =>
+            ["INVERTER", "METER", "GATEWAY", "SENSOR"].includes(
+              String(opt.category || "").toUpperCase()
+            )
+          )
           .sort((a, b) => {
             const bySite = String(a.siteLabel || "").localeCompare(
               String(b.siteLabel || ""),
@@ -754,9 +754,6 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           });
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
-          if (prev === OVERVIEW_DEVICE_ID && !urlDeviceSN) {
-            return OVERVIEW_DEVICE_ID;
-          }
           if (prev && filtered.some((opt) => opt.id === prev)) return prev;
           const matchSn =
             urlDeviceSN &&
@@ -764,7 +761,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
             );
           if (matchSn) return matchSn.id;
-          return OVERVIEW_DEVICE_ID;
+          return filtered[0]?.id ?? OVERVIEW_DEVICE_ID;
         });
       } catch {
         if (cancelled) return;
