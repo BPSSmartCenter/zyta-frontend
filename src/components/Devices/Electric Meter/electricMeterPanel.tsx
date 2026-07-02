@@ -250,6 +250,14 @@ type OverviewInverterSummary = {
   halfHourSeries: number[];
 };
 
+type MetricAvailability = {
+  energy: boolean;
+  voltage: boolean;
+  current: boolean;
+  frequency: boolean;
+  temperature: boolean;
+};
+
 const HALF_HOUR_SLOTS = Array.from({ length: 24 * 2 }, (_, idx) => {
   const hour = Math.floor(idx / 2);
   const minute = (idx % 2) * 30;
@@ -541,6 +549,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     monthKwh: 0,
   });
   const [temperatureC, setTemperatureC] = useState<number | null>(null);
+  const [metricAvailability, setMetricAvailability] = useState<MetricAvailability>({
+    energy: true,
+    voltage: true,
+    current: true,
+    frequency: true,
+    temperature: true,
+  });
   // overview-derived values for side cards and max bound
   const [overviewTodayValue, setOverviewTodayValue] = useState<number | null>(null);
   const [overviewMonthValue, setOverviewMonthValue] = useState<number | null>(null);
@@ -1474,7 +1489,42 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             frequencyAvg: frequencyAvg ?? 0,
             temperatureC: temperatureAvg,
           };
-          res = { data: { summary: aggregatedSummary, telemetries: [] } };
+          const availabilities = settled
+            .filter(
+              (item): item is PromiseFulfilledResult<any> =>
+                item.status === "fulfilled"
+            )
+            .map((item) => (item.value as any)?.data?.availability)
+            .filter((availability) => availability && typeof availability === "object");
+          const aggregatedAvailability: MetricAvailability = {
+            energy:
+              availabilities.length === 0
+                ? true
+                : availabilities.some((a: any) => a?.energy === true),
+            voltage:
+              availabilities.length === 0
+                ? true
+                : availabilities.some((a: any) => a?.voltage === true),
+            current:
+              availabilities.length === 0
+                ? true
+                : availabilities.some((a: any) => a?.current === true),
+            frequency:
+              availabilities.length === 0
+                ? true
+                : availabilities.some((a: any) => a?.frequency === true),
+            temperature:
+              availabilities.length === 0
+                ? true
+                : availabilities.some((a: any) => a?.temperature === true),
+          };
+          res = {
+            data: {
+              summary: aggregatedSummary,
+              telemetries: [],
+              availability: aggregatedAvailability,
+            },
+          };
           logElectricApiPayload("fetchEquipmentTelemetry(all-sites overview aggregated)", res);
         } else {
           res = await fetchEquipmentTelemetry({
@@ -1497,6 +1547,26 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         const list: any[] = payload?.telemetries ?? [];
         console.debug("[FE] rangeRes", { count: list.length });
         const summary = summarizeTelemetryPayload(payload);
+        const nextAvailability: MetricAvailability = {
+          energy:
+            payload?.availability?.energy === true ||
+            Number(summary.usageKwh || 0) > 0 ||
+            Number(summary.accumulatedKwh || 0) > 0,
+          voltage:
+            payload?.availability?.voltage === true ||
+            Number(summary.voltageAvg || 0) > 0,
+          current:
+            payload?.availability?.current === true ||
+            Number(summary.currentAvg || 0) > 0,
+          frequency:
+            payload?.availability?.frequency === true ||
+            Number(summary.frequencyAvg || 0) > 0,
+          temperature:
+            payload?.availability?.temperature === true ||
+            (typeof summary.temperatureC === "number" &&
+              Number.isFinite(summary.temperatureC)),
+        };
+        setMetricAvailability(nextAvailability);
         logElectricApiPayload("fetchEquipmentTelemetry(summary)", summary);
         setMetrics((m) => ({
           ...m,
@@ -1740,7 +1810,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     isOverviewSelected && overviewInverterSummaries.length
       ? Math.round(overviewInverterAggregate.lifetimeKwh)
       : overviewLifetimeValue ?? metrics.lifetimeKwh;
-  const hasTemperature = typeof temperatureC === "number" && Number.isFinite(temperatureC);
+  const hasTemperature =
+    metricAvailability.temperature &&
+    typeof temperatureC === "number" &&
+    Number.isFinite(temperatureC);
   const temperatureValue = hasTemperature ? Math.round(Number(temperatureC)) : 0;
   const temperatureDisplay = hasTemperature
     ? undefined
@@ -1759,71 +1832,88 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     if (!hasTemperature) return 0;
     return Math.max(0, Math.min(100, Math.round((temperatureValue / 60) * 100)));
   }, [hasTemperature, temperatureValue]);
+  const showTemperatureHero = metricAvailability.temperature;
 
   const metricTiles = React.useMemo(
-    () => [
-      {
-        key: "voltage",
-        label: t("devices.electric.cards.voltage", { defaultValue: "Voltage" }),
-        value: `${formatWithComma(metrics.voltage)} V`,
-        tone: "amber" as const,
-        accent: <BoltIcon />,
-      },
-      {
-        key: "consumption",
-        label: t("devices.electric.cards.consumption", {
-          defaultValue: "Power consumption",
-        }),
-        value: `${formatWithComma(metrics.consumptionKwh)} kWh`,
-        tone: "orange" as const,
-        accent: <PulseIcon />,
-      },
-      {
-        key: "accumulated",
-        label: t("devices.electric.cards.accumulated", {
-          defaultValue: "Accumulated power",
-        }),
-        value: `${formatWithComma(metrics.lifetimeKwh)} kWh`,
-        tone: "amber" as const,
-        accent: <MeterIcon />,
-      },
-      {
-        key: "current",
-        label: t("devices.electric.cards.current", { defaultValue: "Current" }),
-        value: `${formatWithComma(metrics.current)} A`,
-        tone: "orange" as const,
-        accent: <CurrentIcon />,
-      },
-      {
-        key: "frequency",
-        label: t("devices.electric.cards.frequency", { defaultValue: "Frequency" }),
-        value: `${formatWithComma(metrics.frequency)} Hz`,
-        tone: "slate" as const,
-        accent: <WaveIcon />,
-      },
-    ],
-    [metrics, t]
+    () =>
+      [
+        metricAvailability.voltage
+          ? {
+              key: "voltage",
+              label: t("devices.electric.cards.voltage", { defaultValue: "Voltage" }),
+              value: `${formatWithComma(metrics.voltage)} V`,
+              tone: "amber" as const,
+              accent: <BoltIcon />,
+            }
+          : null,
+        {
+          key: "consumption",
+          label: t("devices.electric.cards.consumption", {
+            defaultValue: "Power consumption",
+          }),
+          value: `${formatWithComma(metrics.consumptionKwh)} kWh`,
+          tone: "orange" as const,
+          accent: <PulseIcon />,
+        },
+        metricAvailability.energy
+          ? {
+              key: "accumulated",
+              label: t("devices.electric.cards.accumulated", {
+                defaultValue: "Accumulated power",
+              }),
+              value: `${formatWithComma(metrics.lifetimeKwh)} kWh`,
+              tone: "amber" as const,
+              accent: <MeterIcon />,
+            }
+          : null,
+        metricAvailability.current
+          ? {
+              key: "current",
+              label: t("devices.electric.cards.current", { defaultValue: "Current" }),
+              value: `${formatWithComma(metrics.current)} A`,
+              tone: "orange" as const,
+              accent: <CurrentIcon />,
+            }
+          : null,
+        metricAvailability.frequency
+          ? {
+              key: "frequency",
+              label: t("devices.electric.cards.frequency", { defaultValue: "Frequency" }),
+              value: `${formatWithComma(metrics.frequency)} Hz`,
+              tone: "slate" as const,
+              accent: <WaveIcon />,
+            }
+          : null,
+      ].filter((item): item is NonNullable<typeof item> => item !== null),
+    [metricAvailability, metrics, t]
   );
 
   const summaryTiles = React.useMemo(
-    () => [
-      {
-        key: "today",
-        label: t("devices.electric.side.today", { defaultValue: "Today's consumption" }),
-        value: `${formatWithComma(sideCardTodayValue ?? 0)} kWh`,
-      },
-      {
-        key: "month",
-        label: t("devices.electric.side.month", { defaultValue: "This month's consumption" }),
-        value: `${formatWithComma(sideCardMonthValue ?? 0)} kWh`,
-      },
-      {
-        key: "lifetime",
-        label: t("devices.electric.cards.accumulated", { defaultValue: "Accumulated power" }),
-        value: `${formatWithComma(sideCardLifetimeValue)} kWh`,
-      },
-    ],
-    [sideCardLifetimeValue, sideCardMonthValue, sideCardTodayValue, t]
+    () =>
+      metricAvailability.energy
+        ? [
+            {
+              key: "today",
+              label: t("devices.electric.side.today", { defaultValue: "Today's consumption" }),
+              value: `${formatWithComma(sideCardTodayValue ?? 0)} kWh`,
+            },
+            {
+              key: "month",
+              label: t("devices.electric.side.month", {
+                defaultValue: "This month's consumption",
+              }),
+              value: `${formatWithComma(sideCardMonthValue ?? 0)} kWh`,
+            },
+            {
+              key: "lifetime",
+              label: t("devices.electric.cards.accumulated", {
+                defaultValue: "Accumulated power",
+              }),
+              value: `${formatWithComma(sideCardLifetimeValue)} kWh`,
+            },
+          ]
+        : [],
+    [metricAvailability.energy, sideCardLifetimeValue, sideCardMonthValue, sideCardTodayValue, t]
   );
 
   return (
@@ -2026,7 +2116,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           </div>
         </UtilitySurface>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_0.95fr]">
+        <div
+          className={[
+            "grid grid-cols-1 gap-4",
+            showTemperatureHero ? "xl:grid-cols-[1fr_0.95fr]" : "",
+          ].join(" ")}
+        >
           <UtilityHeroCard
             eyebrow={t("devices.electric.cards.consumption", {
               defaultValue: "Power consumption",
@@ -2050,20 +2145,22 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             }
             tone="amber"
           />
-          <UtilityHeroCard
-            eyebrow={t("devices.electric.cards.temperature", {
-              defaultValue: "Temperature",
-            })}
-            title={t("devices.electric.cards.temperature", {
-              defaultValue: "Temperature",
-            })}
-            value={hasTemperature ? String(formatWithComma(temperatureValue)) : "--"}
-            unit={hasTemperature ? "°C" : ""}
-            progressValue={temperaturePercent}
-            progressLabel={`${temperaturePercent}%`}
-            footer={temperatureDisplay ?? heroFooterStatus(hasTemperature, t)}
-            tone="orange"
-          />
+          {showTemperatureHero ? (
+            <UtilityHeroCard
+              eyebrow={t("devices.electric.cards.temperature", {
+                defaultValue: "Temperature",
+              })}
+              title={t("devices.electric.cards.temperature", {
+                defaultValue: "Temperature",
+              })}
+              value={hasTemperature ? String(formatWithComma(temperatureValue)) : "--"}
+              unit={hasTemperature ? "°C" : ""}
+              progressValue={temperaturePercent}
+              progressLabel={`${temperaturePercent}%`}
+              footer={temperatureDisplay ?? heroFooterStatus(hasTemperature, t)}
+              tone="orange"
+            />
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -2078,16 +2175,18 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          {summaryTiles.map((tile) => (
-            <UtilitySurface key={tile.key} className="py-4">
-              <div className="text-[11px] font-medium text-slate-400">{tile.label}</div>
-              <div className="mt-1 text-[30px] font-semibold leading-none text-slate-900">
-                {tile.value}
-              </div>
-            </UtilitySurface>
-          ))}
-        </div>
+        {summaryTiles.length ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            {summaryTiles.map((tile) => (
+              <UtilitySurface key={tile.key} className="py-4">
+                <div className="text-[11px] font-medium text-slate-400">{tile.label}</div>
+                <div className="mt-1 text-[30px] font-semibold leading-none text-slate-900">
+                  {tile.value}
+                </div>
+              </UtilitySurface>
+            ))}
+          </div>
+        ) : null}
 
         <UtilitySurface>
           <UtilitySectionTitle
