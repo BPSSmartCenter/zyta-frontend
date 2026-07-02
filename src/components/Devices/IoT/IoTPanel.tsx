@@ -134,7 +134,7 @@ export default function IoTPanel({ siteCode }: Props) {
                   </div>
                   <div>
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(() => {
+                      className={`inline-flex min-w-[112px] items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(() => {
                         const status = String(device.status || '').toLowerCase();
                         if (status === 'online' || status === 'active') return 'bg-green-100 text-green-800';
                         if (status === 'offline') return 'bg-red-100 text-red-800';

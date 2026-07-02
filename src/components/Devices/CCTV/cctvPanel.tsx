@@ -2,6 +2,7 @@ import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import { useTranslation } from "react-i18next";
+import { request } from "../../../lib/http";
 import { useFilters } from "../../../context/FiltersContext";
 import { useFaceRec } from "../../../context/FaceRecContext";
 import { useDeviceInventory } from "../../../context/DeviceInventoryContext";
@@ -34,6 +35,7 @@ type FeedItem = {
   title: string;
   subtitle: string;
   imageSrc?: string;
+  streamUrl?: string;
   status: FeedStatus;
   eventKey: string;
   eventLabel: string;
@@ -197,6 +199,70 @@ const extractSiteLabel = (noti: Noti) => {
   );
 };
 
+const normalizeCameraKey = (value: string) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+const toFeedStatusFromDeviceStatus = (status: unknown): FeedStatus => {
+  const s = String(status || "").toLowerCase();
+  if (s === "online" || s === "active") return "live";
+  if (s === "offline") return "offline";
+  if (s === "disabled" || s === "provisioning") return "standby";
+  return "standby";
+};
+
+const extractCamNumber = (...candidates: unknown[]) => {
+  for (const c of candidates) {
+    const raw = String(c ?? "");
+    const camMatch = raw.match(/cam\s*0*(\d+)/i);
+    if (camMatch) return Number(camMatch[1]);
+    const numMatch = raw.match(/(?:^|\D)0*(\d+)(?:\D|$)/);
+    if (numMatch) return Number(numMatch[1]);
+  }
+  return null;
+};
+
+const buildStreamUrl = (n: number | null) =>
+  Number.isFinite(n as number) && (n as number) > 0
+    ? `http://203.159.95.168:8888/cam${n}/`
+    : undefined;
+
+type CameraDeviceLite = {
+  id: string;
+  name: string;
+  status: string;
+  externalId?: string;
+  siteName?: string;
+};
+
+const isCameraType = (type: unknown) => {
+  const tx = String(type || "").toLowerCase();
+  return tx === "cctv" || tx === "camera";
+};
+
+const mapCameraDevices = (raw: unknown): CameraDeviceLite[] => {
+  const rows: Array<Record<string, unknown>> =
+    Array.isArray(raw)
+      ? (raw as Array<Record<string, unknown>>)
+      : raw && typeof raw === "object" && Array.isArray((raw as { devices?: unknown }).devices)
+        ? (((raw as { devices: Array<Record<string, unknown>> }).devices) || [])
+        : [];
+
+  return rows
+    .filter((r) => isCameraType(r.type))
+    .map((r) => ({
+      id: String(r.id ?? ""),
+      externalId: r.externalId == null ? undefined : String(r.externalId),
+      name: String(r.name ?? r.displayName ?? r.externalId ?? r.id ?? "").trim(),
+      status: String(r.status ?? "Unknown"),
+      siteName: r.subLocation == null ? (r.locationName == null ? undefined : String(r.locationName)) : String(r.subLocation),
+    }))
+    .filter((r) => r.name.length > 0 || r.id.length > 0);
+};
+
+
 const isCctvRelevantNoti = (noti: Noti) => {
   const eventKey = resolveAlertEventKey(noti);
   if (eventKey === "face" || eventKey === "plate") return true;
@@ -311,11 +377,6 @@ function PlaceholderFrame({ label }: { label: string }) {
   return (
     <div className="relative h-full w-full overflow-hidden rounded-[22px] bg-[linear-gradient(135deg,#E8EEF8_0%,#DCE7F4_100%)]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.55),transparent_38%)]" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="rounded-full border border-white/70 bg-white/60 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-          No signal
-        </div>
-      </div>
       <div className="absolute bottom-4 left-4 text-sm font-medium text-slate-600">
         {label}
       </div>
@@ -473,6 +534,7 @@ export default function CCTVPanel({ siteCode }: Props) {
   const [paused, setPaused] = React.useState(false);
   const [muted, setMuted] = React.useState(false);
   const [clockTimestamp, setClockTimestamp] = React.useState(() => Date.now());
+  const [cameraDevices, setCameraDevices] = React.useState<CameraDeviceLite[]>([]);
 
   React.useEffect(() => {
     const timer = window.setInterval(() => setClockTimestamp(Date.now()), 1000);
@@ -481,6 +543,32 @@ export default function CCTVPanel({ siteCode }: Props) {
 
   const effectiveSiteCode =
     siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : undefined);
+
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const params: Record<string, string | number> = { t: Date.now() };
+        const scoped = String(effectiveSiteCode || "").trim();
+        if (scoped) {
+          if (scoped.toLowerCase().startsWith("grp:")) params.siteGroupId = scoped;
+          else params.siteId = scoped;
+        }
+        const data = await request<unknown>("/devices", { params });
+        if (!mounted) return;
+        setCameraDevices(mapCameraDevices(data));
+      } catch {
+        if (!mounted) return;
+        setCameraDevices([]);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveSiteCode]);
 
   const relevantNotis = React.useMemo(() => {
     const merged = dedupeNotis([...notisItems, ...faceRecItems]);
@@ -504,50 +592,74 @@ export default function CCTVPanel({ siteCode }: Props) {
 
   const totalCameraCount = Math.max(
     Number(counts?.cameras ?? 0),
-    uniqueCameraCountFromEvents
+    uniqueCameraCountFromEvents,
+    cameraDevices.length
   );
 
   const feedItems = React.useMemo(() => {
+    const latestByKey = new Map<string, Noti>();
+    relevantNotis.forEach((item, idx) => {
+      const key = normalizeCameraKey(extractCameraName(item, idx));
+      if (!key || latestByKey.has(key)) return;
+      latestByKey.set(key, item);
+    });
+
+    const items: FeedItem[] = cameraDevices.map((cam, idx) => {
+      const key = normalizeCameraKey(cam.name || cam.externalId || cam.id);
+      const latest = latestByKey.get(key);
+      const latestTs = latest ? parseTimestamp(latest) : null;
+      const latestEvent = latest ? resolveAlertEventKey(latest) : null;
+      const streamNo = extractCamNumber(cam.externalId, cam.name, cam.id, idx + 1);
+      const streamUrl = buildStreamUrl(streamNo);
+
+      const statusFromDevice = toFeedStatusFromDeviceStatus(cam.status);
+      const status: FeedStatus =
+        latest && (latestEvent === "offline" || isCameraOfflineNoti(latest))
+          ? "offline"
+          : statusFromDevice;
+
+      const eventKey = latestEvent || (status === "offline" ? "offline" : status === "live" ? "live" : "standby");
+
+      return {
+        id: key || `cam-${idx + 1}`,
+        title: cam.name || buildFeedLabel(idx),
+        subtitle: cam.siteName || effectiveSiteCode || "All sites",
+        imageSrc: latest ? getNotiImage(latest) : undefined,
+        streamUrl,
+        status,
+        eventKey,
+        eventLabel: eventLabelForKey(eventKey),
+        timestamp: latestTs,
+      };
+    });
+
+    if (items.length > 0) return items;
+
     const seen = new Set<string>();
-    const items: FeedItem[] = [];
+    const fallback: FeedItem[] = [];
     relevantNotis.forEach((item, idx) => {
       const title = extractCameraName(item, idx);
-      const key = title.toLowerCase();
-      if (seen.has(key)) return;
+      const key = normalizeCameraKey(title);
+      if (!key || seen.has(key)) return;
       seen.add(key);
       const timestamp = parseTimestamp(item);
       const eventKey = resolveAlertEventKey(item) ?? "live";
-      items.push({
+      const streamNo = extractCamNumber(title, idx + 1);
+      fallback.push({
         id: key,
         title,
         subtitle: extractSiteLabel(item),
         imageSrc: getNotiImage(item),
-        status:
-          eventKey === "offline" || isCameraOfflineNoti(item) ? "offline" : "live",
+        streamUrl: buildStreamUrl(streamNo),
+        status: eventKey === "offline" || isCameraOfflineNoti(item) ? "offline" : "live",
         eventKey,
         eventLabel: eventLabelForKey(eventKey),
         timestamp,
       });
     });
 
-    const displayTarget = Math.min(
-      THUMBNAIL_LIMIT,
-      Math.max(totalCameraCount || 0, items.length)
-    );
-    for (let idx = items.length; idx < displayTarget; idx += 1) {
-      items.push({
-        id: `placeholder-${idx}`,
-        title: buildFeedLabel(idx),
-        subtitle: effectiveSiteCode || "All sites",
-        status: "standby",
-        eventKey: "standby",
-        eventLabel: "Standby",
-        timestamp: null,
-        isPlaceholder: true,
-      });
-    }
-    return items.slice(0, THUMBNAIL_LIMIT);
-  }, [effectiveSiteCode, relevantNotis, totalCameraCount]);
+    return fallback;
+  }, [cameraDevices, effectiveSiteCode, relevantNotis]);
 
   React.useEffect(() => {
     if (!feedItems.length) {
@@ -661,13 +773,15 @@ export default function CCTVPanel({ siteCode }: Props) {
   );
 
   const handleSnapshot = React.useCallback(() => {
-    if (!selectedFeed?.imageSrc) return;
-    window.open(selectedFeed.imageSrc, "_blank", "noopener,noreferrer");
+    const target = selectedFeed?.streamUrl || selectedFeed?.imageSrc;
+    if (!target) return;
+    window.open(target, "_blank", "noopener,noreferrer");
   }, [selectedFeed]);
 
   const handleFullscreen = React.useCallback(() => {
-    if (!selectedFeed?.imageSrc) return;
-    window.open(selectedFeed.imageSrc, "_blank", "noopener,noreferrer");
+    const target = selectedFeed?.streamUrl || selectedFeed?.imageSrc;
+    if (!target) return;
+    window.open(target, "_blank", "noopener,noreferrer");
   }, [selectedFeed]);
 
   return (
@@ -745,7 +859,18 @@ export default function CCTVPanel({ siteCode }: Props) {
         <UtilitySurface className="p-4 sm:p-5">
           <div className="relative overflow-hidden rounded-[28px] bg-[#0F172A]">
             <div className="aspect-[16/9] w-full">
-              {selectedFeed?.imageSrc && !selectedFeed.isPlaceholder ? (
+              {selectedFeed?.streamUrl ? (
+                <iframe
+                  src={selectedFeed.streamUrl}
+                  title={selectedFeed.title}
+                  className={cx(
+                    "h-full w-full border-0",
+                    paused ? "opacity-50 grayscale-[0.2]" : ""
+                  )}
+                  loading="lazy"
+                  allow="autoplay; fullscreen"
+                />
+              ) : selectedFeed?.imageSrc && !selectedFeed.isPlaceholder ? (
                 <img
                   src={selectedFeed.imageSrc}
                   alt={selectedFeed.title}
