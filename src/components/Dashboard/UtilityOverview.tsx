@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { selectAuthSites } from "../../features/auth";
 import {
+  getElectricOverviewForSites,
   getUtilityOverviewForSites,
+  type ElectricOverviewSummary,
   type UtilityOverviewSummary,
   type UtilitySubtype,
 } from "../../features/electric";
@@ -220,7 +222,14 @@ function UtilityCard({
   const theme = CARD_THEME[cardKey];
   const hasLiveData = overview.hasData;
   const loadingOverview = overview.loading;
-  const displayUnit = overview.unit || (cardKey === "air" ? "" : "kWh");
+  const displayUnit =
+    cardKey === "air" ? "AQI" : cardKey === "water" ? "L" : overview.unit || "kWh";
+  const lowerMetricLabel = cardKey === "air"
+    ? "PM2.5"
+    : t("utilityOverview.monthLabel", {
+        defaultValue: "This month",
+      });
+  const lowerMetricUnit = cardKey === "air" ? "ug/m3" : displayUnit;
   const locale = i18n.language?.toLowerCase().startsWith("th")
     ? "th-TH"
     : "en-US";
@@ -288,7 +297,7 @@ function UtilityCard({
               <p className="text-[0.78rem] font-semibold uppercase tracking-[0.18em] text-white/78">
                 {t(`utilityOverview.cards.${cardKey}.eyebrow`, {
                   defaultValue:
-                    cardKey === "air" ? "Today's average" : "Today's consumption",
+                    cardKey === "air" ? "AQI" : "Today's consumption",
                 })}
               </p>
               <div className="mt-2 flex items-end gap-2">
@@ -305,7 +314,7 @@ function UtilityCard({
                 {t(`utilityOverview.cards.${cardKey}.liveToday`, {
                   defaultValue:
                     cardKey === "air"
-                      ? "Today's average reading"
+                      ? "Current AQI"
                       : "Today's utility usage",
                 })}
               </p>
@@ -344,15 +353,13 @@ function UtilityCard({
               <>
                 <div className="min-w-0">
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white/72">
-                    {t("utilityOverview.monthLabel", {
-                      defaultValue: "This month",
-                    })}
+                    {lowerMetricLabel}
                   </p>
                   <p className="mt-1 truncate text-[0.95rem] font-semibold text-white">
                     {Number(overview.monthValue ?? 0).toLocaleString("en-US", {
                       maximumFractionDigits: cardKey === "air" ? 1 : 0,
                     })}
-                    {displayUnit ? ` ${displayUnit}` : ""}
+                    {lowerMetricUnit ? ` ${lowerMetricUnit}` : ""}
                   </p>
                   <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/20">
                     <div className="h-full w-[78%] rounded-full bg-white/80" />
@@ -552,6 +559,32 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     };
   }, []);
 
+  const aggregateElectricOverview = React.useCallback((
+    rows: ElectricOverviewSummary[]
+  ): UtilityOverviewState => {
+    const usable = rows.filter((row) => row.hasData);
+    if (!usable.length) return { ...EMPTY_OVERVIEW, loading: false };
+
+    const totalToday = usable.reduce((sum, row) => sum + (row.todayKwh ?? 0), 0);
+    const totalMonth = usable.reduce((sum, row) => sum + (row.monthKwh ?? 0), 0);
+    const lastUpdateTime =
+      usable
+        .map((row) => row.lastUpdateTime)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .pop() ?? null;
+
+    return {
+      loading: false,
+      hasData: true,
+      todayValue: totalToday,
+      monthValue: totalMonth,
+      unit: "kWh",
+      lastUpdateTime,
+      deviceCount: 0,
+    };
+  }, []);
+
   React.useEffect(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
     const isAll = !siteCode || siteCode.toLowerCase() === "all";
@@ -603,14 +636,14 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       try {
         const [waterRows, electricRows, airRows] = await Promise.all([
           getUtilityOverviewForSites(siteIds, "water"),
-          getUtilityOverviewForSites(siteIds, "electric"),
+          getElectricOverviewForSites(siteIds),
           getUtilityOverviewForSites(siteIds, "air"),
         ]);
         if (cancelled) return;
 
         setUtilityOverview({
           water: aggregateSubtypeOverview("water", waterRows),
-          electric: aggregateSubtypeOverview("electric", electricRows),
+          electric: aggregateElectricOverview(electricRows),
           air: aggregateSubtypeOverview("air", airRows),
         });
       } catch {
@@ -626,7 +659,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
+  }, [aggregateElectricOverview, aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
   const handleOpenUtility = React.useCallback((cardKey: CardKey) => {
     const siteCode = String(selectedSiteCode ?? "").trim();
