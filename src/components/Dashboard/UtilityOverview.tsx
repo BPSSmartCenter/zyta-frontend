@@ -2,7 +2,11 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { selectAuthSites } from "../../features/auth";
-import { getElectricOverviewForSites } from "../../features/electric";
+import {
+  getUtilityOverviewForSites,
+  type UtilityOverviewSummary,
+  type UtilitySubtype,
+} from "../../features/electric";
 import {
   selectSelectedGroup,
   selectSelectedUtility,
@@ -16,12 +20,24 @@ type Props = {
   selectedSiteCode?: string;
 };
 
-type ElectricOverviewState = {
+type UtilityOverviewState = {
   loading: boolean;
   hasData: boolean;
-  todayKwh: number | null;
-  monthKwh: number | null;
+  todayValue: number | null;
+  monthValue: number | null;
+  unit: string | null;
   lastUpdateTime: string | null;
+  deviceCount: number;
+};
+
+const EMPTY_OVERVIEW: UtilityOverviewState = {
+  loading: false,
+  hasData: false,
+  todayValue: null,
+  monthValue: null,
+  unit: null,
+  lastUpdateTime: null,
+  deviceCount: 0,
 };
 
 const CARD_THEME: Record<
@@ -129,14 +145,14 @@ function formatOverviewUpdateTime(value: string | null, locale: string) {
 }
 
 function Sparkline({
-  todayKwh,
-  monthKwh,
+  todayValue,
+  monthValue,
 }: {
-  todayKwh: number | null;
-  monthKwh: number | null;
+  todayValue: number | null;
+  monthValue: number | null;
 }) {
-  const today = Number.isFinite(Number(todayKwh)) ? Math.max(0, Number(todayKwh)) : 0;
-  const month = Number.isFinite(Number(monthKwh)) ? Math.max(0, Number(monthKwh)) : 0;
+  const today = Number.isFinite(Number(todayValue)) ? Math.max(0, Number(todayValue)) : 0;
+  const month = Number.isFinite(Number(monthValue)) ? Math.max(0, Number(monthValue)) : 0;
   const dayOfMonth = Math.max(1, new Date().getDate());
   const monthDailyAvg = month > 0 ? month / dayOfMonth : 0;
 
@@ -193,23 +209,23 @@ function Sparkline({
 
 function UtilityCard({
   cardKey,
-  electricOverview,
-  onOpenElectric,
+  overview,
+  onOpen,
 }: {
   cardKey: CardKey;
-  electricOverview: ElectricOverviewState;
-  onOpenElectric: () => void;
+  overview: UtilityOverviewState;
+  onOpen: (card: CardKey) => void;
 }) {
   const { t, i18n } = useTranslation("dashboard");
   const theme = CARD_THEME[cardKey];
-  const isElectric = cardKey === "electric";
-  const hasLiveElectric = isElectric && electricOverview.hasData;
-  const loadingElectric = isElectric && electricOverview.loading;
+  const hasLiveData = overview.hasData;
+  const loadingOverview = overview.loading;
+  const displayUnit = overview.unit || (cardKey === "air" ? "" : "kWh");
   const locale = i18n.language?.toLowerCase().startsWith("th")
     ? "th-TH"
     : "en-US";
   const formattedLastUpdateTime = formatOverviewUpdateTime(
-    electricOverview.lastUpdateTime,
+    overview.lastUpdateTime,
     locale
   );
 
@@ -255,7 +271,7 @@ function UtilityCard({
               theme.badgeClassName,
             ].join(" ")}
           >
-            {hasLiveElectric
+            {hasLiveData
               ? t("utilityOverview.live", { defaultValue: "Live" })
               : t("utilityOverview.emptyBadge", { defaultValue: "No data" })}
           </span>
@@ -263,28 +279,34 @@ function UtilityCard({
 
         <div className="relative flex flex-1 flex-col px-5 pt-5">
           <Sparkline
-            todayKwh={isElectric ? electricOverview.todayKwh : null}
-            monthKwh={isElectric ? electricOverview.monthKwh : null}
+            todayValue={overview.todayValue}
+            monthValue={overview.monthValue}
           />
 
-          {hasLiveElectric ? (
+          {hasLiveData ? (
             <div className="max-w-[62%] pr-5">
               <p className="text-[0.78rem] font-semibold uppercase tracking-[0.18em] text-white/78">
-                {t("utilityOverview.cards.electric.eyebrow", {
-                  defaultValue: "Today's consumption",
+                {t(`utilityOverview.cards.${cardKey}.eyebrow`, {
+                  defaultValue:
+                    cardKey === "air" ? "Today's average" : "Today's consumption",
                 })}
               </p>
               <div className="mt-2 flex items-end gap-2">
                 <span className="text-[3.25rem] font-semibold leading-none">
-                  {Number(electricOverview.todayKwh ?? 0).toLocaleString("en-US")}
+                  {Number(overview.todayValue ?? 0).toLocaleString("en-US", {
+                    maximumFractionDigits: cardKey === "air" ? 1 : 0,
+                  })}
                 </span>
                 <span className="pb-1.5 text-[0.95rem] font-semibold text-white/92">
-                  kWh
+                  {displayUnit || "-"}
                 </span>
               </div>
               <p className="mt-1.5 text-[0.95rem] font-semibold text-white/88">
-                {t("utilityOverview.liveToday", {
-                  defaultValue: "Today's energy usage",
+                {t(`utilityOverview.cards.${cardKey}.liveToday`, {
+                  defaultValue:
+                    cardKey === "air"
+                      ? "Today's average reading"
+                      : "Today's utility usage",
                 })}
               </p>
             </div>
@@ -297,7 +319,7 @@ function UtilityCard({
               </p>
               <div className="mt-3">
                 <p className="text-[1rem] font-semibold text-white">
-                  {loadingElectric
+                  {loadingOverview
                     ? t("utilityOverview.loadingTitle", {
                         defaultValue: "Loading utility data",
                       })
@@ -318,7 +340,7 @@ function UtilityCard({
 
         <div className="mt-4 px-5 pb-4 pt-4 backdrop-blur-[1px]">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {hasLiveElectric ? (
+            {hasLiveData ? (
               <>
                 <div className="min-w-0">
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-white/72">
@@ -327,7 +349,10 @@ function UtilityCard({
                     })}
                   </p>
                   <p className="mt-1 truncate text-[0.95rem] font-semibold text-white">
-                    {Number(electricOverview.monthKwh ?? 0).toLocaleString("en-US")} kWh
+                    {Number(overview.monthValue ?? 0).toLocaleString("en-US", {
+                      maximumFractionDigits: cardKey === "air" ? 1 : 0,
+                    })}
+                    {displayUnit ? ` ${displayUnit}` : ""}
                   </p>
                   <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/20">
                     <div className="h-full w-[78%] rounded-full bg-white/80" />
@@ -366,7 +391,11 @@ function UtilityCard({
                     })}
                   </p>
                   <p className="mt-1 truncate text-[0.95rem] font-semibold text-white">
-                    Electric API
+                    {cardKey === "electric"
+                      ? "Electric API"
+                      : cardKey === "water"
+                        ? "Water API"
+                        : "Air API"}
                   </p>
                   <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-white/20">
                     <div className="h-full w-[84%] rounded-full bg-white/80" />
@@ -421,7 +450,7 @@ function UtilityCard({
                     })}
                   </p>
                   <p className="mt-1 truncate text-[0.95rem] font-semibold text-white">
-                    {loadingElectric
+                    {loadingOverview
                       ? t("utilityOverview.loadingShort", {
                           defaultValue: "Loading",
                         })
@@ -439,9 +468,14 @@ function UtilityCard({
 
           <div className="flex items-center justify-between gap-3 border-t border-white/16 pt-3">
             <p className="text-sm font-medium text-white/82">
-              {hasLiveElectric
-                ? t("utilityOverview.electricFooter", {
-                    defaultValue: "Electric meter overview • selected site",
+              {hasLiveData
+                ? t(`utilityOverview.cards.${cardKey}.footer`, {
+                    defaultValue:
+                      cardKey === "electric"
+                        ? "Electric meter overview • selected site"
+                        : cardKey === "water"
+                          ? "Water meter overview • selected site"
+                          : "Air quality overview • selected site",
                   })
                 : t("utilityOverview.waitingFooter", {
                     defaultValue: "Waiting for utility data from the selected site",
@@ -449,7 +483,7 @@ function UtilityCard({
             </p>
             <button
               type="button"
-              onClick={onOpenElectric}
+              onClick={() => onOpen(cardKey)}
               className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[0.95rem] font-semibold text-white transition hover:bg-white/10"
             >
               <span>{t("utilityOverview.open", { defaultValue: "Open" })}</span>
@@ -480,13 +514,43 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
   const authSites = useAppSelector(selectAuthSites);
   const selectedGroup = useAppSelector(selectSelectedGroup);
   const selectedUtility = useAppSelector(selectSelectedUtility);
-  const [electricOverview, setElectricOverview] = React.useState<ElectricOverviewState>({
-    loading: false,
-    hasData: false,
-    todayKwh: null,
-    monthKwh: null,
-    lastUpdateTime: null,
+  const [utilityOverview, setUtilityOverview] = React.useState<Record<CardKey, UtilityOverviewState>>({
+    water: { ...EMPTY_OVERVIEW },
+    electric: { ...EMPTY_OVERVIEW },
+    air: { ...EMPTY_OVERVIEW },
   });
+
+  const aggregateSubtypeOverview = React.useCallback((
+    subtype: UtilitySubtype,
+    rows: UtilityOverviewSummary[]
+  ): UtilityOverviewState => {
+    const usable = rows.filter((row) => row.hasData);
+    if (!usable.length) return { ...EMPTY_OVERVIEW, loading: false };
+
+    const totalToday = usable.reduce((sum, row) => sum + (row.todayValue ?? 0), 0);
+    const totalMonth = usable.reduce((sum, row) => sum + (row.monthValue ?? 0), 0);
+    const lastUpdateTime =
+      usable
+        .map((row) => row.lastUpdateTime)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .pop() ?? null;
+    const unit = usable.find((row) => row.unit)?.unit ?? null;
+    const totalDevices = usable.reduce((sum, row) => sum + (row.deviceCount || 0), 0);
+
+    const aggregatedToday = subtype === "air" ? totalToday / usable.length : totalToday;
+    const aggregatedMonth = subtype === "air" ? totalMonth / usable.length : totalMonth;
+
+    return {
+      loading: false,
+      hasData: true,
+      todayValue: aggregatedToday,
+      monthValue: aggregatedMonth,
+      unit,
+      lastUpdateTime,
+      deviceCount: totalDevices,
+    };
+  }, []);
 
   React.useEffect(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
@@ -519,67 +583,42 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     }
 
     if (targetSites.length === 0) {
-      setElectricOverview({
-        loading: false,
-        hasData: false,
-        todayKwh: null,
-        monthKwh: null,
-        lastUpdateTime: null,
+      setUtilityOverview({
+        water: { ...EMPTY_OVERVIEW },
+        electric: { ...EMPTY_OVERVIEW },
+        air: { ...EMPTY_OVERVIEW },
       });
       return;
     }
 
     const siteIds = targetSites.map((s) => String(s.id || s.code));
     let cancelled = false;
-    setElectricOverview((prev) => ({ ...prev, loading: true }));
+    setUtilityOverview((prev) => ({
+      water: { ...prev.water, loading: true },
+      electric: { ...prev.electric, loading: true },
+      air: { ...prev.air, loading: true },
+    }));
 
     (async () => {
       try {
-        const results = await getElectricOverviewForSites(siteIds);
+        const [waterRows, electricRows, airRows] = await Promise.all([
+          getUtilityOverviewForSites(siteIds, "water"),
+          getUtilityOverviewForSites(siteIds, "electric"),
+          getUtilityOverviewForSites(siteIds, "air"),
+        ]);
         if (cancelled) return;
-        const usable = results.filter((r) => r.hasData);
-        if (usable.length === 0) {
-          setElectricOverview({
-            loading: false,
-            hasData: false,
-            todayKwh: null,
-            monthKwh: null,
-            lastUpdateTime: null,
-          });
-          return;
-        }
-        const totalToday = usable.reduce(
-          (sum, r) => sum + (r.todayKwh ?? 0),
-          0
-        );
-        const totalMonth = usable.reduce(
-          (sum, r) => sum + (r.monthKwh ?? 0),
-          0
-        );
-        const lastUpdateTime =
-          usable
-            .map((r) => r.lastUpdateTime)
-            .filter((v): v is string => Boolean(v))
-            .sort()
-            .pop() ?? null;
 
-        // hasData = at least one in-scope site responded with electric data.
-        // Zero kWh is still valid (e.g., at night / inverter idle).
-        setElectricOverview({
-          loading: false,
-          hasData: true,
-          todayKwh: Math.round(totalToday),
-          monthKwh: Math.round(totalMonth),
-          lastUpdateTime,
+        setUtilityOverview({
+          water: aggregateSubtypeOverview("water", waterRows),
+          electric: aggregateSubtypeOverview("electric", electricRows),
+          air: aggregateSubtypeOverview("air", airRows),
         });
       } catch {
         if (cancelled) return;
-        setElectricOverview({
-          loading: false,
-          hasData: false,
-          todayKwh: null,
-          monthKwh: null,
-          lastUpdateTime: null,
+        setUtilityOverview({
+          water: { ...EMPTY_OVERVIEW },
+          electric: { ...EMPTY_OVERVIEW },
+          air: { ...EMPTY_OVERVIEW },
         });
       }
     })();
@@ -587,15 +626,17 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [selectedSiteCode, selectedUtility, selectedGroup, authSites]);
+  }, [aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
-  const handleOpenElectric = React.useCallback(() => {
+  const handleOpenUtility = React.useCallback((cardKey: CardKey) => {
     const siteCode = String(selectedSiteCode ?? "").trim();
+    const route =
+      cardKey === "electric" ? "/electric/meter" : cardKey === "water" ? "/devices" : "/devices";
     if (siteCode && siteCode.toLowerCase() !== "all") {
-      navigate(absSite("/electric/meter", siteCode));
+      navigate(absSite(route, siteCode));
       return;
     }
-    navigate(abs("/electric/meter"));
+    navigate(abs(route));
   }, [abs, absSite, navigate, selectedSiteCode]);
 
   return (
@@ -603,18 +644,18 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <UtilityCard
           cardKey="water"
-          electricOverview={electricOverview}
-          onOpenElectric={handleOpenElectric}
+          overview={utilityOverview.water}
+          onOpen={handleOpenUtility}
         />
         <UtilityCard
           cardKey="electric"
-          electricOverview={electricOverview}
-          onOpenElectric={handleOpenElectric}
+          overview={utilityOverview.electric}
+          onOpen={handleOpenUtility}
         />
         <UtilityCard
           cardKey="air"
-          electricOverview={electricOverview}
-          onOpenElectric={handleOpenElectric}
+          overview={utilityOverview.air}
+          onOpen={handleOpenUtility}
         />
       </div>
     </section>

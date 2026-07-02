@@ -43,6 +43,19 @@ export type ElectricOverviewSummary = {
   lastUpdateTime: string | null;
 };
 
+export type UtilitySubtype = "water" | "electric" | "air";
+
+export type UtilityOverviewSummary = {
+  siteIdOrCode: string;
+  subtype: UtilitySubtype;
+  hasData: boolean;
+  todayValue: number | null;
+  monthValue: number | null;
+  unit: string | null;
+  lastUpdateTime: string | null;
+  deviceCount: number;
+};
+
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim() !== "") {
@@ -175,6 +188,68 @@ export async function getElectricOverviewForSites(
           }
     );
   }
+}
+
+export async function getUtilityOverviewSummary(
+  siteIdOrCode: string,
+  subtype: UtilitySubtype
+): Promise<UtilityOverviewSummary> {
+  try {
+    const data = await request<Record<string, unknown>>(
+      `/sites/${encodeURIComponent(siteIdOrCode)}/utility/overview/${encodeURIComponent(subtype)}`,
+      { silent401: true }
+    );
+    return {
+      siteIdOrCode,
+      subtype,
+      hasData: Boolean(data?.hasData),
+      todayValue: toFiniteNumber(data?.today_value),
+      monthValue: toFiniteNumber(data?.month_value),
+      unit: typeof data?.unit === "string" && data.unit.trim() ? data.unit : null,
+      lastUpdateTime:
+        typeof data?.lastUpdateTime === "string"
+          ? (data.lastUpdateTime as string)
+          : null,
+      deviceCount: toFiniteNumber(data?.deviceCount) ?? 0,
+    };
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 401)) {
+      return {
+        siteIdOrCode,
+        subtype,
+        hasData: false,
+        todayValue: null,
+        monthValue: null,
+        unit: null,
+        lastUpdateTime: null,
+        deviceCount: 0,
+      };
+    }
+    throw err;
+  }
+}
+
+export async function getUtilityOverviewForSites(
+  siteIdsOrCodes: string[],
+  subtype: UtilitySubtype
+): Promise<UtilityOverviewSummary[]> {
+  const settled = await Promise.allSettled(
+    siteIdsOrCodes.map((siteIdOrCode) => getUtilityOverviewSummary(siteIdOrCode, subtype))
+  );
+  return settled.map((result, index) =>
+    result.status === "fulfilled"
+      ? result.value
+      : {
+          siteIdOrCode: siteIdsOrCodes[index],
+          subtype,
+          hasData: false,
+          todayValue: null,
+          monthValue: null,
+          unit: null,
+          lastUpdateTime: null,
+          deviceCount: 0,
+        }
+  );
 }
 
 export async function updateElectricOverview(
