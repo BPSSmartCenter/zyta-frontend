@@ -50,7 +50,6 @@ type SummaryCard = {
   tone: "violet" | "emerald" | "amber" | "rose";
 };
 
-const THUMBNAIL_LIMIT = 12;
 const ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
