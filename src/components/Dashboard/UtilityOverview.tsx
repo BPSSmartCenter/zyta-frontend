@@ -585,6 +585,37 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     };
   }, []);
 
+  const mergeElectricOverview = React.useCallback((
+    billingRows: ElectricOverviewSummary[],
+    utilityRows: UtilityOverviewSummary[]
+  ): ElectricOverviewSummary[] => {
+    const utilityBySite = new Map<string, UtilityOverviewSummary>();
+    for (const row of utilityRows) {
+      utilityBySite.set(String(row.siteIdOrCode).toLowerCase(), row);
+    }
+
+    return billingRows.map((billing) => {
+      const key = String(billing.siteIdOrCode).toLowerCase();
+      const utility = utilityBySite.get(key);
+
+      const billingHasData =
+        billing.hasData &&
+        (billing.todayKwh != null || billing.monthKwh != null || Boolean(billing.lastUpdateTime));
+
+      if (billingHasData || !utility || !utility.hasData) {
+        return billing;
+      }
+
+      return {
+        siteIdOrCode: billing.siteIdOrCode,
+        hasData: true,
+        todayKwh: utility.todayValue,
+        monthKwh: utility.monthValue,
+        lastUpdateTime: utility.lastUpdateTime,
+      };
+    });
+  }, []);
+
   React.useEffect(() => {
     const siteCode = String(selectedSiteCode ?? "").trim();
     const isAll = !siteCode || siteCode.toLowerCase() === "all";
@@ -634,12 +665,18 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
 
     (async () => {
       try {
-        const [waterRows, electricRows, airRows] = await Promise.all([
+        const [waterRows, electricBillingRows, electricUtilityRows, airRows] = await Promise.all([
           getUtilityOverviewForSites(siteIds, "water"),
           getElectricOverviewForSites(siteIds),
+          getUtilityOverviewForSites(siteIds, "electric"),
           getUtilityOverviewForSites(siteIds, "air"),
         ]);
         if (cancelled) return;
+
+        const electricRows = mergeElectricOverview(
+          electricBillingRows,
+          electricUtilityRows
+        );
 
         setUtilityOverview({
           water: aggregateSubtypeOverview("water", waterRows),
@@ -659,7 +696,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [aggregateElectricOverview, aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
+  }, [aggregateElectricOverview, aggregateSubtypeOverview, mergeElectricOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
   const handleOpenUtility = React.useCallback((cardKey: CardKey) => {
     const siteCode = String(selectedSiteCode ?? "").trim();
