@@ -134,10 +134,14 @@ export default function IoTPanel({ siteCode }: Props) {
                   </div>
                   <div>
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${String(device.status).toLowerCase() === "online" || String(device.status).toLowerCase() === "active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                        }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${(() => {
+                        const status = String(device.status || '').toLowerCase();
+                        if (status === 'online' || status === 'active') return 'bg-green-100 text-green-800';
+                        if (status === 'offline') return 'bg-red-100 text-red-800';
+                        if (status === 'disabled') return 'bg-slate-100 text-slate-700';
+                        if (status === 'provisioning') return 'bg-sky-100 text-sky-700';
+                        return 'bg-slate-100 text-slate-700';
+                      })()}`}
                     >
                       {device.status || "Unknown"}
                     </span>

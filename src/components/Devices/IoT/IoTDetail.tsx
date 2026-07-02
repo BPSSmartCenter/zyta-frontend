@@ -345,7 +345,14 @@ export default function IoTDetail({ deviceId, onBack, siteCode }: Props) {
                     </button>
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800">{device.name || device.deviceId}</h1>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${String(device.status).toLowerCase() === 'online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${(() => {
+                            const status = String(device.status || '').toLowerCase();
+                            if (status === 'online' || status === 'active') return 'bg-green-100 text-green-800';
+                            if (status === 'offline') return 'bg-red-100 text-red-800';
+                            if (status === 'disabled') return 'bg-slate-100 text-slate-700';
+                            if (status === 'provisioning') return 'bg-sky-100 text-sky-700';
+                            return 'bg-slate-100 text-slate-700';
+                        })()}`}>
                             {device.status}
                         </span>
                     </div>
