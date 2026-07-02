@@ -18,17 +18,26 @@ export default function DashboardTopBar() {
   const dispatch = useAppDispatch();
   const sites = useAppSelector(selectAccessibleSites);
   const hasHydrated = useAppSelector(selectHasHydrated);
-  const { date, setDate, selectedSite, siteOptions } = useFilters();
+  const {
+    date,
+    setDate,
+    selectedSite,
+    selectedGroupSite,
+    selectedUtility,
+    siteOptions,
+  } = useFilters();
 
   const siteLabel = React.useMemo(() => {
     if (!selectedSite || selectedSite === "all") {
+      if (selectedGroupSite?.label) return selectedGroupSite.label;
+      if (selectedUtility?.label) return selectedUtility.label;
       return t("navbar.allSites", { defaultValue: "All Sites" });
     }
     return (
       siteOptions.find((option) => option.value === selectedSite)?.label ??
       selectedSite
     );
-  }, [selectedSite, siteOptions, t]);
+  }, [selectedSite, selectedGroupSite, selectedUtility, siteOptions, t]);
 
   return (
     <div className="flex min-w-0 items-center gap-3">
