@@ -120,7 +120,15 @@ function matchesActiveSiteCode(noti: Noti, codes: Set<string>): boolean {
     .some((candidate) => codes.has(candidate.trim()));
 }
 
-function filterFetchedNotisByScope(items: Noti[], scope: SiteScope): Noti[] {
+function filterFetchedNotisByScope(
+  items: Noti[],
+  scope: SiteScope,
+  requestedSiteCode?: string
+): Noti[] {
+  // Backend already scopes by `siteCode` for selected site/group. Avoid a
+  // second client filter that can drop valid rows when identifier formats differ.
+  if (requestedSiteCode) return items;
+
   const isAll = !scope.selectedSite || scope.selectedSite === "all";
   const scopedSiteCodes = buildScopedSiteCodes(scope);
   const activeFilter = scopedSiteCodes;
@@ -159,12 +167,16 @@ export const fetchNotisFeed = createAsyncThunk<
       limit: 500,
     });
 
-    const scoped = filterFetchedNotisByScope(fetched, {
-      selectedSite,
-      selectedGroupSite,
-      selectedUtility,
-      accessibleSites,
-    });
+    const scoped = filterFetchedNotisByScope(
+      fetched,
+      {
+        selectedSite,
+        selectedGroupSite,
+        selectedUtility,
+        accessibleSites,
+      },
+      requestedSiteCode
+    );
 
     return {
       items: prepareNotis(scoped),
