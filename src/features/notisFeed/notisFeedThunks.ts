@@ -48,27 +48,37 @@ function toRequestedSiteCode(
   selectedSite: string | null,
   selectedGroupSite: SelectedGroupSite
 ): string | undefined {
-  if (selectedSite && selectedSite !== "all") return selectedSite;
-
   const groupId = String(selectedGroupSite?.id || "").trim();
-  if (!groupId) return undefined;
+  if (groupId) {
+    const normalized = groupId.toLowerCase();
+    if (normalized.startsWith("__site:") || normalized.startsWith("__bps:")) {
+      const tail = groupId.split(":").pop()?.trim();
+      return tail || undefined;
+    }
 
-  const normalized = groupId.toLowerCase();
-  if (normalized.startsWith("__site:") || normalized.startsWith("__bps:")) {
-    const tail = groupId.split(":").pop()?.trim();
-    return tail || undefined;
+    if (normalized.startsWith("grp:")) {
+      return groupId;
+    }
+
+    const groupLabel = String(selectedGroupSite?.label || "").trim();
+    if (groupLabel) {
+      return `grp:${groupLabel}`;
+    }
+
+    return groupId;
   }
 
-  return groupId;
+  if (selectedSite && selectedSite !== "all") return selectedSite;
+  return undefined;
 }
 
 function buildScopedSiteCodes(scope: SiteScope): Set<string> | null {
-  const isAll = !scope.selectedSite || scope.selectedSite === "all";
-  if (!isAll) return null;
-
   const hasGroupFilter = Boolean(
     scope.selectedUtility?.id || scope.selectedGroupSite?.id
   );
+  const isAll = !scope.selectedSite || scope.selectedSite === "all";
+
+  if (!hasGroupFilter && !isAll) return null;
   if (!hasGroupFilter) return null;
 
   const codes = new Set<string>();
