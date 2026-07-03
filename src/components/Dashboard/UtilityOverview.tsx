@@ -600,7 +600,9 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
 
       const billingHasData =
         billing.hasData &&
-        (billing.todayKwh != null || billing.monthKwh != null || Boolean(billing.lastUpdateTime));
+        ((billing.todayKwh ?? 0) > 0 ||
+          (billing.monthKwh ?? 0) > 0 ||
+          Boolean(billing.lastUpdateTime));
 
       if (billingHasData || !utility || !utility.hasData) {
         return billing;
