@@ -44,6 +44,24 @@ function getErrorMessage(error: unknown): string {
   return "Failed to load notifications";
 }
 
+function toRequestedSiteCode(
+  selectedSite: string | null,
+  selectedGroupSite: SelectedGroupSite
+): string | undefined {
+  if (selectedSite && selectedSite !== "all") return selectedSite;
+
+  const groupId = String(selectedGroupSite?.id || "").trim();
+  if (!groupId) return undefined;
+
+  const normalized = groupId.toLowerCase();
+  if (normalized.startsWith("__site:") || normalized.startsWith("__bps:")) {
+    const tail = groupId.split(":").pop()?.trim();
+    return tail || undefined;
+  }
+
+  return groupId;
+}
+
 function buildScopedSiteCodes(scope: SiteScope): Set<string> | null {
   const isAll = !scope.selectedSite || scope.selectedSite === "all";
   if (!isAll) return null;
@@ -120,10 +138,10 @@ export const fetchNotisFeed = createAsyncThunk<
 
   try {
     const range = toIsoRangeForDate(date);
-    const requestedSiteCode =
-      selectedSite && selectedSite !== "all"
-        ? selectedSite
-        : selectedGroupSite?.id || undefined;
+    const requestedSiteCode = toRequestedSiteCode(
+      selectedSite,
+      selectedGroupSite
+    );
     const fetched = await listNotifications({
       from: range.from,
       to: range.to,
