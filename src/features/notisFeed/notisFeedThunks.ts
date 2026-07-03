@@ -104,11 +104,13 @@ function matchesActiveSiteCode(noti: Noti, codes: Set<string>): boolean {
 
 function filterFetchedNotisByScope(items: Noti[], scope: SiteScope): Noti[] {
   const isAll = !scope.selectedSite || scope.selectedSite === "all";
-  const allowedSiteCodes = buildAllowedSiteCodes(scope.accessibleSites);
   const scopedSiteCodes = buildScopedSiteCodes(scope);
-  const activeFilter =
-    scopedSiteCodes ??
-    (isAll && allowedSiteCodes.size > 0 ? allowedSiteCodes : null);
+  const activeFilter = scopedSiteCodes;
+
+  // When selectedSite is "all" with no group/utility scope, backend already
+  // returns user-scoped notifications. Applying an extra client-side filter by
+  // site code can drop valid events that only carry siteId/siteName.
+  if (isAll && !activeFilter) return items;
 
   if (!activeFilter) return items;
   return items.filter((noti) => matchesActiveSiteCode(noti, activeFilter));
