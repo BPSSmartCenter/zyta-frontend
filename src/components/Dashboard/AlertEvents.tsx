@@ -43,6 +43,7 @@ export default function AlertEvents({
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
+      timeZone: "Asia/Bangkok",
     });
   };
   const formatDateForUI = (s: string) => {
@@ -54,6 +55,7 @@ export default function AlertEvents({
       day: "2-digit",
       month: "short",
       year: "numeric",
+      timeZone: "Asia/Bangkok",
     });
   };
 
