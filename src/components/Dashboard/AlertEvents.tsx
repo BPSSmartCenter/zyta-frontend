@@ -34,6 +34,17 @@ export default function AlertEvents({
   const { setSelectedSite, setSelectedGroupSite } = useFilters();
 
   const { abs, absSite } = useUserPath();
+  const formatTimeForUI = (s: string) => {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const isTH = (i18n.language || "").startsWith("th");
+    const locale = isTH ? "th-TH-u-nu-latn" : "en-GB";
+    return d.toLocaleTimeString(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  };
   const formatDateForUI = (s: string) => {
     const d = new Date(s);
     if (isNaN(d.getTime())) return s;
@@ -126,11 +137,27 @@ export default function AlertEvents({
                 ? `${deviceName} Offline`
                 : isElectric && eventKey === "electric_low_power" && deviceName
                 ? `${deviceName} Low power`
+                : eventKey === "motion"
+                ? "Motion Detection"
                 : n.titleKey
                 ? t(n.titleKey, { defaultValue: n.title })
                 : n.title;
               const site = t(`sites.${n.site}`, { defaultValue: n.site });
               const dateText = formatDateForUI(n.date);
+              const timeText = formatTimeForUI(n.date);
+              const locationLabel =
+                (typeof meta?.locationLabel === "string" && meta.locationLabel.trim()) ||
+                (typeof meta?.location === "string" && meta.location.trim()) ||
+                site;
+              const subLocationLabel =
+                (typeof meta?.subLocationLabel === "string" && meta.subLocationLabel.trim()) ||
+                (typeof meta?.sub_location_label === "string" && meta.sub_location_label.trim()) ||
+                (typeof meta?.subLocation === "string" && meta.subLocation.trim()) ||
+                "";
+              const motionDetail =
+                eventKey === "motion"
+                  ? `${timeText}${locationLabel ? ` - ${locationLabel}` : ""}${subLocationLabel ? ` (${subLocationLabel})` : ""}`
+                  : undefined;
               const isNavigable = Boolean(eventKey);
 
               const handleClick = (n: any, eventKey: AlertEventKey | null) => {
@@ -163,6 +190,7 @@ export default function AlertEvents({
                 title={title}
                 site={site}
                 date={dateText}
+                detail={motionDetail}
                 img={n.img as any}
                 meta={(n as any)?.meta ?? undefined}
                 forceDefaultImage={eventKey !== "face" && eventKey !== "plate"}

@@ -29,7 +29,15 @@ type ApiNoti = {
   titleKey?: string;
   title_key?: string;
   img?: string;
-  site?: string;
+  site?:
+    | string
+    | {
+        id?: string;
+        code?: string;
+        name?: string;
+        coords?: { lat?: number; lng?: number } | null;
+      }
+    | null;
   siteId?: string;
   site_id?: string;
   siteCode?: string;
@@ -49,6 +57,15 @@ type ApiNoti = {
   deviceModel?: string;
   device_model?: string;
   meta?: Record<string, unknown> | null;
+  payload?: {
+    feKey?: string;
+    extra?: Record<string, unknown> | null;
+  } | null;
+  device?: {
+    id?: string;
+    model?: string;
+    type?: string;
+  } | null;
 };
 
 const normalizeType = (value?: string): NotiType => {
@@ -81,12 +98,35 @@ const parseDate = (value?: string): string => {
 
 const toNoti = (n: ApiNoti): Noti => {
   const iso = parseDate(n.date ?? n.occurredAt ?? n.occurred_at);
-  const lat = typeof n.lat === "number" ? n.lat : n.coords?.lat;
-  const lng = typeof n.lng === "number" ? n.lng : n.coords?.lng;
-  const siteName = n.siteName ?? n.site_name;
-  const siteCode = n.siteCode ?? n.site_code;
-  const siteId = n.siteId ?? n.site_id;
-  const siteLabel = n.site ?? siteName ?? siteCode ?? siteId ?? "-";
+  const siteRecord =
+    n.site && typeof n.site === "object" && !Array.isArray(n.site)
+      ? n.site
+      : null;
+  const lat =
+    typeof n.lat === "number"
+      ? n.lat
+      : typeof siteRecord?.coords?.lat === "number"
+      ? siteRecord.coords.lat
+      : n.coords?.lat;
+  const lng =
+    typeof n.lng === "number"
+      ? n.lng
+      : typeof siteRecord?.coords?.lng === "number"
+      ? siteRecord.coords.lng
+      : n.coords?.lng;
+  const siteName = n.siteName ?? n.site_name ?? siteRecord?.name;
+  const siteCode = n.siteCode ?? n.site_code ?? siteRecord?.code;
+  const siteId = n.siteId ?? n.site_id ?? siteRecord?.id;
+  const siteLabel =
+    typeof n.site === "string" && n.site.trim().length
+      ? n.site
+      : siteName ?? siteCode ?? siteId ?? "-";
+  const payloadExtra = n.payload?.extra ?? null;
+  const mergedMeta = {
+    ...(n.meta ?? {}),
+    ...(payloadExtra ?? {}),
+    ...(typeof n.payload?.feKey === "string" ? { feKey: n.payload.feKey } : {}),
+  };
 
   return {
     id: n.id,
@@ -108,9 +148,9 @@ const toNoti = (n: ApiNoti): Noti => {
     date: iso,
     occurredAt: iso,
     createdAt: parseDate(n.createdAt ?? n.created_at),
-    deviceId: n.deviceId ?? n.device_id,
-    deviceModel: n.deviceModel ?? n.device_model,
-    meta: n.meta ?? undefined,
+    deviceId: n.deviceId ?? n.device_id ?? n.device?.id,
+    deviceModel: n.deviceModel ?? n.device_model ?? n.device?.model,
+    meta: Object.keys(mergedMeta).length ? mergedMeta : undefined,
   };
 };
 
