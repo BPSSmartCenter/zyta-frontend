@@ -34,7 +34,22 @@ export default function AlertEvents({
   const { setSelectedSite, setSelectedGroupSite } = useFilters();
 
   const { abs, absSite } = useUserPath();
-  const toBangkokDate = (value: string): Date => new Date(new Date(value).getTime() + 7 * 60 * 60 * 1000);
+  const parseAsUtcDate = (value: string): Date => {
+    const raw = String(value || "").trim();
+    if (!raw) return new Date(NaN);
+
+    // If timestamp already includes timezone (Z or ±HH:mm), trust it.
+    if (/(z|[+\-]\d{2}:\d{2})$/i.test(raw)) {
+      return new Date(raw);
+    }
+
+    // DB often returns "YYYY-MM-DD HH:mm:ss.SSS" without timezone.
+    // Treat it as UTC explicitly to avoid browser/local timezone drift.
+    const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+    return new Date(`${normalized}Z`);
+  };
+  const toBangkokDate = (value: string): Date =>
+    new Date(parseAsUtcDate(value).getTime() + 7 * 60 * 60 * 1000);
   const formatTimeForUI = (s: string) => {
     const d = toBangkokDate(s);
     if (isNaN(d.getTime())) return s;
