@@ -120,11 +120,14 @@ export const fetchNotisFeed = createAsyncThunk<
 
   try {
     const range = toIsoRangeForDate(date);
+    const requestedSiteCode =
+      selectedSite && selectedSite !== "all"
+        ? selectedSite
+        : selectedGroupSite?.id || undefined;
     const fetched = await listNotifications({
       from: range.from,
       to: range.to,
-      siteCode:
-        selectedSite && selectedSite !== "all" ? selectedSite : undefined,
+      siteCode: requestedSiteCode,
       limit: 500,
     });
 

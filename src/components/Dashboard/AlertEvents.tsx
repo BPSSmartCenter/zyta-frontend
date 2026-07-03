@@ -34,29 +34,25 @@ export default function AlertEvents({
   const { setSelectedSite, setSelectedGroupSite } = useFilters();
 
   const { abs, absSite } = useUserPath();
+  const toBangkokDate = (value: string): Date => new Date(new Date(value).getTime() + 7 * 60 * 60 * 1000);
   const formatTimeForUI = (s: string) => {
-    const d = new Date(s);
+    const d = toBangkokDate(s);
     if (isNaN(d.getTime())) return s;
-    const isTH = (i18n.language || "").startsWith("th");
-    const locale = isTH ? "th-TH-u-nu-latn" : "en-GB";
-    return d.toLocaleTimeString(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Bangkok",
-    });
+    const hour = String(d.getUTCHours()).padStart(2, "0");
+    const minute = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${hour}:${minute}`;
   };
   const formatDateForUI = (s: string) => {
-    const d = new Date(s);
+    const d = toBangkokDate(s);
     if (isNaN(d.getTime())) return s;
     const isTH = (i18n.language || "").startsWith("th");
     const locale = isTH ? "th-TH-u-nu-latn" : "en-GB";
-    return d.toLocaleDateString(locale, {
+    return new Intl.DateTimeFormat(locale, {
       day: "2-digit",
       month: "short",
       year: "numeric",
-      timeZone: "Asia/Bangkok",
-    });
+      timeZone: "UTC",
+    }).format(d);
   };
 
   const navigateToEvent = (ev: AlertEventKey | null, noti?: any) => {
