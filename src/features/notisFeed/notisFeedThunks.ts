@@ -44,16 +44,6 @@ function getErrorMessage(error: unknown): string {
   return "Failed to load notifications";
 }
 
-function buildAllowedSiteCodes(sites: SiteOption[]): Set<string> {
-  const codes = new Set<string>();
-  for (const option of sites) {
-    const code = String(option.value || "").trim();
-    if (!code || code.toLowerCase() === "all") continue;
-    codes.add(code);
-  }
-  return codes;
-}
-
 function buildScopedSiteCodes(scope: SiteScope): Set<string> | null {
   const isAll = !scope.selectedSite || scope.selectedSite === "all";
   if (!isAll) return null;
