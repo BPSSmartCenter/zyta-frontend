@@ -743,7 +743,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           .flatMap((result) => {
             const siteIdOrCode = result.value.siteIdOrCode;
             const siteLabel = siteLabelByCode.get(siteIdOrCode) ?? siteIdOrCode;
-            return normalizeElectricDeviceOptions(result.value.items).map((item) => ({
+            // Only devices that have reported at least once (lastReadingAt from the API).
+            const itemsWithData = result.value.items.filter(
+              (raw: any) => typeof raw?.lastReadingAt === "string" && raw.lastReadingAt.length > 0
+            );
+            return normalizeElectricDeviceOptions(itemsWithData).map((item) => ({
               ...item,
               id: `${siteIdOrCode}::${item.id}`,
               siteIdOrCode,
@@ -830,7 +834,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   );
   const deviceDropdownOptions = React.useMemo(
     () => {
-      const overviewLabel = t("devices.electric.deviceSelector.overview", {
+      const overviewLabel = t("devices.deviceSelector.overview", {
             defaultValue: "Overview",
           });
       return [
@@ -1933,10 +1937,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               <div className="flex flex-col gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
                   {isGlobalAllOverview
-                    ? t("devices.electric.deviceSelector.overview", {
+                    ? t("devices.deviceSelector.overview", {
                         defaultValue: "Overview",
                       })
-                    : t("devices.electric.deviceSelector.label", {
+                    : t("devices.deviceSelector.label", {
                         defaultValue: "Device",
                       })}
                 </span>
@@ -2056,10 +2060,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                       ) : (
                         <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-400">
                           {deviceOptionsLoading
-                            ? t("devices.electric.loadingDevices", {
+                            ? t("devices.deviceSelector.loading", {
                                 defaultValue: "Loading devices...",
                               })
-                            : t("devices.electric.deviceSelector.emptyShort", {
+                            : t("devices.deviceSelector.empty", {
                                 defaultValue: "No devices",
                               })}
                         </span>

@@ -598,7 +598,7 @@ function AirTrendChart({
 
 export default function AirPanel({ siteCode }: Props) {
   const { t, i18n } = useTranslation("devices");
-  const { selectedSite } = useFilters();
+  const { selectedSite, selectedGroupSite } = useFilters();
   const locale = i18n.language || "en-US";
   const scopedSiteKey =
     siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : "all");
@@ -683,7 +683,14 @@ export default function AirPanel({ siteCode }: Props) {
       setLoading(true);
       setLoadError(null);
       try {
-        const allDevices = await getIoTDevices();
+        // Scope the query the way the dashboard does: a site, else the selected main location, else all.
+        const allDevices = await getIoTDevices(
+          scopedSiteKey !== "all"
+            ? { siteId: scopedSiteKey }
+            : selectedGroupSite?.id
+              ? { siteGroupId: selectedGroupSite.id }
+              : undefined
+        );
         if (cancelled) return;
         // An air sensor is any device whose newest reading carries a pollutant value.
         const nextSnapshots = allDevices
@@ -722,7 +729,7 @@ export default function AirPanel({ siteCode }: Props) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [t]);
+  }, [t, scopedSiteKey, selectedGroupSite?.id]);
 
   const scopedSnapshots = React.useMemo(() => {
     const matched = deviceSnapshots.filter((snapshot) =>

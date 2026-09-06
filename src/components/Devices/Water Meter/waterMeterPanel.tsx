@@ -1057,9 +1057,14 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   }, [siteTargetsKey]);
 
   // Every item carries its own snapshot; the page shows one device or the sum of all in scope.
+  // Meters that never reported (no reading timestamp) are left out entirely.
+  const itemsWithData = useMemo(
+    () => waterItems.filter((item) => !!extractWaterSnapshot(item)?.timestamp),
+    [waterItems]
+  );
   const deviceOptions = useMemo<DeviceTabOption[]>(
     () =>
-      waterItems.map((item) => ({
+      itemsWithData.map((item) => ({
         value: String(item.id),
         label:
           [item.site_name, item.name]
@@ -1067,7 +1072,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
             .join(" / ") || `#${item.id}`,
         offline: String(item.status || "").toLowerCase() !== "online",
       })),
-    [waterItems]
+    [itemsWithData]
   );
   useEffect(() => {
     if (
@@ -1080,14 +1085,14 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   const snapshot = useMemo(() => {
     const scoped =
       selectedDeviceId === OVERVIEW_DEVICE_TAB
-        ? waterItems
-        : waterItems.filter((item) => String(item.id) === selectedDeviceId);
+        ? itemsWithData
+        : itemsWithData.filter((item) => String(item.id) === selectedDeviceId);
     return mergeWaterSnapshots(
       scoped
         .map((item) => extractWaterSnapshot(item))
         .filter((entry): entry is WaterSnapshot => !!entry)
     );
-  }, [selectedDeviceId, waterItems]);
+  }, [itemsWithData, selectedDeviceId]);
 
   useEffect(() => {
     if (!siteTargets.length) return;
