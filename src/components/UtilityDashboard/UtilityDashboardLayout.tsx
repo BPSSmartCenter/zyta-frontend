@@ -112,12 +112,12 @@ export const UtilityHeroCard: React.FC<{
   // The ring is a fixed size: shrink the type for long figures instead of cutting them off.
   const valueSizeClass =
     value.length <= 4
-      ? "text-[2.4rem]"
+      ? "text-[2rem]"
       : value.length <= 6
-        ? "text-[1.9rem]"
+        ? "text-[1.45rem]"
         : value.length <= 8
-          ? "text-[1.45rem]"
-          : "text-[1.15rem]";
+          ? "text-[1.15rem]"
+          : "text-[0.95rem]";
   return (
     <UtilitySurface className={cx("overflow-hidden bg-gradient-to-br", style.surface, style.glow)}>
       <div className="flex h-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -239,12 +239,12 @@ function ProgressRing({
 }) {
   return (
     <div
-      className="grid size-[92px] shrink-0 place-items-center rounded-full bg-white"
+      className="grid size-[104px] shrink-0 place-items-center rounded-full bg-white"
       style={{
         background: `conic-gradient(${color} ${value * 3.6}deg, rgba(226,232,240,0.9) 0deg)`,
       }}
     >
-      <div className="grid size-[74px] place-items-center rounded-full bg-white">
+      <div className="grid size-[84px] place-items-center rounded-full bg-white">
         {children}
       </div>
     </div>

@@ -1557,15 +1557,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             payload?.availability?.energy === true ||
             Number(summary.usageKwh || 0) > 0 ||
             Number(summary.accumulatedKwh || 0) > 0,
-          voltage:
-            payload?.availability?.voltage === true ||
-            Number(summary.voltageAvg || 0) > 0,
-          current:
-            payload?.availability?.current === true ||
-            Number(summary.currentAvg || 0) > 0,
-          frequency:
-            payload?.availability?.frequency === true ||
-            Number(summary.frequencyAvg || 0) > 0,
+          // A live meter never reads 0 V / 0 A / 0 Hz: a zero means the value is not reported.
+          voltage: Number(summary.voltageAvg || 0) > 0,
+          current: Number(summary.currentAvg || 0) > 0,
+          frequency: Number(summary.frequencyAvg || 0) > 0,
           temperature:
             payload?.availability?.temperature === true ||
             (typeof summary.temperatureC === "number" &&
@@ -2189,7 +2184,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         </div>
 
         {summaryTiles.length ? (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div
+            className={[
+              "grid grid-cols-1 gap-4",
+              summaryTiles.length === 1 ? "xl:grid-cols-1" : summaryTiles.length === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3",
+            ].join(" ")}
+          >
             {summaryTiles.map((tile) => (
               <UtilitySurface key={tile.key} className="py-4">
                 <div className="text-[11px] font-medium text-slate-400">{tile.label}</div>

@@ -230,16 +230,30 @@ const extractSiteLabel = (device: IoTDevice, fallback: string) =>
       fallback
   ).trim() || fallback;
 
+// Observation date and time of the forecast provider's current conditions.
 const formatWeatherTime = (value?: string, locale = "en-US") => {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString(locale, {
-    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 };
+
+// Grid classes must be literal for Tailwind; pick by how many cards survived the "no data" filter.
+const GRID_BY_COUNT: Record<number, string> = {
+  1: "xl:grid-cols-1",
+  2: "xl:grid-cols-2",
+  3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4",
+  5: "xl:grid-cols-5",
+  6: "xl:grid-cols-6",
+};
+const gridColsFor = (count: number) => GRID_BY_COUNT[Math.max(1, Math.min(6, count))];
 
 const getWeatherIconLabel = (code?: number) => {
   if (code == null) return "sun";
@@ -824,7 +838,7 @@ export default function AirPanel({ siteCode }: Props) {
         status: tvocStatus,
         threshold: METRIC_THRESHOLDS.tvoc,
       },
-    ],
+    ].filter((card) => card.value !== null),
     [airSummary.pm25, airSummary.tvoc, pm25Status, tvocStatus]
   );
 
@@ -858,7 +872,7 @@ export default function AirPanel({ siteCode }: Props) {
         unit: "µg/m³",
         status: tvocStatus,
       },
-    ],
+    ].filter((metric) => metric.value !== null),
     [
       airSummary.co2,
       airSummary.pm10,
@@ -975,7 +989,16 @@ export default function AirPanel({ siteCode }: Props) {
 
   return (
     <div className="mt-6 space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1fr_0.95fr]">
+      <div
+        className={[
+          "grid grid-cols-1 gap-4",
+          primaryCards.length >= 2
+            ? "xl:grid-cols-[1fr_1fr_0.95fr]"
+            : primaryCards.length === 1
+              ? "xl:grid-cols-[1fr_0.95fr]"
+              : "xl:grid-cols-1",
+        ].join(" ")}
+      >
         {primaryCards.map((card) => {
           const color =
             card.status === "high"
@@ -1086,7 +1109,10 @@ export default function AirPanel({ siteCode }: Props) {
         </UtilitySurface>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div
+        className={["grid grid-cols-1 gap-4 md:grid-cols-2", gridColsFor(metricCards.length)].join(" ")}
+        hidden={metricCards.length === 0}
+      >
         {metricCards.map((metric) => (
           <UtilitySurface
             key={metric.key}

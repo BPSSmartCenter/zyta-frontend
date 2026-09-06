@@ -45,7 +45,19 @@ type WaterSnapshot = {
   stacked?: { categories?: string[]; series: WaterSeries[] };
   radial?: { total?: number | string; values: number[]; labels: string[] };
   usage?: { categories?: string[]; series: WaterSeries[] };
+  /** which kinds have at least one meter (absent when the API does not say) */
+  kinds?: { domestic: boolean; drinking: boolean };
 };
+
+const GRID_BY_COUNT: Record<number, string> = {
+  1: "xl:grid-cols-1",
+  2: "xl:grid-cols-2",
+  3: "xl:grid-cols-3",
+  4: "xl:grid-cols-4",
+  5: "xl:grid-cols-5",
+  6: "xl:grid-cols-6",
+};
+const gridColsFor = (count: number) => GRID_BY_COUNT[Math.max(1, Math.min(6, count))];
 
 type WaterAlertRow = {
   id: string;
@@ -237,8 +249,17 @@ const extractWaterSnapshot = (device: WaterDeviceRecord | null): WaterSnapshot |
         ? lastReading.capturedAt
         : null;
 
+  const deviceCounts = safeObject(waterMeta.deviceCounts);
+  const kinds = deviceCounts
+    ? {
+        domestic: (coerceNumber(deviceCounts.domestic) ?? 0) > 0,
+        drinking: (coerceNumber(deviceCounts.drinking) ?? 0) > 0,
+      }
+    : undefined;
+
   return {
     timestamp,
+    kinds,
     domestic,
     drinking,
     totals: {
@@ -307,8 +328,15 @@ const mergeWaterSnapshots = (snapshots: WaterSnapshot[]): WaterSnapshot | null =
       },
       { ...ZERO_TOTALS }
     );
+  const knownKinds = snapshots.map((snapshot) => snapshot.kinds).filter((kinds): kinds is NonNullable<WaterSnapshot["kinds"]> => !!kinds);
   return {
     timestamp,
+    kinds: knownKinds.length
+      ? {
+          domestic: knownKinds.some((kinds) => kinds.domestic),
+          drinking: knownKinds.some((kinds) => kinds.drinking),
+        }
+      : undefined,
     domestic: mergeSection((snapshot) => snapshot.domestic),
     drinking: mergeSection((snapshot) => snapshot.drinking),
     totals: {
@@ -1199,6 +1227,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
 
   const totalCards = [
     {
+      key: "drinking-today",
       label: t("devices.waterMeter.drinkingToday", {
         defaultValue: "Drinking water today",
       }),
@@ -1206,6 +1235,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
     {
+      key: "drinking-month",
       label: t("devices.waterMeter.drinkingMonth", {
         defaultValue: "Drinking water this month",
       }),
@@ -1213,6 +1243,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
     {
+      key: "drinking-year",
       label: t("devices.waterMeter.drinkingYear", {
         defaultValue: "Drinking water this year",
       }),
@@ -1220,6 +1251,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
     {
+      key: "domestic-today",
       label: t("devices.waterMeter.domesticToday", {
         defaultValue: "Domestic water today",
       }),
@@ -1227,6 +1259,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
     {
+      key: "domestic-month",
       label: t("devices.waterMeter.domesticMonth", {
         defaultValue: "Domestic water this month",
       }),
@@ -1234,6 +1267,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
     {
+      key: "domestic-year",
       label: t("devices.waterMeter.domesticYear", {
         defaultValue: "Domestic water this year",
       }),
@@ -1241,6 +1275,14 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       icon: waterDrop,
     },
   ];
+
+  // A kind with no meter at all is hidden and the other kind's cards take the room. Without kind
+  // information from the API both kinds stay visible, as before.
+  const showDomestic = snapshot?.kinds ? snapshot.kinds.domestic || !snapshot.kinds.drinking : true;
+  const showDrinking = snapshot?.kinds ? snapshot.kinds.drinking : true;
+  const showKind = (key: string) => (key.startsWith("drinking") ? showDrinking : showDomestic);
+  const visibleHeroCards = heroCards.filter((card) => showKind(card.key));
+  const visibleTotalCards = totalCards.filter((card) => showKind(card.key));
 
   const domesticPhMeta = describePh(domesticSection.ph);
   const drinkingPhMeta = describePh(drinkingSection.ph);
@@ -1306,6 +1348,9 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       tone: "sky" as const,
     },
   ];
+  const visibleMetricBands = metricBands.filter(
+    (band) => band.value !== "--" && showKind(band.key)
+  );
 
   const fallbackSeriesNames = [
     t("devices.waterMeter.domesticWater", { defaultValue: "Domestic" }),
@@ -1388,8 +1433,8 @@ export default function WaterMeterPanel({ siteCode }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 xl:grid-cols-2">
-        {heroCards.map((card) => (
+      <div className={["grid gap-4", gridColsFor(visibleHeroCards.length)].join(" ")}>
+        {visibleHeroCards.map((card) => (
           <WaterHeroCard
             key={card.key}
             title={card.title}
@@ -1403,8 +1448,8 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        {totalCards.map((card) => (
+      <div className={["grid gap-4 md:grid-cols-2", gridColsFor(visibleTotalCards.length)].join(" ")}>
+        {visibleTotalCards.map((card) => (
           <WaterStatCard
             key={card.label}
             icon={card.icon}
@@ -1414,8 +1459,11 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metricBands.map((card) => (
+      <div
+        className={["grid gap-4 md:grid-cols-2", gridColsFor(visibleMetricBands.length)].join(" ")}
+        hidden={visibleMetricBands.length === 0}
+      >
+        {visibleMetricBands.map((card) => (
           <WaterMetricBand
             key={card.key}
             icon={card.icon}
