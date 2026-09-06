@@ -82,9 +82,13 @@ export const deleteSiteDevice = createAsyncThunk<
 export type WaterDeviceRecord = {
   id: string;
   site_id?: string;
+  site_name?: string | null;
+  name?: string | null;
   model: string;
   status: string;
   meta?: unknown;
+  snapshot?: Record<string, unknown> | null;
+  timestamp?: string | null;
 };
 
 export type AirDeviceRecord = WaterDeviceRecord;

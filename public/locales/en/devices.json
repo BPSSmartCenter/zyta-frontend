@@ -52,6 +52,12 @@
     }
   },
   "devices": {
+    "deviceSelector": {
+      "label": "Device",
+      "overview": "Overview",
+      "empty": "No devices",
+      "loading": "Loading devices..."
+    },
     "waterMeter": {
       "selectTime": "Select time",
       "to": "TO",

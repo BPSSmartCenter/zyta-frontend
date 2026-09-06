@@ -3,6 +3,11 @@ import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import { useTranslation } from "react-i18next";
 import SearchInput from "../../SearchInput";
+import {
+  DeviceTabStrip,
+  OVERVIEW_DEVICE_TAB,
+  type DeviceTabOption,
+} from "../../UtilityDashboard/DeviceTabStrip";
 import { getIoTDevices, type IoTDevice } from "../../../features/devices";
 import { request } from "../../../lib/http";
 import { useFilters } from "../../../context/FiltersContext";
@@ -572,7 +577,8 @@ export default function AirPanel({ siteCode }: Props) {
   const locale = i18n.language || "en-US";
   const scopedSiteKey =
     siteCode ?? (selectedSite && selectedSite !== "all" ? selectedSite : "all");
-  const trendStorageKey = `air-panel:trend:${scopedSiteKey}`;
+  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string>(OVERVIEW_DEVICE_TAB);
+  const trendStorageKey = `air-panel:trend:${scopedSiteKey}:${selectedDeviceId}`;
 
   const [deviceSnapshots, setDeviceSnapshots] = React.useState<DeviceSnapshot[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -703,18 +709,48 @@ export default function AirPanel({ siteCode }: Props) {
     return matched.length ? matched : deviceSnapshots;
   }, [deviceSnapshots, scopedSiteKey]);
 
+  const deviceKeyOf = (device: IoTDevice) => String(device.id ?? device.deviceId ?? device.name ?? "");
+  const deviceOptions = React.useMemo<DeviceTabOption[]>(
+    () =>
+      scopedSnapshots.map((snapshot) => ({
+        value: deviceKeyOf(snapshot.device),
+        label:
+          [snapshot.device.siteName, snapshot.device.name]
+            .filter((part) => typeof part === "string" && part.trim().length > 0)
+            .join(" / ") || deviceKeyOf(snapshot.device),
+        offline: String(snapshot.device.status || "").toLowerCase() !== "online",
+      })),
+    [scopedSnapshots]
+  );
+  React.useEffect(() => {
+    if (
+      selectedDeviceId !== OVERVIEW_DEVICE_TAB &&
+      !deviceOptions.some((opt) => opt.value === selectedDeviceId)
+    ) {
+      setSelectedDeviceId(OVERVIEW_DEVICE_TAB);
+    }
+  }, [deviceOptions, selectedDeviceId]);
+  // The selected device, or every device in scope (averaged).
+  const visibleSnapshots = React.useMemo(
+    () =>
+      selectedDeviceId === OVERVIEW_DEVICE_TAB
+        ? scopedSnapshots
+        : scopedSnapshots.filter((snapshot) => deviceKeyOf(snapshot.device) === selectedDeviceId),
+    [scopedSnapshots, selectedDeviceId]
+  );
+
   const airSummary = React.useMemo(() => {
-    const pm25 = averageDefined(scopedSnapshots.map((snapshot) => snapshot.reading.pm25));
-    const pm10 = averageDefined(scopedSnapshots.map((snapshot) => snapshot.reading.pm10));
-    const co2 = averageDefined(scopedSnapshots.map((snapshot) => snapshot.reading.co2));
-    const tvoc = averageDefined(scopedSnapshots.map((snapshot) => snapshot.reading.tvoc));
+    const pm25 = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.pm25));
+    const pm10 = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.pm10));
+    const co2 = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.co2));
+    const tvoc = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.tvoc));
     const temperature = averageDefined(
-      scopedSnapshots.map((snapshot) => snapshot.reading.temperature)
+      visibleSnapshots.map((snapshot) => snapshot.reading.temperature)
     );
     const humidity = averageDefined(
-      scopedSnapshots.map((snapshot) => snapshot.reading.humidity)
+      visibleSnapshots.map((snapshot) => snapshot.reading.humidity)
     );
-    const latestTimestamp = scopedSnapshots.reduce<number | null>(
+    const latestTimestamp = visibleSnapshots.reduce<number | null>(
       (max, snapshot) =>
         typeof snapshot.timestamp === "number"
           ? max === null || snapshot.timestamp > max
@@ -724,7 +760,7 @@ export default function AirPanel({ siteCode }: Props) {
       null
     );
     return { pm25, pm10, co2, tvoc, temperature, humidity, latestTimestamp };
-  }, [scopedSnapshots]);
+  }, [visibleSnapshots]);
 
   React.useEffect(() => {
     if (!lastTrendSampleAt) return;
@@ -755,7 +791,7 @@ export default function AirPanel({ siteCode }: Props) {
     });
   }, [airSummary.co2, airSummary.pm25, lastTrendSampleAt, trendStorageKey]);
 
-  const seedTrend = React.useMemo(() => buildSeedTrend(scopedSnapshots), [scopedSnapshots]);
+  const seedTrend = React.useMemo(() => buildSeedTrend(visibleSnapshots), [visibleSnapshots]);
 
   const trendPoints = React.useMemo(() => {
     const merged = new Map<number, TrendPoint>();
@@ -989,6 +1025,17 @@ export default function AirPanel({ siteCode }: Props) {
 
   return (
     <div className="mt-6 space-y-4">
+      <DeviceTabStrip
+        title={t("devices.deviceSelector.label", { defaultValue: "Device" })}
+        overviewLabel={t("devices.deviceSelector.overview", { defaultValue: "Overview" })}
+        emptyText={t("devices.deviceSelector.empty", { defaultValue: "No devices" })}
+        loading={loading}
+        loadingText={t("devices.deviceSelector.loading", { defaultValue: "Loading devices..." })}
+        options={deviceOptions}
+        selected={selectedDeviceId}
+        onSelect={setSelectedDeviceId}
+      />
+
       <div
         className={[
           "grid grid-cols-1 gap-4",

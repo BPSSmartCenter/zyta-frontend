@@ -52,6 +52,12 @@
     }
   },
   "devices": {
+    "deviceSelector": {
+      "label": "อุปกรณ์",
+      "overview": "ภาพรวม",
+      "empty": "ไม่มีอุปกรณ์",
+      "loading": "กำลังโหลดอุปกรณ์..."
+    },
     "waterMeter": {
       "selectTime": "เลือกเวลา",
       "to": "ถึง",

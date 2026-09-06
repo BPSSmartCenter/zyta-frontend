@@ -4,6 +4,11 @@ import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import SearchInput from "../../SearchInput";
 import {
+  DeviceTabStrip,
+  OVERVIEW_DEVICE_TAB,
+  type DeviceTabOption,
+} from "../../UtilityDashboard/DeviceTabStrip";
+import {
   UtilitySectionTitle,
   UtilitySurface,
 } from "../../UtilityDashboard/UtilityDashboardLayout";
@@ -157,31 +162,6 @@ const normalizeSeries = (
       ? entry.data.map((value: any) => coerceNumber(value) ?? 0)
       : [],
   }));
-};
-
-const readingTimestamp = (device: WaterDeviceRecord): number => {
-  const meta = safeObject(device.meta);
-  const waterMeta = safeObject(meta?.water);
-  const last = safeObject(waterMeta?.lastReading);
-  const tsString =
-    typeof last?.timestamp === "string"
-      ? last.timestamp
-      : typeof last?.capturedAt === "string"
-        ? last.capturedAt
-        : undefined;
-  if (!tsString) return -Infinity;
-  const parsed = Date.parse(tsString);
-  return Number.isNaN(parsed) ? -Infinity : parsed;
-};
-
-const pickLatestWaterDevice = (
-  devices: WaterDeviceRecord[]
-): WaterDeviceRecord | null => {
-  if (!devices.length) return null;
-  return devices.reduce<WaterDeviceRecord | null>((best, current) => {
-    if (!best) return current;
-    return readingTimestamp(current) > readingTimestamp(best) ? current : best;
-  }, null);
 };
 
 const extractWaterSnapshot = (device: WaterDeviceRecord | null): WaterSnapshot | null => {
@@ -1065,14 +1045,49 @@ export default function WaterMeterPanel({ siteCode }: Props) {
   }, [normalizedSelectedSite, normalizedSiteCode, normalizedSiteOptions]);
 
   const siteTargetsKey = siteTargets.join("|");
-  const [snapshot, setSnapshot] = useState<WaterSnapshot | null>(null);
+  const [waterItems, setWaterItems] = useState<WaterDeviceRecord[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(OVERVIEW_DEVICE_TAB);
   const [loading, setLoading] = useState(true);
   const [trendRange, setTrendRange] = useState<"30d" | "90d" | "1y">("1y");
 
   useEffect(() => {
-    setSnapshot(null);
+    setWaterItems([]);
+    setSelectedDeviceId(OVERVIEW_DEVICE_TAB);
     setLoading(true);
   }, [siteTargetsKey]);
+
+  // Every item carries its own snapshot; the page shows one device or the sum of all in scope.
+  const deviceOptions = useMemo<DeviceTabOption[]>(
+    () =>
+      waterItems.map((item) => ({
+        value: String(item.id),
+        label:
+          [item.site_name, item.name]
+            .filter((part) => typeof part === "string" && part.trim().length > 0)
+            .join(" / ") || `#${item.id}`,
+        offline: String(item.status || "").toLowerCase() !== "online",
+      })),
+    [waterItems]
+  );
+  useEffect(() => {
+    if (
+      selectedDeviceId !== OVERVIEW_DEVICE_TAB &&
+      !deviceOptions.some((opt) => opt.value === selectedDeviceId)
+    ) {
+      setSelectedDeviceId(OVERVIEW_DEVICE_TAB);
+    }
+  }, [deviceOptions, selectedDeviceId]);
+  const snapshot = useMemo(() => {
+    const scoped =
+      selectedDeviceId === OVERVIEW_DEVICE_TAB
+        ? waterItems
+        : waterItems.filter((item) => String(item.id) === selectedDeviceId);
+    return mergeWaterSnapshots(
+      scoped
+        .map((item) => extractWaterSnapshot(item))
+        .filter((entry): entry is WaterSnapshot => !!entry)
+    );
+  }, [selectedDeviceId, waterItems]);
 
   useEffect(() => {
     if (!siteTargets.length) return;
@@ -1105,24 +1120,13 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         if (cancelled) return;
 
         if (!aggregated.length) {
-          setSnapshot(null);
+          setWaterItems([]);
           setLoading(false);
           timer = window.setTimeout(fetchDevices, 5000);
           return;
         }
 
-        // Every water device of a site carries the same site-level snapshot; take the newest
-        // item per site and merge the sites in scope.
-        const perSite = new Map<string, WaterDeviceRecord[]>();
-        for (const item of aggregated) {
-          const key = String(item.site_id ?? item.id);
-          if (!perSite.has(key)) perSite.set(key, []);
-          perSite.get(key)!.push(item);
-        }
-        const siteSnapshots = Array.from(perSite.values())
-          .map((items) => extractWaterSnapshot(pickLatestWaterDevice(items)))
-          .filter((entry): entry is WaterSnapshot => !!entry);
-        setSnapshot(mergeWaterSnapshots(siteSnapshots));
+        setWaterItems(aggregated);
         setLoading(false);
       } catch (error) {
         if (cancelled) return;
@@ -1433,6 +1437,17 @@ export default function WaterMeterPanel({ siteCode }: Props) {
 
   return (
     <div className="space-y-5">
+      <DeviceTabStrip
+        title={t("devices.deviceSelector.label", { defaultValue: "Device" })}
+        overviewLabel={t("devices.deviceSelector.overview", { defaultValue: "Overview" })}
+        emptyText={t("devices.deviceSelector.empty", { defaultValue: "No devices" })}
+        loading={loading}
+        loadingText={t("devices.deviceSelector.loading", { defaultValue: "Loading devices..." })}
+        options={deviceOptions}
+        selected={selectedDeviceId}
+        onSelect={setSelectedDeviceId}
+      />
+
       <div className={["grid gap-4", gridColsFor(visibleHeroCards.length)].join(" ")}>
         {visibleHeroCards.map((card) => (
           <WaterHeroCard
