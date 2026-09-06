@@ -2,6 +2,7 @@ import React from "react";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import SearchInput from "../../SearchInput";
 import {
   DeviceTabStrip,
@@ -759,6 +760,21 @@ export default function AirPanel({ siteCode }: Props) {
       setSelectedDeviceId(OVERVIEW_DEVICE_TAB);
     }
   }, [deviceOptions, selectedDeviceId]);
+  const location = useLocation();
+  // Opened from the IoT list with ?deviceId=…: preselect that device once its option exists.
+  const urlDeviceId = React.useMemo(
+    () => new URLSearchParams(location.search).get("deviceId") || "",
+    [location.search]
+  );
+  const appliedUrlDeviceRef = React.useRef<string>("");
+  React.useEffect(() => {
+    if (!urlDeviceId || appliedUrlDeviceRef.current === urlDeviceId) return;
+    if (deviceOptions.some((opt) => opt.value === urlDeviceId)) {
+      appliedUrlDeviceRef.current = urlDeviceId;
+      setSelectedDeviceId(urlDeviceId);
+    }
+  }, [deviceOptions, urlDeviceId]);
+
   // The selected device, or every device in scope (averaged).
   const visibleSnapshots = React.useMemo(
     () =>

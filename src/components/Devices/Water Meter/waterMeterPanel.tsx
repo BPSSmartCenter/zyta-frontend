@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation } from "react-router-dom";
 import ReactApexChart from "react-apexcharts";
 import type { ApexOptions } from "apexcharts";
 import SearchInput from "../../SearchInput";
@@ -1082,6 +1083,21 @@ export default function WaterMeterPanel({ siteCode }: Props) {
       setSelectedDeviceId(OVERVIEW_DEVICE_TAB);
     }
   }, [deviceOptions, selectedDeviceId]);
+  const location = useLocation();
+  // Opened from the IoT list with ?deviceId=…: preselect that device once its option exists.
+  const urlDeviceId = useMemo(
+    () => new URLSearchParams(location.search).get("deviceId") || "",
+    [location.search]
+  );
+  const appliedUrlDeviceRef = useRef<string>("");
+  useEffect(() => {
+    if (!urlDeviceId || appliedUrlDeviceRef.current === urlDeviceId) return;
+    if (deviceOptions.some((opt) => opt.value === urlDeviceId)) {
+      appliedUrlDeviceRef.current = urlDeviceId;
+      setSelectedDeviceId(urlDeviceId);
+    }
+  }, [deviceOptions, urlDeviceId]);
+
   const snapshot = useMemo(() => {
     const scoped =
       selectedDeviceId === OVERVIEW_DEVICE_TAB

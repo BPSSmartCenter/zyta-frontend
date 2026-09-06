@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { getIoTDevices, type IoTDevice } from "../../../features/devices";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useFilters } from "../../../context/FiltersContext";
+import { useUserPath } from "../../../routes/useUserPath";
 
 type Props = {
   siteCode?: string;
@@ -12,6 +13,7 @@ export default function IoTPanel({ siteCode }: Props) {
   const { t } = useTranslation("devices");
   const navigate = useNavigate();
   const location = useLocation();
+  const { abs, absSite } = useUserPath();
   const { selectedSite, selectedGroupSite, selectedUtility, siteOptions } = useFilters();
   const [devices, setDevices] = useState<IoTDevice[]>([]);
   const [loading, setLoading] = useState(false);
@@ -123,8 +125,21 @@ export default function IoTPanel({ siteCode }: Props) {
                   key={device.deviceId || device.id || idx}
                   className={`grid ${GRID_COLS} py-3 px-4 text-sm text-gray-700 items-center text-center hover:bg-gray-50 cursor-pointer transition`}
                   onClick={() => {
+                    const id = String(device.id || device.deviceId);
+                    const page = typeof device.page === "string" ? device.page : "";
+                    if (page === "watermeter" || page === "electricmeter" || page === "airsensor") {
+                      // The device has a page of its own (water / electric / air): open it with
+                      // this device preselected. The electric page selects by serial.
+                      const search = new URLSearchParams({ type: page, deviceId: id });
+                      if (page === "electricmeter") {
+                        search.set("deviceSn", String(device.externalId || device.deviceId || id));
+                      }
+                      const target = `/devices?${search.toString()}`;
+                      navigate(scopedSiteCode ? absSite(target, scopedSiteCode) : abs(target));
+                      return;
+                    }
                     const params = new URLSearchParams(location.search);
-                    params.set("deviceId", String(device.id || device.deviceId));
+                    params.set("deviceId", id);
                     navigate({ search: `?${params.toString()}` });
                   }}
                 >

@@ -743,10 +743,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           .flatMap((result) => {
             const siteIdOrCode = result.value.siteIdOrCode;
             const siteLabel = siteLabelByCode.get(siteIdOrCode) ?? siteIdOrCode;
-            // Only devices that have reported at least once (lastReadingAt from the API).
-            const itemsWithData = result.value.items.filter(
-              (raw: any) => typeof raw?.lastReadingAt === "string" && raw.lastReadingAt.length > 0
-            );
+            // Only devices whose newest reading carries an energy counter; switches, sockets and
+            // breakers report state or instant power but nothing this page can chart.
+            const itemsWithData = result.value.items.filter((raw: any) => raw?.hasEnergyData === true);
             return normalizeElectricDeviceOptions(itemsWithData).map((item) => ({
               ...item,
               id: `${siteIdOrCode}::${item.id}`,
