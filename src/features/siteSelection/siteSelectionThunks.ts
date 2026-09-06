@@ -2,8 +2,8 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import type { MeResponse, MeSite } from "../users/usersTypes";
 import type { RootState } from "../../store/store";
-import type { SiteOption } from "./siteSelectionTypes";
-import { readStoredSite, writeStoredSite } from "./siteSelectionStorage";
+import type { SelectedGroupSite, SelectedUtility, SiteOption } from "./siteSelectionTypes";
+import { readStoredScope, writeStoredSite } from "./siteSelectionStorage";
 
 type ApiRecord = Record<string, unknown>;
 
@@ -180,7 +180,13 @@ export type HydrateSelectionInput = {
 };
 
 export type HydrateSelectionResult =
-  | { kind: "resolved"; value: string; source: "url" | "storage" | "auto-single" }
+  | {
+      kind: "resolved";
+      value: string;
+      group: SelectedGroupSite;
+      utility: SelectedUtility;
+      source: "url" | "storage" | "auto-single";
+    }
   | { kind: "needs-picker" }
   | { kind: "no-access" };
 
@@ -203,24 +209,34 @@ export const hydrateSelection = createAsyncThunk<
       const match = sites.find((s) => s.value.toLowerCase() === norm);
       const value = match ? match.value : urlSiteCode.trim();
       writeStoredSite(uid, value);
-      return { kind: "resolved", value, source: "url" };
+      return { kind: "resolved", value, group: null, utility: null, source: "url" };
     }
   }
 
-  const stored = readStoredSite(uid);
+  // The stored scope carries the group/utility that was active together with
+  // the site value, so a refresh after picking a main location comes back to
+  // that location instead of "All Sites".
+  const stored = readStoredScope(uid);
   if (stored) {
-    const norm = stored.toLowerCase();
+    const norm = stored.value.toLowerCase();
     if (validValues.has(norm)) {
       const match = sites.find((s) => s.value.toLowerCase() === norm);
-      const value = norm === "all" ? "all" : match ? match.value : stored;
-      return { kind: "resolved", value, source: "storage" };
+      const value = norm === "all" ? "all" : match ? match.value : stored.value;
+      const scoped = value === "all";
+      return {
+        kind: "resolved",
+        value,
+        group: scoped ? stored.group : null,
+        utility: scoped ? stored.utility : null,
+        source: "storage",
+      };
     }
   }
 
   if (sites.length === 1) {
     const only = sites[0].value;
     writeStoredSite(uid, only);
-    return { kind: "resolved", value: only, source: "auto-single" };
+    return { kind: "resolved", value: only, group: null, utility: null, source: "auto-single" };
   }
 
   return { kind: "needs-picker" };

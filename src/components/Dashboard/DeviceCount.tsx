@@ -15,16 +15,26 @@ import { useDeviceInventory } from "../../context/DeviceInventoryContext";
 
 type DeviceCounts = {
   cameras: number;
+  camerasOnline?: number;
+  camerasOffline?: number;
   intercom: number;
+  intercomOnline?: number;
+  intercomOffline?: number;
   waterMeter: number;
+  waterMeterOnline?: number;
+  waterMeterOffline?: number;
   electricMeter: number;
   electricOnline?: number;
   electricOffline?: number;
   airSensor: number;
+  airSensorOnline?: number;
+  airSensorOffline?: number;
   zyta: number;
   iot: number;
+  iotOnline?: number;
   iotOffline?: number;
   medical: number;
+  medicalOnline?: number;
   medicalOffline?: number;
   caregiver: number;
   caregiverOffline?: number;
@@ -230,35 +240,37 @@ export default function DeviceCount({
     ...(counts || {}),
   } as DeviceCounts;
 
+  // Online = devices whose status is exactly Online; offline = every other
+  // counted device. Both come from the backend counters; only if a type has
+  // no online figure at all is it shown as fully online.
+  const tally = (
+    total: number | undefined,
+    online: number | undefined,
+    offline: number | undefined
+  ) => {
+    const count = Math.max(0, Number(total || 0));
+    const on =
+      typeof online === "number" ? Math.min(count, Math.max(0, online)) : count;
+    const off =
+      typeof offline === "number" ? Math.max(0, offline) : Math.max(0, count - on);
+    return { on, off };
+  };
+
   const statusByType = {
-    cameras: { on: Number(mergedCounts.cameras || 0), off: 0 },
-    waterMeter: { on: Number(mergedCounts.waterMeter || 0), off: 0 },
-    electricMeter: {
-      on:
-        typeof mergedCounts.electricOnline === "number"
-          ? mergedCounts.electricOnline
-          : Math.max(
-              0,
-              Number(mergedCounts.electricMeter || 0) -
-                Number(mergedCounts.electricOffline || 0)
-            ),
-      off: Number(mergedCounts.electricOffline || 0),
-    },
-    airSensor: { on: Number(mergedCounts.airSensor || 0), off: 0 },
-    iot: {
-      on: Math.max(
-        0,
-        Number(mergedCounts.iot || 0) - Number(mergedCounts.iotOffline || 0)
-      ),
-      off: Number(mergedCounts.iotOffline || 0),
-    },
-    medical: {
-      on: Math.max(
-        0,
-        Number(mergedCounts.medical || 0) - Number(mergedCounts.medicalOffline || 0)
-      ),
-      off: Number(mergedCounts.medicalOffline || 0),
-    },
+    cameras: tally(mergedCounts.cameras, mergedCounts.camerasOnline, mergedCounts.camerasOffline),
+    waterMeter: tally(
+      mergedCounts.waterMeter,
+      mergedCounts.waterMeterOnline,
+      mergedCounts.waterMeterOffline
+    ),
+    electricMeter: tally(
+      mergedCounts.electricMeter,
+      mergedCounts.electricOnline,
+      mergedCounts.electricOffline
+    ),
+    airSensor: tally(mergedCounts.airSensor, mergedCounts.airSensorOnline, mergedCounts.airSensorOffline),
+    iot: tally(mergedCounts.iot, mergedCounts.iotOnline, mergedCounts.iotOffline),
+    medical: tally(mergedCounts.medical, mergedCounts.medicalOnline, mergedCounts.medicalOffline),
   } as const;
 
   const donut = (() => {

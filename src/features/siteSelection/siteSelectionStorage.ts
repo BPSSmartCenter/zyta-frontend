@@ -1,14 +1,28 @@
 // src/features/siteSelection/siteSelectionStorage.ts
 //
-// sessionStorage persistence helper for selected site (per user).
+// sessionStorage persistence helper for the current site scope (per user).
 // ย้ายมาจาก FiltersContext เพื่อรวม logic ที่เดียว
 // TTL 15 นาที — หลัง refresh ยังจำได้ แต่ไม่ค้างนานเกิน
+//
+// The whole scope is stored, not only the site value: choosing a main location
+// (group) or a utility sets selectedSite = "all" plus the group/utility, and a
+// refresh must bring back that same view rather than "All Sites".
 
 const STORAGE_PREFIX = "filters:selectedSite";
 const TTL_MS = 1000 * 60 * 15; // 15 minutes
 
+export type StoredScopeRef = { id: string; label: string };
+
+export type StoredSiteScope = {
+  value: string;
+  group: StoredScopeRef | null;
+  utility: StoredScopeRef | null;
+};
+
 type StoredPayload = {
   value: string;
+  group?: StoredScopeRef | null;
+  utility?: StoredScopeRef | null;
   expiresAt: number;
 };
 
@@ -20,10 +34,19 @@ function isBrowser(): boolean {
   return typeof window !== "undefined" && !!window.sessionStorage;
 }
 
+function toScopeRef(value: unknown): StoredScopeRef | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const id = typeof raw.id === "string" ? raw.id.trim() : "";
+  const label = typeof raw.label === "string" ? raw.label.trim() : "";
+  if (!id) return null;
+  return { id, label: label || id };
+}
+
 /**
- * อ่านค่าที่ persist ไว้ — คืน null ถ้าไม่มี/หมดอายุ/parse ไม่ได้
+ * อ่าน scope ที่ persist ไว้ — คืน null ถ้าไม่มี/หมดอายุ/parse ไม่ได้
  */
-export function readStoredSite(uid: string): string | null {
+export function readStoredScope(uid: string): StoredSiteScope | null {
   if (!isBrowser() || !uid) return null;
   try {
     const raw = window.sessionStorage.getItem(keyFor(uid));
@@ -34,26 +57,46 @@ export function readStoredSite(uid: string): string | null {
       window.sessionStorage.removeItem(keyFor(uid));
       return null;
     }
-    return parsed.value;
+    return {
+      value: parsed.value,
+      group: toScopeRef(parsed.group),
+      utility: toScopeRef(parsed.utility),
+    };
   } catch {
     return null;
   }
 }
 
 /**
- * บันทึกค่า selected site + refresh TTL
+ * อ่านเฉพาะค่า selected site (คงไว้ให้ caller เดิม)
  */
-export function writeStoredSite(uid: string, value: string): void {
+export function readStoredSite(uid: string): string | null {
+  return readStoredScope(uid)?.value ?? null;
+}
+
+/**
+ * บันทึก scope ทั้งชุด + refresh TTL
+ */
+export function writeStoredScope(uid: string, scope: StoredSiteScope): void {
   if (!isBrowser() || !uid) return;
   try {
     const payload: StoredPayload = {
-      value,
+      value: scope.value,
+      group: scope.group,
+      utility: scope.utility,
       expiresAt: Date.now() + TTL_MS,
     };
     window.sessionStorage.setItem(keyFor(uid), JSON.stringify(payload));
   } catch {
     // quota exceeded / storage disabled — เงียบไว้
   }
+}
+
+/**
+ * บันทึกเฉพาะ site (ล้าง group/utility) — ใช้เมื่อเลือกไซต์ตรง ๆ
+ */
+export function writeStoredSite(uid: string, value: string): void {
+  writeStoredScope(uid, { value, group: null, utility: null });
 }
 
 /**

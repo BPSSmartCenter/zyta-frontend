@@ -16,7 +16,11 @@ import {
   loadSiteCatalog,
   type LoadSiteCatalogError,
 } from "./siteSelectionThunks";
-import { clearAllStoredSites, writeStoredSite } from "./siteSelectionStorage";
+import {
+  clearAllStoredSites,
+  writeStoredScope,
+  writeStoredSite,
+} from "./siteSelectionStorage";
 import { logoutUser } from "../auth/authThunks";
 
 type SiteSelectionState = {
@@ -56,6 +60,24 @@ const initialState: SiteSelectionState = {
   pickerReason: null,
 };
 
+/**
+ * Persist the whole scope (site + group + utility). A group or utility choice
+ * keeps selectedSite = "all", so storing only the site value would bring the
+ * user back to "All Sites" after a refresh.
+ */
+function persistScope(state: SiteSelectionState): void {
+  if (!state.catalogUid) return;
+  writeStoredScope(state.catalogUid, {
+    value: state.selectedSite ?? "all",
+    group: state.selectedGroup
+      ? { id: state.selectedGroup.id, label: state.selectedGroup.label }
+      : null,
+    utility: state.selectedUtility
+      ? { id: state.selectedUtility.id, label: state.selectedUtility.label }
+      : null,
+  });
+}
+
 const slice = createSlice({
   name: "siteSelection",
   initialState,
@@ -79,15 +101,17 @@ const slice = createSlice({
       if (state.catalogUid) writeStoredSite(state.catalogUid, action.payload);
     },
 
-    /** select group (ภายใน utility) — ไม่กระทบ selectedSite */
+    /** select group (ภายใน utility) — ไม่กระทบ selectedSite (persist ด้วย) */
     selectGroup(state, action: PayloadAction<SelectedGroupSite>) {
       state.selectedGroup = action.payload;
+      persistScope(state);
     },
 
-    /** select utility — ล้าง group ที่เลือก */
+    /** select utility — ล้าง group ที่เลือก (persist ด้วย) */
     selectUtility(state, action: PayloadAction<SelectedUtility>) {
       state.selectedUtility = action.payload;
       state.selectedGroup = null;
+      persistScope(state);
     },
 
     /** เปิด modal เลือก site */
@@ -139,21 +163,27 @@ const slice = createSlice({
         state.sites = [];
       })
 
-      // hydrateSelection — set selectedSite ตามผลลัพธ์
+      // hydrateSelection — set selectedSite (+ group/utility) ตามผลลัพธ์
       .addCase(hydrateSelection.fulfilled, (state, action) => {
         state.hasHydrated = true;
         const result = action.payload;
         if (result.kind === "resolved") {
           state.selectedSite = result.value;
+          state.selectedGroup = result.group;
+          state.selectedUtility = result.utility;
           state.isPickerOpen = false;
           state.pickerReason = null;
         } else if (result.kind === "needs-picker") {
           state.selectedSite = null;
+          state.selectedGroup = null;
+          state.selectedUtility = null;
           state.isPickerOpen = true;
           state.pickerReason = "forced";
         } else {
           // no-access
           state.selectedSite = null;
+          state.selectedGroup = null;
+          state.selectedUtility = null;
           state.isPickerOpen = false;
           state.pickerReason = null;
         }

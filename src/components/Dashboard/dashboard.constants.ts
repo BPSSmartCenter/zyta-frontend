@@ -142,18 +142,33 @@ export const getSeriesByPeriod = (period: "daily" | "weekly" | "monthly") =>
 
 export const niceUp = (v: number, step = 5) => Math.ceil(v / step) * step;
 
-export const regionSeries = [20, 47, 20, 47];
+// "Sites by region" donut defaults. Order follows THAI_REGION_ORDER in lib/thaiRegion.ts
+// and the i18n labels userMgmt.region.labels.<index>: north, northeast, central, west,
+// east, south, unspecified.
+export const regionSeries = [0, 0, 0, 0, 0, 0, 0];
 export const regionLabels = [
   "ภาคเหนือ",
   "ภาคตะวันออกเฉียงเหนือ",
-  "ภาคใต้",
   "ภาคกลาง",
+  "ภาคตะวันตก",
+  "ภาคตะวันออก",
+  "ภาคใต้",
+  "ไม่ระบุ",
 ];
-export const regionColors = ["#0077B6", "#4D80F4", "#FBBB50", "#98D1E4"];
+export const regionColors = [
+  "#0077B6",
+  "#4D80F4",
+  "#98D1E4",
+  "#7C3AED",
+  "#F97316",
+  "#FBBB50",
+  "#CBD5E1",
+];
 
-export const roleSeries = [34, 46, 54];
-export const roleLabels = ["officers", "User", "Admin"];
-export const roleColors = ["#4D80F4", "#98D1E4", "#FBBB50"];
+// "Active users" donut defaults. Order follows userMgmt.role.labels.<index>.
+export const roleSeries = [0, 0, 0, 0];
+export const roleLabels = ["Officer", "User", "Admin", "Manager"];
+export const roleColors = ["#4D80F4", "#98D1E4", "#FBBB50", "#34D399"];
 
 export const TH_BOUNDS: L.LatLngBoundsExpression = [
   [5.5, 97.0],

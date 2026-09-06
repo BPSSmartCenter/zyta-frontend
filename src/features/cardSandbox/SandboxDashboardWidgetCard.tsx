@@ -10,6 +10,7 @@ import {
   roleColors,
   roleLabels,
 } from "../../components/Dashboard/dashboard.constants";
+import { countSitesByRegion } from "../../lib/thaiRegion";
 import { listSites } from "../sites";
 import { getUserStats } from "../users";
 import { selectAuthUser } from "../auth";
@@ -328,19 +329,10 @@ export default function SandboxDashboardWidgetCard({ variant, cardId }: Props) {
     );
   }, [dateScopedNotis, zytaSearch]);
 
-  const regionSeriesFromSites = React.useMemo(() => {
-    const counts = [0, 0, 0, 0];
-    const map: Record<string, number> = {
-      "10": 2,
-      "73": 3,
-    };
-    for (const site of scopedAccessibleSites) {
-      const code = String(site?.province_code ?? "").trim();
-      const idx = map[code] ?? 3;
-      counts[idx] += 1;
-    }
-    return counts;
-  }, [scopedAccessibleSites]);
+  const regionSeriesFromSites = React.useMemo(
+    () => countSitesByRegion(scopedAccessibleSites),
+    [scopedAccessibleSites]
+  );
 
   const { counts: deviceCounts, totals: deviceTotals } =
     useDeviceInventoryLoader({

@@ -10,18 +10,34 @@ export type DeviceTypeKey =
   | "iot"
   | "caregiver";
 
+/**
+ * Device counts shown on the dashboard. Every `<type>` has a matching
+ * `<type>Online` / `<type>Offline` pair; "offline" means any counted status
+ * other than Online (Active, Provisioning, Offline, Maintenance). Deleted and
+ * Disabled devices are never counted.
+ */
 export type DeviceCounts = Partial<{
   cameras: number;
+  camerasOnline: number;
+  camerasOffline: number;
   intercom: number;
+  intercomOnline: number;
+  intercomOffline: number;
   waterMeter: number;
+  waterMeterOnline: number;
+  waterMeterOffline: number;
   electricMeter: number;
   electricOnline: number;
   electricOffline: number;
   airSensor: number;
+  airSensorOnline: number;
+  airSensorOffline: number;
   zyta: number;
   iot: number;
+  iotOnline: number;
   iotOffline: number;
   medical: number;
+  medicalOnline: number;
   medicalOffline: number;
   caregiver: number;
   caregiverOffline: number;

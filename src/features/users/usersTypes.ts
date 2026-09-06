@@ -36,20 +36,31 @@ export type MeSiteBilling = {
   treeFactor: number | null;
 };
 
+/**
+ * Device counters per site, computed by the backend with the dashboard rules:
+ * Deleted and Disabled devices are not counted, `*_online` is exactly the
+ * Online status, and offline = total - online.
+ */
 export type MeSiteCounters = {
   devices_total: number;
   devices_online: number;
   devices_offline: number;
   devices_camera: number;
+  devices_camera_online: number;
   devices_intercom: number;
+  devices_intercom_online: number;
   devices_water: number;
+  devices_water_online: number;
   devices_electric: number;
-  devices_air: number;
-  devices_iot: number;
-  devices_medical: number;
-  devices_caregiver: number;
   devices_electric_online: number;
   devices_electric_offline: number;
+  devices_air: number;
+  devices_air_online: number;
+  devices_iot: number;
+  devices_iot_online: number;
+  devices_medical: number;
+  devices_medical_online: number;
+  devices_caregiver: number;
   users_count: number;
 };
 
@@ -262,15 +273,21 @@ function normalizeCounters(raw: unknown): MeSiteCounters {
     devices_online: asNumber(r.devices_online),
     devices_offline: asNumber(r.devices_offline),
     devices_camera: asNumber(r.devices_camera),
+    devices_camera_online: asNumber(r.devices_camera_online),
     devices_intercom: asNumber(r.devices_intercom),
+    devices_intercom_online: asNumber(r.devices_intercom_online),
     devices_water: asNumber(r.devices_water),
+    devices_water_online: asNumber(r.devices_water_online),
     devices_electric: asNumber(r.devices_electric),
-    devices_air: asNumber(r.devices_air),
-    devices_iot: asNumber(r.devices_iot),
-    devices_medical: asNumber(r.devices_medical ?? r.devices_caregiver),
-    devices_caregiver: asNumber(r.devices_caregiver),
     devices_electric_online: asNumber(r.devices_electric_online),
     devices_electric_offline: asNumber(r.devices_electric_offline),
+    devices_air: asNumber(r.devices_air),
+    devices_air_online: asNumber(r.devices_air_online),
+    devices_iot: asNumber(r.devices_iot),
+    devices_iot_online: asNumber(r.devices_iot_online),
+    devices_medical: asNumber(r.devices_medical ?? r.devices_caregiver),
+    devices_medical_online: asNumber(r.devices_medical_online),
+    devices_caregiver: asNumber(r.devices_caregiver),
     users_count: asNumber(r.users_count),
   };
 }

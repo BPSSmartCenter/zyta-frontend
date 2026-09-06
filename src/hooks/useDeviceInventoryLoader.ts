@@ -1,48 +1,30 @@
 import React from "react";
-import { useDeviceInventory } from "../context/DeviceInventoryContext";
+import {
+  useDeviceInventory,
+  type DeviceCounts,
+} from "../context/DeviceInventoryContext";
 import { useFilters } from "../context/FiltersContext";
 import { useAppSelector } from "../store/hooks";
 import { selectAuthSites } from "../features/auth";
-import type { MeSite } from "../features/users";
+import type { MeSite, MeSiteCounters } from "../features/users/usersTypes";
 import type { SiteOption } from "../components/Shared/SiteDropdownGrouped";
-
-type DeviceCounts = Partial<{
-  cameras: number;
-  intercom: number;
-  waterMeter: number;
-  electricMeter: number;
-  electricOnline: number;
-  electricOffline: number;
-  airSensor: number;
-  zyta: number;
-  iot: number;
-  iotOffline: number;
-  medical: number;
-  medicalOffline: number;
-  caregiver: number;
-  caregiverOffline: number;
-}>;
 
 type DeviceTotals = { online: number; offline: number };
 
+/** Per-type tally: total counted devices and how many of them are Online. */
+type TypeTally = { total: number; online: number };
+
 type DeviceAggregate = {
   total: number;
-  cameras: number;
-  intercom: number;
-  water: number;
-  electric: number;
-  electricOnline: number;
-  electricOffline: number;
-  air: number;
-  iot: number;
-  iotOffline: number;
-  medical: number;
-  medicalOffline: number;
-  caregiver: number;
-  caregiverOffline: number;
-  zyta: number;
   online: number;
-  offline: number;
+  cameras: TypeTally;
+  intercom: TypeTally;
+  water: TypeTally;
+  electric: TypeTally;
+  air: TypeTally;
+  iot: TypeTally;
+  medical: TypeTally;
+  caregiver: number;
 };
 
 type SiteSummary = {
@@ -63,48 +45,53 @@ type Options = {
 
 const EMPTY_TOTALS: DeviceTotals = { online: 0, offline: 0 };
 
+function emptyTally(): TypeTally {
+  return { total: 0, online: 0 };
+}
+
 function createEmptyAggregate(): DeviceAggregate {
   return {
     total: 0,
-    cameras: 0,
-    intercom: 0,
-    water: 0,
-    electric: 0,
-    electricOnline: 0,
-    electricOffline: 0,
-    air: 0,
-    iot: 0,
-    iotOffline: 0,
-    medical: 0,
-    medicalOffline: 0,
-    caregiver: 0,
-    caregiverOffline: 0,
-    zyta: 0,
     online: 0,
-    offline: 0,
+    cameras: emptyTally(),
+    intercom: emptyTally(),
+    water: emptyTally(),
+    electric: emptyTally(),
+    air: emptyTally(),
+    iot: emptyTally(),
+    medical: emptyTally(),
+    caregiver: 0,
+  };
+}
+
+function num(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function addTally(acc: TypeTally, total: unknown, online: unknown): TypeTally {
+  const t = Math.max(0, num(total));
+  return {
+    total: acc.total + t,
+    // A site can never report more online devices of a type than it has.
+    online: acc.online + Math.min(t, Math.max(0, num(online))),
   };
 }
 
 function addSiteToAggregate(acc: DeviceAggregate, site: MeSite): DeviceAggregate {
-  const c = site.counters;
-  const medicalCount = Number((c as any).devices_medical ?? c.devices_caregiver ?? 0);
-  const onlineCount = Number((c as any).devices_online ?? 0);
-  const offlineCount = Number((c as any).devices_offline ?? 0);
+  const c: MeSiteCounters = site.counters;
+  const total = Math.max(0, num(c.devices_total));
   return {
-    ...acc,
-    total: acc.total + c.devices_total,
-    cameras: acc.cameras + c.devices_camera,
-    intercom: acc.intercom + c.devices_intercom,
-    water: acc.water + c.devices_water,
-    electric: acc.electric + c.devices_electric,
-    electricOnline: acc.electricOnline + c.devices_electric_online,
-    electricOffline: acc.electricOffline + c.devices_electric_offline,
-    air: acc.air + c.devices_air,
-    iot: acc.iot + c.devices_iot,
-    medical: acc.medical + medicalCount,
-    caregiver: acc.caregiver + c.devices_caregiver,
-    online: acc.online + onlineCount,
-    offline: acc.offline + offlineCount,
+    total: acc.total + total,
+    online: acc.online + Math.min(total, Math.max(0, num(c.devices_online))),
+    cameras: addTally(acc.cameras, c.devices_camera, c.devices_camera_online),
+    intercom: addTally(acc.intercom, c.devices_intercom, c.devices_intercom_online),
+    water: addTally(acc.water, c.devices_water, c.devices_water_online),
+    electric: addTally(acc.electric, c.devices_electric, c.devices_electric_online),
+    air: addTally(acc.air, c.devices_air, c.devices_air_online),
+    iot: addTally(acc.iot, c.devices_iot, c.devices_iot_online),
+    medical: addTally(acc.medical, c.devices_medical, c.devices_medical_online),
+    caregiver: acc.caregiver + num(c.devices_caregiver),
   };
 }
 
@@ -112,8 +99,11 @@ function addSiteToAggregate(acc: DeviceAggregate, site: MeSite): DeviceAggregate
  * Aggregate device counters across the user's accessible sites.
  *
  * Counters are pre-computed by backend and shipped inside `/users/me`
- * (one request, no N+1). This hook reads from `selectAuthSites`, applies
- * site/utility/group filters, and returns the rolled-up totals.
+ * (one request, no N+1). Backend already applies the dashboard rules:
+ * Deleted and Disabled devices are not counted, "online" is exactly the
+ * Online status, and everything else counted is "offline". This hook reads
+ * from `selectAuthSites`, applies site/utility/group filters, and returns the
+ * rolled-up totals.
  *
  * Re-runs synchronously whenever filter deps change; no polling.
  */
@@ -216,36 +206,38 @@ export function useDeviceInventoryLoader({
         );
       }
 
-      const aggregated = targetSites.reduce(
-        addSiteToAggregate,
-        createEmptyAggregate()
-      );
+      const a = targetSites.reduce(addSiteToAggregate, createEmptyAggregate());
+      const offlineOf = (t: TypeTally) => Math.max(0, t.total - t.online);
 
       const nextCounts: DeviceCounts = {
-        cameras: aggregated.cameras,
-        intercom: aggregated.intercom,
-        waterMeter: aggregated.water,
-        electricMeter: aggregated.electric,
-        electricOnline: aggregated.electricOnline,
-        electricOffline: aggregated.electricOffline,
-        airSensor: aggregated.air,
-        iot: aggregated.iot,
-        iotOffline: 0,
-        medical: aggregated.medical,
-        medicalOffline: 0,
-        caregiver: aggregated.caregiver,
+        cameras: a.cameras.total,
+        camerasOnline: a.cameras.online,
+        camerasOffline: offlineOf(a.cameras),
+        intercom: a.intercom.total,
+        intercomOnline: a.intercom.online,
+        intercomOffline: offlineOf(a.intercom),
+        waterMeter: a.water.total,
+        waterMeterOnline: a.water.online,
+        waterMeterOffline: offlineOf(a.water),
+        electricMeter: a.electric.total,
+        electricOnline: a.electric.online,
+        electricOffline: offlineOf(a.electric),
+        airSensor: a.air.total,
+        airSensorOnline: a.air.online,
+        airSensorOffline: offlineOf(a.air),
+        iot: a.iot.total,
+        iotOnline: a.iot.online,
+        iotOffline: offlineOf(a.iot),
+        medical: a.medical.total,
+        medicalOnline: a.medical.online,
+        medicalOffline: offlineOf(a.medical),
+        caregiver: a.caregiver,
         caregiverOffline: 0,
       };
 
-      const hasLifecycleTotals = aggregated.online > 0 || aggregated.offline > 0;
-      const fallbackOffline = aggregated.electricOffline;
       const nextTotals: DeviceTotals = {
-        online: hasLifecycleTotals
-          ? Math.max(0, aggregated.online)
-          : Math.max(0, aggregated.total - fallbackOffline),
-        offline: hasLifecycleTotals
-          ? Math.max(0, aggregated.offline)
-          : fallbackOffline,
+        online: a.online,
+        offline: Math.max(0, a.total - a.online),
       };
 
       setCountsState(nextCounts);

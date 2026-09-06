@@ -94,6 +94,7 @@
       "temp": "Temp",
       "humidity": "Humidity"
     },
+    "deviceCount": "{{count}} devices",
     "cards": {
       "water": {
         "title": "Water Meter",
@@ -127,7 +128,8 @@
         "2": "Central",
         "3": "West",
         "4": "East",
-        "5": "South"
+        "5": "South",
+        "6": "Unspecified"
       }
     },
     "role": {
@@ -135,7 +137,8 @@
       "labels": {
         "0": "Officer",
         "1": "User",
-        "2": "Admin"
+        "2": "Admin",
+        "3": "Manager"
       }
     }
   },

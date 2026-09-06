@@ -3,9 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { selectAuthSites } from "../../features/auth";
 import {
-  getElectricOverviewForSites,
   getUtilityOverviewForSites,
-  type ElectricOverviewSummary,
   type UtilityOverviewSummary,
   type UtilitySubtype,
 } from "../../features/electric";
@@ -212,10 +210,13 @@ function Sparkline({
 function UtilityCard({
   cardKey,
   overview,
+  scopeLabel,
   onOpen,
 }: {
   cardKey: CardKey;
   overview: UtilityOverviewState;
+  /** Name of the site, main location or utility the figures belong to. */
+  scopeLabel: string;
   onOpen: (card: CardKey) => void;
 }) {
   const { t, i18n } = useTranslation("dashboard");
@@ -477,12 +478,12 @@ function UtilityCard({
             <p className="text-sm font-medium text-white/82">
               {hasLiveData
                 ? t(`utilityOverview.cards.${cardKey}.footer`, {
-                    defaultValue:
-                      cardKey === "electric"
-                        ? "Electric meter overview • selected site"
-                        : cardKey === "water"
-                          ? "Water meter overview • selected site"
-                          : "Air quality overview • selected site",
+                    defaultValue: "{{primary}} • {{secondary}}",
+                    primary: scopeLabel,
+                    secondary: t("utilityOverview.deviceCount", {
+                      count: overview.deviceCount,
+                      defaultValue: "{{count}} devices",
+                    }),
                   })
                 : t("utilityOverview.waitingFooter", {
                     defaultValue: "Waiting for utility data from the selected site",
@@ -521,6 +522,24 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
   const authSites = useAppSelector(selectAuthSites);
   const selectedGroup = useAppSelector(selectSelectedGroup);
   const selectedUtility = useAppSelector(selectSelectedUtility);
+  const { t } = useTranslation("dashboard");
+
+  // What the cards describe: the selected site, else the selected main
+  // location / utility, else every accessible site.
+  const scopeLabel = React.useMemo(() => {
+    const siteCode = String(selectedSiteCode ?? "").trim();
+    if (siteCode && siteCode.toLowerCase() !== "all") {
+      const norm = siteCode.toLowerCase();
+      const site = authSites.find(
+        (s) => s.code.toLowerCase() === norm || String(s.id).toLowerCase() === norm
+      );
+      return site?.name || siteCode;
+    }
+    if (selectedGroup?.label) return selectedGroup.label;
+    if (selectedUtility?.label) return selectedUtility.label;
+    return t("navbar.allSites", { defaultValue: "All Sites" });
+  }, [authSites, selectedGroup, selectedSiteCode, selectedUtility, t]);
+
   const [utilityOverview, setUtilityOverview] = React.useState<Record<CardKey, UtilityOverviewState>>({
     water: { ...EMPTY_OVERVIEW },
     electric: { ...EMPTY_OVERVIEW },
@@ -545,8 +564,22 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     const unit = usable.find((row) => row.unit)?.unit ?? null;
     const totalDevices = usable.reduce((sum, row) => sum + (row.deviceCount || 0), 0);
 
-    const aggregatedToday = subtype === "air" ? totalToday / usable.length : totalToday;
-    const aggregatedMonth = subtype === "air" ? totalMonth / usable.length : totalMonth;
+    // Water and electric are sums over the devices in scope; air is the
+    // average over them. Each site row already averages its own devices, so
+    // weight the site values by device count to get the per-device average.
+    const weightOf = (row: UtilityOverviewSummary) => Math.max(1, row.deviceCount || 0);
+    const totalWeight = usable.reduce((sum, row) => sum + weightOf(row), 0);
+    const weightedToday = usable.reduce(
+      (sum, row) => sum + (row.todayValue ?? 0) * weightOf(row),
+      0
+    );
+    const weightedMonth = usable.reduce(
+      (sum, row) => sum + (row.monthValue ?? 0) * weightOf(row),
+      0
+    );
+
+    const aggregatedToday = subtype === "air" ? weightedToday / totalWeight : totalToday;
+    const aggregatedMonth = subtype === "air" ? weightedMonth / totalWeight : totalMonth;
 
     return {
       loading: false,
@@ -557,65 +590,6 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
       lastUpdateTime,
       deviceCount: totalDevices,
     };
-  }, []);
-
-  const aggregateElectricOverview = React.useCallback((
-    rows: ElectricOverviewSummary[]
-  ): UtilityOverviewState => {
-    const usable = rows.filter((row) => row.hasData);
-    if (!usable.length) return { ...EMPTY_OVERVIEW, loading: false };
-
-    const totalToday = usable.reduce((sum, row) => sum + (row.todayKwh ?? 0), 0);
-    const totalMonth = usable.reduce((sum, row) => sum + (row.monthKwh ?? 0), 0);
-    const lastUpdateTime =
-      usable
-        .map((row) => row.lastUpdateTime)
-        .filter((value): value is string => Boolean(value))
-        .sort()
-        .pop() ?? null;
-
-    return {
-      loading: false,
-      hasData: true,
-      todayValue: totalToday,
-      monthValue: totalMonth,
-      unit: "kWh",
-      lastUpdateTime,
-      deviceCount: 0,
-    };
-  }, []);
-
-  const mergeElectricOverview = React.useCallback((
-    billingRows: ElectricOverviewSummary[],
-    utilityRows: UtilityOverviewSummary[]
-  ): ElectricOverviewSummary[] => {
-    const utilityBySite = new Map<string, UtilityOverviewSummary>();
-    for (const row of utilityRows) {
-      utilityBySite.set(String(row.siteIdOrCode).toLowerCase(), row);
-    }
-
-    return billingRows.map((billing) => {
-      const key = String(billing.siteIdOrCode).toLowerCase();
-      const utility = utilityBySite.get(key);
-
-      const billingHasData =
-        billing.hasData &&
-        ((billing.todayKwh ?? 0) > 0 ||
-          (billing.monthKwh ?? 0) > 0 ||
-          Boolean(billing.lastUpdateTime));
-
-      if (billingHasData || !utility || !utility.hasData) {
-        return billing;
-      }
-
-      return {
-        siteIdOrCode: billing.siteIdOrCode,
-        hasData: true,
-        todayKwh: utility.todayValue,
-        monthKwh: utility.monthValue,
-        lastUpdateTime: utility.lastUpdateTime,
-      };
-    });
   }, []);
 
   React.useEffect(() => {
@@ -667,22 +641,20 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
 
     (async () => {
       try {
-        const [waterRows, electricBillingRows, electricUtilityRows, airRows] = await Promise.all([
+        // All three cards read the utility overview (today's raw telemetry
+        // plus the daily rollups). The billing overview is no longer merged
+        // into the electric card: its month figure is built from the billing
+        // usage register, which is known to be wrong.
+        const [waterRows, electricRows, airRows] = await Promise.all([
           getUtilityOverviewForSites(siteIds, "water"),
-          getElectricOverviewForSites(siteIds),
           getUtilityOverviewForSites(siteIds, "electric"),
           getUtilityOverviewForSites(siteIds, "air"),
         ]);
         if (cancelled) return;
 
-        const electricRows = mergeElectricOverview(
-          electricBillingRows,
-          electricUtilityRows
-        );
-
         setUtilityOverview({
           water: aggregateSubtypeOverview("water", waterRows),
-          electric: aggregateElectricOverview(electricRows),
+          electric: aggregateSubtypeOverview("electric", electricRows),
           air: aggregateSubtypeOverview("air", airRows),
         });
       } catch {
@@ -698,7 +670,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [aggregateElectricOverview, aggregateSubtypeOverview, mergeElectricOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
+  }, [aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
   const handleOpenUtility = React.useCallback((cardKey: CardKey) => {
     const siteCode = String(selectedSiteCode ?? "").trim();
@@ -717,16 +689,19 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
         <UtilityCard
           cardKey="water"
           overview={utilityOverview.water}
+          scopeLabel={scopeLabel}
           onOpen={handleOpenUtility}
         />
         <UtilityCard
           cardKey="electric"
           overview={utilityOverview.electric}
+          scopeLabel={scopeLabel}
           onOpen={handleOpenUtility}
         />
         <UtilityCard
           cardKey="air"
           overview={utilityOverview.air}
+          scopeLabel={scopeLabel}
           onOpen={handleOpenUtility}
         />
       </div>

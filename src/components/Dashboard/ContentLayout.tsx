@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserPath } from "../../routes/useUserPath";
 import { useAppSelector } from "../../store/hooks";
 import { selectAuthUser, selectAuthUserStats } from "../../features/auth";
+import { countSitesByRegion } from "../../lib/thaiRegion";
 import SnapshotChartSection from "../Chart";
 import Switch from "../Switch";
 import type { Noti } from "../../data/Dashboard/notis";
@@ -239,22 +240,12 @@ export default function ContentLayout(props: Props) {
     return filterDashboardAlertEvents(mapBaseItems as any[], searchEvent);
   }, [mapBaseItems, searchEvent]);
 
-  // Compute region-site counts from accessibleSites
-  const regionSeriesFromSites = React.useMemo(() => {
-    const counts = [0, 0, 0, 0]; // [north, northeast, south, central]
-    const map: Record<string, number> = {
-      // Central
-      "10": 2, // กรุงเทพมหานคร
-      "73": 3, // นครปฐม
-    };
-    const sites = props.accessibleSites ?? [];
-    for (const s of sites) {
-      const code = String(s?.province_code ?? "").trim();
-      const idx = map[code] ?? 3; // default central if unknown
-      counts[idx] += 1;
-    }
-    return counts;
-  }, [JSON.stringify(props.accessibleSites)]);
+  // Sites by region over every site the user can access. This widget is
+  // deliberately not scoped to the selected site.
+  const regionSeriesFromSites = React.useMemo(
+    () => countSitesByRegion(props.accessibleSites ?? []),
+    [props.accessibleSites]
+  );
 
   const { counts: liveDeviceCounts, totals: liveDeviceTotals } =
     useDeviceInventoryLoader({
@@ -271,10 +262,12 @@ export default function ContentLayout(props: Props) {
   const userStats = useAppSelector(selectAuthUserStats);
   const roleSeriesFromApi: number[] | null = React.useMemo(() => {
     if (!userStats) return null;
+    // Order follows userMgmt.role.labels: officer, user, admin, manager.
     return [
       userStats.byRole.officer ?? 0,
       userStats.byRole.user ?? 0,
       userStats.byRole.admin ?? 0,
+      userStats.byRole.manager ?? 0,
     ];
   }, [userStats]);
 
