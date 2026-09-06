@@ -26,13 +26,20 @@ type AirStatus = "good" | "medium" | "high" | "na";
 type AirReading = {
   pm25?: number;
   pm10?: number;
+  pm1?: number;
   co2?: number;
+  co?: number;
   tvoc?: number;
+  /** mg/m³ */
+  hcho?: number;
   temperature?: number;
   humidity?: number;
   updatedAt?: string;
   capturedAt?: string;
 };
+
+/** Pollutant fields; a device with any of these is an air sensor. */
+const AIR_METRIC_KEYS: Array<keyof AirReading> = ["pm25", "pm10", "pm1", "co2", "co", "tvoc", "hcho"];
 
 type DeviceSnapshot = {
   device: IoTDevice;
@@ -86,11 +93,14 @@ const THAILAND_COORDS = {
   label: "Thailand",
 };
 
-const METRIC_THRESHOLDS: Record<"pm25" | "pm10" | "co2" | "tvoc", Threshold> = {
+const METRIC_THRESHOLDS: Record<"pm25" | "pm10" | "pm1" | "co2" | "co" | "tvoc" | "hcho", Threshold> = {
   pm25: { medium: 25, high: 50 },
   pm10: { medium: 50, high: 100 },
+  pm1: { medium: 16, high: 36 },
   co2: { medium: 1000, high: 1500 },
+  co: { medium: 9, high: 35 },
   tvoc: { medium: 0.3, high: 0.6 },
+  hcho: { medium: 0.08, high: 0.1 },
 };
 
 const TREND_COLORS = {
@@ -184,17 +194,32 @@ const readingTimestamp = (device: IoTDevice, reading: AirReading): number | null
   return null;
 };
 
+// First numeric value among the candidate keys (device families name the same metric differently:
+// ERV units report pm25/eco2/tvoc/temp_indoor, Tuya air monitors pm25_value/co2_value/ch2o_value/
+// temp_current/humidity_value). Same key table as the LINE bot.
+const readSnapshotNumber = (snapshot: Record<string, any>, keys: string[]): number | undefined => {
+  for (const key of keys) {
+    const value = coerceNumber(snapshot[key]);
+    if (value !== undefined) return value;
+  }
+  return undefined;
+};
+
 const parseReadingFromDevice = (device: IoTDevice): AirReading => {
   const snapshot = device.snapshot ?? {};
+  const hchoDirect = readSnapshotNumber(snapshot, ["hcho", "HCHO", "hcho_value"]);
+  const ch2oMicrograms = readSnapshotNumber(snapshot, ["ch2o_value"]);
   return {
-    pm25: coerceNumber(snapshot.pm25),
-    pm10: coerceNumber(snapshot.pm10),
-    co2: coerceNumber(snapshot.eco2 ?? snapshot.co2),
-    tvoc: coerceNumber(snapshot.tvoc ?? snapshot.voc),
-    temperature: coerceNumber(snapshot.temp_indoor ?? snapshot.temperature),
-    humidity: coerceNumber(
-      snapshot.relative_humidity ?? snapshot.humidity ?? snapshot.rh
-    ),
+    pm25: readSnapshotNumber(snapshot, ["pm25", "PM25", "pm25_value"]),
+    pm10: readSnapshotNumber(snapshot, ["pm10", "PM10", "pm10_value"]),
+    pm1: readSnapshotNumber(snapshot, ["pm1", "pm10_0", "PM1.0", "pm1_value"]),
+    co2: readSnapshotNumber(snapshot, ["eco2", "co2", "CO2", "co2_value"]),
+    co: readSnapshotNumber(snapshot, ["co", "CO", "co_value"]),
+    tvoc: readSnapshotNumber(snapshot, ["tvoc", "TVOC", "voc", "tvoc_value"]),
+    // Tuya reports ch2o_value in µg/m³; the page shows HCHO in mg/m³.
+    hcho: hchoDirect !== undefined ? hchoDirect : ch2oMicrograms === undefined ? undefined : ch2oMicrograms * 0.001,
+    temperature: readSnapshotNumber(snapshot, ["temp_indoor", "temperature", "temp_current", "temp"]),
+    humidity: readSnapshotNumber(snapshot, ["relative_humidity", "humidity", "rh", "humidity_value"]),
     updatedAt:
       typeof snapshot.updatedAt === "string"
         ? snapshot.updatedAt
@@ -660,22 +685,19 @@ export default function AirPanel({ siteCode }: Props) {
       try {
         const allDevices = await getIoTDevices();
         if (cancelled) return;
-        const airDevices = allDevices.filter(
-          (device) =>
-            device.snapshot &&
-            (device.snapshot.pm25 !== undefined ||
-              device.snapshot.eco2 !== undefined ||
-              device.snapshot.tvoc !== undefined ||
-              device.snapshot.pm10 !== undefined)
-        );
-        const nextSnapshots = airDevices.map((device) => {
-          const reading = parseReadingFromDevice(device);
-          return {
-            device,
-            reading,
-            timestamp: readingTimestamp(device, reading) ?? Date.now(),
-          } satisfies DeviceSnapshot;
-        });
+        // An air sensor is any device whose newest reading carries a pollutant value.
+        const nextSnapshots = allDevices
+          .filter((device) => !!device.snapshot)
+          .map((device) => ({ device, reading: parseReadingFromDevice(device) }))
+          .filter(({ reading }) => AIR_METRIC_KEYS.some((key) => typeof reading[key] === "number"))
+          .map(
+            ({ device, reading }) =>
+              ({
+                device,
+                reading,
+                timestamp: readingTimestamp(device, reading) ?? Date.now(),
+              }) satisfies DeviceSnapshot
+          );
         setDeviceSnapshots(nextSnapshots);
         setLastTrendSampleAt(Date.now());
       } catch (error) {
@@ -750,6 +772,9 @@ export default function AirPanel({ siteCode }: Props) {
     const humidity = averageDefined(
       visibleSnapshots.map((snapshot) => snapshot.reading.humidity)
     );
+    const pm1 = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.pm1));
+    const co = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.co));
+    const hcho = averageDefined(visibleSnapshots.map((snapshot) => snapshot.reading.hcho));
     const latestTimestamp = visibleSnapshots.reduce<number | null>(
       (max, snapshot) =>
         typeof snapshot.timestamp === "number"
@@ -759,7 +784,7 @@ export default function AirPanel({ siteCode }: Props) {
           : max,
       null
     );
-    return { pm25, pm10, co2, tvoc, temperature, humidity, latestTimestamp };
+    return { pm25, pm10, pm1, co2, co, tvoc, hcho, temperature, humidity, latestTimestamp };
   }, [visibleSnapshots]);
 
   React.useEffect(() => {
@@ -839,6 +864,9 @@ export default function AirPanel({ siteCode }: Props) {
   const co2Status = deriveStatus(airSummary.co2, METRIC_THRESHOLDS.co2);
   const tvocStatus = deriveStatus(airSummary.tvoc, METRIC_THRESHOLDS.tvoc);
   const pm10Status = deriveStatus(airSummary.pm10, METRIC_THRESHOLDS.pm10);
+  const pm1Status = deriveStatus(airSummary.pm1, METRIC_THRESHOLDS.pm1);
+  const coStatus = deriveStatus(airSummary.co, METRIC_THRESHOLDS.co);
+  const hchoStatus = deriveStatus(airSummary.hcho, METRIC_THRESHOLDS.hcho);
 
   const statusLabel = React.useCallback(
     (status: AirStatus) => {
@@ -878,47 +906,47 @@ export default function AirPanel({ siteCode }: Props) {
     [airSummary.pm25, airSummary.tvoc, pm25Status, tvocStatus]
   );
 
+  // One card per metric the selected sensors report; temperature and humidity carry no air-quality
+  // status. Cards with no reading are dropped and the grid reflows.
   const metricCards = React.useMemo(
-    () => [
-      {
-        key: "pm25",
-        label: "PM 2.5",
-        value: airSummary.pm25,
-        unit: "µg/m³",
-        status: pm25Status,
-      },
-      {
-        key: "co2",
-        label: "CO2",
-        value: airSummary.co2,
-        unit: "ppm",
-        status: co2Status,
-      },
-      {
-        key: "pm10",
-        label: "PM 10",
-        value: airSummary.pm10,
-        unit: "µg/m³",
-        status: pm10Status,
-      },
-      {
-        key: "tvoc",
-        label: "TVOC",
-        value: airSummary.tvoc,
-        unit: "µg/m³",
-        status: tvocStatus,
-      },
-    ].filter((metric) => metric.value !== null),
-    [
-      airSummary.co2,
-      airSummary.pm10,
-      airSummary.pm25,
-      airSummary.tvoc,
-      co2Status,
-      pm10Status,
-      pm25Status,
-      tvocStatus,
-    ]
+    () =>
+      (
+        [
+          { key: "pm25", label: "PM 2.5", value: airSummary.pm25, unit: "µg/m³", status: pm25Status },
+          { key: "pm10", label: "PM 10", value: airSummary.pm10, unit: "µg/m³", status: pm10Status },
+          { key: "pm1", label: "PM 1.0", value: airSummary.pm1, unit: "µg/m³", status: pm1Status },
+          { key: "co2", label: "CO2", value: airSummary.co2, unit: "ppm", status: co2Status },
+          { key: "tvoc", label: "TVOC", value: airSummary.tvoc, unit: "µg/m³", status: tvocStatus },
+          { key: "hcho", label: "HCHO", value: airSummary.hcho, unit: "mg/m³", status: hchoStatus, fractionDigits: 3 },
+          { key: "co", label: "CO", value: airSummary.co, unit: "ppm", status: coStatus },
+          {
+            key: "temperature",
+            label: t("devices.air.temperature", { defaultValue: "Temperature" }),
+            value: airSummary.temperature,
+            unit: "°C",
+            status: "na" as AirStatus,
+            fractionDigits: 1,
+            hideStatus: true,
+          },
+          {
+            key: "humidity",
+            label: t("devices.air.humidity", { defaultValue: "Humidity" }),
+            value: airSummary.humidity,
+            unit: "%",
+            status: "na" as AirStatus,
+            hideStatus: true,
+          },
+        ] as Array<{
+          key: string;
+          label: string;
+          value: number | null;
+          unit: string;
+          status: AirStatus;
+          fractionDigits?: number;
+          hideStatus?: boolean;
+        }>
+      ).filter((metric) => metric.value !== null),
+    [airSummary, co2Status, coStatus, hchoStatus, pm10Status, pm1Status, pm25Status, t, tvocStatus]
   );
 
   const weatherDisplay = React.useMemo(() => {
@@ -1172,12 +1200,15 @@ export default function AirPanel({ siteCode }: Props) {
               <div className="min-w-0">
                 <div className="flex items-end gap-2">
                   <span className="text-[34px] font-semibold leading-none text-slate-900">
-                    {formatMetricValue(metric.value, metric.value !== null && metric.value < 1 ? 2 : 0)}
+                    {formatMetricValue(
+                      metric.value,
+                      metric.fractionDigits ?? (metric.value !== null && metric.value < 1 ? 2 : 0)
+                    )}
                   </span>
                   <span className="mb-1 text-base text-slate-500">{metric.unit}</span>
                 </div>
                 <div className="mt-2 text-[15px] font-medium text-slate-500">
-                  {metric.label} · {statusLabel(metric.status)}
+                  {metric.hideStatus ? metric.label : `${metric.label} · ${statusLabel(metric.status)}`}
                 </div>
               </div>
             </div>
