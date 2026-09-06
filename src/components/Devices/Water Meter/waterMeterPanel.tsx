@@ -251,6 +251,76 @@ const extractWaterSnapshot = (device: WaterDeviceRecord | null): WaterSnapshot |
   };
 };
 
+const sumSectionField = (
+  sections: WaterSectionSnapshot[],
+  pick: (section: WaterSectionSnapshot) => number | null
+): number | null => {
+  const values = sections.map(pick).filter((value): value is number => typeof value === "number");
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const mergeSeriesByIndex = (
+  lists: Array<{ categories?: string[]; series: WaterSeries[] } | undefined>
+): { categories?: string[]; series: WaterSeries[] } | undefined => {
+  const present = lists.filter((entry): entry is { categories?: string[]; series: WaterSeries[] } => !!entry && entry.series.length > 0);
+  if (!present.length) return undefined;
+  const categories = present.find((entry) => entry.categories?.length)?.categories;
+  const length = categories?.length ?? Math.max(...present.map((entry) => Math.max(...entry.series.map((s) => s.data.length))));
+  const names = present[0].series.map((s) => s.name);
+  const series = names.map((name, seriesIndex) => ({
+    name,
+    data: Array.from({ length }, (_, index) =>
+      present.reduce((sum, entry) => sum + Number(entry.series[seriesIndex]?.data[index] || 0), 0)
+    ),
+  }));
+  return { categories, series };
+};
+
+/**
+ * One snapshot per site comes back from the API; the page shows the selected scope, which may be
+ * several sites (a main location or "all"). Usage figures are summed, quality readings averaged.
+ */
+const mergeWaterSnapshots = (snapshots: WaterSnapshot[]): WaterSnapshot | null => {
+  if (!snapshots.length) return null;
+  if (snapshots.length === 1) return snapshots[0];
+  const timestamp =
+    snapshots
+      .map((snapshot) => snapshot.timestamp)
+      .filter((value): value is string => !!value)
+      .sort()
+      .pop() ?? null;
+  const mergeSection = (pick: (snapshot: WaterSnapshot) => WaterSectionSnapshot): WaterSectionSnapshot => {
+    const sections = snapshots.map(pick);
+    return {
+      ph: sumSectionField(sections, (section) => section.ph),
+      flowRateLpm: sumSectionField(sections, (section) => section.flowRateLpm),
+      tdsPpm: sumSectionField(sections, (section) => section.tdsPpm),
+      consumptionLiters: sections.reduce((sum, section) => sum + Number(section.consumptionLiters ?? 0), 0),
+    };
+  };
+  const mergeTotals = (pick: (snapshot: WaterSnapshot) => WaterTotalsTriple): WaterTotalsTriple =>
+    snapshots.reduce(
+      (acc, snapshot) => {
+        const totals = pick(snapshot);
+        return { today: acc.today + totals.today, month: acc.month + totals.month, year: acc.year + totals.year };
+      },
+      { ...ZERO_TOTALS }
+    );
+  return {
+    timestamp,
+    domestic: mergeSection((snapshot) => snapshot.domestic),
+    drinking: mergeSection((snapshot) => snapshot.drinking),
+    totals: {
+      domestic: mergeTotals((snapshot) => snapshot.totals.domestic),
+      drinking: mergeTotals((snapshot) => snapshot.totals.drinking),
+    },
+    stacked: mergeSeriesByIndex(snapshots.map((snapshot) => snapshot.stacked)),
+    usage: mergeSeriesByIndex(snapshots.map((snapshot) => snapshot.usage)),
+    radial: undefined,
+  };
+};
+
 const formatWithComma = (value: number | string, digits = 0) => {
   const numeric = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(numeric)) return String(value);
@@ -1013,8 +1083,18 @@ export default function WaterMeterPanel({ siteCode }: Props) {
           return;
         }
 
-        const latest = pickLatestWaterDevice(aggregated);
-        setSnapshot(extractWaterSnapshot(latest));
+        // Every water device of a site carries the same site-level snapshot; take the newest
+        // item per site and merge the sites in scope.
+        const perSite = new Map<string, WaterDeviceRecord[]>();
+        for (const item of aggregated) {
+          const key = String(item.site_id ?? item.id);
+          if (!perSite.has(key)) perSite.set(key, []);
+          perSite.get(key)!.push(item);
+        }
+        const siteSnapshots = Array.from(perSite.values())
+          .map((items) => extractWaterSnapshot(pickLatestWaterDevice(items)))
+          .filter((entry): entry is WaterSnapshot => !!entry);
+        setSnapshot(mergeWaterSnapshots(siteSnapshots));
         setLoading(false);
       } catch (error) {
         if (cancelled) return;

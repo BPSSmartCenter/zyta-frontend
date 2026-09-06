@@ -302,12 +302,31 @@ const normalizeTelemetries = (raw: any[]): DailyTelemetryPoint[] => {
     .sort((a, b) => a.timestamp - b.timestamp);
 };
 
+// Cumulative reading just before a day starts (the previous day's last point). Past days come
+// from the daily rollups as a single point each, so a day's usage is its last reading minus the
+// reading before the day, not the span inside the day.
+const dayBaselineWh = (points: DailyTelemetryPoint[], dayStartMs: number): number | undefined => {
+  let baseline: number | undefined;
+  for (const point of points) {
+    if (point.timestamp >= dayStartMs) break;
+    baseline = point.totalWh;
+  }
+  return baseline;
+};
+
+const dayUsageWh = (dayPoints: DailyTelemetryPoint[], baselineWh: number | undefined): number => {
+  if (!dayPoints.length) return 0;
+  const start = baselineWh ?? dayPoints[0].totalWh;
+  return Math.max(0, dayPoints[dayPoints.length - 1].totalWh - start);
+};
+
 const buildHalfHourSeries = (
   points: DailyTelemetryPoint[],
-  dayStart: Date
+  dayStart: Date,
+  baselineWh?: number
 ): number[] => {
   if (!points.length) return HALF_HOUR_SLOTS.map(() => 0);
-  const baseline = points[0].totalWh;
+  const baseline = baselineWh ?? points[0].totalWh;
   let cursor = 0;
   let latest = baseline;
   return HALF_HOUR_SLOTS.map((slot) => {
@@ -1117,19 +1136,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                 const dayPoints = sitePoints.filter(
                   (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
                 );
-                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
+                const baselineWh = dayBaselineWh(sitePoints, dayStart.getTime());
+                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart, baselineWh);
                 for (let j = 0; j < summedHalfHourSeries.length; j++) {
                   summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
                 }
 
-                const totalWh =
-                  dayPoints.length > 1
-                    ? Math.max(
-                        0,
-                        dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
-                      )
-                    : 0;
-                totalWhSum += totalWh;
+                totalWhSum += dayUsageWh(dayPoints, baselineWh);
               }
 
               const totalKwh = summedHalfHourSeries.length
@@ -1169,14 +1182,9 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                 const dayPoints = points.filter(
                   (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
                 );
-                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart);
-                const totalWh =
-                  dayPoints.length > 1
-                    ? Math.max(
-                        0,
-                        dayPoints[dayPoints.length - 1].totalWh - dayPoints[0].totalWh
-                      )
-                    : 0;
+                const baselineWh = dayBaselineWh(points, dayStart.getTime());
+                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart, baselineWh);
+                const totalWh = dayUsageWh(dayPoints, baselineWh);
                 const totalKwh = halfHourSeries.length
                   ? halfHourSeries[halfHourSeries.length - 1]
                   : 0;

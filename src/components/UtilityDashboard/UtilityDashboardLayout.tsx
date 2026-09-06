@@ -109,6 +109,15 @@ export const UtilityHeroCard: React.FC<{
 }) => {
   const style = TONE_STYLES[tone];
   const safeProgress = Math.max(0, Math.min(100, progressValue));
+  // The ring is a fixed size: shrink the type for long figures instead of cutting them off.
+  const valueSizeClass =
+    value.length <= 4
+      ? "text-[2.4rem]"
+      : value.length <= 6
+        ? "text-[1.9rem]"
+        : value.length <= 8
+          ? "text-[1.45rem]"
+          : "text-[1.15rem]";
   return (
     <UtilitySurface className={cx("overflow-hidden bg-gradient-to-br", style.surface, style.glow)}>
       <div className="flex h-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -116,7 +125,7 @@ export const UtilityHeroCard: React.FC<{
           <ProgressRing value={safeProgress} color={style.ring}>
             <div className="text-center leading-tight">
               <div
-                className="mx-auto max-w-[5.4rem] truncate text-[clamp(1.85rem,2vw,2.6rem)] font-semibold leading-none text-slate-900 tabular-nums"
+                className={cx("mx-auto whitespace-nowrap font-semibold leading-none text-slate-900 tabular-nums", valueSizeClass)}
                 title={value}
               >
                 {value}
