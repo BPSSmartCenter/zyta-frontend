@@ -11,9 +11,8 @@
 //   - V1 envelope unwrap: { ok, data } / { ok, items } / { ok:false, error }
 //   - Legacy /api carve-out for SSE/IoT (legacy:true)
 
-const DEFAULT_API_BASE_URL = import.meta.env.DEV
-  ? "/api/v1"
-  : "https://zyta.net/api/v1";
+// Relative by default so the bundle never points at another host; VITE_API_BASE_URL overrides.
+const DEFAULT_API_BASE_URL = "/api/v1";
 const configuredBaseUrl =
   typeof import.meta.env.VITE_API_BASE_URL === "string"
     ? import.meta.env.VITE_API_BASE_URL.trim()

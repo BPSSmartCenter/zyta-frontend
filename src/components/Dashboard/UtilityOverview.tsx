@@ -672,10 +672,13 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
     };
   }, [aggregateSubtypeOverview, selectedSiteCode, selectedUtility, selectedGroup, authSites]);
 
+  // "Open" goes to the same page as the matching sidebar device entry
+  // (Sidebar.tsx: /devices?type=<key>, site-scoped when a site is selected).
   const handleOpenUtility = React.useCallback((cardKey: CardKey) => {
     const siteCode = String(selectedSiteCode ?? "").trim();
-    const route =
-      cardKey === "electric" ? "/electric/meter" : cardKey === "water" ? "/devices" : "/devices";
+    const deviceType =
+      cardKey === "electric" ? "electricmeter" : cardKey === "water" ? "watermeter" : "airsensor";
+    const route = `/devices?type=${deviceType}`;
     if (siteCode && siteCode.toLowerCase() !== "all") {
       navigate(absSite(route, siteCode));
       return;
