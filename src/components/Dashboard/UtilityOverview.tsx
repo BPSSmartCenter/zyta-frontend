@@ -688,7 +688,7 @@ export default function UtilityOverview({ selectedSiteCode }: Props) {
 
   return (
     <section>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg-1024:grid-cols-3">
         <UtilityCard
           cardKey="water"
           overview={utilityOverview.water}

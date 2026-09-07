@@ -611,7 +611,7 @@ export const ElectricMeter: React.FC = () => {
             onChange={() => setPickerOpen(true)}
           />
 
-          <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="mt-5 grid grid-cols-1 gap-6 lg-1024:grid-cols-2 lg:grid-cols-2">
             <div
               className="relative flex min-h-[160px] items-center justify-between gap-6 overflow-hidden rounded-[28px] border border-[#1b3c58] px-8 py-7 text-white shadow-[0_15px_30px_rgba(2,12,27,0.45)]"
               style={{ backgroundColor: C.cardBg }}
@@ -775,7 +775,7 @@ export const ElectricMeter: React.FC = () => {
               </div>
 
               {/* Block-1 */}
-              <div className="items-center grid grid-cols-1 gap-8 lg:grid-cols-[1.1fr_1.1fr_1.1fr]">
+              <div className="items-center grid grid-cols-1 gap-8 lg-1024:grid-cols-3 lg:grid-cols-[1.1fr_1.1fr_1.1fr]">
                 <div className="flex flex-col justify-center gap-3 h-full mb-[50px]">
                   <div className="text-[20px] font-semibold tracking-[0.05em] text-white">
                     {t("cards.energyUsageRealtime", {

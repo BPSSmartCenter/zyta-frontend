@@ -785,7 +785,7 @@ export default function CCTVPanel({ siteCode }: Props) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="grid gap-5 lg-1024:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]">
         <UtilitySurface className="p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -975,7 +975,7 @@ export default function CCTVPanel({ siteCode }: Props) {
         </UtilitySurface>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg-1024:grid-cols-3 xl:grid-cols-4">
         {summaryCards.map((card) => (
           <SummaryMetricCard key={card.label} card={card} />
         ))}

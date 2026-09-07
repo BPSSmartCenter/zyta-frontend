@@ -57,7 +57,7 @@ export const UtilityPageShell: React.FC<{
   children: React.ReactNode;
 }> = ({ title, titleBadge, toolbar, children }) => (
   <div className="mx-auto w-full max-w-[1600px] px-4 pb-14 sm:px-6">
-    <div className="mb-5 mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mb-5 mt-6 flex flex-col gap-3 lg-1024:flex-row lg-1024:items-center lg-1024:justify-between">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-[24px] font-semibold tracking-tight text-slate-950">
@@ -120,7 +120,7 @@ export const UtilityHeroCard: React.FC<{
           : "text-[0.95rem]";
   return (
     <UtilitySurface className={cx("overflow-hidden bg-gradient-to-br", style.surface, style.glow)}>
-      <div className="flex h-full flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex h-full flex-col gap-4 lg-1024:flex-row lg-1024:items-center lg-1024:justify-between">
         <div className="flex items-center gap-4">
           <ProgressRing value={safeProgress} color={style.ring}>
             <div className="text-center leading-tight">

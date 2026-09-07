@@ -78,7 +78,7 @@ export const DeviceTabStrip: React.FC<Props> = ({
 
   return (
     <UtilitySurface>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div className="flex flex-col gap-4 lg-1024:flex-row lg-1024:items-start lg-1024:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">

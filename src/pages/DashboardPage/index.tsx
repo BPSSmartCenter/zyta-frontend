@@ -208,7 +208,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#F5F7FB] px-4 py-4 sm:px-5 lg:px-6 lg:py-5">
       <div className="flex flex-col gap-4 lg:gap-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-6">
+        <div className="grid grid-cols-1 gap-4 lg-1024:grid-cols-[minmax(0,1fr)_auto] lg-1024:items-center lg-1024:gap-6">
           <div className="min-w-0">
             <DashboardTopBar />
           </div>

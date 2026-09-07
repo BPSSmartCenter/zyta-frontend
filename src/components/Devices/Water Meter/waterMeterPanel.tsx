@@ -56,12 +56,12 @@ type WaterSnapshot = {
 };
 
 const GRID_BY_COUNT: Record<number, string> = {
-  1: "xl:grid-cols-1",
-  2: "xl:grid-cols-2",
-  3: "xl:grid-cols-3",
-  4: "xl:grid-cols-4",
-  5: "xl:grid-cols-5",
-  6: "xl:grid-cols-6",
+  1: "",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-2 lg-1024:grid-cols-3",
+  4: "md:grid-cols-2 lg-1024:grid-cols-4",
+  5: "md:grid-cols-2 lg-1024:grid-cols-3 xl:grid-cols-5",
+  6: "md:grid-cols-2 lg-1024:grid-cols-3 xl:grid-cols-6",
 };
 const gridColsFor = (count: number) => GRID_BY_COUNT[Math.max(1, Math.min(6, count))];
 
@@ -1512,7 +1512,7 @@ export default function WaterMeterPanel({ siteCode }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
+      <div className="grid gap-4 lg-1024:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.9fr)] xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]">
         <UtilitySurface>
           <UtilitySectionTitle
             title="Monthly consumption"

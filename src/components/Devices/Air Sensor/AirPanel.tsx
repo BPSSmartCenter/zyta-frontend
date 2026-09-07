@@ -277,12 +277,12 @@ const formatWeatherTime = (value?: string, locale = "en-US") => {
 
 // Grid classes must be literal for Tailwind; pick by how many cards survived the "no data" filter.
 const GRID_BY_COUNT: Record<number, string> = {
-  1: "xl:grid-cols-1",
-  2: "xl:grid-cols-2",
-  3: "xl:grid-cols-3",
-  4: "xl:grid-cols-4",
-  5: "xl:grid-cols-5",
-  6: "xl:grid-cols-6",
+  1: "",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-2 lg-1024:grid-cols-3",
+  4: "md:grid-cols-2 lg-1024:grid-cols-4",
+  5: "md:grid-cols-2 lg-1024:grid-cols-3 xl:grid-cols-5",
+  6: "md:grid-cols-2 lg-1024:grid-cols-3 xl:grid-cols-6",
 };
 const gridColsFor = (count: number) => GRID_BY_COUNT[Math.max(1, Math.min(6, count))];
 
@@ -1091,10 +1091,10 @@ export default function AirPanel({ siteCode }: Props) {
         className={[
           "grid grid-cols-1 gap-4",
           primaryCards.length >= 2
-            ? "xl:grid-cols-[1fr_1fr_0.95fr]"
+            ? "lg-1024:grid-cols-[1fr_1fr_0.95fr]"
             : primaryCards.length === 1
-              ? "xl:grid-cols-[1fr_0.95fr]"
-              : "xl:grid-cols-1",
+              ? "md:grid-cols-[1fr_0.95fr]"
+              : "",
         ].join(" ")}
       >
         {primaryCards.map((card) => {
@@ -1239,7 +1239,7 @@ export default function AirPanel({ siteCode }: Props) {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <WeatherBadge
           label="Live weather"
           temp={

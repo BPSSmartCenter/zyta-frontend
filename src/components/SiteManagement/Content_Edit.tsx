@@ -926,7 +926,7 @@ export default function ContentEdit({
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr]">
+        <div className="grid gap-4 md:grid-cols-2 lg-1024:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr]">
           <div>
             <label className="font-semibold text-sm block mb-2">
               {texts.labels.province}

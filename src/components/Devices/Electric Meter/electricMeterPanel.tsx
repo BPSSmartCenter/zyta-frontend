@@ -1892,11 +1892,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   );
   const metricGridColsClass = React.useMemo(() => {
     const count = metricTiles.length;
-    if (count >= 5) return "xl:grid-cols-5";
-    if (count === 4) return "xl:grid-cols-4";
-    if (count === 3) return "xl:grid-cols-3";
-    if (count === 2) return "xl:grid-cols-2";
-    return "xl:grid-cols-1";
+    if (count >= 5) return "lg-1024:grid-cols-3 xl:grid-cols-5";
+    if (count === 4) return "lg-1024:grid-cols-4";
+    if (count === 3) return "lg-1024:grid-cols-3";
+    if (count === 2) return "md:grid-cols-2";
+    return "";
   }, [metricTiles.length]);
 
   const summaryTiles = React.useMemo(
@@ -1931,7 +1931,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     <>
       <div className="mt-6 space-y-4">
         <UtilitySurface>
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex flex-col gap-4 lg-1024:flex-row lg-1024:items-start lg-1024:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -2130,7 +2130,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         <div
           className={[
             "grid grid-cols-1 gap-4",
-            showTemperatureHero ? "xl:grid-cols-[1fr_0.95fr]" : "",
+            showTemperatureHero ? "lg-1024:grid-cols-[1fr_0.95fr]" : "",
           ].join(" ")}
         >
           <UtilityHeroCard
@@ -2190,7 +2190,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           <div
             className={[
               "grid grid-cols-1 gap-4",
-              summaryTiles.length === 1 ? "xl:grid-cols-1" : summaryTiles.length === 2 ? "xl:grid-cols-2" : "xl:grid-cols-3",
+              summaryTiles.length === 1 ? "" : summaryTiles.length === 2 ? "md:grid-cols-2" : "md:grid-cols-2 lg-1024:grid-cols-3",
             ].join(" ")}
           >
             {summaryTiles.map((tile) => (
@@ -2213,7 +2213,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               defaultValue: "Last 7 days",
             })}
           />
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg-1024:grid-cols-4 xl:grid-cols-7">
             {comparisonItems.length ? (
               comparisonItems.map((item) => (
                 <button

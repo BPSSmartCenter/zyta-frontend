@@ -360,7 +360,7 @@ export default function IoTDetail({ deviceId, onBack, siteCode }: Props) {
             </div>
 
             {/* Main Grid Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg-1024:grid-cols-3 lg:grid-cols-5 gap-6">
 
                 {/* Main Panel (White Box) - spans 4 cols */}
                 <div className="lg:col-span-4 bg-white rounded-xl p-6 shadow-sm flex flex-col gap-8">
