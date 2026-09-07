@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
     // Production serves `vite preview` behind nginx (pm2 "zyta-site", port 4001). Vite blocks any
     // Host header it does not know, so every public hostname that nginx forwards must be listed.
     preview: {
-      allowedHosts: ["www.bpscaregiver.com"],
+      allowedHosts: ["www.bpscaregiver.com", "system.zyta.net"],
     },
   };
 });
