@@ -223,9 +223,12 @@ const extractCamNumber = (...candidates: unknown[]) => {
   return null;
 };
 
+// The MediaMTX stream server (203.159.95.168:8888) only speaks plain HTTP. Embedding it directly
+// as `http://…` fails on our HTTPS sites because browsers block mixed content. nginx reverse-proxies
+// it under `/cams/` on each HTTPS vhost, so use a same-origin relative URL and let nginx reach .168.
 const buildStreamUrl = (n: number | null) =>
   Number.isFinite(n as number) && (n as number) > 0
-    ? `http://203.159.95.168:8888/cam${n}/`
+    ? `/cams/cam${n}/`
     : undefined;
 
 type CameraDeviceLite = {
