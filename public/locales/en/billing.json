@@ -5,7 +5,9 @@
     "cards": {
       "usage": "Total usage (kWh)",
       "billing": "Bill amount this month",
-      "trend": "Monthly trend"
+      "trend": "Monthly trend",
+      "savingsMonth": "Real solar savings (month)",
+      "savingsYtd": "Real solar savings (year)"
     },
     "realtime": {
       "heading": "Real-Time Monitor",
@@ -93,6 +95,51 @@
         "warning": "This action cannot be undone",
         "confirm": "Delete bill",
         "cancel": "Cancel"
+      }
+    },
+    "savings": {
+      "title": "Real solar savings",
+      "subtitle": "Self-consumed solar energy × the utility rate set for this site — only the kWh that replaced grid power counts as a saving.",
+      "loading": "Calculating savings...",
+      "noSolar": "This site has no solar system with readings (Sigenergy / Huawei).",
+      "noRates": "Set the electricity rates (on-peak / off-peak / Ft) for this site in Site Management to calculate savings.",
+      "error": "Could not load solar readings.",
+      "estimateBadge": "Estimate",
+      "estimateNote": "The backend does not report grid export yet, so all generated energy is counted as self-consumed. The saving is an upper bound until export data arrives.",
+      "periods": {
+        "month": "This month",
+        "ytd": "This year (Jan – today)"
+      },
+      "metrics": {
+        "production": "Generated",
+        "exported": "Exported to grid",
+        "selfConsumed": "Self-consumed",
+        "savings": "Saved"
+      },
+      "rates": {
+        "label": "Rates used",
+        "onPeak": "On-peak (weekdays)",
+        "offPeak": "Off-peak (weekends)",
+        "ft": "Ft",
+        "perKwh": "THB/kWh"
+      },
+      "devices": {
+        "title": "By system",
+        "device": "System",
+        "vendor": "Brand",
+        "customer": "Customer / plant",
+        "production": "Generated this month (kWh)",
+        "selfConsumed": "Self-consumed this month (kWh)",
+        "month": "Saved this month (THB)",
+        "ytd": "Saved this year (THB)"
+      },
+      "monthly": {
+        "title": "By month",
+        "month": "Month",
+        "production": "Generated (kWh)",
+        "selfConsumed": "Self-consumed (kWh)",
+        "savings": "Saved (THB)",
+        "empty": "No readings this year yet"
       }
     }
   },

@@ -1,0 +1,133 @@
+/* Energy-flow card (Electric meter page) — animated power flow between solar, home, battery and grid.
+   Colors are the dark-surface steps validated for the navy card: solar #c98500 · battery #199e70 · grid #3987e5.
+   Text always wears the text tokens; the mark color only sits on nodes, spokes and dots. */
+.ef-card {
+  --ef-surface: #0b1220;
+  --ef-surface-2: #111a2e;
+  --ef-node: #16213a;
+  --ef-line-idle: #2a3650;
+  --ef-text: #f8fafc;
+  --ef-text-2: #cbd5e1;
+  --ef-text-3: #94a3b8;
+  --ef-solar: #c98500;
+  --ef-solar-glow: #f5b800;
+  --ef-battery: #199e70;
+  --ef-battery-glow: #34d399;
+  --ef-grid: #3987e5;
+  --ef-grid-glow: #7cb4f5;
+  --ef-home: #e2e8f0;
+  color: var(--ef-text);
+  background: radial-gradient(120% 90% at 20% 0%, var(--ef-surface-2) 0%, var(--ef-surface) 60%);
+}
+
+.ef-diagram {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: inherit;
+}
+
+.ef-label {
+  fill: var(--ef-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ef-value {
+  fill: var(--ef-text);
+  font-size: 22px;
+  font-weight: 600;
+}
+.ef-sub {
+  fill: var(--ef-text-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+.ef-sub--solar { fill: var(--ef-solar-glow); }
+.ef-sub--battery { fill: var(--ef-battery-glow); }
+.ef-sub--grid { fill: var(--ef-grid-glow); }
+
+/* nodes */
+.ef-node circle.ef-node__disc {
+  fill: var(--ef-node);
+  stroke: var(--ef-line-idle);
+  stroke-width: 1.5;
+  transition: stroke 300ms ease, filter 300ms ease;
+}
+.ef-node--solar.ef-node--active circle.ef-node__disc {
+  stroke: var(--ef-solar);
+  filter: drop-shadow(0 0 10px rgba(245, 184, 0, 0.35));
+}
+.ef-node--battery.ef-node--active circle.ef-node__disc {
+  stroke: var(--ef-battery);
+  filter: drop-shadow(0 0 10px rgba(52, 211, 153, 0.35));
+}
+.ef-node--grid.ef-node--active circle.ef-node__disc {
+  stroke: var(--ef-grid);
+  filter: drop-shadow(0 0 10px rgba(124, 180, 245, 0.35));
+}
+.ef-node--home circle.ef-node__disc {
+  stroke: #475569;
+}
+.ef-icon {
+  fill: none;
+  stroke: var(--ef-text-2);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ef-node--active .ef-icon { stroke: var(--ef-text); }
+.ef-icon--fill { fill: currentColor; stroke: none; }
+
+/* spokes */
+.ef-spoke__base {
+  fill: none;
+  stroke: var(--ef-line-idle);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.ef-spoke__glow {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.ef-spoke__flow {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 4 10;
+  stroke-dashoffset: 14;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.ef-spoke--solar .ef-spoke__glow, .ef-spoke--solar .ef-spoke__flow { stroke: var(--ef-solar); }
+.ef-spoke--battery .ef-spoke__glow, .ef-spoke--battery .ef-spoke__flow { stroke: var(--ef-battery); }
+.ef-spoke--grid .ef-spoke__glow, .ef-spoke--grid .ef-spoke__flow { stroke: var(--ef-grid); }
+.ef-spoke--active .ef-spoke__glow { opacity: 0.18; }
+.ef-spoke--active .ef-spoke__flow {
+  opacity: 1;
+  animation: ef-flow var(--ef-duration, 1.2s) linear infinite;
+}
+.ef-spoke--reverse .ef-spoke__flow { animation-direction: reverse; }
+
+@keyframes ef-flow {
+  from { stroke-dashoffset: 14; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* the SoC fill inside the battery glyph */
+.ef-battery-level {
+  fill: var(--ef-battery-glow);
+  transition: width 600ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ef-spoke--active .ef-spoke__flow {
+    animation: none;
+    stroke-dasharray: none;
+    opacity: 0.9;
+  }
+}

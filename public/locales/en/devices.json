@@ -58,6 +58,48 @@
       "empty": "No devices",
       "loading": "Loading devices..."
     },
+    "vendorSelector": {
+      "label": "Brand",
+      "all": "All",
+      "other": "Other",
+      "deviceCount_one": "{{count}} device",
+      "deviceCount_other": "{{count}} devices",
+      "noDevices": "No devices of this brand in the selected site"
+    },
+    "energyFlow": {
+      "title": "Energy flow",
+      "subtitle": "Live power of the solar system — from the maker's cloud, refreshed every 5 minutes",
+      "solar": "Solar",
+      "home": "Home / load",
+      "battery": "Battery",
+      "grid": "Grid",
+      "charging": "charging",
+      "discharging": "discharging",
+      "idle": "idle",
+      "importing": "importing",
+      "exporting": "exporting",
+      "coverage": "Solar covers {{percent}}% of the load",
+      "today": "Generated today",
+      "month": "Generated this month",
+      "pvCapacity": "PV capacity",
+      "batteryCapacity": "Battery capacity",
+      "noBattery": "No battery",
+      "loading": "Loading live power…",
+      "error": "Could not load live power",
+      "noData": "No live power readings for this system yet (the poller has not sent a snapshot)",
+      "legend": "Arrows show the direction of flow; the dots move faster with more power",
+      "systemsTitle": "By system",
+      "systems_one": "{{count}} system",
+      "systems_other": "{{count}} systems",
+      "updated": "Updated {{time}}",
+      "status": {
+        "normal": "Normal",
+        "standby": "Standby",
+        "poweroff": "Power-off",
+        "offline": "Offline",
+        "mixed": "Some systems offline"
+      }
+    },
     "waterMeter": {
       "selectTime": "Select time",
       "to": "TO",

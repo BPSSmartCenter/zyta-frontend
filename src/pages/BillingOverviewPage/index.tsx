@@ -18,7 +18,11 @@ import {
   whiteBaht,
   cyanTrend,
   whiteTrend,
+  solarImage,
+  solarSelected,
 } from "../../assets";
+import { useSolarSavings } from "../../hooks/useSolarSavings";
+import SolarSavingsPanel from "../../components/Billing/SolarSavingsPanel";
 import { useUserPath } from "../../routes/useUserPath";
 import Modal from "../../components/Modal";
 import SearchInput from "../../components/SearchInput";
@@ -64,7 +68,26 @@ const CARD_CONFIG: CardConfig[] = [
     img: cyanTrend,
     activeImg: whiteTrend,
   },
+  // Real solar savings: self-consumed solar kWh × the site's utility rate (see solarSavings.ts)
+  {
+    id: "savingsMonth",
+    labelKey: "overview.cards.savingsMonth",
+    defaultLabel: "Real solar savings this month",
+    img: solarImage,
+    activeImg: solarSelected,
+    labelClassName: "text-[10px] tracking-wide",
+  },
+  {
+    id: "savingsYtd",
+    labelKey: "overview.cards.savingsYtd",
+    defaultLabel: "Real solar savings this year",
+    img: solarImage,
+    activeImg: solarSelected,
+    labelClassName: "text-[10px] tracking-wide",
+  },
 ] as const;
+
+const SAVINGS_CARD_IDS = new Set<string>(["savingsMonth", "savingsYtd"]);
 
 type RealtimeRow = {
   meterId: string;
@@ -358,6 +381,9 @@ const BillingOverview: React.FC = () => {
     requiresSiteSelection || blockedByPermission ? null : normalizedSite,
     fetchBillingError,
   );
+  const solarSavings = useSolarSavings(
+    requiresSiteSelection || blockedByPermission ? null : normalizedSite,
+  );
 
   const fetchRealtimeRowsForSite = React.useCallback(
     async (siteCode: string) => {
@@ -532,10 +558,21 @@ const BillingOverview: React.FC = () => {
       } else if (card.id === "trend") {
         const val = cards?.monthlyTrendPercent ?? 0;
         valueDisplay = `${val >= 0 ? "+" : ""}${val.toFixed(1)}%`;
+      } else if (SAVINGS_CARD_IDS.has(card.id)) {
+        const period =
+          card.id === "savingsMonth" ? solarSavings.data?.month : solarSavings.data?.ytd;
+        if (solarSavings.loading) valueDisplay = "...";
+        else if (!period || !solarSavings.data?.ratesConfigured) valueDisplay = "-";
+        else
+          valueDisplay = period.savingsThb.toLocaleString(locale, {
+            style: "currency",
+            currency: "THB",
+            maximumFractionDigits: 0,
+          });
       }
       return { ...card, value: valueDisplay, label };
     });
-  }, [billingData, loading, realtimeUsageTotal, t, locale]);
+  }, [billingData, loading, realtimeUsageTotal, t, locale, solarSavings.data, solarSavings.loading]);
 
   const electricDeviceCount = getCountForType(
     inventoryCounts as any,
@@ -1069,6 +1106,10 @@ const BillingOverview: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {SAVINGS_CARD_IDS.has(activeCard) && (
+            <SolarSavingsPanel savings={solarSavings} locale={locale} />
           )}
         </div>
       </div>

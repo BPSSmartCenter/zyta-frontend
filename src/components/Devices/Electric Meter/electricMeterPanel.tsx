@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { ElectricLineBasicChart } from "../../Chart";
 import { useFilters } from "../../../context/FiltersContext";
 import {
@@ -12,6 +13,21 @@ import {
   UtilitySectionTitle,
   UtilitySurface,
 } from "../../UtilityDashboard/UtilityDashboardLayout";
+import {
+  ALL_VENDORS,
+  ELECTRIC_VENDOR_LABELS,
+  ELECTRIC_VENDOR_ORDER,
+  detectCustomerName,
+  detectElectricVendor,
+  isElectricVendorKey,
+  isSolarVendor,
+  type ElectricVendorFilter,
+  type ElectricVendorKey,
+} from "../../../features/electric/electricVendor";
+import { ElectricVendorBar, type ElectricVendorTab } from "./ElectricVendorBar";
+import EnergyFlowCard from "./EnergyFlowCard";
+import { useEnergyFlow } from "../../../hooks/useEnergyFlow";
+import { aggregateEnergyFlow, type EnergyFlowSnapshot } from "../../../features/electric/energyFlow";
 
 type Props = {
   siteCode?: string;
@@ -36,10 +52,19 @@ type ElectricDeviceOption = {
   label: string;
   sn: string;
   category: DeviceCategory;
+  /** maker of the device (Huawei / Sigenergy / Tuya …), see electricVendor.ts */
+  vendor: ElectricVendorKey;
+  /** the customer's installation name from the maker's cloud (Sigenergy systemName …) */
+  customerName: string | null;
   siteIdOrCode?: string;
   siteLabel?: string;
   status?: string | null;
+  /** newest reading the backend has for this device (ISO string) */
+  lastReadingAt?: string | null;
 };
+
+/** URL query key that keeps the maker filter across reloads and shared links. */
+const VENDOR_QUERY_PARAM = "vendor";
 
 const DEVICE_CATEGORY_SET: ReadonlySet<DeviceCategory> = new Set([
   "INVERTER",
@@ -168,7 +193,11 @@ function normalizeElectricDeviceOptions(items: any[]): ElectricDeviceOption[] {
       label,
       sn,
       category: normalizedCategory as DeviceCategory,
+      vendor: detectElectricVendor(item),
+      customerName: detectCustomerName(item),
       status: item?.status ?? null,
+      lastReadingAt:
+        typeof item?.lastReadingAt === "string" ? item.lastReadingAt : null,
     });
   }
   return options;
@@ -213,7 +242,10 @@ const to24FromLabel = (label?: string) => {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
 
-import { fetchEquipmentTelemetry } from "../../../features/electric";
+import {
+  fetchEquipmentTelemetry,
+  type EquipmentFetchResp,
+} from "../../../features/electric";
 
 type DailySeries = {
   key: string;
@@ -496,6 +528,117 @@ const summarizeTelemetryPayload = (payload: any): NormalizedTelemetrySummary => 
   };
 };
 
+// Sum per-source cumulative readings into one day-by-day series. Each source (a site's
+// aggregate or a single device) is normalised on its own first — baseline per day, then
+// half-hour kWh — because sources report at different timestamps and merging raw totals
+// by timestamp produces negative deltas that lock the 7-day chart at zero.
+const aggregateDailySeries = (
+  perSourcePoints: DailyTelemetryPoint[][],
+  todayStart: Date,
+  daysToFetch: number
+): DailySeries[] => {
+  const entries: DailySeries[] = [];
+  for (let i = 0; i < daysToFetch; i++) {
+    const dayStart = new Date(todayStart);
+    dayStart.setDate(dayStart.getDate() - i);
+    const dayEnd = endOfDay(dayStart);
+    const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
+
+    const summedHalfHourSeries = HALF_HOUR_SLOTS.map(() => 0);
+    let totalWhSum = 0;
+
+    for (const sourcePoints of perSourcePoints) {
+      const dayPoints = sourcePoints.filter(
+        (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
+      );
+      const baselineWh = dayBaselineWh(sourcePoints, dayStart.getTime());
+      const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart, baselineWh);
+      for (let j = 0; j < summedHalfHourSeries.length; j++) {
+        summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
+      }
+      totalWhSum += dayUsageWh(dayPoints, baselineWh);
+    }
+
+    const totalKwh = summedHalfHourSeries.length
+      ? summedHalfHourSeries[summedHalfHourSeries.length - 1]
+      : 0;
+
+    entries.push({
+      key: dayKey,
+      date: dayStart,
+      isToday: i === 0,
+      totalWh: totalWhSum,
+      totalKwh,
+      halfHourSeries: summedHalfHourSeries,
+    });
+  }
+  return entries;
+};
+
+// Merge several per-device `/electric/equipment/{sn}/data` payloads into the shape the
+// site-wide `__OVERVIEW__` call returns, so a maker-scoped Overview (only the Sigenergy
+// systems, only the Huawei inverters …) can reuse the same rendering path. Energy counters
+// add up; voltage / current / frequency / temperature are averaged over the devices that
+// actually report them (a meter that reports 0 V is not reporting).
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+const aggregateEquipmentPayloads = (payloads: unknown[]) => {
+  const records = payloads
+    .map(asRecord)
+    .filter((payload): payload is Record<string, unknown> => payload !== null);
+  const summaries = records
+    .map((payload) => asRecord(payload.summary))
+    .filter((summary): summary is Record<string, unknown> => summary !== null);
+  const availabilities = records
+    .map((payload) => asRecord(payload.availability))
+    .filter((availability): availability is Record<string, unknown> => availability !== null);
+
+  const sum = (field: string) =>
+    summaries.reduce((acc, summary) => {
+      const value = Number(summary[field]);
+      return acc + (Number.isFinite(value) ? value : 0);
+    }, 0);
+  const average = (field: string): number | null => {
+    let total = 0;
+    let count = 0;
+    for (const summary of summaries) {
+      const raw = summary[field];
+      if (raw === null || raw === undefined) continue;
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value <= 0) continue;
+      total += value;
+      count += 1;
+    }
+    return count > 0 ? total / count : null;
+  };
+  const anyAvailable = (key: keyof MetricAvailability) =>
+    availabilities.length === 0
+      ? true
+      : availabilities.some((availability) => availability[key] === true);
+
+  return {
+    summary: {
+      usageKwh: sum("usageKwh"),
+      accumulatedKwh: sum("accumulatedKwh"),
+      productionTodayKwh: sum("productionTodayKwh"),
+      productionMonthKwh: sum("productionMonthKwh"),
+      voltageAvg: average("voltageAvg") ?? 0,
+      currentAvg: average("currentAvg") ?? 0,
+      frequencyAvg: average("frequencyAvg") ?? 0,
+      temperatureC: average("temperatureC"),
+    },
+    telemetries: [] as unknown[],
+    availability: {
+      energy: anyAvailable("energy"),
+      voltage: anyAvailable("voltage"),
+      current: anyAvailable("current"),
+      frequency: anyAvailable("frequency"),
+      temperature: anyAvailable("temperature"),
+    } satisfies MetricAvailability,
+  };
+};
+
 export default function ElectricMeterPanel({ siteCode }: Props) {
   const { selectedSite, selectedGroupSite, selectedUtility, siteOptions, date: filtersDate } = useFilters();
   const { t, i18n } = useTranslation("devices");
@@ -577,6 +720,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   const [overviewLifetimeValue, setOverviewLifetimeValue] = useState<number | null>(null);
   const [overviewThreshold90DayKwh, setOverviewThreshold90DayKwh] = useState<number | null>(null);
   const [overviewLastUpdateTime, setOverviewLastUpdateTime] = useState<string | null>(null);
+  // Today / month / lifetime totals of the maker Overview, summed client-side from that
+  // maker's devices (the site-wide `/electric/overview` numbers would include every maker).
+  const [vendorOverviewTotals, setVendorOverviewTotals] = useState<{
+    todayKwh: number;
+    monthKwh: number;
+    lifetimeKwh: number;
+  } | null>(null);
   const [overviewInverterSummaries, setOverviewInverterSummaries] = useState<
     OverviewInverterSummary[]
   >([]);
@@ -609,6 +759,114 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   );
   const qs = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const urlDeviceSN = qs?.get("inverterSN") || qs?.get("deviceSn") || undefined;
+
+  // ===== Maker (brand) filter: "All | Huawei Solar | Sigenergy | Tuya …" above the device strip =====
+  // The URL query (`?vendor=sigenergy`) is the single source of truth so the choice survives a
+  // reload and can be shared; the tabs themselves are built from the makers actually present
+  // in the current site / group, so an empty maker never shows up as a dead tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vendorParam = searchParams.get(VENDOR_QUERY_PARAM);
+  const requestedVendor: ElectricVendorFilter = isElectricVendorKey(vendorParam)
+    ? vendorParam
+    : ALL_VENDORS;
+  // Latest requested maker for async callbacks (the device loader picks its default device
+  // after a fetch, which must not re-run just because the maker changed).
+  const requestedVendorRef = React.useRef<ElectricVendorFilter>(requestedVendor);
+  React.useEffect(() => {
+    requestedVendorRef.current = requestedVendor;
+  }, [requestedVendor]);
+  const vendorTabs = React.useMemo<ElectricVendorTab[]>(() => {
+    const counts = new Map<ElectricVendorKey, number>();
+    for (const opt of deviceOptions) {
+      counts.set(opt.vendor, (counts.get(opt.vendor) ?? 0) + 1);
+    }
+    return ELECTRIC_VENDOR_ORDER.filter((key) => counts.has(key)).map((key) => ({
+      key,
+      label:
+        key === "other"
+          ? t("devices.vendorSelector.other", { defaultValue: "Other" })
+          : ELECTRIC_VENDOR_LABELS[key],
+      count: counts.get(key) ?? 0,
+    }));
+  }, [deviceOptions, t]);
+  const requestedVendorAvailable =
+    requestedVendor === ALL_VENDORS ||
+    vendorTabs.some((tab) => tab.key === requestedVendor);
+  // Bumped every time a device-list load for the current scope finishes (see the loader
+  // effect below); until the first one we don't know yet which makers the site has.
+  const [deviceListVersion, setDeviceListVersion] = useState(0);
+  const deviceListSettled = !deviceOptionsLoading && deviceListVersion > 0;
+  // Keep the requested maker while the device list is still loading; only fall back to
+  // "All" once we know the site really has no device of that maker.
+  const vendorFilter: ElectricVendorFilter =
+    requestedVendorAvailable || !deviceListSettled ? requestedVendor : ALL_VENDORS;
+  const isVendorScoped = vendorFilter !== ALL_VENDORS;
+  const vendorLabel = React.useMemo(() => {
+    if (!isVendorScoped) return null;
+    return (
+      vendorTabs.find((tab) => tab.key === vendorFilter)?.label ??
+      (vendorFilter === "other"
+        ? t("devices.vendorSelector.other", { defaultValue: "Other" })
+        : ELECTRIC_VENDOR_LABELS[vendorFilter])
+    );
+  }, [isVendorScoped, vendorFilter, vendorTabs, t]);
+  const scopedDeviceOptions = React.useMemo(
+    () =>
+      isVendorScoped
+        ? deviceOptions.filter((opt) => opt.vendor === vendorFilter)
+        : deviceOptions,
+    [deviceOptions, isVendorScoped, vendorFilter]
+  );
+  // Same list for the telemetry effects below, which key on `vendorScopeKey` (a string
+  // fingerprint) instead of the array so they don't refetch on every unrelated re-render.
+  // Declared before those effects so it is refreshed first within the same commit.
+  const scopedDeviceOptionsRef = React.useRef<ElectricDeviceOption[]>(scopedDeviceOptions);
+  React.useEffect(() => {
+    scopedDeviceOptionsRef.current = scopedDeviceOptions;
+  }, [scopedDeviceOptions]);
+  const showVendorBar = vendorTabs.length >= 2 || isVendorScoped;
+  const handleVendorSelect = React.useCallback(
+    (next: ElectricVendorFilter) => {
+      // Both updates in one transition: the router applies the URL change as a transition,
+      // so a plain setState here would commit first and fire the all-makers Overview
+      // fetches for one render before the maker-scoped ones replace them.
+      React.startTransition(() => {
+        setSearchParams(
+          (prev) => {
+            const params = new URLSearchParams(prev);
+            if (next === ALL_VENDORS) params.delete(VENDOR_QUERY_PARAM);
+            else params.set(VENDOR_QUERY_PARAM, next);
+            return params;
+          },
+          { replace: true }
+        );
+        // A maker always opens on its own Overview; the device tabs below drill in from there.
+        setSelectedDeviceId(OVERVIEW_DEVICE_ID);
+      });
+    },
+    [setSearchParams]
+  );
+  // Drop a stale `?vendor=` (e.g. carried over from a site that had Sigenergy to one that
+  // doesn't) once the device list has settled.
+  React.useEffect(() => {
+    if (!deviceListSettled || requestedVendorAvailable) return;
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.delete(VENDOR_QUERY_PARAM);
+        return params;
+      },
+      { replace: true }
+    );
+  }, [deviceListSettled, requestedVendorAvailable, setSearchParams]);
+  // Never keep a device of another maker selected behind an active maker filter.
+  React.useEffect(() => {
+    if (!isVendorScoped || !deviceListSettled) return;
+    setSelectedDeviceId((prev) => {
+      if (!prev || prev === OVERVIEW_DEVICE_ID) return prev;
+      return scopedDeviceOptions.some((opt) => opt.id === prev) ? prev : OVERVIEW_DEVICE_ID;
+    });
+  }, [isVendorScoped, deviceListSettled, scopedDeviceOptions]);
   const isAllSitesSelected = String(selectedSite || "")
     .trim()
     .toLowerCase() === "all";
@@ -712,6 +970,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       setDeviceOptions([]);
       setSelectedDeviceId(OVERVIEW_DEVICE_ID);
       setDeviceOptionsLoading(false);
+      setDeviceListVersion((v) => v + 1);
       return;
     }
     let cancelled = false;
@@ -776,14 +1035,21 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           });
         setDeviceOptions(filtered);
         setSelectedDeviceId((prev) => {
-          if (prev && filtered.some((opt) => opt.id === prev)) return prev;
+          // Honour an active maker filter (`?vendor=`) when picking the default device, so a
+          // shared Sigenergy link never lands on the first Tuya meter of the site.
+          const requested = requestedVendorRef.current;
+          const inScope =
+            requested === ALL_VENDORS
+              ? filtered
+              : filtered.filter((opt) => opt.vendor === requested);
+          if (prev && inScope.some((opt) => opt.id === prev)) return prev;
           const matchSn =
             urlDeviceSN &&
-            filtered.find(
+            inScope.find(
               (opt) => opt.sn.toUpperCase() === urlDeviceSN.toUpperCase()
             );
           if (matchSn) return matchSn.id;
-          return filtered[0]?.id ?? OVERVIEW_DEVICE_ID;
+          return inScope[0]?.id ?? OVERVIEW_DEVICE_ID;
         });
       } catch {
         if (cancelled) return;
@@ -792,6 +1058,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       } finally {
         if (!cancelled) {
           setDeviceOptionsLoading(false);
+          setDeviceListVersion((v) => v + 1);
         }
       }
     })();
@@ -821,16 +1088,44 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         DEFAULT_INVERTER_SN;
   const selectedDeviceSiteForApi = selectedDevice?.siteIdOrCode || siteForApi;
   const deviceCategory = "INVERTER";
+  // Fingerprint of the devices the Overview currently covers (all makers, or one maker).
   const overviewDeviceOptionsKey = React.useMemo(
     () =>
-      deviceOptions
+      scopedDeviceOptions
         .map(
           (device) =>
             `${device.siteIdOrCode || siteForApi}:${device.category}:${device.sn}`
         )
         .join("|"),
-    [deviceOptions, siteForApi]
+    [scopedDeviceOptions, siteForApi]
   );
+  // Non-empty only while a maker is selected and the Overview must be built client-side
+  // from that maker's devices (the backend `__OVERVIEW__` aggregate covers the whole site).
+  const vendorScopeKey = isVendorScoped
+    ? `${vendorFilter}:${overviewDeviceOptionsKey}`
+    : "";
+  const isVendorOverview = isOverviewSelected && isVendorScoped;
+  // Newest reading among the scoped devices — the maker Overview's "last sync".
+  const vendorLastReadingAt = React.useMemo(() => {
+    if (!isVendorScoped) return null;
+    let latest: string | null = null;
+    for (const opt of scopedDeviceOptions) {
+      const value = opt.lastReadingAt;
+      if (!value) continue;
+      const ts = new Date(value).getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (!latest || ts > new Date(latest).getTime()) latest = value;
+    }
+    return latest;
+  }, [isVendorScoped, scopedDeviceOptions]);
+  const vendorLabelByKey = React.useMemo(() => {
+    const map = new Map<ElectricVendorKey, string>();
+    for (const tab of vendorTabs) map.set(tab.key, tab.label);
+    return map;
+  }, [vendorTabs]);
+  // Tag each device tab with its maker while "All" is selected and more than one maker is
+  // listed — the tabs alone ("Sigenergy 2", "มิเตอร์ไฟอัจฉริยะ") don't say who made the device.
+  const showVendorChips = !isVendorScoped && vendorTabs.length >= 2;
   const deviceDropdownOptions = React.useMemo(
     () => {
       const overviewLabel = t("devices.deviceSelector.overview", {
@@ -840,22 +1135,34 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         {
           value: OVERVIEW_DEVICE_ID,
           label: overviewLabel,
+          subLabel: null as string | null,
+          title: overviewLabel,
+          vendorLabel: null as string | null,
         },
-        ...deviceOptions.map((opt) => {
+        ...scopedDeviceOptions.map((opt) => {
           const name = (opt.label || "").trim() || opt.sn;
-          const sitePrefix =
-            isGroupSiteSelected && (opt.siteLabel || opt.siteIdOrCode)
-              ? `${opt.siteLabel || opt.siteIdOrCode} / `
-              : "";
+          // The BPS site is named whenever devices of several sites can share the strip (a
+          // site group) or when a maker is picked, since one maker's systems are often
+          // registered under one BPS site but belong to different customers.
+          const siteName =
+            (isGroupSiteSelected || isVendorScoped) && (opt.siteLabel || opt.siteIdOrCode)
+              ? opt.siteLabel || opt.siteIdOrCode
+              : null;
+          // Second line: the customer's installation name from the maker's cloud and the BPS
+          // site; a device with neither keeps showing its SN there, as the strip always did.
+          const scope = [opt.customerName, siteName].filter(Boolean).join(" · ");
           return {
             value: opt.id,
             // Use real inverter label from backend (avoid misleading index-based names).
-            label: `${sitePrefix}${name} (${opt.sn})`,
+            label: name,
+            subLabel: scope || opt.sn,
+            title: [name, opt.customerName, siteName, opt.sn].filter(Boolean).join(" · "),
+            vendorLabel: vendorLabelByKey.get(opt.vendor) ?? null,
           };
         }),
       ];
     },
-    [deviceOptions, t, isGroupSiteSelected]
+    [scopedDeviceOptions, t, isGroupSiteSelected, isVendorScoped, vendorLabelByKey]
   );
   const [deviceTabsPerPage, setDeviceTabsPerPage] = useState(8);
   React.useEffect(() => {
@@ -908,12 +1215,12 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   React.useEffect(() => {
     let active = true;
     (async () => {
-      if (!isOverviewSelected || !deviceOptions.length) {
+      if (!isOverviewSelected || !scopedDeviceOptions.length) {
         if (!active) return;
         setOverviewInverterSummaries([]);
         return;
       }
-      if (!inverterSectionInView) return;
+      if (!inverterSectionInView && !isVendorScoped) return;
       const base =
         typeof filtersDate === "object" && filtersDate
           ? new Date(filtersDate.y, (filtersDate.m || 1) - 1, filtersDate.d || 1)
@@ -923,7 +1230,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       const startTime = formatDateTimeForApi(dayStart);
       const endTime = formatDateTimeForApi(dayEnd);
       const dayKey = startTime.slice(0, 10);
-      const deviceFingerprint = deviceOptions
+      const deviceFingerprint = scopedDeviceOptions
         .map((d) => `${d.siteIdOrCode || siteForApi}|${d.sn}`)
         .sort()
         .join(",");
@@ -937,13 +1244,13 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         typeof cached.fetchedAt === "number" &&
         Date.now() - cached.fetchedAt <= TELEMETRY_CACHE_TTL_MS &&
         Array.isArray(cached.entries) &&
-        cached.entries.length === deviceOptions.length
+        cached.entries.length === scopedDeviceOptions.length
       ) {
         setOverviewInverterSummaries(cached.entries);
         return;
       }
       try {
-        const settled = await runWithConcurrency(deviceOptions, 8, async (device) => {
+        const settled = await runWithConcurrency(scopedDeviceOptions, 8, async (device) => {
           const res = await fetchEquipmentTelemetry({
             siteIdOrCode: device.siteIdOrCode || siteForApi,
             sn: device.sn,
@@ -957,7 +1264,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
           );
           return {
             deviceId: device.id,
-            label: device.label,
+            label: device.customerName ? `${device.label} · ${device.customerName}` : device.label,
             sn: device.sn,
             siteIdOrCode: device.siteIdOrCode,
             siteLabel: device.siteLabel,
@@ -992,7 +1299,14 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return () => {
       active = false;
     };
-  }, [deviceOptions, filtersDate, isOverviewSelected, siteForApi, inverterSectionInView]);
+  }, [
+    scopedDeviceOptions,
+    filtersDate,
+    isOverviewSelected,
+    isVendorScoped,
+    siteForApi,
+    inverterSectionInView,
+  ]);
 
   React.useEffect(() => {
     let active = true;
@@ -1025,7 +1339,14 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         }));
 
       const daysToFetch = 8; // today + previous 7 days
-      if (isOverviewSelected && !isAllSitesSelected && !deviceOptions.length) {
+      // A maker Overview is built from that maker's devices, so it has nothing to show
+      // until the device list is in (same rule the single-site Overview already follows).
+      const scopedDevices = scopedDeviceOptionsRef.current;
+      if (
+        isOverviewSelected &&
+        (isVendorScoped || !isAllSitesSelected) &&
+        !scopedDevices.length
+      ) {
         if (!active) return;
         setDailySeries([]);
         return;
@@ -1040,10 +1361,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         isAllSitesSelected && isOverviewSelected
           ? `group:${siteTargetsKey}`
           : selectedDeviceSiteForApi;
-      const cacheDeviceKey =
-        isOverviewSelected && !isAllSitesSelected
-          ? `overview:${overviewDeviceOptionsKey || "pending"}`
-          : deviceSN;
+      const cacheDeviceKey = isVendorOverview
+        ? `vendor:${vendorScopeKey || "pending"}`
+        : isOverviewSelected && !isAllSitesSelected
+        ? `overview:${overviewDeviceOptionsKey || "pending"}`
+        : deviceSN;
       const cacheKey = `db:telemetry-window:${cacheSiteKey}:${cacheDeviceKey}:${rangeStartKey}:${rangeEndKey}`;
       const stickyKey = `db:telemetry-window:sticky:${cacheSiteKey}:${cacheDeviceKey}`;
       const cached = readSessionJson<{
@@ -1096,8 +1418,29 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         let points: DailyTelemetryPoint[] = [];
         let aggregatedEntries: DailySeries[] | null = null;
         // Single-site Overview falls through to the single aggregate call
-        // below (sn = __OVERVIEW__); only all-sites Overview fans out per site.
-        if (isAllSitesSelected && isOverviewSelected) {
+        // below (sn = __OVERVIEW__); the all-sites Overview fans out per site and a
+        // maker Overview fans out per device of that maker (the backend aggregate has
+        // no maker filter).
+        if (isVendorOverview) {
+          const settled = await runWithConcurrency(scopedDevices, 8, async (device) => {
+            const res = await fetchEquipmentTelemetry({
+              siteIdOrCode: device.siteIdOrCode || siteForApi,
+              sn: device.sn,
+              startTime,
+              endTime,
+              category: device.category,
+            });
+            const list: any[] = (res?.data as any)?.telemetries ?? [];
+            return normalizeTelemetries(list);
+          });
+          const perDevicePoints = settled
+            .filter(
+              (result): result is PromiseFulfilledResult<DailyTelemetryPoint[]> =>
+                result.status === "fulfilled"
+            )
+            .map((result) => result.value);
+          aggregatedEntries = aggregateDailySeries(perDevicePoints, todayStart, daysToFetch);
+        } else if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           if (!targets.length) {
             aggregatedEntries = [];
@@ -1125,42 +1468,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
               )
               .map((result) => result.value);
 
-            aggregatedEntries = [];
-            for (let i = 0; i < daysToFetch; i++) {
-              const dayStart = new Date(todayStart);
-              dayStart.setDate(dayStart.getDate() - i);
-              const dayEnd = endOfDay(dayStart);
-              const dayKey = formatDateTimeForApi(dayStart).slice(0, 10);
-
-              const summedHalfHourSeries = HALF_HOUR_SLOTS.map(() => 0);
-              let totalWhSum = 0;
-
-              for (const sitePoints of perSitePoints) {
-                const dayPoints = sitePoints.filter(
-                  (p) => p.timestamp >= dayStart.getTime() && p.timestamp <= dayEnd.getTime()
-                );
-                const baselineWh = dayBaselineWh(sitePoints, dayStart.getTime());
-                const halfHourSeries = buildHalfHourSeries(dayPoints, dayStart, baselineWh);
-                for (let j = 0; j < summedHalfHourSeries.length; j++) {
-                  summedHalfHourSeries[j] += Number(halfHourSeries[j] || 0);
-                }
-
-                totalWhSum += dayUsageWh(dayPoints, baselineWh);
-              }
-
-              const totalKwh = summedHalfHourSeries.length
-                ? summedHalfHourSeries[summedHalfHourSeries.length - 1]
-                : 0;
-
-              aggregatedEntries.push({
-                key: dayKey,
-                date: dayStart,
-                isToday: i === 0,
-                totalWh: totalWhSum,
-                totalKwh,
-                halfHourSeries: summedHalfHourSeries,
-              });
-            }
+            aggregatedEntries = aggregateDailySeries(perSitePoints, todayStart, daysToFetch);
           }
         } else {
           const res = await fetchEquipmentTelemetry({
@@ -1300,7 +1608,10 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     deviceOptions,
     isAllSitesSelected,
     isOverviewSelected,
+    isVendorOverview,
+    isVendorScoped,
     overviewDeviceOptionsKey,
+    vendorScopeKey,
     siteForApi,
     siteTargetsKey,
     selectedDeviceSiteForApi,
@@ -1412,7 +1723,34 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
         // needs to fan out per site. Per-inverter cards still come from the
         // dedicated overview-summaries effect, so we no longer loop
         // deviceOptions here (was the source of duplicate equipment requests).
-        if (isAllSitesSelected && isOverviewSelected) {
+        // A maker Overview is the exception: the backend aggregate cannot be
+        // narrowed to one maker, so it is summed here from that maker's devices.
+        if (isVendorOverview) {
+          const scopedDevices = scopedDeviceOptionsRef.current;
+          if (!scopedDevices.length) {
+            if (!active) return;
+            setVendorOverviewTotals(null);
+            return;
+          }
+          const settled = await runWithConcurrency(scopedDevices, 8, async (device) =>
+            fetchEquipmentTelemetry({
+              siteIdOrCode: device.siteIdOrCode || siteForApi,
+              sn: device.sn,
+              startTime: range.from,
+              endTime: range.to,
+              category: device.category,
+            })
+          );
+          logElectricApiPayload("fetchEquipmentTelemetry(maker overview settled)", settled);
+          const payloads = settled
+            .filter(
+              (item): item is PromiseFulfilledResult<EquipmentFetchResp> =>
+                item.status === "fulfilled"
+            )
+            .map((item) => item.value?.data);
+          res = { data: aggregateEquipmentPayloads(payloads) };
+          logElectricApiPayload("fetchEquipmentTelemetry(maker overview aggregated)", res);
+        } else if (isAllSitesSelected && isOverviewSelected) {
           const targets = siteTargets;
           const settled = await runWithConcurrency(targets, 4, async (siteIdOrCode) =>
             fetchEquipmentTelemetry({
@@ -1599,6 +1937,21 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             setMetrics((m) => ({ ...m, monthKwh: Math.round(summary.productionMonthKwh) }));
           }
         }
+        if (isVendorOverview) {
+          const todayKwh = Number(summary.productionTodayKwh);
+          const monthKwh = Number(summary.productionMonthKwh);
+          const lifetimeKwh = Number(summary.accumulatedKwh);
+          setVendorOverviewTotals({
+            todayKwh: Number.isFinite(todayKwh) ? Math.round(todayKwh) : 0,
+            monthKwh: Number.isFinite(monthKwh) ? Math.round(monthKwh) : 0,
+            lifetimeKwh: Number.isFinite(lifetimeKwh) ? Math.round(lifetimeKwh) : 0,
+          });
+          if (Number.isFinite(monthKwh)) {
+            setMetrics((m) => ({ ...m, monthKwh: Math.round(monthKwh) }));
+          }
+        } else {
+          setVendorOverviewTotals(null);
+        }
       } catch (e) {
         // ignore
       }
@@ -1611,6 +1964,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     deviceSN,
     deviceCategory,
     isOverviewSelected,
+    isVendorOverview,
+    vendorScopeKey,
     isAllSitesSelected,
     siteForApi,
     siteTargetsKey,
@@ -1620,7 +1975,8 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
   React.useEffect(() => {
     let active = true;
     (async () => {
-      if (isAllSitesSelected) {
+      // The 90-day baseline is site-wide; it says nothing about one maker's share.
+      if (isAllSitesSelected || isVendorOverview) {
         if (!active) return;
         setOverviewThreshold90DayKwh(null);
         return;
@@ -1643,13 +1999,14 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     return () => {
       active = false;
     };
-  }, [isAllSitesSelected, siteForApi]);
+  }, [isAllSitesSelected, isVendorOverview, siteForApi]);
 
-  // Overview side cards come from backend aggregate only.
+  // Overview side cards come from backend aggregate only (a maker Overview sums its own
+  // devices instead — see vendorOverviewTotals — so the site-wide numbers are cleared).
   React.useEffect(() => {
     let active = true;
     (async () => {
-      if (isOverviewSelected) {
+      if (isOverviewSelected && !isVendorOverview) {
         try {
           let data: any = {};
           if (isAllSitesSelected) {
@@ -1710,6 +2067,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
       setOverviewMonthValue(null);
       setOverviewLifetimeValue(null);
       setOverviewThreshold90DayKwh(null);
+      if (isVendorOverview) setOverviewLastUpdateTime(null);
     })();
     return () => {
       active = false;
@@ -1719,6 +2077,7 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     deviceSN,
     deviceCategory,
     isOverviewSelected,
+    isVendorOverview,
     isAllSitesSelected,
     siteTargetsKey,
   ]);
@@ -1797,22 +2156,81 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     });
     return { max, ticks };
   }, [overviewContributionColumns.maxValue]);
+  // Maker Overview: per-device summaries first, then the client-side range aggregate;
+  // never the site-wide `/electric/overview` numbers, which include every maker.
   const sideCardTodayValue =
     isOverviewSelected && overviewInverterSummaries.length
       ? Math.round(overviewInverterAggregate.todayKwh)
+      : isVendorOverview
+      ? vendorOverviewTotals?.todayKwh ?? 0
       : overviewTodayValue !== null && overviewTodayValue !== undefined
       ? overviewTodayValue
       : metrics.consumptionKwh;
   const sideCardMonthValue =
     isOverviewSelected && overviewInverterSummaries.length
       ? Math.round(overviewInverterAggregate.monthKwh)
+      : isVendorOverview
+      ? vendorOverviewTotals?.monthKwh ?? 0
       : overviewMonthValue !== null && overviewMonthValue !== undefined
       ? overviewMonthValue
       : metrics.monthKwh;
   const sideCardLifetimeValue =
     isOverviewSelected && overviewInverterSummaries.length
       ? Math.round(overviewInverterAggregate.lifetimeKwh)
+      : isVendorOverview
+      ? vendorOverviewTotals?.lifetimeKwh ?? metrics.lifetimeKwh
       : overviewLifetimeValue ?? metrics.lifetimeKwh;
+  const heroLastUpdateTime = isVendorOverview ? vendorLastReadingAt : overviewLastUpdateTime;
+  // A selected device shows where it is and whose it is: "ห้อง Monitoring 24/7 · 05_2026_khunthomporn".
+  const selectedDeviceScopeLabel = React.useMemo(() => {
+    if (!selectedDevice) return null;
+    return (
+      [selectedDevice.siteLabel || selectedDevice.siteIdOrCode, selectedDevice.customerName]
+        .filter(Boolean)
+        .join(" · ") || null
+    );
+  }, [selectedDevice]);
+  // "Sigenergy · 3 devices" under the hero ring while the maker Overview is shown; a single
+  // device keeps the plain footer it always had.
+  const vendorScopeLabel = React.useMemo(() => {
+    if (!isVendorOverview || !vendorLabel) return null;
+    return `${vendorLabel} · ${t("devices.vendorSelector.deviceCount", {
+      count: scopedDeviceOptions.length,
+      defaultValue: "{{count}} devices",
+    })}`;
+  }, [isVendorOverview, vendorLabel, scopedDeviceOptions.length, t]);
+  // Live energy-flow card: the selected solar system, or every system of the selected solar
+  // maker folded into one flow. Readings come from GET /sites/{id}/devices?type=electric.
+  const energyFlowDevices = React.useMemo(() => {
+    if (selectedDevice) return isSolarVendor(selectedDevice.vendor) ? [selectedDevice] : [];
+    // `isVendorOverview` implies a maker is selected, so `vendorFilter` is a maker key here.
+    if (isVendorOverview && isSolarVendor(vendorFilter)) return scopedDeviceOptions;
+    return [];
+  }, [selectedDevice, isVendorOverview, vendorFilter, scopedDeviceOptions]);
+  const showEnergyFlow = energyFlowDevices.length > 0;
+  const energyFlowSiteIds = React.useMemo(
+    () =>
+      energyFlowDevices
+        .map((device) => device.siteIdOrCode || siteForApi)
+        .filter((site): site is string => Boolean(site)),
+    [energyFlowDevices, siteForApi]
+  );
+  const energyFlow = useEnergyFlow(energyFlowSiteIds, showEnergyFlow);
+  // Option ids are `${site}::${deviceId}`; the devices API keys snapshots by the bare device id.
+  const energyFlowSystems = React.useMemo(
+    () =>
+      energyFlowDevices
+        .map((device) => {
+          const sep = device.id.lastIndexOf("::");
+          return energyFlow.byDeviceId.get(sep >= 0 ? device.id.slice(sep + 2) : device.id);
+        })
+        .filter((snap): snap is EnergyFlowSnapshot => Boolean(snap)),
+    [energyFlowDevices, energyFlow.byDeviceId]
+  );
+  const energyFlowSnapshot = React.useMemo(
+    () => aggregateEnergyFlow(energyFlowSystems, vendorLabel || ""),
+    [energyFlowSystems, vendorLabel]
+  );
   const hasTemperature =
     metricAvailability.temperature &&
     typeof temperatureC === "number" &&
@@ -1931,6 +2349,17 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
     <>
       <div className="mt-6 space-y-4">
         <UtilitySurface>
+          {!isGlobalAllOverview && showVendorBar ? (
+            <div className="mb-4 border-b border-slate-100 pb-4">
+              <ElectricVendorBar
+                title={t("devices.vendorSelector.label", { defaultValue: "Brand" })}
+                allLabel={t("devices.vendorSelector.all", { defaultValue: "All" })}
+                tabs={vendorTabs}
+                selected={vendorFilter}
+                onSelect={handleVendorSelect}
+              />
+            </div>
+          ) : null}
           <div className="flex flex-col gap-4 lg-1024:flex-row lg-1024:items-start lg-1024:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-col gap-2">
@@ -1942,6 +2371,11 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                     : t("devices.deviceSelector.label", {
                         defaultValue: "Device",
                       })}
+                  {!isGlobalAllOverview && vendorLabel ? (
+                    <span className="ml-2 normal-case tracking-normal text-slate-500">
+                      · {vendorLabel}
+                    </span>
+                  ) : null}
                 </span>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   {isGlobalAllOverview ? (
@@ -1997,15 +2431,37 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                                   type="button"
                                   onClick={() => setSelectedDeviceId(opt.value || null)}
                                   className={[
-                                    "inline-flex min-w-0 flex-1 items-center justify-center gap-2 border-r border-slate-200 px-4 py-3 text-sm font-medium transition cursor-pointer last:border-r-0",
+                                    "inline-flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 border-r border-slate-200 px-4 py-2 text-sm font-medium transition cursor-pointer last:border-r-0",
                                     active
                                       ? "bg-[#4A90E2] text-white"
                                       : "bg-white text-slate-600 hover:bg-slate-50",
                                     isOfflineOpt && !active ? "text-rose-600" : "",
                                   ].join(" ")}
-                                  title={opt.label}
+                                  title={[opt.title, opt.vendorLabel].filter(Boolean).join(" · ")}
                                 >
-                                  <span className="truncate">{opt.label}</span>
+                                  <span className="flex min-w-0 flex-col items-center leading-tight">
+                                    <span className="w-full truncate text-center">{opt.label}</span>
+                                    {opt.subLabel ? (
+                                      <span
+                                        className={`w-full truncate text-center text-[11px] font-normal ${
+                                          active ? "text-white/80" : "text-slate-400"
+                                        }`}
+                                      >
+                                        {opt.subLabel}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {showVendorChips && opt.vendorLabel ? (
+                                    <span
+                                      className={`hidden shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide md:inline-flex ${
+                                        active
+                                          ? "bg-white/20 text-white"
+                                          : "bg-slate-100 text-slate-500"
+                                      }`}
+                                    >
+                                      {opt.vendorLabel}
+                                    </span>
+                                  ) : null}
                                   {isOfflineOpt ? (
                                     <span
                                       className={`inline-flex h-2.5 w-2.5 rounded-full ${
@@ -2082,6 +2538,15 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
                           defaultValue: "No electric devices found for this site",
                         })}
                   </p>
+                ) : !isGlobalAllOverview &&
+                  !deviceOptionsLoading &&
+                  isVendorScoped &&
+                  scopedDeviceOptions.length === 0 ? (
+                  <p className="text-sm text-rose-500">
+                    {t("devices.vendorSelector.noDevices", {
+                      defaultValue: "No devices of this brand in the selected site",
+                    })}
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -2144,16 +2609,21 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             unit="kWh"
             progressValue={utilizationPercent}
             progressLabel={`${utilizationPercent}%`}
-            footer={
-              overviewLastUpdateTime
+            footer={[
+              vendorScopeLabel ?? selectedDeviceScopeLabel,
+              heroLastUpdateTime
                 ? `${t("devices.electric.lastUpdate", {
                     defaultValue: "Last sync",
-                  })} ${new Date(overviewLastUpdateTime).toLocaleTimeString(i18n.language, {
+                  })} ${new Date(heroLastUpdateTime).toLocaleTimeString(i18n.language, {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}`
-                : selectedGroupLabel
-            }
+                : vendorScopeLabel || selectedDeviceScopeLabel
+                ? null
+                : selectedGroupLabel,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             tone="amber"
           />
           {showTemperatureHero ? (
@@ -2173,6 +2643,23 @@ export default function ElectricMeterPanel({ siteCode }: Props) {
             />
           ) : null}
         </div>
+
+        {showEnergyFlow ? (
+          <EnergyFlowCard
+            snapshot={energyFlowSnapshot}
+            systems={energyFlowSystems}
+            loading={energyFlow.loading}
+            error={energyFlow.error}
+            title={selectedDevice ? selectedDevice.label : vendorScopeLabel || vendorLabel || ""}
+            subtitle={
+              selectedDevice
+                ? selectedDeviceScopeLabel
+                : isAllSitesSelected
+                  ? selectedGroupLabel
+                  : scopedDeviceOptions[0]?.siteLabel ?? null
+            }
+          />
+        ) : null}
 
         <div className={["grid grid-cols-1 gap-4 md:grid-cols-2", metricGridColsClass].join(" ")}>
           {metricTiles.map((tile) => (

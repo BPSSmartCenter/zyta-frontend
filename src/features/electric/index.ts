@@ -30,3 +30,31 @@ export {
   type UtilityOverviewSummary,
   type UtilitySubtype,
 } from "./electricApi";
+export {
+  ALL_VENDORS,
+  ELECTRIC_VENDOR_LABELS,
+  ELECTRIC_VENDOR_ORDER,
+  SOLAR_VENDORS,
+  detectCustomerName,
+  detectElectricVendor,
+  isElectricVendorKey,
+  isSolarVendor,
+  type ElectricVendorFilter,
+  type ElectricVendorKey,
+} from "./electricVendor";
+export {
+  dailyEnergyFromCounters,
+  isTariffConfigured,
+  loadSiteSolarSavings,
+  rateForDay,
+  savingsForDays,
+  solarDevicesFromItems,
+  tariffFromSiteBilling,
+  type DailyEnergy,
+  type DeviceSolarSavings,
+  type MonthlySolarSavings,
+  type SavingsPeriod,
+  type SiteSolarSavings,
+  type SolarDeviceRef,
+  type SolarTariff,
+} from "./solarSavings";
