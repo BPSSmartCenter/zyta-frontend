@@ -26,6 +26,20 @@
   display: block;
   font-family: inherit;
 }
+/* compact variant (viewBox 320 × 236): smaller type and tighter dots */
+.ef-diagram--compact .ef-label { font-size: 9px; letter-spacing: 0.06em; }
+.ef-diagram--compact .ef-value { font-size: 15px; }
+.ef-diagram--compact .ef-sub { font-size: 10px; }
+.ef-diagram--compact .ef-spoke__base { stroke-width: 1.5; }
+.ef-diagram--compact .ef-spoke__glow { stroke-width: 6; }
+.ef-diagram--compact .ef-spoke__flow { stroke-width: 2.5; stroke-dasharray: 3 8; stroke-dashoffset: 11; }
+.ef-diagram--compact .ef-spoke--active .ef-spoke__flow { animation-name: ef-flow-compact; }
+.ef-diagram--compact .ef-icon { stroke-width: 2; }
+
+@keyframes ef-flow-compact {
+  from { stroke-dashoffset: 11; }
+  to { stroke-dashoffset: 0; }
+}
 
 .ef-label {
   fill: var(--ef-text-3);

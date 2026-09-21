@@ -96,6 +96,23 @@
         "poweroff": "ปิดเครื่อง",
         "offline": "ออฟไลน์",
         "mixed": "บางระบบออฟไลน์"
+      },
+      "generating": "กำลังผลิต",
+      "consuming": "กำลังใช้ไฟ",
+      "noSun": "ไม่มีแดด",
+      "coverageShort": "โซลาร์จ่ายโหลด",
+      "soc": "ระดับแบต",
+      "online": "ออนไลน์ {{count}}",
+      "sections": {
+        "now": "กำลังไฟตอนนี้",
+        "results": "ผลลัพธ์",
+        "system": "ระบบ"
+      },
+      "columns": {
+        "system": "ระบบ",
+        "solar": "โซลาร์",
+        "load": "โหลด",
+        "battery": "แบต"
       }
     },
     "waterMeter": {

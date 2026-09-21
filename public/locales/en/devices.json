@@ -98,6 +98,24 @@
         "poweroff": "Power-off",
         "offline": "Offline",
         "mixed": "Some systems offline"
+      },
+      "generating": "generating",
+      "consuming": "consuming",
+      "noSun": "no sun",
+      "coverageShort": "Load covered by solar",
+      "soc": "State of charge",
+      "online_one": "{{count}} online",
+      "online_other": "{{count}} online",
+      "sections": {
+        "now": "Power right now",
+        "results": "Results",
+        "system": "System"
+      },
+      "columns": {
+        "system": "System",
+        "solar": "Solar",
+        "load": "Load",
+        "battery": "Battery"
       }
     },
     "waterMeter": {
